@@ -34,12 +34,33 @@ export function extractLocalDataSimple(title: string): SimpleExtractedData {
 
   // 3. Potência (ex: 60W, 1200W)
   const powerMatch = title.match(/(\d+)\s*(W|watts?)/i)
-  if (powerMatch) {
-    specs["Potência"] = `${powerMatch[1]}W`
+  // 4. Detecção básica de marcas conhecidas
+  let detectedBrand = ""
+  const commonBrands = [
+    "Apple", "Samsung", "Nike", "Adidas", "Xiaomi", "Motorola", "LG", "Sony",
+    "Dell", "Lenovo", "Asus", "Bosch", "Stanley", "Tramontina", "Philco",
+    "Mondial", "Electrolux", "Brastemp", "Consul", "Puma", "Natura", "Boticário",
+    "JBL", "Intelbras", "Multilaser", "HP", "Acer", "Microsoft"
+  ]
+
+  for (const b of commonBrands) {
+    const regex = new RegExp(`\\b${b}\\b`, "i")
+    if (regex.test(title)) {
+      detectedBrand = b
+      break
+    }
+  }
+
+  if (!detectedBrand) {
+    if (/\b(iPhone|iPad|MacBook|AirPods)\b/i.test(title)) detectedBrand = "Apple"
+    else if (/\b(Galaxy)\b/i.test(title)) detectedBrand = "Samsung"
+    else if (/\b(Air\s*Force|Dunk|Air\s*Max)\b/i.test(title)) detectedBrand = "Nike"
+    else if (/\b(PlayStation|PS[45])\b/i.test(title)) detectedBrand = "Sony"
+    else if (/\b(Xbox)\b/i.test(title)) detectedBrand = "Microsoft"
   }
 
   return {
-    brand: "",
+    brand: detectedBrand,
     description: "",
     tags: [],
     specs,

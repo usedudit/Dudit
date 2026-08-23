@@ -70,21 +70,25 @@ export function Combobox({
 
     const isMobile = useMediaQuery("(max-width: 768px)")
 
-    const selectedOption =
-        options.find((option) => option.value === value) ||
-        (value && creatable ? { value, label: value } : undefined)
+    const safeOptions = Array.isArray(options) ? options : []
 
-    const normalizedSearch = search.trim()
-    const hasExactMatch = options.some(
+    const selectedOption =
+        safeOptions.find((option) => option && String(option.value) === String(value)) ||
+        (value && creatable ? { value: String(value), label: String(value) } : undefined)
+
+    const normalizedSearch = (search || "").trim()
+    const hasExactMatch = safeOptions.some(
         (opt) =>
-            opt.label.trim().toLowerCase() === normalizedSearch.toLowerCase() ||
-            opt.value.trim().toLowerCase() === normalizedSearch.toLowerCase()
+            Boolean(opt) &&
+            (((opt.label || "").trim().toLowerCase() === normalizedSearch.toLowerCase()) ||
+             ((opt.value || "").trim().toLowerCase() === normalizedSearch.toLowerCase()))
     )
 
-    const filteredOptions = options.filter(
+    const filteredOptions = safeOptions.filter(
         (option) =>
-            option.label.toLowerCase().includes(search.toLowerCase()) ||
-            option.value.toLowerCase().includes(search.toLowerCase()),
+            Boolean(option) &&
+            (((option.label || "").toLowerCase().includes(search.toLowerCase())) ||
+             ((option.value || "").toLowerCase().includes(search.toLowerCase()))),
     )
 
     const handleToggle = useCallback(
@@ -205,7 +209,7 @@ export function Combobox({
                         onKeyDown={(e) => {
                             if (e.key === "Enter") {
                                 e.preventDefault()
-                                if (filteredOptions.length === 1 && filteredOptions[0].label.toLowerCase() === normalizedSearch.toLowerCase()) {
+                                if (filteredOptions.length === 1 && (filteredOptions[0]?.label || "").toLowerCase() === normalizedSearch.toLowerCase()) {
                                     onChange(filteredOptions[0].value)
                                     closeDropdown()
                                 } else if (creatable && normalizedSearch && !hasExactMatch) {
@@ -247,7 +251,7 @@ export function Combobox({
                             closeDropdown()
                         }}
                         className={cn(
-                            "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-md transition-colors duration-150",
+                            "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-md transition-colors duration-150 cursor-pointer",
                             "hover:bg-brand-green/10 dark:hover:bg-brand-green/20 text-brand-green font-medium border-b border-brand-border/40 dark:border-dark-border/40 mb-1 text-left"
                         )}
                     >

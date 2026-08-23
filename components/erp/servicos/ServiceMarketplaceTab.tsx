@@ -95,7 +95,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                 {/* --- COLUNA ESQUERDA (Principal) --- */}
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* Descrição */}
-                    <FormSection title="Descrição">
+                    <FormSection title="Descrição" className="mb-8">
                         <div className={`relative ${!isDescriptionExpanded ? "max-h-[160px] overflow-hidden" : ""}`}>
                             {serviceData?.description ? (
                                 <div
@@ -128,11 +128,10 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                                 {technicalDetails.map((spec: any, i: number) => (
                                     <div
                                         key={i}
-                                        className={`flex justify-between items-center px-5 py-3.5 ${
-                                            i % 2 === 0
-                                                ? "bg-brand-gray dark:bg-dark-border/30"
-                                                : "bg-white dark:bg-dark-surface"
-                                        } ${i < technicalDetails.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                        className={`flex justify-between items-center px-5 py-3.5 ${i % 2 === 0
+                                            ? "bg-brand-gray dark:bg-dark-border/30"
+                                            : "bg-white dark:bg-dark-surface"
+                                            } ${i < technicalDetails.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
                                     >
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                             {spec.name || spec.label || ""}

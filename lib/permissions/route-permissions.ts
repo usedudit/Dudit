@@ -123,7 +123,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
         specificPermissions: ["can_view_dre"],
     },
     cadastros_financeiro: { key: "cadastros_financeiro", path: "/erp/transacoes/cadastros-financeiro", label: "Cadastros financeiros", category: "Financeiro", legacyCategory: "financial" },
-    reports: { key: "reports", path: "/erp/relatorios", label: "Estatísticas", category: "Desempenho" },
+    reports: { key: "reports", path: "/erp/estatisticas", label: "Estatísticas", category: "Desempenho" },
 
     // ── Minha Vitrine
     store_customize: {

@@ -68,19 +68,17 @@ const DINO_CAVALERE_URL = "/api/assets/qr-dino";
 function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName: string }) {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     const [generating, setGenerating] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState<string>("");
     const { toast } = useToast();
 
-    // Posições do QR code no cavalete (proporcionais à imagem)
-    // Ajuste conforme a imagem real do Dino cavalete
+    // Posições exatas do espaço branco do cavalete no QRDino.png (perfeitamente quadrado, abaixo do logo dudit)
     const QR_POSITION = {
-        x: 0.175,      // 17.5% da largura (início do espaço branco)
-        y: 0.53,       // 53% da altura (início do espaço branco)
-        width: 0.22,   // 22% da largura da imagem
-        height: 0.27,  // 27% da altura da imagem
+        x: 0.156,      // 15.6% da largura (centro do espaço branco do cavalete)
+        y: 0.644,      // 64.4% da altura (abaixo do logo verde da dudit no cavalete)
+        width: 0.188,  // 18.8% da largura (quadrado perfeito)
+        height: 0.188, // 18.8% da altura (quadrado perfeito)
     };
 
-    const generatePoster = React.useCallback(async () => {
+    const downloadPoster = React.useCallback(async () => {
         setGenerating(true);
         try {
             const canvas = canvasRef.current;
@@ -113,37 +111,30 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
             canvas.width = dinoImg.naturalWidth;
             canvas.height = dinoImg.naturalHeight;
 
-            // Desenha o Dino cavalete
+            // Desenha o Dino cavalete original
             ctx.drawImage(dinoImg, 0, 0);
 
-            // Calcula a posição do QR code no cavalete
+            // Calcula a posição do QR code no cavalete (proporções exatas sem distorção)
             const qrX = canvas.width * QR_POSITION.x;
             const qrY = canvas.height * QR_POSITION.y;
             const qrWidth = canvas.width * QR_POSITION.width;
             const qrHeight = canvas.height * QR_POSITION.height;
 
-            // Desenha um fundo branco arredondado para o QR code
-            const padding = qrWidth * 0.08;
-            const borderRadius = qrWidth * 0.06;
-            ctx.fillStyle = "#FFFFFF";
-            ctx.beginPath();
-            ctx.roundRect(
-                qrX - padding,
-                qrY - padding,
-                qrWidth + padding * 2,
-                qrHeight + padding * 2,
-                borderRadius
-            );
-            ctx.fill();
-
-            // Desenha o QR code centralizado no espaço
+            // Desenha o QR code centralizado perfeitamente no espaço branco já existente no cavalete
             ctx.drawImage(qrImg, qrX, qrY, qrWidth, qrHeight);
 
-            // Converte para blob e cria URL para preview/download
+            // Converte para blob e faz download direto
             canvas.toBlob((blob) => {
                 if (blob) {
                     const url = URL.createObjectURL(blob);
-                    setPreviewUrl(url);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `poster-dudit-${storeName.replace(/\s+/g, "-").toLowerCase()}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    toast({ title: "Poster baixado!", description: "Pronto para imprimir ou compartilhar." });
                 }
                 setGenerating(false);
             }, "image/png");
@@ -153,70 +144,22 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
             toast({ title: "Erro ao gerar imagem", description: "Tente novamente.", variant: "destructive" });
             setGenerating(false);
         }
-    }, [profileUrl, toast]);
-
-    const downloadPoster = React.useCallback(() => {
-        if (!previewUrl) return;
-        const link = document.createElement("a");
-        link.href = previewUrl;
-        link.download = `perfil-vendedor-dudit-${storeName.replace(/\s+/g, "-").toLowerCase()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast({ title: "Imagem baixada!", description: "Use para imprimir, colar na porta ou compartilhar." });
-    }, [previewUrl, storeName, toast]);
+    }, [profileUrl, storeName, toast]);
 
     return (
-        <div className="flex flex-col items-center gap-3">
+        <>
             <canvas ref={canvasRef} className="hidden" />
-
-            {!previewUrl ? (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 rounded-full font-semibold text-xs"
-                    onClick={generatePoster}
-                    disabled={generating}
-                >
-                    <DownloadIcon className="w-3.5 h-3.5" />
-                    {generating ? "Gerando..." : "Baixar Poster"}
-                </Button>
-            ) : (
-                <div className="flex flex-col items-center gap-2">
-                    <div className="relative group cursor-pointer" onClick={downloadPoster}>
-                        <img
-                            src={previewUrl}
-                            alt="Poster do perfil"
-                            className="w-32 h-auto rounded-lg border border-brand-border dark:border-dark-border shadow-sm group-hover:shadow-md transition-shadow"
-                        />
-                        <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-white text-xs font-bold flex items-center gap-1">
-                                <DownloadIcon className="w-4 h-4" /> Baixar
-                            </span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1 rounded-full font-semibold text-xs"
-                            onClick={downloadPoster}
-                        >
-                            <DownloadIcon className="w-3 h-3" />
-                            Salvar
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs font-semibold"
-                            onClick={() => { setPreviewUrl(""); }}
-                        >
-                            Gerar novamente
-                        </Button>
-                    </div>
-                </div>
-            )}
-        </div>
+            <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 rounded-full font-semibold text-xs text-brand-green border-brand-green/40 hover:bg-brand-green-light/30"
+                onClick={downloadPoster}
+                disabled={generating}
+            >
+                <DownloadIcon className="w-3.5 h-3.5" />
+                {generating ? "Gerando..." : "Baixar Poster"}
+            </Button>
+        </>
     );
 }
 
@@ -262,123 +205,106 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
-                <div>
-                    <div className="flex items-start gap-4">
-                        <div className="bg-white dark:bg-dark-surface p-2 rounded-xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
-                            {qrCodeUrl ? (
-                                <img
-                                    src={qrCodeUrl}
-                                    alt="QR Code do perfil"
-                                    className="w-16 h-16 rounded-lg object-contain"
-                                />
-                            ) : (
-                                <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1 leading-snug">
-                                Seu Perfil de Vendedor
-                            </h3>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                                Compartilhe seu perfil com clientes e receba pedidos direto pela sua vitrine.
-                            </p>
-                        </div>
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+            <div>
+                <div className="flex items-start gap-4">
+                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded-2xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
+                        {qrCodeUrl ? (
+                            <img
+                                src={qrCodeUrl}
+                                alt="QR Code do perfil"
+                                className="w-16 h-16 rounded-lg object-contain"
+                            />
+                        ) : (
+                            <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
+                        )}
                     </div>
-                </div>
-
-                <div className="mt-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 rounded-full font-semibold text-xs"
-                            onClick={copyLink}
-                        >
-                            <CopyIcon className="w-3.5 h-3.5" />
-                            {copied ? "Copiado!" : "Copiar Link"}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 rounded-full font-semibold text-xs"
-                            onClick={shareProfile}
-                        >
-                            <ShareIcon className="w-3.5 h-3.5" />
-                            Compartilhar
-                        </Button>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1 leading-snug">
+                            Seu Perfil de Vendedor
+                        </h3>
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            Compartilhe seu perfil com clientes e receba pedidos direto pela sua vitrine.
+                        </p>
                     </div>
-
-                    {showShareOptions && (
-                        <div className="mt-3 p-3 bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border">
-                            <p className="text-xs font-medium text-brand-dark dark:text-dark-heading mb-2">Compartilhar via:</p>
-                            <div className="flex gap-2 flex-wrap">
-                                <a
-                                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Confira meu perfil na Dudit: ${storeName} ${profileUrl}`)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-[#25D366] hover:bg-[#25D366]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                    title="WhatsApp"
-                                >
-                                    <WhatsappIcon size={16} className="text-white" />
-                                </a>
-                                <a
-                                    href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-[#1877F2] hover:bg-[#1877F2]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                    title="Facebook"
-                                >
-                                    <FacebookIcon size={16} className="text-white" />
-                                </a>
-                                <a
-                                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(storeName)}&url=${encodeURIComponent(profileUrl)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-black hover:bg-black/90 flex items-center justify-center transition-transform hover:scale-105"
-                                    title="X"
-                                >
-                                    <XIcon size={16} className="text-white" />
-                                </a>
-                                <a
-                                    href={`https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encodeURIComponent(storeName)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-[#26A5E4] hover:bg-[#26A5E4]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                    title="Telegram"
-                                >
-                                    <TelegramIcon size={16} className="text-white" />
-                                </a>
-                                <a
-                                    href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="w-8 h-8 rounded-full bg-[#0A66C2] hover:bg-[#0A66C2]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                    title="LinkedIn"
-                                >
-                                    <LinkedinIcon size={16} className="text-white" />
-                                </a>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Poster para download */}
-                <div className="mt-3 pt-3 border-t border-brand-border/40 dark:border-dark-border/40">
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-2">
-                        Imprima e coloque na porta da sua loja:
-                    </p>
-                    <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
                 </div>
             </div>
 
-            <div className="shrink-0 w-[140px] flex items-center justify-center p-4">
-                <img
-                    src="https://img.dudit.com.br/static/mascots/QRDino.png"
-                    alt="Perfil de Vendedor"
-                    className="w-full h-full object-contain max-h-[160px]"
-                />
+            <div className="mt-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 rounded-full font-semibold text-xs"
+                        onClick={copyLink}
+                    >
+                        <CopyIcon className="w-3.5 h-3.5" />
+                        {copied ? "Copiado!" : "Copiar Link"}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 rounded-full font-semibold text-xs"
+                        onClick={shareProfile}
+                    >
+                        <ShareIcon className="w-3.5 h-3.5" />
+                        Compartilhar
+                    </Button>
+                    <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
+                </div>
+
+                {showShareOptions && (
+                    <div className="mt-3 p-3 bg-brand-gray/30 dark:bg-dark-border/30 rounded-xl border border-brand-border dark:border-dark-border">
+                        <p className="text-xs font-medium text-brand-dark dark:text-dark-heading mb-2">Compartilhar via:</p>
+                        <div className="flex gap-2 flex-wrap">
+                            <a
+                                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Confira meu perfil na Dudit: ${storeName} ${profileUrl}`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#25D366] hover:bg-[#25D366]/90 flex items-center justify-center transition-transform hover:scale-105"
+                                title="WhatsApp"
+                            >
+                                <WhatsappIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#1877F2] hover:bg-[#1877F2]/90 flex items-center justify-center transition-transform hover:scale-105"
+                                title="Facebook"
+                            >
+                                <FacebookIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(storeName)}&url=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-black hover:bg-black/90 flex items-center justify-center transition-transform hover:scale-105"
+                                title="X"
+                            >
+                                <XIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encodeURIComponent(storeName)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#26A5E4] hover:bg-[#26A5E4]/90 flex items-center justify-center transition-transform hover:scale-105"
+                                title="Telegram"
+                            >
+                                <TelegramIcon size={16} className="text-white" />
+                            </a>
+                            <a
+                                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-8 h-8 rounded-full bg-[#0A66C2] hover:bg-[#0A66C2]/90 flex items-center justify-center transition-transform hover:scale-105"
+                                title="LinkedIn"
+                            >
+                                <LinkedinIcon size={16} className="text-white" />
+                            </a>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -400,38 +326,28 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[240px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
-                <div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
-                        Ajuda e Suporte
-                    </h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                        Conte com a nossa equipe para tirar suas dúvidas.
-                    </p>
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+            <div>
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
+                    Ajuda e Suporte
+                </h3>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                    Conte com a nossa equipe para tirar suas dúvidas.
+                </p>
 
-                    <div className="space-y-1.5">
-                        {helpItems.map((item) => (
-                            <ListItem
-                                key={item.label}
-                                icon={helpIconMap[item.icon] || HelpCircleIcon}
-                                title={item.label}
-                                description={item.description}
-                                right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
-                                onClick={() => item.external ? window.open(item.href, "_blank") : router.push(item.href)}
-                                className="border-0 bg-transparent hover:bg-white/60 dark:hover:bg-dark-surface/60 p-2 rounded-xl"
-                            />
-                        ))}
-                    </div>
+                <div className="space-y-1.5">
+                    {helpItems.map((item) => (
+                        <ListItem
+                            key={item.label}
+                            icon={helpIconMap[item.icon] || HelpCircleIcon}
+                            title={item.label}
+                            description={item.description}
+                            right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
+                            onClick={() => item.external ? window.open(item.href, "_blank") : router.push(item.href)}
+                            className="border-0 bg-transparent hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 p-2 rounded-xl"
+                        />
+                    ))}
                 </div>
-            </div>
-
-            <div className="shrink-0 w-[140px] flex items-center justify-center p-4">
-                <img
-                    src="https://img.dudit.com.br/static/mascots/Notificacoes.png"
-                    alt="Ajuda e Suporte"
-                    className="w-full h-full object-contain max-h-[160px]"
-                />
             </div>
         </div>
     );

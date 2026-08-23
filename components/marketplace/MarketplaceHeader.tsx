@@ -983,7 +983,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-[280px] bg-white dark:bg-dark-surface rounded-[8px] shadow-[0_8px_30px_rgba(0,0,0,0.15)] border border-gray-100 dark:border-dark-border overflow-visible animate-fade-in flex flex-col">
                                     <div className="absolute -top-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-dark-surface border-t border-l border-gray-100 dark:border-dark-border transform rotate-45" />
 
-                                    <div className="px-6 py-5 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
+                                    <div className="px-5 py-5 border-b border-gray-100 dark:border-dark-border flex items-center gap-3">
                                         <div className={`w-10 h-10 rounded-full overflow-hidden border border-gray-100 dark:border-dark-border shrink-0 flex items-center justify-center font-semibold text-white ${getAvatarColor(fullName)}`}>
                                             {getUserInitials(fullName)}
                                         </div>
@@ -1007,7 +1007,7 @@ const Header: React.FC<HeaderProps> = ({
                                                 <ItemWrapper
                                                     key={idx}
                                                     {...wrapProps}
-                                                    className="px-1 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                                    className="px-6 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
                                                     onClick={() => {
                                                         if (wrapProps.onClick) wrapProps.onClick();
                                                         setIsUserMenuOpen(false)
@@ -1021,10 +1021,7 @@ const Header: React.FC<HeaderProps> = ({
 
                                     <div className="border-t border-brand-border dark:border-dark-border py-2">
                                         <div className="px-6 py-2.5 flex items-center justify-between">
-                                            <span className="flex items-center gap-3">
-                                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
-                                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
-                                            </span>
+                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
                                             <Switch checked={theme === "dark"} onCheckedChange={handleThemeToggle} />
                                         </div>
                                     </div>

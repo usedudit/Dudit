@@ -38,7 +38,7 @@ function RankBadge({ position }: { position: number }) {
     )
   }
   return (
-    <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0 text-xs font-bold text-brand-inactive-text">
+    <div className="w-8 h-8 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0 text-xs font-bold text-brand-inactive-text dark:text-dark-body">
       {position}
     </div>
   )
@@ -108,7 +108,7 @@ export function ReportRankingCard({
 
       {items.length === 0 && (
         <div className="py-8 text-center">
-          <span className="text-sm font-medium text-brand-inactive-text">Nenhum dado disponível.</span>
+          <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Nenhum dado disponível.</span>
         </div>
       )}
     </div>

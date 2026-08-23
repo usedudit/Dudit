@@ -90,7 +90,7 @@ export async function getModerationQueue(
         .select(`
       id, name, description, price, images, moderation_status, created_at, store_id,
       category_id, category:product_categories!category_id(name),
-      brand_id, brand:brands!brand_id(name),
+      brand, brand_id, brand_rel:brands!brand_id(name),
       video_url, video_type, video_thumbnail,
       partner:partners!inner(id, user_id),
       store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)

@@ -15,8 +15,8 @@ export class ProductService {
         *,
         category:product_categories!category_id(name),
         subcategory:product_categories!subcategory_id(name),
-        brand:brands!brand_id(name),
-        location:storage_locations!location_id(name),
+        brand_rel:brands!brand_id(name),
+        location_rel:storage_locations!location_id(name),
         variants:product_variants(*),
         product_fiscal_profiles(*),
         product_logistics(*)
@@ -34,8 +34,8 @@ export class ProductService {
         ...data,
         category: (data.category as any)?.name || null,
         subcategory: (data.subcategory as any)?.name || null,
-        brand: (data.brand as any)?.name || (data as any).brand || null,
-        location: (data.location as any)?.name || (data as any).location || null,
+        brand: (data.brand_rel as any)?.name || (data as any).brand || null,
+        location: (data.location_rel as any)?.name || (data as any).location || null,
       }
 
       const fiscal = Array.isArray(mapped.product_fiscal_profiles) ? mapped.product_fiscal_profiles[0] : mapped.product_fiscal_profiles
@@ -64,8 +64,8 @@ export class ProductService {
         *,
         category:product_categories!category_id(name),
         subcategory:product_categories!subcategory_id(name),
-        brand:brands!brand_id(name),
-        location:storage_locations!location_id(name)
+        brand_rel:brands!brand_id(name),
+        location_rel:storage_locations!location_id(name)
       `)
       .eq("partner_id", partnerId))
       .order("created_at", { ascending: false })
@@ -79,8 +79,8 @@ export class ProductService {
       ...p,
       category: p.category?.name || null,
       subcategory: p.subcategory?.name || null,
-      brand: p.brand?.name || p.brand || null,
-      location: p.location?.name || p.location || null,
+      brand: p.brand_rel?.name || p.brand || null,
+      location: p.location_rel?.name || p.location || null,
     }))
   }
 
@@ -177,8 +177,8 @@ export class ProductService {
         *,
         category:product_categories!category_id(name),
         subcategory:product_categories!subcategory_id(name),
-        brand:brands!brand_id(name),
-        location:storage_locations!location_id(name)
+        brand_rel:brands!brand_id(name),
+        location_rel:storage_locations!location_id(name)
       `)
       .eq("partner_id", partnerId)
       .ilike("name", `%${searchTerm}%`)
@@ -193,8 +193,8 @@ export class ProductService {
       ...p,
       category: p.category?.name || null,
       subcategory: p.subcategory?.name || null,
-      brand: p.brand?.name || p.brand || null,
-      location: p.location?.name || p.location || null,
+      brand: p.brand_rel?.name || p.brand || null,
+      location: p.location_rel?.name || p.location || null,
     }))
   }
 }

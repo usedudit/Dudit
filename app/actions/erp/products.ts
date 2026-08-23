@@ -782,16 +782,21 @@ export async function createProductComprehensiveAction(data: {
             }
         }
 
-        // 8. Video update se necessário
+        // 8. Video e campos diretos (brand/location) update garantido
+        const directCreatePatch: any = {}
+        if (productData.brand !== undefined) directCreatePatch.brand = productData.brand
+        if (productData.brand_id !== undefined) directCreatePatch.brand_id = productData.brand_id
+        if (productData.location !== undefined) directCreatePatch.location = productData.location
+        if (productData.location_id !== undefined) directCreatePatch.location_id = productData.location_id
         if (videoMetadata.video_url || videoMetadata.video_thumbnail) {
-            const videoUpdate = {
-                video_type: videoMetadata.video_type,
-                video_url: videoMetadata.video_url,
-                video_thumbnail: videoMetadata.video_thumbnail,
-                video_duration: videoMetadata.video_duration,
-                video_provider_id: videoMetadata.video_provider_id,
-            }
-            await admin.from("products").update(videoUpdate).eq("id", createdProductId)
+            directCreatePatch.video_type = videoMetadata.video_type
+            directCreatePatch.video_url = videoMetadata.video_url
+            directCreatePatch.video_thumbnail = videoMetadata.video_thumbnail
+            directCreatePatch.video_duration = videoMetadata.video_duration
+            directCreatePatch.video_provider_id = videoMetadata.video_provider_id
+        }
+        if (Object.keys(directCreatePatch).length > 0) {
+            await admin.from("products").update(directCreatePatch).eq("id", createdProductId)
         }
 
         // 9. Revalidação síncrona de Cache e Redis em uma única passagem
@@ -1035,10 +1040,10 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         if (transactionError) return errorResponse(transactionError.message, transactionError)
 
-        // FIX: A função RPC no Supabase ignora o campo moderation_status. Fazemos o update direto aqui.
+        // FIX: Garantir persistência direta de moderation_status, vídeo e colunas diretas de brand/location
         const adminUpdate = getAdminClient()
         const directProductPatch: any = { moderation_status: payload.moderation_status }
-            ;["video_type", "video_url", "video_thumbnail", "video_duration", "video_provider_id"].forEach((field) => {
+            ;["video_type", "video_url", "video_thumbnail", "video_duration", "video_provider_id", "brand", "brand_id", "location", "location_id"].forEach((field) => {
                 if (payload[field] !== undefined) directProductPatch[field] = payload[field]
             })
         await adminUpdate.from('products').update(directProductPatch).eq('id', productId)
@@ -2226,7 +2231,7 @@ const fetchProductsStatic = unstable_cache(
         const supabase = getAdminClient()
         const { data, error } = await supabase
             .from("products")
-            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
             .eq("partner_id", partnerId)
             .limit(100)
             .order("created_at", { ascending: false })
@@ -2234,7 +2239,8 @@ const fetchProductsStatic = unstable_cache(
         const rows = (data || []).map((p: any) => ({
             ...p,
             category: p.category?.name || null,
-            brand: p.brand?.name || null
+            brand: p.brand_rel?.name || p.brand || null,
+            location: p.location_rel?.name || p.location || null
         }))
         const withVariants = rows.filter((p: any) => {
             const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
@@ -2253,7 +2259,7 @@ const fetchProductsStatic = unstable_cache(
         }
         return rows
     },
-    ["cached-products-by-partner-id"],
+    ["cached-products-static"],
     { tags: ["products"], revalidate: 300 }
 )
 
@@ -2264,7 +2270,7 @@ const fetchProductByIdStatic = unstable_cache(
         const supabase = getAdminClient()
         const { data: product, error } = await supabase
             .from("products")
-            .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name), variants:product_variants(*)")
+            .select("*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand_rel:brands!brand_id(name), location_rel:storage_locations!location_id(name), variants:product_variants(*)")
             .eq("id", productId)
             .single()
         if (error) throw error
@@ -2273,8 +2279,8 @@ const fetchProductByIdStatic = unstable_cache(
                 ...product,
                 category: product.category?.name || null,
                 subcategory: product.subcategory?.name || null,
-                brand: product.brand?.name || (product as any).brand || null,
-                location: product.location?.name || (product as any).location || null
+                brand: product.brand_rel?.name || (product as any).brand || null,
+                location: product.location_rel?.name || (product as any).location || null
             }
         }
         return product
@@ -2419,7 +2425,7 @@ export async function getERPProductsPageAction(
 
         let q = supabase
             .from("products")
-            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {
@@ -2448,7 +2454,8 @@ export async function getERPProductsPageAction(
         const rows = (data || []).map((p: any) => ({
             ...p,
             category: p.category?.name || null,
-            brand: p.brand?.name || null
+            brand: p.brand_rel?.name || p.brand || null,
+            location: p.location_rel?.name || p.location || null
         }))
 
         const withVariants = rows.filter((p: any) => {

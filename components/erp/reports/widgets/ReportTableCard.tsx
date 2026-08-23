@@ -67,7 +67,7 @@ export function ReportTableCard({
         )}
         {data.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-medium text-brand-inactive-text">
+            <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
               {page * pageSize + 1}-{Math.min((page + 1) * pageSize, data.length)} de {data.length}
             </span>
           </div>
@@ -84,7 +84,7 @@ export function ReportTableCard({
                     <th
                       key={col.key}
                       className={cn(
-                        "pb-3 text-[13px] font-semibold text-brand-inactive-text",
+                        "pb-3 text-[13px] font-bold text-brand-inactive-text dark:text-dark-body",
                         col.align === "right" && "text-right",
                         col.align === "center" && "text-center",
                         col.className

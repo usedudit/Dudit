@@ -61,7 +61,7 @@ const navItems: NavItem[] = [
             { label: "Visão Geral", href: "/erp/produtividade" },
             { label: "Metas", href: "/erp/metas" },
             { label: "Comissões", href: "/erp/comissoes" },
-            { label: "Estatísticas", href: "/erp/relatorios" },
+            { label: "Estatísticas", href: "/erp/estatisticas" },
         ],
     },
     {
@@ -133,6 +133,7 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/produtos/cadastros": "crescer",
     "/erp/servicos/cadastros": "crescer",
     "/erp/transacoes/cadastros-financeiro": "crescer",
+    "/erp/estatisticas": "crescer",
     "/erp/relatorios": "crescer",
     "/erp/cupons": "crescer",
     "/erp/promocoes": "escalar",
@@ -345,7 +346,7 @@ export function ERPSidebar() {
                             return marketingResourceActive
                         }
                         if (item.label === "Desempenho") {
-                            if (sub.href === "/erp/relatorios") return reportsResourceActive
+                            if (sub.href === "/erp/estatisticas" || sub.href === "/erp/relatorios") return reportsResourceActive
                             return productivityResourceActive
                         }
                         return true

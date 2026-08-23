@@ -5,10 +5,11 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button, Dropdown, DropdownItem } from "@/components/reusable"
 import type { Period, CompareMode } from "@/lib/period-types"
 import { PERIOD_LABELS, COMPARE_PRESET_LABELS, PERIOD_OPTIONS, COMPARE_PRESETS, getPeriodDateRange, getCustomMaxDate } from "@/lib/period-types"
-import { FilterIcon, SparklesIcon, DownloadIcon } from "@/lib/icons"
+import { FilterIcon, SparklesIcon, DownloadIcon, XIcon } from "@/lib/icons"
 import { useDashboard } from "./dashboard/DashboardContext"
 import Portal from "@/components/Portal"
-import { XIcon } from "@/lib/icons"
+import BottomSheet from "@/components/BottomSheet"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 function DashboardInsight({ message, color }: { message: string; color: string }) {
   const colors: Record<string, { bg: string; text: string; bar: string; border: string }> = {
@@ -19,7 +20,7 @@ function DashboardInsight({ message, color }: { message: string; color: string }
   }
   const c = colors[color] || colors.blue
   return (
-    <div className={`${c.bg} ${c.border} rounded-xl px-4 py-4 border transition-all duration-200 hover:scale-[1.01] hover:shadow-xs`}>
+    <div className={`${c.bg} ${c.border} rounded-2xl p-4 border`}>
       <div className="flex gap-3 items-start">
         <div className={`${c.bar} w-1.5 rounded-full self-stretch shrink-0 min-h-6`} />
         <p className={`text-[14px] font-semibold leading-relaxed ${c.text}`}>{message}</p>
@@ -34,6 +35,7 @@ export function GlobalPeriodFilter() {
   const searchParams = useSearchParams()
   const { insights, exportHandler } = useDashboard()
   const [insightSheetOpen, setInsightSheetOpen] = useState(false)
+  const isMobile = useMediaQuery("(max-width: 1023px)")
 
   const period = (searchParams.get("period") as Period) || "monthly"
   const compare = (searchParams.get("compare") as CompareMode) || "none"
@@ -68,6 +70,14 @@ export function GlobalPeriodFilter() {
 
   const maxDate = getCustomMaxDate(period, new Date().toISOString().slice(0, 10))
 
+  const insightsContent = (
+    <div className="space-y-4">
+      {insights && insights.map((insight, i) => (
+        <DashboardInsight key={i} message={insight.message} color={insight.color} />
+      ))}
+    </div>
+  )
+
   return (
     <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
       {insights && insights.length > 0 && (
@@ -76,34 +86,32 @@ export function GlobalPeriodFilter() {
             <SparklesIcon size={14} />
           </Button>
 
-          {insightSheetOpen && (
+          {isMobile ? (
+            <BottomSheet isOpen={insightSheetOpen} onClose={() => setInsightSheetOpen(false)} title="Insights de Desempenho">
+              <div className="pt-2 pb-4">
+                {insightsContent}
+              </div>
+            </BottomSheet>
+          ) : (
             <Portal>
               <div
-                className="fixed inset-0 bg-black/50 z-50 transition-opacity duration-300"
+                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${insightSheetOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
                 onClick={() => setInsightSheetOpen(false)}
               >
                 <div
-                  className="fixed right-4 top-4 bottom-4 w-96 bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col"
+                  className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${insightSheetOpen ? "translate-x-0" : "translate-x-[120%]"}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center shrink-0">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                        <SparklesIcon size={18} className="text-brand-green dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</h2>
-                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">Análises automáticas sobre os seus resultados.</p>
-                      </div>
+                  <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                    <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                      <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Insights de Desempenho</h2>
+                      <Button variant="filled" onClick={() => setInsightSheetOpen(false)} size="icon">
+                        <XIcon className="h-5 w-5" />
+                      </Button>
+                    </header>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                      {insightsContent}
                     </div>
-                    <Button variant="filled" size="icon" onClick={() => setInsightSheetOpen(false)}>
-                      <XIcon className="w-5 h-5" />
-                    </Button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-4">
-                    {insights.map((insight, i) => (
-                      <DashboardInsight key={i} message={insight.message} color={insight.color} />
-                    ))}
                   </div>
                 </div>
               </div>

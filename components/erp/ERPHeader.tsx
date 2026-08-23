@@ -326,7 +326,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                                         { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                                         { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
-                                        { label: "Sair da sessão", className: "text-brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                                        { label: "Sair da sessão", className: "brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
                                     ] as any[]).map((item, idx) => {
                                         const ItemWrapper: any = item.href ? Link : "div";
                                         const wrapProps = item.href
@@ -344,7 +344,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                             >
                                                 <span className="flex items-center gap-3">
                                                     {item.icon}
-                                                    <span className={"text-[14px] font-normal text-brand-inactive-text dark:text-dark-body " + item.className}>{item.label}</span>
+                                                    <span className={`text-[14px] font-normal ${item.className ? `text-${item.className}` : "text-brand-inactive-text dark:text-dark-body"}`}>{item.label}</span>
                                                 </span>
                                             </ItemWrapper>
                                         )
@@ -406,7 +406,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                 >
                                     <span className="flex items-center gap-3">
                                         {item.icon}
-                                        <span className={"text-[14px] font-normal text-brand-inactive-text dark:text-dark-body " + item.className}>{item.label}</span>
+                                        <span className={`text-[14px] font-normal ${item.className ? `text-${item.className}` : "text-brand-inactive-text dark:text-dark-body"}`}>{item.label}</span>
                                     </span>
                                 </ItemWrapper>
                             )

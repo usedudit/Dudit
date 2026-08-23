@@ -95,25 +95,21 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                             {
                                 title: "Visitas Totais",
                                 value: formatMetric(productData.views_count),
-                                subtext: `${formatMetric(productData.views_last_30_days)} nos últimos 30 dias`,
                                 icon: EyeIcon,
                             },
                             {
                                 title: "Vendas Totais",
                                 value: formatMetric(productData.total_sales),
-                                subtext: `${formatMetric(productData.sales_last_30_days)} nos últimos 30 dias`,
                                 icon: SalesIcon,
                             },
                             {
                                 title: "Vendas (7d)",
                                 value: formatMetric(productData.sales_last_7_days),
-                                subtext: "Volume nos últimos 7 dias",
                                 icon: TrendingUpIcon,
                             },
                             {
                                 title: "Favoritos",
                                 value: formatMetric(productData.favorites_count),
-                                subtext: "Desejado por clientes",
                                 icon: HeartIcon,
                             },
                         ]}
@@ -157,7 +153,7 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col items-center justify-between">
                         <div className="flex items-center justify-between w-full mb-6">
                             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Score no Marketplace</h3>
-                            <StarIcon className="text-yellow-500 fill-yellow-500 w-5 h-5" />
+                            <StarIcon className="text-brand-green fill-brand-green w-5 h-5" />
                         </div>
 
                         <div className="relative flex items-center justify-center w-36 h-36 my-4">
@@ -195,7 +191,7 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                         </div>
 
                         <div className="text-center mt-2 w-full border-t border-brand-border dark:border-dark-border pt-4">
-                            <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                 Nota de relevância baseada em visualizações, favoritos e conversão de vendas.
                             </p>
                         </div>
@@ -242,7 +238,7 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                                 </div>
                             </div>
 
-                            <div className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body py-2">
+                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                 Este produto ainda não possui vendas registradas.
                             </div>
                         </div>

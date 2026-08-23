@@ -288,7 +288,7 @@ export function DeliveryPortalHeader({
                                             >
                                                 <span className="flex items-center gap-3">
                                                     {item.icon}
-                                                    <span className={"text-[14px] font-normal text-brand-inactive-text dark:text-dark-body " + item.className}>{item.label}</span>
+                                                    <span className={`text-[14px] font-normal ${item.className ? `text-${item.className}` : "text-brand-inactive-text dark:text-dark-body"}`}>{item.label}</span>
                                                 </span>
                                             </ItemWrapper>
                                         )

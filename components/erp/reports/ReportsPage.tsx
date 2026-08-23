@@ -2,20 +2,24 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, InfoCard, Button, ListItem } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
 import {
-    DashboardPieChart, DashboardLineChart, DashboardBarChart, CHART_COLORS, CHART_COLORS_VIVID, CHART_COLORS_CATEGORY
+    DashboardLineChart,
+    DashboardBarChart,
+    DashboardDonutChart,
+    HorizontalBarRankingList,
+    CHART_COLORS_VIVID,
+    CHART_COLORS_CATEGORY,
 } from "@/components/erp/dashboard/charts/DashboardCharts"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
-
 import { formatCurrency as brl, formatQuantityWithUnit } from "@/lib/utils"
 import {
     AnalyticsIcon, PackageIcon, WrenchIcon, TruckIcon, FileTextIcon,
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
-    ChartIcon, ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
+    ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
     ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon, ExportFileIcon,
     AlertCircleIcon,
 } from "@/lib/icons"
@@ -32,7 +36,6 @@ import {
     generateFinancialInsights, generateCustomerInsights, generateMarketingInsights,
     generateReturnsInsights, generateDeliveryInsights, generateProductivityInsights,
 } from "./insights"
-import type { Insight } from "./insights"
 
 type TabId = "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas" | "assinaturas"
 
@@ -80,7 +83,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
     const resourcesList = activeResources || sells || ["products", "services"]
     const sellsProducts = resourcesList.includes("products")
     const sellsServices = resourcesList.includes("services")
-    const tabs = useMemo(() => REPORT_TABS.filter(tab => {
+    return useMemo(() => REPORT_TABS.filter(tab => {
         switch (tab.id) {
             case "produtos": case "vendas": case "marketing": return sellsProducts && productsData !== null
             case "servicos": return sellsServices && servicesData !== null
@@ -94,34 +97,72 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
             default: return true
         }
     }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, props.subscriptionData])
-    return tabs
 }
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
     positive: "green", negative: "red", warning: "orange", info: "blue", neutral: "gray",
 }
 
-function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
+/**
+ * Standard Card Header:
+ * Places the icon & title on the left, and legend items on the top-right in desktop,
+ * and neatly below the title (above chart) in mobile/tablet.
+ */
+function CardHeader({
+    icon: Icon,
+    title,
+    subtitle,
+    legendItems,
+}: {
+    icon?: React.ElementType
+    title: string
+    subtitle?: string
+    legendItems?: Array<{ label: string; color: string }>
+}) {
     return (
-        <div className="flex items-center space-x-3 mb-6">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div className="flex items-center space-x-3">
+                {Icon && (
+                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+                        <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+                    </div>
+                )}
+                <div>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{title}</h3>
+                    {subtitle && (
+                        <p className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body mt-0.5">{subtitle}</p>
+                    )}
+                </div>
             </div>
-            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+            {legendItems && legendItems.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3.5 sm:self-center">
+                    {legendItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body">
+                                {item.label}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
 
-// ─────────────────────────── Header ───────────────────────────
-
-function SectionHeader({ title, onExport }: { title: string; onExport: (f: "csv" | "xlsx") => Promise<void> }) {
-    return null
+function SectionPlaceholder({ title, description }: { title: string; description: string }) {
+    return (
+        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border">
+            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-3">{title}</h3>
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</p>
+        </div>
+    )
 }
 
 export function ReportsPage(props: ReportsPageProps) {
     const availableTabs = useAvailableTabs(props)
     const initialTab = availableTabs.length > 0 ? availableTabs[0].id : ""
-    const [activeTab, setActiveTab] = useState<string>(initialTab)
+    const [, setActiveTab] = useState<string>(initialTab)
 
     if (availableTabs.length === 0) {
         return (
@@ -153,10 +194,10 @@ export function ReportsPage(props: ReportsPageProps) {
     )
 }
 
-// ─────────────────── Vendas ───────────────────
-
-function SalesSection({ salesData, period }: { salesData: SalesReportData | null; period: Period }) {
-    const router = useRouter()
+// ─────────────────────────────────────────────────────────────
+// 1. ABA DE VENDAS
+// ─────────────────────────────────────────────────────────────
+function SalesSection({ salesData }: { salesData: SalesReportData | null; period: Period }) {
     const { setExportHandler } = useDashboard()
 
     const insights = useMemo(() => {
@@ -168,12 +209,10 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
         })
     }, [salesData])
 
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
 
     const kpis = useMemo(() => {
         if (!salesData) return []
@@ -205,59 +244,81 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     const combinedItems = [
         ...salesData.topProducts.map(p => ({ label: p.label, value: p.value })),
         ...(salesData.topServices || []).map(s => ({ label: s.label, value: s.value })),
-    ].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 10)
+    ].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 5)
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-12">
                     <SummaryCards metrics={kpis} variant="horizontal" />
                 </div>
             </div>
 
+            {/* Row 2: Evolução de Vendas (8) + Canal (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Este Período", secondary: "Anterior" }} />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Evolução de Vendas"
+                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                        />
+                        <DashboardLineChart data={evoData} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Vendas por Canal" />
+                        <DashboardDonutChart
+                            data={sourceData}
+                            totalValue={String(salesData.metrics.orderCount)}
+                            totalLabel="Pedidos"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Pedidos por Hora (8) + Itens Mais Vendidos (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={ClockIcon}
+                            title="Pedidos por Hora"
+                            legendItems={[{ label: "Volume de Pedidos", color: "#059669" }]}
+                        />
+                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={["#059669"]} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={ShoppingBagIcon} title="Itens Mais Vendidos" />
-                        <DashboardBarChart data={combinedItems.slice(0, 5)} colors={CHART_COLORS_VIVID} layout="horizontal" />
+                        <HorizontalBarRankingList items={combinedItems} colors={CHART_COLORS_VIVID} maxItems={5} />
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={ClockIcon} title="Pedidos por Hora" />
-                        <DashboardBarChart data={salesData.ordersByHour.map(h => ({ label: h.label, value: h.value }))} colors={[CHART_COLORS_VIVID[0]]} />
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TagIcon} title="Canal" />
-                        <DashboardPieChart data={sourceData} totalValue={String(salesData.metrics.orderCount)} totalLabel="Pedidos" half innerRadius={60} outerRadius={80} className="mt-4" showLegend colors={CHART_COLORS_CATEGORY} />
-                    </div>
-                </div>
-            </div>
-
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={CreditCardIcon} title="Pagamento" />
-                        <DashboardPieChart data={paymentData} totalValue={salesData.metrics.revenueFormatted} totalLabel="Faturamento" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={CreditCardIcon} title="Formas de Pagamento" />
+                        <DashboardDonutChart
+                            data={paymentData}
+                            totalValue={salesData.metrics.revenueFormatted}
+                            totalLabel="Faturamento"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={TargetIcon} title="Curva ABC" />
-                        <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 5)} colors={["#f97316"]} />
+                        <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 5)} colors={["#f97316"]} height="h-[200px]" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -266,6 +327,7 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
                         items={salesData.topMarginProducts.slice(0, 6).map(p => ({ id: p.id, label: p.label, value: `${p.margin}%` }))}
                         variant="compact"
                         icon={AwardIcon}
+                        className="h-full"
                     />
                 </div>
             </div>
@@ -273,10 +335,10 @@ function SalesSection({ salesData, period }: { salesData: SalesReportData | null
     )
 }
 
-// ─────────────────── 3. Produtos ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// 2. ABA DE PRODUTOS
+// ─────────────────────────────────────────────────────────────
 function ProductsSection({ productsData, stockValue, returnsData }: { productsData: ProductsDashboardData | null; stockValue: number; returnsData: ReturnsReportData | null }) {
-    const router = useRouter()
     const { setExportHandler } = useDashboard()
     const insights = useMemo(() => {
         if (!productsData) return []
@@ -291,12 +353,10 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
         })
     }, [productsData])
 
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
 
     const kpis = useMemo(() => {
         if (!productsData) return []
@@ -334,175 +394,240 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
     const faturamentoData = [
         { label: "Valor Vendido", value: vendidoTotal },
         { label: "Valor Devolvido", value: devolvidoTotal },
-        { label: "Valor Faturado", value: Math.max(vendidoTotal - devolvidoTotal, 0) },
+        { label: "Líquido Faturado", value: Math.max(vendidoTotal - devolvidoTotal, 0) },
     ]
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-12">
                     <SummaryCards metrics={kpis} variant="horizontal" />
                 </div>
             </div>
 
+            {/* Row 2: Evolução de Vendas e Devoluções (8) + Categorias (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-7">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Evolução de Vendas" />
-                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} showLegend legendLabels={{ vendidos: "Produtos Vendidos", devolvidos: "Produtos Devolvidos" }} />
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Evolução de Vendas e Devoluções"
+                            legendItems={[{ label: "Produtos Vendidos", color: "#059669" }, { label: "Produtos Devolvidos", color: "#ef4444" }]}
+                        />
+                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} />
                     </div>
                 </div>
-                <div className="lg:col-span-5">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={ShoppingBagIcon} title="Vendas por Categoria" />
-                        <DashboardPieChart data={catData} totalValue={String(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0)} totalLabel="Produtos" showLegend colors={CHART_COLORS_CATEGORY} />
+                        <DashboardDonutChart
+                            data={catData}
+                            totalValue={String(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0)}
+                            totalLabel="Produtos"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
             </div>
 
+            {/* Row 3: Faturamento vs Devoluções (8) + Produtos Mais Vendidos (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-7">
-                    <ReportRankingCard
-                        title="Mais Vendidos"
-                        items={productsData.topProducts.slice(0, 6).map(p => ({ id: p.id, label: p.title, value: p.value ?? 0, subtitle: p.subtitle ?? "" }))}
-                        variant="compact"
-                        icon={AwardIcon}
-                    />
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={MoneyIcon}
+                            title="Faturamento vs Devoluções"
+                            legendItems={[{ label: "Vendido", color: "#059669" }, { label: "Devolvido", color: "#ef4444" }, { label: "Líquido", color: "#0284c7" }]}
+                        />
+                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} />
+                    </div>
                 </div>
-                <div className="lg:col-span-5">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AwardIcon} title="Mais Vendidos" />
+                        <HorizontalBarRankingList
+                            items={productsData.topProducts.slice(0, 5).map(p => ({ label: p.title, value: p.value ?? 0 }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
                     <ReportRankingCard
                         title="Produtos Parados"
                         items={idleData.slice(0, 6)}
                         variant="compact"
                         icon={AlertCircleIcon}
+                        className="h-full"
                     />
                 </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-6">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={MoneyIcon} title="Faturamento vs Devoluções" />
-                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} />
-                    </div>
-                </div>
-                <div className="lg:col-span-6">
+                <div className="lg:col-span-4">
                     <ReportRankingCard
                         title="Menor Estoque"
                         items={productsData.criticalStock.slice(0, 6).map(p => ({ id: p.id, label: p.title, value: p.value ?? 0, subtitle: p.subtitle ?? "" }))}
                         variant="compact"
                         icon={AlertCircleIcon}
+                        className="h-full"
                     />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Distribuição de Estoque" />
+                        <DashboardDonutChart
+                            data={catData.slice(0, 5)}
+                            totalValue={productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || "0"}
+                            totalLabel="Itens"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
                 </div>
             </div>
         </div>
     )
 }
 
-// ─────────────────── 5. Clientes ───────────────────
-
-function CustomersSection({ customerData, period }: { customerData: CustomerReportData | null; period: Period }) {
-    const router = useRouter()
+// ─────────────────────────────────────────────────────────────
+// 3. ABA DE SERVIÇOS
+// ─────────────────────────────────────────────────────────────
+function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData }) {
     const { setExportHandler } = useDashboard()
 
-    const insights = useMemo(() => {
-        if (!customerData) return []
-        return generateCustomerInsights({
-            totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
-            avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
-            topCustomerName: customerData.topCustomers[0]?.label,
-            topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
-        })
-    }, [customerData])
+    const parseBrl = (val?: string) => {
+        if (!val) return 0
+        const clean = val.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")
+        return Number(clean) || 0
+    }
 
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
+    const totalCategoryServices = (servicesData.categoryRows || []).reduce((acc, c) => acc + (Number(c.value) || 0), 0)
+    const serviceChartData = (servicesData.serviceRows || []).map(s => ({ label: s.title, value: parseBrl(s.value) }))
+    const todayCount = servicesData.todayAppointments?.length || 0
+    const topStaffName = servicesData.staffRows?.[0]?.title
+    const topStaffRevenue = parseBrl(servicesData.staffRows?.[0]?.value)
 
-    const kpis = useMemo(() => {
-        if (!customerData) return []
-        return [
-            { title: "Total", value: String(customerData.totalCustomers), trend: "" },
-            { title: "Ativos", value: String(customerData.activeCustomers), trend: "" },
-            { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "" },
-            { title: "Novos", value: String(customerData.newCustomers), trend: "" },
-            { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
-            { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
-        ]
-    }, [customerData])
+    const insights = useMemo(() => generateServicesInsights({
+        todayAppointments: todayCount,
+        cancelledCount: Number(servicesData.metrics.find((m: any) => m.title.includes("Cancelados"))?.value || 0),
+        totalAppointments: Number(servicesData.metrics.find((m: any) => m.title.includes("Total"))?.value || 0),
+        attendanceRate: Number(String(servicesData.metrics.find((m: any) => m.title.includes("Comparecimento"))?.value || "100").replace("%", "")),
+        topStaffName,
+        topStaffRevenue,
+    }), [servicesData, todayCount, topStaffName, topStaffRevenue])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        if (!customerData) return
-        const rows = [["Total", String(customerData.totalCustomers)], ["Ativos", String(customerData.activeCustomers)]]
-        if (fmt === "csv") exportCSV("relatorio-clientes", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-clientes", [{ name: "Clientes", headers: ["Indicador", "Valor"], rows }])
-    }, [customerData])
+        const rows = [["Atendimentos", String(servicesData.metrics[0]?.value || "0")]]
+        if (fmt === "csv") exportCSV("servicos", ["Indicador", "Valor"], rows)
+        else await exportXLSX("servicos", [{ name: "Serviços", headers: ["Indicador", "Valor"], rows }])
+    }, [servicesData])
 
     useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
-
-    const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
-                </div>
+                <div className="lg:col-span-12"><SummaryCards metrics={servicesData.metrics} variant="horizontal" /></div>
             </div>
 
+            {/* Row 2: Faturamento por Serviço (8) + Categorias (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Ativos vs Novos" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Ativos", secondary: "Novos" }} />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={WrenchIcon}
+                            title="Faturamento por Serviço"
+                            legendItems={[{ label: "Receita", color: "#059669" }]}
+                        />
+                        <DashboardLineChart data={serviceChartData} />
                     </div>
                 </div>
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                    <ReportRankingCard
-                        title="Top Clientes"
-                        items={customerData.topCustomers.slice(0, 5).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: c.subtitle }))}
-                        variant="compact"
-                        icon={AwardIcon}
-                    />
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-[13px] font-bold text-brand-inactive-text">Frequência</h3>
-                            <h3 className="text-[13px] font-bold text-brand-inactive-text">Intervalo</h3>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{customerData.purchaseFrequency} ped./cliente</span>
-                            <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">{customerData.avgDaysBetweenPurchases} dias</span>
-                        </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Distribuição por Categoria" />
+                        <DashboardDonutChart
+                            data={(servicesData.categoryRows || []).map(c => ({ label: c.title, value: Number(c.value || 0) }))}
+                            totalValue={String(totalCategoryServices)}
+                            totalLabel="Serviços"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
             </div>
 
+            {/* Row 3: Agendamentos de Hoje (8) + Serviços Mais Realizados (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={CalendarIcon} title="Agendamentos de Hoje" />
+                        {todayCount === 0 ? (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body py-10 text-center">Nenhum agendamento para hoje.</p>
+                        ) : (
+                            <div className="space-y-2 my-auto">
+                                {(servicesData.todayAppointments || []).slice(0, 5).map(a => (
+                                    <div key={a.id} className="flex items-center justify-between py-2.5 border-b border-brand-border dark:border-dark-border last:border-0">
+                                        <div>
+                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{a.title}</p>
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body">{a.subtitle}{a.meta ? ` · ${a.meta}` : ""}</p>
+                                        </div>
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{a.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ShoppingBagIcon} title="Serviços Mais Realizados" />
+                        <HorizontalBarRankingList
+                            items={(servicesData.serviceRows || []).slice(0, 5).map(s => ({ label: s.title, value: parseBrl(s.value) }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
                     <ReportRankingCard
-                        title="Clientes VIP"
-                        items={customerData.vipCustomers.slice(0, 6).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: `${c.orders} pedidos` }))}
+                        title="Ranking da Equipe"
+                        items={(servicesData.staffRows || []).slice(0, 6).map(s => ({ id: s.id, label: s.title, value: s.value || "0", subtitle: s.subtitle }))}
                         variant="compact"
                         icon={AwardIcon}
+                        className="h-full"
                     />
                 </div>
-                <div className="lg:col-span-8">
+                <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={Users} title="Recorrência de Clientes" />
-                        <div className="flex-1 flex flex-col items-center justify-center py-6">
-                            <p className="text-[48px] font-bold text-brand-green dark:text-dark-heading leading-none">{customerData.recurringCustomers}</p>
-                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mt-2">clientes recorrentes</p>
-                            <p className="text-xs text-brand-inactive-text mt-1">de um total de {customerData.totalCustomers} clientes cadastrados</p>
-                        </div>
+                        <CardHeader icon={ClockIcon} title="Serviços por Especialidade" />
+                        <DashboardDonutChart
+                            data={(servicesData.categoryRows || []).slice(0, 5).map(c => ({ label: c.title, value: Number(c.value || 0) }))}
+                            totalValue={String(totalCategoryServices)}
+                            totalLabel="Atendimentos"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Faturamento Equipe" />
+                        <HorizontalBarRankingList
+                            items={(servicesData.staffRows || []).slice(0, 5).map(s => ({ label: s.title, value: parseBrl(s.value) }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
                     </div>
                 </div>
             </div>
@@ -510,10 +635,10 @@ function CustomersSection({ customerData, period }: { customerData: CustomerRepo
     )
 }
 
-// ─────────────────── 7. Entregas ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// 4. ABA DE ENTREGAS
+// ─────────────────────────────────────────────────────────────
 function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
-    const router = useRouter()
     const { setExportHandler } = useDashboard()
 
     const insights = useMemo(() => {
@@ -525,12 +650,10 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
         })
     }, [deliveryData])
 
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
 
     const kpis = useMemo(() => {
         if (!deliveryData) return []
@@ -560,72 +683,108 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
-                </div>
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
             </div>
 
+            {/* Row 2: Entregas por Período (8) + Situação (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Entregas por Período" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Este Período", secondary: "Anterior" }} />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Entregas por Período"
+                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                        />
+                        <DashboardLineChart data={evoData} />
                     </div>
                 </div>
-                <div className="lg:col-span-4 flex flex-col gap-6">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={TruckIcon} title="Situação" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart data={statusData} totalValue={String(deliveryData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[180px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={ClockIcon} title="Tempo Médio" />
-                        <p className="text-[32px] font-bold text-brand-orange dark:text-dark-heading">{deliveryData.metrics.avgTimeMinutes}min</p>
-                        <p className="text-[13px] font-medium text-brand-inactive-text">por entrega</p>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TruckIcon} title="Situação das Entregas" />
+                        <DashboardDonutChart
+                            data={statusData}
+                            totalValue={String(deliveryData.metrics.total)}
+                            totalLabel="Total"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
             </div>
 
+            {/* Row 3: Últimas Entregas (8) + Ranking de Entregadores (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
                     <ReportTableCard
                         title="Últimas Entregas"
-                        columns={[{ key: "id", header: "ID", render: (v: string) => v.slice(0, 8) }, { key: "status", header: "Status" }, { key: "deliveryPerson", header: "Entregador" }, { key: "date", header: "Data" }, { key: "duration", header: "Duração" }]}
+                        columns={[
+                            { key: "id", header: "ID", render: (v: string) => v.slice(0, 8) },
+                            { key: "status", header: "Status" },
+                            { key: "deliveryPerson", header: "Entregador" },
+                            { key: "date", header: "Data" },
+                            { key: "duration", header: "Duração" },
+                        ]}
                         data={deliveryData.recentDeliveries}
                         icon={TruckIcon}
+                        className="h-full"
                     />
                 </div>
                 <div className="lg:col-span-4">
-                    {deliveryData.deliveryPersonRanking.length > 0 ? (
-                        <ReportRankingCard
-                            title="Ranking de Entregadores"
-                            items={deliveryData.deliveryPersonRanking.slice(0, 6).map(p => ({ id: p.id, label: p.name, value: String(p.deliveries), subtitle: "entregas" }))}
-                            variant="compact"
-                            icon={AwardIcon}
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AwardIcon} title="Ranking de Entregadores" />
+                        <HorizontalBarRankingList
+                            items={deliveryData.deliveryPersonRanking.slice(0, 5).map(p => ({ label: p.name, value: p.deliveries }))}
+                            colors={CHART_COLORS_VIVID}
                         />
-                    ) : (
-                        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col h-full">
-                            <div className="flex items-center space-x-3 mb-6">
-                                <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-                                    <AwardIcon size={18} className="text-brand-dark dark:text-dark-heading" />
-                                </div>
-                                <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Ranking de Entregadores</h3>
-                            </div>
-                            <div className="flex-1 flex items-center justify-center py-8">
-                                <p className="text-sm text-brand-inactive-text">Sem entregadores ativos no período.</p>
-                            </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ClockIcon} title="Tempo Médio" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[44px] font-extrabold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
+                                {deliveryData.metrics.avgTimeMinutes}<span className="text-xl font-bold text-brand-inactive-text ml-1">min</span>
+                            </p>
+                            <p className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body mt-2">Duração média por entrega</p>
                         </div>
-                    )}
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Pontualidade" />
+                        <DashboardDonutChart
+                            data={[
+                                { label: "No Prazo", value: deliveryData.metrics.onTimeRate, fill: "#059669" },
+                                { label: "Atrasadas", value: Math.max(100 - deliveryData.metrics.onTimeRate, 0), fill: "#ef4444" },
+                            ]}
+                            totalValue={`${deliveryData.metrics.onTimeRate}%`}
+                            totalLabel="No Prazo"
+                            colors={["#059669", "#ef4444"]}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Top Entregadores"
+                        items={deliveryData.deliveryPersonRanking.slice(0, 6).map(p => ({ id: p.id, label: p.name, value: `${p.deliveries}x` }))}
+                        variant="compact"
+                        icon={AwardIcon}
+                        className="h-full"
+                    />
                 </div>
             </div>
         </div>
     )
 }
 
-// ─────────────────── 8. Ordens de Serviço ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// 5. ABA DE ORDENS DE SERVIÇO
+// ─────────────────────────────────────────────────────────────
 function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: ServiceOrderReportData | null }) {
     const router = useRouter()
     const { setExportHandler } = useDashboard()
@@ -658,468 +817,95 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
-                </div>
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
             </div>
 
+            {/* Row 2: Evolução (8) + Por Status (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Evolução" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Ordens", secondary: "Período Anterior" }} />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Evolução de Ordens de Serviço"
+                            legendItems={[{ label: "Ordens", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                        />
+                        <DashboardLineChart data={evoData} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
-                    <ReportRankingCard
-                        title="Ranking por Responsável"
-                        items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ id: a.id, label: a.name, value: String(a.count), subtitle: `R$ ${Math.round(a.revenue).toLocaleString("pt-BR")}` }))}
-                        variant="compact"
-                        icon={AwardIcon}
-                    />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ListIcon} title="OS por Status" />
+                        <DashboardDonutChart
+                            data={statusData}
+                            totalValue={String(serviceOrdersData.metrics.total)}
+                            totalLabel="Total"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
                 </div>
             </div>
 
+            {/* Row 3: Últimas OS (8) + Ranking Responsável (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
                     <ReportTableCard
-                        title="Últimas OS"
-                        columns={[{ key: "orderNumber", header: "Número" }, { key: "title", header: "Título" }, { key: "status", header: "Status" }, { key: "total", header: "Total" }, { key: "date", header: "Data" }]}
+                        title="Últimas Ordens de Serviço"
+                        columns={[
+                            { key: "orderNumber", header: "Número" },
+                            { key: "title", header: "Título" },
+                            { key: "status", header: "Status" },
+                            { key: "total", header: "Total" },
+                            { key: "date", header: "Data" },
+                        ]}
                         data={serviceOrdersData.recentOrders}
                         onRowClick={() => router.push("/erp/ordens-de-servico")}
                         icon={ListIcon}
+                        className="h-full"
                     />
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={ListIcon} title="Por Status" />
-                        <div className="flex justify-center flex-1 items-center">
-                            <DashboardPieChart data={statusData} totalValue={String(serviceOrdersData.metrics.total)} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─────────────────── 9. Trocas ───────────────────
-
-function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
-    const router = useRouter()
-    const { setExportHandler } = useDashboard()
-
-    const insights = useMemo(() => {
-        if (!returnsData) return []
-        return generateReturnsInsights({
-            returnRate: returnsData.returnRate, previousReturnRate: returnsData.previousReturnRate,
-            totalRefunded: returnsData.totalRefunded, topReason: returnsData.byReason[0]?.label,
-            returnCount: returnsData.returnCount,
-        })
-    }, [returnsData])
-
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
-
-    const kpis = useMemo(() => {
-        if (!returnsData) return []
-        return [
-            { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
-            { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
-            { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
-        ]
-    }, [returnsData])
-
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        if (!returnsData) return
-        const rows = [["Total", String(returnsData.returnCount)], ["Taxa", `${returnsData.returnRate}%`]]
-        if (fmt === "csv") exportCSV("relatorio-trocas", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-trocas", [{ name: "Trocas", headers: ["Indicador", "Valor"], rows }])
-    }, [returnsData])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
-
-    const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
-    const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
-
-    return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            <InsightsRegister insights={mappedInsights} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12"><SummaryCards metrics={kpis} /></div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-7">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Evolução das Devoluções" />
-                        <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} colors={CHART_COLORS_VIVID} showLegend />
-                    </div>
-                </div>
-                <div className="lg:col-span-5 flex flex-col gap-6">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={TagIcon} title="Por Motivo" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart data={reasonData} totalValue={String(returnsData.returnCount)} totalLabel="Devoluções" innerRadius={60} outerRadius={80} className="h-[190px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={ListIcon} title="Por Status" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart data={statusData} totalValue={String(returnsData.byStatus.reduce((a: any, s: any) => a + s.value, 0))} totalLabel="Total" innerRadius={55} outerRadius={72} className="h-[170px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-5">
-                    {returnsData.topReturnedProducts.length > 0 ? (
-                        <ReportRankingCard
-                            title="Produtos Mais Devolvidos"
-                            items={returnsData.topReturnedProducts.slice(0, 6).map(p => ({ id: String(p.productName), label: p.productName, value: `${p.count}x`, subtitle: formatQuantityWithUnit(p.totalQuantity, (p as any).unit) }))}
-                            variant="compact"
-                        />
-                    ) : (
-                        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex items-center justify-center h-full">
-                            <p className="text-sm text-brand-inactive-text">Nenhum produto devolvido.</p>
-                        </div>
-                    )}
-                </div>
-                <div className="lg:col-span-7">
-                    <ReportTableCard
-                        title="Últimas Devoluções"
-                        columns={[{ key: "customer", header: "Cliente" }, { key: "reason", header: "Motivo" }, { key: "amount", header: "Valor" }, { key: "status", header: "Status" }, { key: "date", header: "Data" }]}
-                        data={returnsData.recentReturns}
-                        onRowClick={() => router.push("/erp/devolucoes")}
-                    />
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─────────────────── 10. Marketing ───────────────────
-
-function MarketingSection({ marketingData }: { marketingData: MarketingReportData | null }) {
-    const router = useRouter()
-    const { setExportHandler } = useDashboard()
-
-    const insights = useMemo(() => {
-        if (!marketingData) return []
-        return generateMarketingInsights({
-            totalCoupons: marketingData.couponStats.total, couponUsageRate: marketingData.couponStats.usageRate,
-            revenueBySource: Object.fromEntries(marketingData.revenueBySource.map(s => [s.label, s.value])),
-            topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
-        })
-    }, [marketingData])
-
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
-
-    const kpis = useMemo(() => {
-        if (!marketingData) return []
-        return [
-            { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
-            { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
-            { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
-            { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
-            ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
-        ]
-    }, [marketingData])
-
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        if (!marketingData) return
-        const rows = [["Faturamento", marketingData.totalRevenueFormatted], ["Top Canal", marketingData.topSource]]
-        if (fmt === "csv") exportCSV("relatorio-marketing", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-marketing", [{ name: "Marketing", headers: ["Indicador", "Valor"], rows }])
-    }, [marketingData])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
-
-    const sourceData = marketingData.revenueBySource.map(s => ({ label: s.label, value: s.value }))
-    const evoData = marketingData.evolution.map(d => ({ label: d.label, value: d.online + d.presencial + d.outros }))
-
-    return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            <InsightsRegister insights={mappedInsights} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Evolução" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Faturamento" }} />
-                    </div>
-                </div>
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Faturamento por Canal" />
-                        <div className="flex justify-center flex-1 items-center">
-                            <DashboardPieChart data={sourceData} totalValue={marketingData.totalRevenueFormatted} totalLabel="Total" innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {marketingData.topCoupons.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                    <div className="lg:col-span-8">
-                        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                            <CardHeader icon={MegaphoneIcon} title="Campanhas" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {marketingData.campaigns.slice(0, 6).map(c => (
-                                    <div key={c.id} className={`rounded-[12px] p-3 border ${c.isActive ? "border-brand-green bg-green-50 dark:bg-green-900/20" : "border-brand-border dark:border-dark-border"}`}>
-                                        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{c.name}</p>
-                                        <p className={`text-[11px] font-medium mt-0.5 ${c.isActive ? "text-brand-green" : "text-brand-inactive-text"}`}>{c.isActive ? "Ativa" : "Inativa"}</p>
-                                    </div>
-                                ))}
-                                {marketingData.campaigns.length === 0 && <p className="text-sm text-brand-inactive-text col-span-2">Nenhuma campanha cadastrada.</p>}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="lg:col-span-4">
-                        <ReportRankingCard
-                            title="Cupons Mais Usados"
-                            items={marketingData.topCoupons.slice(0, 6).map(c => ({
-                                id: c.id,
-                                label: c.code,
-                                value: `${c.usageCount} usos`,
-                                subtitle: c.discountType === "percentage" ? `${c.discountValue}%` : brl(c.discountValue),
-                            }))}
-                            variant="compact"
-                            icon={TagIcon}
+                        <CardHeader icon={AwardIcon} title="Ranking por Responsável" />
+                        <HorizontalBarRankingList
+                            items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ label: a.name, value: a.count }))}
+                            colors={CHART_COLORS_VIVID}
                         />
                     </div>
                 </div>
-            )}
-        </div>
-    )
-}
-
-// ─────────────────── 11. Produtividade ───────────────────
-
-function ProductivitySection({ productivityData, goalData }: { productivityData: ProductivityReportData | null; goalData: GoalReportData | null }) {
-    const router = useRouter()
-    const { setExportHandler } = useDashboard()
-
-    const insights = useMemo(() => {
-        if (!productivityData) return []
-        return generateProductivityInsights({
-            topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
-            staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
-        })
-    }, [productivityData])
-
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
-
-    const kpis = useMemo(() => {
-        if (!productivityData) return []
-        return [
-            { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
-            { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
-            { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
-            { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
-            { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
-            ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
-        ]
-    }, [productivityData, goalData])
-
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        if (!productivityData) return
-        const rows = [["Atendimentos", String(productivityData.metrics.totalAppointments)], ["Receita", productivityData.metrics.totalRevenueFormatted]]
-        if (fmt === "csv") exportCSV("relatorio-produtividade", ["Indicador", "Valor"], rows)
-        else await exportXLSX("relatorio-produtividade", [{ name: "Produtividade", headers: ["Indicador", "Valor"], rows }])
-    }, [productivityData])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
-
-    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
-
-    return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            <InsightsRegister insights={mappedInsights} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={kpis} variant="horizontal" />
-                </div>
             </div>
 
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={TrendingUpIcon} title="Atendimentos por Dia" />
-                        <DashboardLineChart data={evoData} showLegend legendLabels={{ value: "Atendimentos", secondary: "Receita" }} />
-                    </div>
-                </div>
                 <div className="lg:col-span-4">
                     <ReportRankingCard
-                        title="Ranking da Equipe"
-                        items={productivityData.staffRanking.slice(0, 6).map(s => ({
-                            id: s.id,
-                            label: s.label,
-                            value: `${s.appointments} atd.`,
-                            subtitle: `Ticket: R$ ${s.ticketMedio}`,
-                        }))}
+                        title="Top Responsáveis"
+                        items={serviceOrdersData.assigneeRanking.slice(0, 6).map(a => ({ id: a.id, label: a.name, value: `${a.count} OS`, subtitle: `R$ ${Math.round(a.revenue).toLocaleString("pt-BR")}` }))}
                         variant="compact"
                         icon={AwardIcon}
+                        className="h-full"
                     />
                 </div>
-            </div>
-
-            {goalData && goalData.totalCount > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                    <div className="lg:col-span-12">
-                        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                            <CardHeader icon={TargetIcon} title="Progresso das Metas" />
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {goalData.goals.slice(0, 6).map(g => {
-                                    const pct = Math.min(g.progressPct, 100)
-                                    const barColor = g.achieved ? "bg-brand-green" : pct >= 80 ? "bg-brand-orange" : pct >= 50 ? "bg-brand-blue" : "bg-brand-red"
-                                    const textColor = g.achieved ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"
-                                    return (
-                                        <div key={g.id} className="bg-brand-bg dark:bg-dark-elevated rounded-[16px] p-4 border border-brand-border dark:border-dark-border">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{g.name}</p>
-                                            <p className="text-xs text-brand-inactive-text mt-1">Meta: {g.targetFormatted}</p>
-                                            <div className="mt-3 flex items-center gap-2">
-                                                <div className="flex-1 h-2 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
-                                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
-                                                </div>
-                                                <span className={`text-[13px] font-bold ${textColor}`}>{g.achieved ? "✅ 100%" : `${pct}%`}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Distribuição por Status" />
+                        <DashboardDonutChart
+                            data={statusData}
+                            totalValue={String(serviceOrdersData.metrics.total)}
+                            totalLabel="Ordens"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
-            )}
-        </div>
-    )
-}
-
-// ─────────────────── Serviços ───────────────────
-
-function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData }) {
-    const router = useRouter()
-    const { setExportHandler } = useDashboard()
-
-    const parseBrl = (val?: string) => {
-        if (!val) return 0
-        const clean = val.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")
-        return Number(clean) || 0
-    }
-
-    const totalCategoryServices = (servicesData.categoryRows || []).reduce((acc, c) => acc + (Number(c.value) || 0), 0)
-    const staffChartData = (servicesData.staffRows || []).map(s => ({ label: s.title, value: parseBrl(s.value) }))
-    const serviceChartData = (servicesData.serviceRows || []).map(s => ({ label: s.title, value: parseBrl(s.value) }))
-    const todayCount = servicesData.todayAppointments?.length || 0
-    const staffCount = servicesData.staffRows?.length || 0
-    const topStaffName = servicesData.staffRows?.[0]?.title
-    const topStaffRevenue = parseBrl(servicesData.staffRows?.[0]?.value)
-
-    const insights = useMemo(() => generateServicesInsights({
-        todayAppointments: todayCount,
-        cancelledCount: Number(servicesData.metrics.find((m: any) => m.title.includes("Cancelados"))?.value || 0),
-        totalAppointments: Number(servicesData.metrics.find((m: any) => m.title.includes("Total"))?.value || 0),
-        attendanceRate: Number(String(servicesData.metrics.find((m: any) => m.title.includes("Comparecimento"))?.value || "100").replace("%", "")),
-        topStaffName,
-        topStaffRevenue,
-    }), [servicesData])
-
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
-
-    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
-        const rows = [["Atendimentos", String(servicesData.metrics[0]?.value || "0")]]
-        if (fmt === "csv") exportCSV("servicos", ["Indicador", "Valor"], rows)
-        else await exportXLSX("servicos", [{ name: "Serviços", headers: ["Indicador", "Valor"], rows }])
-    }, [servicesData])
-
-    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
-
-    return (
-        <div className="flex flex-col gap-6 animate-fade-in">
-            <InsightsRegister insights={mappedInsights} />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12"><SummaryCards metrics={servicesData.metrics} /></div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-5">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
-                        <CardHeader icon={TagIcon} title="Distribuição por Categoria" />
-                        <div className="flex justify-center">
-                            <DashboardPieChart
-                                data={(servicesData.categoryRows || []).map(c => ({ label: c.title, value: Number(c.value || 0) }))}
-                                totalValue={String(totalCategoryServices)} totalLabel="Serviços"
-                                innerRadius={60} outerRadius={80} className="h-[200px]" showLegend colors={CHART_COLORS_CATEGORY}
-                            />
-                        </div>
-                    </div>
-                </div>
-                <div className="lg:col-span-7">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={WrenchIcon} title="Faturamento por Serviço" />
-                        <DashboardLineChart data={serviceChartData} showLegend />
-                    </div>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-5">
-                    <ReportRankingCard
-                        title="Ranking da Equipe"
-                        items={(servicesData.staffRows || []).slice(0, 6).map(s => ({ id: s.id, label: s.title, value: s.value || "0", subtitle: s.subtitle }))}
-                        variant="compact"
-                    />
-                </div>
-                <div className="lg:col-span-7">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full">
-                        <CardHeader icon={CalendarIcon} title="Agendamentos de Hoje" />
-                        {todayCount === 0 ? (
-                            <p className="text-sm text-brand-inactive-text py-8 text-center">Nenhum agendamento para hoje.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {(servicesData.todayAppointments || []).slice(0, 5).map(a => (
-                                    <div key={a.id} className="flex items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-0">
-                                        <div>
-                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{a.title}</p>
-                                            <p className="text-[11px] text-brand-inactive-text">{a.subtitle}{a.meta ? ` · ${a.meta}` : ""}</p>
-                                        </div>
-                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{a.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Faturamento por Membro" />
+                        <HorizontalBarRankingList
+                            items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ label: a.name, value: a.revenue }))}
+                            colors={CHART_COLORS_VIVID}
+                            valueFormatter={v => brl(v)}
+                        />
                     </div>
                 </div>
             </div>
@@ -1127,10 +913,10 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
     )
 }
 
-// ─────────────────── Financeiro ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// 6. ABA FINANCEIRO
+// ─────────────────────────────────────────────────────────────
 function FinancialSection({ financialData }: { financialData: FinancialDashboardData }) {
-    const router = useRouter()
     const { setExportHandler } = useDashboard()
 
     const totalExpenses = useMemo(() => {
@@ -1167,12 +953,10 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         expenseTotal: totalExpenses || Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("despesa"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
     }), [financialData, totalExpenses])
 
-    const mappedInsights = useMemo(() => {
-        return insights.map(ins => ({
-            message: ins.message,
-            color: INSIGHT_COLORS[ins.tone] || "blue"
-        }))
-    }, [insights])
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
 
     const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
         const rows = [
@@ -1191,127 +975,735 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         <div className="flex flex-col gap-6 animate-fade-in">
             <InsightsRegister insights={mappedInsights} />
 
-            {/* Row 1: KPI Cards */}
+            {/* Row 1: KPI Horizontal */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <SummaryCards metrics={financialData.metrics} variant="horizontal" />
-                </div>
+                <div className="lg:col-span-12"><SummaryCards metrics={financialData.metrics} variant="horizontal" /></div>
             </div>
 
-            {/* Row 2: Fluxo de Caixa + Calendário Financeiro */}
+            {/* Row 2: Fluxo de Caixa (8) + Despesas por Categoria (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-8 flex flex-col">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
-                        <CardHeader icon={MoneyIcon} title="Fluxo de Caixa" />
-                        <div className="flex-1 flex items-center justify-center">
-                            <DashboardLineChart
-                                data={cashflowData}
-                                colors={["#059669", "#ef4444"]}
-                                showLegend
-                                legendLabels={{ value: "Entradas", secondary: "Saídas" }}
-                            />
-                        </div>
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={MoneyIcon}
+                            title="Fluxo de Caixa"
+                            legendItems={[{ label: "Entradas", color: "#059669" }, { label: "Saídas", color: "#ef4444" }]}
+                        />
+                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} />
                     </div>
                 </div>
-
-                <div className="lg:col-span-4 flex flex-col">
-                    <FinancialCalendarCard dailyMovements={financialData.dailyMovements} />
-                </div>
-            </div>
-
-            {/* Row 3: Alertas e Pendências + Despesas por Categoria */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-6 flex flex-col">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
-                        <CardHeader icon={AlertCircleIcon} title="Alertas e Pendências" />
-
-                        <div className="flex-1">
-                            {alertsList.length === 0 ? (
-                                <p className="text-sm text-brand-inactive-text py-8 text-center">Nenhum alerta ou conta pendente.</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {alertsList.slice(0, 5).map(item => {
-                                        const isOverdue = item.statusLabel === "Vencido" || item.tone === "red"
-                                        return (
-                                            <ListItem
-                                                key={item.id}
-                                                left={
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isOverdue
-                                                        ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500"
-                                                        : "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
-                                                        }`}>
-                                                        {isOverdue ? <AlertCircleIcon size={18} /> : <ClockIcon size={18} />}
-                                                    </div>
-                                                }
-                                                title={item.title}
-                                                description={item.subtitle}
-                                                titleClassName="text-[14px] font-bold text-brand-dark dark:text-dark-heading"
-                                                descriptionClassName="text-[12px] text-brand-inactive-text dark:text-dark-body font-medium"
-                                                className="!border-0 !bg-transparent hover:!bg-brand-gray/20 dark:hover:!bg-dark-border/20 px-2 py-2.5 transition-colors"
-                                                right={
-                                                    <span className={`text-[12px] font-bold px-3 py-1 rounded-full border ${isOverdue
-                                                        ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200/80 dark:border-rose-900/40"
-                                                        : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200/80 dark:border-amber-900/40"
-                                                        }`}>
-                                                        {item.statusLabel || (isOverdue ? "Vencido" : "Próximo")}
-                                                    </span>
-                                                }
-                                            />
-                                        )
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="lg:col-span-6 flex flex-col">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex flex-col justify-between h-full">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={TagIcon} title="Despesas por Categoria" />
-
-                        <div className="flex justify-center flex-1 items-center">
-                            {(financialData.expensesByCategory || []).length === 0 ? (
-                                <p className="text-sm text-brand-inactive-text py-8 text-center">Nenhuma despesa categorizada no período.</p>
-                            ) : (
-                                <DashboardPieChart
-                                    data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))}
-                                    totalValue={brl(totalExpenses)}
-                                    totalLabel="Despesas"
-                                    innerRadius={65}
-                                    outerRadius={88}
-                                    className="h-[210px]"
-                                    showLegend
-                                    colors={CHART_COLORS_CATEGORY}
-                                />
-                            )}
-                        </div>
+                        <DashboardDonutChart
+                            data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))}
+                            totalValue={brl(totalExpenses)}
+                            totalLabel="Despesas"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
                     </div>
                 </div>
             </div>
 
-            {/* Row 4: Últimas Movimentações */}
+            {/* Row 3: Últimas Movimentações (8) + Alertas e Pendências (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-12">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={ListIcon} title="Últimas Movimentações" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2.5 my-auto">
                             {(financialData.latestMovements || []).slice(0, 8).map(m => (
-                                <div key={m.id} className="flex items-center justify-between py-2.5 border-b border-brand-border dark:border-dark-border last:border-0">
-                                    <div className="flex items-center gap-3">
+                                <div key={m.id} className="flex items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-0">
+                                    <div className="flex items-center gap-3 min-w-0">
                                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${m.tone === "red"
                                             ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
                                             : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
                                             }`}>
                                             <MoneyIcon size={15} />
                                         </div>
-                                        <div>
-                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{m.title}</p>
-                                            <p className="text-[11px] text-brand-inactive-text">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
+                                        <div className="min-w-0">
+                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{m.title}</p>
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
                                         </div>
                                     </div>
-                                    <span className={`text-[13px] font-bold ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
+                                    <span className={`text-[13px] font-bold shrink-0 ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AlertCircleIcon} title="Alertas e Pendências" />
+                        <div className="flex-1 space-y-2">
+                            {alertsList.length === 0 ? (
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body py-8 text-center">Nenhum alerta pendente.</p>
+                            ) : (
+                                alertsList.slice(0, 4).map(item => {
+                                    const isOverdue = item.statusLabel === "Vencido" || item.tone === "red"
+                                    return (
+                                        <ListItem
+                                            key={item.id}
+                                            left={
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isOverdue
+                                                    ? "bg-rose-50 dark:bg-rose-950/40 text-rose-500"
+                                                    : "bg-amber-50 dark:bg-amber-950/40 text-amber-500"
+                                                    }`}>
+                                                    {isOverdue ? <AlertCircleIcon size={18} /> : <ClockIcon size={18} />}
+                                                </div>
+                                            }
+                                            title={item.title}
+                                            description={item.subtitle}
+                                            titleClassName="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate"
+                                            descriptionClassName="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium truncate"
+                                            className="!border-0 !bg-transparent px-2 py-2"
+                                            right={
+                                                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${isOverdue
+                                                    ? "bg-[#fef2f2] dark:bg-rose-950/40 text-[#ef4444] dark:text-rose-300 border-rose-200"
+                                                    : "bg-[#fffbeb] dark:bg-amber-950/40 text-[#f59e0b] dark:text-amber-300 border-amber-200"
+                                                    }`}>
+                                                    {item.statusLabel || (isOverdue ? "Vencido" : "Próximo")}
+                                                </span>
+                                            }
+                                        />
+                                    )
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <FinancialCalendarCard dailyMovements={financialData.dailyMovements} className="h-full" />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Maiores Despesas" />
+                        <HorizontalBarRankingList
+                            items={(financialData.expensesByCategory || []).slice(0, 5).map(e => ({ label: e.label, value: Number(e.value) }))}
+                            colors={CHART_COLORS_VIVID}
+                            valueFormatter={v => brl(v)}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Contas a Pagar Críticas"
+                        items={(financialData.overdueAccounts || []).slice(0, 6).map(a => ({ id: a.id, label: a.title, value: a.value, subtitle: a.subtitle }))}
+                        variant="compact"
+                        icon={AlertCircleIcon}
+                        className="h-full"
+                    />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. ABA DE CLIENTES
+// ─────────────────────────────────────────────────────────────
+function CustomersSection({ customerData }: { customerData: CustomerReportData | null; period: Period }) {
+    const { setExportHandler } = useDashboard()
+
+    const insights = useMemo(() => {
+        if (!customerData) return []
+        return generateCustomerInsights({
+            totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
+            avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
+            topCustomerName: customerData.topCustomers[0]?.label,
+            topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
+        })
+    }, [customerData])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
+
+    const kpis = useMemo(() => {
+        if (!customerData) return []
+        return [
+            { title: "Total", value: String(customerData.totalCustomers), trend: "" },
+            { title: "Ativos", value: String(customerData.activeCustomers), trend: "" },
+            { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "" },
+            { title: "Novos", value: String(customerData.newCustomers), trend: "" },
+            { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
+            { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
+        ]
+    }, [customerData])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!customerData) return
+        const rows = [["Total", String(customerData.totalCustomers)], ["Ativos", String(customerData.activeCustomers)]]
+        if (fmt === "csv") exportCSV("relatorio-clientes", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-clientes", [{ name: "Clientes", headers: ["Indicador", "Valor"], rows }])
+    }, [customerData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!customerData) return <SectionPlaceholder title="Clientes" description="Relatórios de clientes disponíveis com o plano Crescer." />
+
+    const evoData = customerData.customerEvolution.map(d => ({ label: d.label, value: d.ativos, secondary: d.novos }))
+    const statusPie = [
+        { label: "Ativos", value: customerData.activeCustomers, fill: "#059669" },
+        { label: "Recorrentes", value: customerData.recurringCustomers, fill: "#2563eb" },
+        { label: "Novos", value: customerData.newCustomers, fill: "#f59e0b" },
+        { label: "Inativos 90d", value: customerData.inactiveCustomers, fill: "#94a3b8" },
+    ]
+
+    return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={mappedInsights} />
+
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
+            </div>
+
+            {/* Row 2: Ativos vs Novos (8) + Segmentação (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Ativos vs Novos Clientes"
+                            legendItems={[{ label: "Ativos", color: "#059669" }, { label: "Novos", color: "#2563eb" }]}
+                        />
+                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={Users} title="Segmentação de Clientes" />
+                        <DashboardDonutChart
+                            data={statusPie}
+                            totalValue={String(customerData.totalCustomers)}
+                            totalLabel="Clientes"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Frequência e Recorrência (8) + Top Clientes (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ClockIcon} title="Frequência e Intervalo de Compras" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-auto">
+                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-6 text-center border border-brand-border/60 dark:border-dark-border/60">
+                                <p className="text-[36px] font-extrabold text-brand-dark dark:text-dark-heading">{customerData.purchaseFrequency}</p>
+                                <p className="text-sm font-bold text-brand-inactive-text dark:text-dark-body mt-1">pedidos por cliente</p>
+                            </div>
+                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-6 text-center border border-brand-border/60 dark:border-dark-border/60">
+                                <p className="text-[36px] font-extrabold text-brand-dark dark:text-dark-heading">{customerData.avgDaysBetweenPurchases} <span className="text-xl">dias</span></p>
+                                <p className="text-sm font-bold text-brand-inactive-text dark:text-dark-body mt-1">intervalo médio entre compras</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AwardIcon} title="Top Clientes" />
+                        <HorizontalBarRankingList
+                            items={customerData.topCustomers.slice(0, 5).map(c => ({ label: c.label, value: parseFloat(String(c.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")) || 0 }))}
+                            colors={CHART_COLORS_VIVID}
+                            valueFormatter={v => brl(v)}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Clientes VIP"
+                        items={customerData.vipCustomers.slice(0, 6).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: `${c.orders} pedidos` }))}
+                        variant="compact"
+                        icon={AwardIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={Users} title="Recorrência" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[44px] font-extrabold text-brand-green dark:text-dark-heading leading-none">
+                                {customerData.recurringCustomers}
+                            </p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">clientes recorrentes</p>
+                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">de {customerData.totalCustomers} cadastrados</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Clientes Inativos (+90d)"
+                        items={customerData.topCustomers.slice(5, 11).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: "Inativo" }))}
+                        variant="compact"
+                        icon={AlertCircleIcon}
+                        className="h-full"
+                    />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. ABA DE MARKETING
+// ─────────────────────────────────────────────────────────────
+function MarketingSection({ marketingData }: { marketingData: MarketingReportData | null }) {
+    const { setExportHandler } = useDashboard()
+
+    const insights = useMemo(() => {
+        if (!marketingData) return []
+        return generateMarketingInsights({
+            totalCoupons: marketingData.couponStats.total, couponUsageRate: marketingData.couponStats.usageRate,
+            revenueBySource: Object.fromEntries(marketingData.revenueBySource.map(s => [s.label, s.value])),
+            topSource: marketingData.topSource, topSourcePercent: marketingData.topSourcePercent,
+        })
+    }, [marketingData])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
+
+    const kpis = useMemo(() => {
+        if (!marketingData) return []
+        return [
+            { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
+            { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
+            { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
+            { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
+            ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
+        ]
+    }, [marketingData])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!marketingData) return
+        const rows = [["Faturamento", marketingData.totalRevenueFormatted], ["Top Canal", marketingData.topSource]]
+        if (fmt === "csv") exportCSV("relatorio-marketing", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-marketing", [{ name: "Marketing", headers: ["Indicador", "Valor"], rows }])
+    }, [marketingData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!marketingData) return <SectionPlaceholder title="Marketing" description="Ative o módulo de vendas para visualizar relatórios de marketing." />
+
+    const sourceData = marketingData.revenueBySource.map(s => ({ label: s.label, value: s.value }))
+    const evoData = marketingData.evolution.map(d => ({ label: d.label, value: d.online + d.presencial + d.outros }))
+
+    return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={mappedInsights} />
+
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
+            </div>
+
+            {/* Row 2: Evolução por Canal (8) + Faturamento Canal (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Evolução de Faturamento por Canal"
+                            legendItems={[{ label: "Faturamento", color: "#059669" }]}
+                        />
+                        <DashboardLineChart data={evoData} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Faturamento por Canal" />
+                        <DashboardDonutChart
+                            data={sourceData}
+                            totalValue={marketingData.totalRevenueFormatted}
+                            totalLabel="Total"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Campanhas (8) + Cupons Mais Usados (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={MegaphoneIcon} title="Campanhas Ativas" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 my-auto">
+                            {marketingData.campaigns.slice(0, 6).map(c => (
+                                <div key={c.id} className={`rounded-2xl p-4 border ${c.isActive ? "border-brand-green/40 bg-green-50/50 dark:bg-green-900/10" : "border-brand-border dark:border-dark-border"}`}>
+                                    <p className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">{c.name}</p>
+                                    <p className={`text-[12px] font-bold mt-1 ${c.isActive ? "text-brand-green" : "text-brand-inactive-text"}`}>{c.isActive ? "● Ativa" : "○ Inativa"}</p>
+                                </div>
+                            ))}
+                            {marketingData.campaigns.length === 0 && <p className="text-sm text-brand-inactive-text col-span-2 py-8 text-center">Nenhuma campanha cadastrada.</p>}
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Cupons Mais Usados" />
+                        <HorizontalBarRankingList
+                            items={marketingData.topCoupons.slice(0, 5).map(c => ({ label: c.code, value: c.usageCount }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Top Cupons de Desconto"
+                        items={marketingData.topCoupons.slice(0, 6).map(c => ({
+                            id: c.id,
+                            label: c.code,
+                            value: `${c.usageCount} usos`,
+                            subtitle: c.discountType === "percentage" ? `${c.discountValue}%` : brl(c.discountValue),
+                        }))}
+                        variant="compact"
+                        icon={TagIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Conversão por Canal" />
+                        <DashboardDonutChart
+                            data={sourceData}
+                            totalValue={marketingData.totalRevenueFormatted}
+                            totalLabel="Faturado"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AwardIcon} title="Desempenho de Canais" />
+                        <HorizontalBarRankingList
+                            items={sourceData}
+                            colors={CHART_COLORS_VIVID}
+                            valueFormatter={v => brl(v)}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. ABA DE PRODUTIVIDADE
+// ─────────────────────────────────────────────────────────────
+function ProductivitySection({ productivityData, goalData }: { productivityData: ProductivityReportData | null; goalData: GoalReportData | null }) {
+    const { setExportHandler } = useDashboard()
+
+    const insights = useMemo(() => {
+        if (!productivityData) return []
+        return generateProductivityInsights({
+            topStaffName: productivityData.staffRanking[0]?.label, topStaffRevenue: productivityData.staffRanking[0]?.revenue,
+            staffCount: productivityData.staffRanking.length, totalRevenue: productivityData.metrics.totalRevenue,
+        })
+    }, [productivityData])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
+
+    const kpis = useMemo(() => {
+        if (!productivityData) return []
+        return [
+            { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
+            { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
+            { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
+            { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
+            { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
+            ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
+        ]
+    }, [productivityData, goalData])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!productivityData) return
+        const rows = [["Atendimentos", String(productivityData.metrics.totalAppointments)], ["Receita", productivityData.metrics.totalRevenueFormatted]]
+        if (fmt === "csv") exportCSV("relatorio-produtividade", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-produtividade", [{ name: "Produtividade", headers: ["Indicador", "Valor"], rows }])
+    }, [productivityData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
+
+    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
+    const staffPieData = productivityData.staffRanking.map(s => ({ label: s.label, value: s.appointments }))
+
+    return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={mappedInsights} />
+
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
+            </div>
+
+            {/* Row 2: Atendimentos por Dia (8) + Atendimentos por Membro (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Atendimentos por Dia"
+                            legendItems={[{ label: "Atendimentos", color: "#059669" }, { label: "Receita", color: "#2563eb" }]}
+                        />
+                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={Users} title="Atendimentos por Membro" />
+                        <DashboardDonutChart
+                            data={staffPieData}
+                            totalValue={String(productivityData.metrics.totalAppointments)}
+                            totalLabel="Total"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Progresso das Metas (8) + Ranking Equipe (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Progresso das Metas" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 my-auto">
+                            {(goalData?.goals || []).slice(0, 6).map(g => {
+                                const pct = Math.min(g.progressPct, 100)
+                                const barColor = g.achieved ? "bg-brand-green" : pct >= 80 ? "bg-brand-orange" : pct >= 50 ? "bg-brand-blue" : "bg-brand-red"
+                                const textColor = g.achieved ? "text-brand-green" : "text-brand-dark dark:text-dark-heading"
+                                return (
+                                    <div key={g.id} className="bg-brand-bg dark:bg-dark-elevated rounded-2xl p-4 border border-brand-border dark:border-dark-border">
+                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{g.name}</p>
+                                        <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">Meta: {g.targetFormatted}</p>
+                                        <div className="mt-3 flex items-center gap-2">
+                                            <div className="flex-1 h-2 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
+                                                <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+                                            </div>
+                                            <span className={`text-[12px] font-bold ${textColor}`}>{g.achieved ? "100%" : `${pct}%`}</span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                            {(!goalData || goalData.goals.length === 0) && (
+                                <p className="text-sm text-brand-inactive-text col-span-3 py-8 text-center">Nenhuma meta configurada no período.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={AwardIcon} title="Ranking da Equipe" />
+                        <HorizontalBarRankingList
+                            items={productivityData.staffRanking.slice(0, 5).map(s => ({ label: s.label, value: s.appointments }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Top Profissionais"
+                        items={productivityData.staffRanking.slice(0, 6).map(s => ({
+                            id: s.id,
+                            label: s.label,
+                            value: `${s.appointments} atd.`,
+                            subtitle: `Ticket: R$ ${s.ticketMedio}`,
+                        }))}
+                        variant="compact"
+                        icon={AwardIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Receita por Membro" />
+                        <HorizontalBarRankingList
+                            items={productivityData.staffRanking.slice(0, 5).map(s => ({ label: s.label, value: s.revenue }))}
+                            colors={CHART_COLORS_VIVID}
+                            valueFormatter={v => brl(v)}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Taxa de Comparecimento" />
+                        <DashboardDonutChart
+                            data={[
+                                { label: "Presentes", value: productivityData.metrics.attendanceRate, fill: "#059669" },
+                                { label: "Ausentes", value: Math.max(100 - productivityData.metrics.attendanceRate, 0), fill: "#ef4444" },
+                            ]}
+                            totalValue={`${productivityData.metrics.attendanceRate}%`}
+                            totalLabel="Taxa"
+                            colors={["#059669", "#ef4444"]}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. ABA DE TROCAS E DEVOLUÇÕES
+// ─────────────────────────────────────────────────────────────
+function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null }) {
+    const router = useRouter()
+    const { setExportHandler } = useDashboard()
+
+    const insights = useMemo(() => {
+        if (!returnsData) return []
+        return generateReturnsInsights({
+            returnRate: returnsData.returnRate, previousReturnRate: returnsData.previousReturnRate,
+            totalRefunded: returnsData.totalRefunded, topReason: returnsData.byReason[0]?.label,
+            returnCount: returnsData.returnCount,
+        })
+    }, [returnsData])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
+
+    const kpis = useMemo(() => {
+        if (!returnsData) return []
+        return [
+            { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
+            { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
+            { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
+        ]
+    }, [returnsData])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        if (!returnsData) return
+        const rows = [["Total", String(returnsData.returnCount)], ["Taxa", `${returnsData.returnRate}%`]]
+        if (fmt === "csv") exportCSV("relatorio-trocas", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-trocas", [{ name: "Trocas", headers: ["Indicador", "Valor"], rows }])
+    }, [returnsData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
+
+    const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
+    const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
+
+    return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={mappedInsights} />
+
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
+            </div>
+
+            {/* Row 2: Evolução (8) + Por Motivo (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={TrendingUpIcon}
+                            title="Evolução das Devoluções"
+                            legendItems={[{ label: "Devoluções", color: "#ef4444" }]}
+                        />
+                        <DashboardBarChart data={returnsData.returnEvolution.map(e => ({ label: e.label, value: e.value }))} colors={["#ef4444"]} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Devoluções por Motivo" />
+                        <DashboardDonutChart
+                            data={reasonData}
+                            totalValue={String(returnsData.returnCount)}
+                            totalLabel="Devoluções"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Últimas Devoluções (8) + Produtos Mais Devolvidos (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <ReportTableCard
+                        title="Últimas Devoluções"
+                        columns={[
+                            { key: "customer", header: "Cliente" },
+                            { key: "reason", header: "Motivo" },
+                            { key: "amount", header: "Valor" },
+                            { key: "status", header: "Status" },
+                            { key: "date", header: "Data" },
+                        ]}
+                        data={returnsData.recentReturns}
+                        onRowClick={() => router.push("/erp/devolucoes")}
+                        icon={ReturnIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ShoppingBagIcon} title="Produtos Mais Devolvidos" />
+                        <HorizontalBarRankingList
+                            items={returnsData.topReturnedProducts.slice(0, 5).map(p => ({ label: p.productName, value: p.count }))}
+                            colors={["#ef4444", "#f97316", "#f59e0b", "#ec4899", "#8b5cf6"]}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ListIcon} title="Devoluções por Status" />
+                        <DashboardDonutChart
+                            data={statusData}
+                            totalValue={String(returnsData.byStatus.reduce((a: any, s: any) => a + s.value, 0))}
+                            totalLabel="Total"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Ranking de Itens Devolvidos"
+                        items={returnsData.topReturnedProducts.slice(0, 6).map(p => ({ id: String(p.productName), label: p.productName, value: `${p.count}x`, subtitle: formatQuantityWithUnit(p.totalQuantity, (p as any).unit) }))}
+                        variant="compact"
+                        icon={AlertCircleIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={MoneyIcon} title="Impacto Financeiro" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[38px] font-extrabold text-brand-red leading-none">
+                                {returnsData.totalRefundedFormatted}
+                            </p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">total reembolsado</p>
+                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">Taxa de devolução: {returnsData.returnRate}%</p>
                         </div>
                     </div>
                 </div>
@@ -1320,41 +1712,20 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
     )
 }
 
-// ─────────────────── Placeholder ───────────────────
-
-function SectionPlaceholder({ title, description }: { title: string; description: string }) {
-    return (
-        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border">
-            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-3">{title}</h3>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</p>
-        </div>
-    )
-}
-
-// ─────────────────── 10. Assinaturas ───────────────────
-
+// ─────────────────────────────────────────────────────────────
+// 11. ABA DE ASSINATURAS
+// ─────────────────────────────────────────────────────────────
 function SubscriptionSection({ subscriptionData }: { subscriptionData: SubscriptionReportData | null }) {
-    const router = useRouter()
     const { setExportHandler } = useDashboard()
 
     const kpis = useMemo(() => {
         if (!subscriptionData) return []
         return [
             { title: "MRR (Ativo)", value: brl(subscriptionData.mrr), trend: "" },
-            { title: "ARR (Anualizado)", value: brl(subscriptionData.arr), trend: "" },
+            { title: "ARR (Anual)", value: brl(subscriptionData.arr), trend: "" },
             { title: "LTV Médio", value: brl(subscriptionData.ltv), trend: "" },
-            { title: "Taxa de Renovação", value: `${subscriptionData.renewalRate.toFixed(1)}%`, trend: "" },
-            { title: "Churn (30 dias)", value: `${subscriptionData.churnRate.toFixed(1)}%`, trend: "" },
-        ]
-    }, [subscriptionData])
-
-    const statusMetrics = useMemo(() => {
-        if (!subscriptionData) return []
-        return [
-            { title: "Assinaturas Ativas", value: String(subscriptionData.activeCount), color: "text-brand-green" },
-            { title: "Em Pausa", value: String(subscriptionData.pausedCount), color: "text-brand-orange" },
-            { title: "Aguardando Reposição", value: String(subscriptionData.delinquentCount), color: "text-brand-red" },
-            { title: "Canceladas (Total)", value: String(subscriptionData.cancelledCount), color: "text-brand-inactive-text" },
+            { title: "Renovação", value: `${subscriptionData.renewalRate.toFixed(1)}%`, trend: "" },
+            { title: "Churn (30d)", value: `${subscriptionData.churnRate.toFixed(1)}%`, trend: "" },
         ]
     }, [subscriptionData])
 
@@ -1366,38 +1737,29 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
             ["LTV Médio", brl(subscriptionData.ltv)],
             ["Taxa de Renovação", `${subscriptionData.renewalRate.toFixed(1)}%`],
             ["Churn Rate (30d)", `${subscriptionData.churnRate.toFixed(1)}%`],
-            ["Assinantes Ativos", String(subscriptionData.activeCount)],
-            ["Assinantes Pausados", String(subscriptionData.pausedCount)],
-            ["Aguardando Reposição", String(subscriptionData.delinquentCount)],
-            ["Canceladas", String(subscriptionData.cancelledCount)]
         ]
-        if (fmt === "csv") {
-            exportCSV("relatorio-assinaturas", ["Indicador", "Valor"], rows)
-        } else {
-            await exportXLSX("relatorio-assinaturas", [{ name: "Assinaturas", headers: ["Indicador", "Valor"], rows }])
-        }
+        if (fmt === "csv") exportCSV("relatorio-assinaturas", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-assinaturas", [{ name: "Assinaturas", headers: ["Indicador", "Valor"], rows }])
     }, [subscriptionData])
 
-    useEffect(() => {
-        setExportHandler(onExport)
-        return () => setExportHandler(null)
-    }, [onExport, setExportHandler])
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
 
-    if (!subscriptionData) {
-        return (
-            <SectionPlaceholder
-                title="Assinaturas Recorrentes"
-                description="Dados e métricas de assinaturas recorrentes indisponíveis."
-            />
-        )
-    }
+    if (!subscriptionData) return <SectionPlaceholder title="Assinaturas Recorrentes" description="Dados e métricas de assinaturas indisponíveis." />
+
+    const statusDonutData = [
+        { label: "Ativas", value: subscriptionData.activeCount, fill: "#059669" },
+        { label: "Pausadas", value: subscriptionData.pausedCount, fill: "#f59e0b" },
+        { label: "Pendentes", value: subscriptionData.delinquentCount, fill: "#ef4444" },
+        { label: "Canceladas", value: subscriptionData.cancelledCount, fill: "#94a3b8" },
+    ]
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
+            {/* Header controls */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">Analytics de Assinaturas</h2>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Visão geral do desempenho, faturamento recorrente e demanda prevista de produtos.</p>
+                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Desempenho recorrente e demanda prevista de produtos.</p>
                 </div>
                 <div className="flex gap-2">
                     <Button onClick={() => onExport("csv")} variant="outline" size="sm" leftIcon={<ExportFileIcon size={18} />}>Exportar CSV</Button>
@@ -1405,90 +1767,125 @@ function SubscriptionSection({ subscriptionData }: { subscriptionData: Subscript
                 </div>
             </div>
 
-            {/* Main KPI Row */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 w-full">
-                {kpis.map((k, idx) => (
-                    <div key={idx} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border shadow-sm flex flex-col justify-between">
-                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{k.title}</span>
-                        <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading mt-2">{k.value}</span>
-                    </div>
-                ))}
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={kpis} variant="horizontal" /></div>
             </div>
 
-            {/* Status Counters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 w-full">
-                {statusMetrics.map((sm, idx) => (
-                    <div key={idx} className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border shadow-sm flex items-center justify-between">
-                        <div>
-                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{sm.title}</span>
-                            <p className="text-3xl font-black text-brand-dark dark:text-dark-heading mt-1">{sm.value}</p>
-                        </div>
-                        <span className={`h-3.5 w-3.5 rounded-full ${sm.color === "text-brand-green" ? "bg-brand-green" : sm.color === "text-brand-orange" ? "bg-brand-orange" : sm.color === "text-brand-red" ? "bg-brand-red" : "bg-gray-400"}`} />
-                    </div>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
-                {/* Left: Projected stock demand for next 30 days */}
-                <div className="lg:col-span-6 bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border shadow-sm flex flex-col">
-                    <CardHeader icon={BoxIcon} title="Demanda Prevista de Produtos (Próximos 30 dias)" />
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">Total planejado de reposição física exigida para atender as entregas dos ciclos futuros.</p>
-
-                    {subscriptionData.projectedProducts.length === 0 ? (
-                        <div className="flex-grow flex items-center justify-center py-12 text-sm text-brand-inactive-text dark:text-dark-body">
-                            Nenhuma demanda de produtos físicos prevista para os próximos 30 dias.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="border-b border-brand-border dark:border-dark-border text-brand-inactive-text font-semibold">
-                                        <th className="pb-3">Produto</th>
-                                        <th className="pb-3 text-right">Qtd Prevista</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-brand-border dark:divide-dark-border">
-                                    {subscriptionData.projectedProducts.map((p) => (
-                                        <tr key={p.id} className="hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                            <td className="py-3 font-medium text-brand-dark dark:text-dark-heading">{p.name}</td>
-                                            <td className="py-3 text-right font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(p.quantity, (p as any).unit)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-
-                {/* Right: Credits usage & projected cycle billing */}
-                <div className="lg:col-span-6 flex flex-col gap-6">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border shadow-sm">
-                        <CardHeader icon={CreditCardIcon} title="Uso de Créditos de Assinatura" />
-                        <div className="grid grid-cols-2 gap-4 mt-2">
-                            <div className="bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl p-4 flex flex-col">
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">Créditos Utilizados</span>
-                                <span className="text-2xl font-extrabold text-brand-green mt-1">{subscriptionData.creditsUsedCount}</span>
-                            </div>
-                            <div className="bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl p-4 flex flex-col">
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">Créditos Expirados</span>
-                                <span className="text-2xl font-extrabold text-brand-red mt-1">{subscriptionData.creditsExpiredCount}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border shadow-sm flex flex-col flex-grow">
+            {/* Row 2: Previsão Financeira (8) + Status das Assinaturas (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={TrendingUpIcon} title="Faturamento Previsto (Próximos 30 dias)" />
-                        <div className="space-y-4 my-auto">
-                            <div className="flex justify-between items-center pb-2 border-b border-brand-border dark:border-dark-border">
-                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Ciclos Previstos</span>
+                        <div className="my-auto space-y-4 max-w-lg mx-auto w-full py-4">
+                            <div className="flex justify-between items-center pb-3 border-b border-brand-border dark:border-dark-border">
+                                <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">Ciclos Previstos</span>
                                 <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">{subscriptionData.projectedOrders30Days} ciclos</span>
                             </div>
-                            <div className="flex justify-between items-center pb-2 border-b border-brand-border dark:border-dark-border">
-                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Previsão Financeira</span>
-                                <span className="text-2xl font-black text-brand-green">{brl(subscriptionData.projectedRevenue30Days)}</span>
+                            <div className="flex justify-between items-center pb-3 border-b border-brand-border dark:border-dark-border">
+                                <span className="text-sm font-bold text-brand-inactive-text dark:text-dark-body">Previsão Financeira</span>
+                                <span className="text-2xl font-extrabold text-brand-green">{brl(subscriptionData.projectedRevenue30Days)}</span>
                             </div>
                         </div>
                     </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Status das Assinaturas" />
+                        <DashboardDonutChart
+                            data={statusDonutData}
+                            totalValue={String(subscriptionData.activeCount + subscriptionData.pausedCount + subscriptionData.delinquentCount + subscriptionData.cancelledCount)}
+                            totalLabel="Total"
+                            colors={["#059669", "#f59e0b", "#ef4444", "#94a3b8"]}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Demanda de Produtos (8) + Créditos (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={BoxIcon} title="Demanda Prevista de Produtos (Próximos 30 dias)" />
+                        {subscriptionData.projectedProducts.length === 0 ? (
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body py-10 text-center">Nenhuma demanda prevista.</p>
+                        ) : (
+                            <div className="overflow-x-auto my-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-brand-border dark:border-dark-border text-brand-inactive-text font-semibold">
+                                            <th className="pb-3">Produto</th>
+                                            <th className="pb-3 text-right">Qtd Prevista</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-brand-border dark:divide-dark-border">
+                                        {subscriptionData.projectedProducts.slice(0, 5).map((p) => (
+                                            <tr key={p.id}>
+                                                <td className="py-3 font-medium text-brand-dark dark:text-dark-heading">{p.name}</td>
+                                                <td className="py-3 text-right font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(p.quantity, (p as any).unit)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={CreditCardIcon} title="Uso de Créditos" />
+                        <div className="grid grid-cols-2 gap-4 my-auto">
+                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-4 text-center border border-brand-border/60 dark:border-dark-border/60">
+                                <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">Utilizados</span>
+                                <p className="text-2xl font-extrabold text-brand-green mt-1">{subscriptionData.creditsUsedCount}</p>
+                            </div>
+                            <div className="bg-brand-gray/40 dark:bg-dark-border/20 rounded-2xl p-4 text-center border border-brand-border/60 dark:border-dark-border/60">
+                                <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">Expirados</span>
+                                <p className="text-2xl font-extrabold text-brand-red mt-1">{subscriptionData.creditsExpiredCount}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TargetIcon} title="Retenção de Assinantes" />
+                        <DashboardDonutChart
+                            data={[
+                                { label: "Renovados", value: subscriptionData.renewalRate, fill: "#059669" },
+                                { label: "Churn", value: subscriptionData.churnRate, fill: "#ef4444" },
+                            ]}
+                            totalValue={`${subscriptionData.renewalRate.toFixed(0)}%`}
+                            totalLabel="Retenção"
+                            colors={["#059669", "#ef4444"]}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={BoxIcon} title="Top Produtos Assinados" />
+                        <HorizontalBarRankingList
+                            items={subscriptionData.projectedProducts.slice(0, 5).map(p => ({ label: p.name, value: p.quantity }))}
+                            colors={CHART_COLORS_VIVID}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Resumo de Status"
+                        items={[
+                            { id: "1", label: "Assinaturas Ativas", value: String(subscriptionData.activeCount), trendDirection: "up", trend: "Ativo" },
+                            { id: "2", label: "Em Pausa", value: String(subscriptionData.pausedCount) },
+                            { id: "3", label: "Aguardando Reposição", value: String(subscriptionData.delinquentCount), trendDirection: "down", trend: "Pendente" },
+                            { id: "4", label: "Canceladas", value: String(subscriptionData.cancelledCount) },
+                        ]}
+                        variant="compact"
+                        icon={AwardIcon}
+                        className="h-full"
+                    />
                 </div>
             </div>
         </div>

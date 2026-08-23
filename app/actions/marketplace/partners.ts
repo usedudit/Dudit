@@ -127,8 +127,8 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
       *,
       category:product_categories!category_id(name),
       subcategory:product_categories!subcategory_id(name),
-      brand:brands!brand_id(name),
-      location:storage_locations!location_id(name),
+      brand_rel:brands!brand_id(name),
+      location_rel:storage_locations!location_id(name),
       product_variants(variant_options, price_adjustment, is_active)
     `)
     .eq("partner_id", partnerId)
@@ -180,8 +180,8 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
       ...rest,
       category: item.category?.name || null,
       subcategory: item.subcategory?.name || null,
-      brand: item.brand?.name || null,
-      location: item.location?.name || null,
+      brand: item.brand_rel?.name || item.brand || null,
+      location: item.location_rel?.name || item.location || null,
       price,
       originalPrice,
       fallback_variant_image,
@@ -400,8 +400,8 @@ export const getCachedPartnerProducts = async (partnerId: string, storeId?: stri
           *,
           category:product_categories!category_id(name),
           subcategory:product_categories!subcategory_id(name),
-          brand:brands!brand_id(name),
-          location:storage_locations!location_id(name),
+          brand_rel:brands!brand_id(name),
+          location_rel:storage_locations!location_id(name),
           product_variants(variant_options, price_adjustment, is_active)
         `)
         .eq("partner_id", partnerId)
@@ -444,8 +444,8 @@ export const getCachedPartnerProducts = async (partnerId: string, storeId?: stri
           ...rest,
           category: item.category?.name || null,
           subcategory: item.subcategory?.name || null,
-          brand: item.brand?.name || null,
-          location: item.location?.name || null,
+          brand: item.brand_rel?.name || item.brand || null,
+          location: item.location_rel?.name || item.location || null,
           price,
           originalPrice,
           fallback_variant_image,

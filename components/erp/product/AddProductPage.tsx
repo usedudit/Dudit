@@ -394,16 +394,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setProductData((prev: any) => {
                 let brandId = prev.brand_id
                 let brandName = prev.brand
-                if (aiData.brand) {
+                if (aiData.brand && typeof aiData.brand === "string" && aiData.brand.trim()) {
+                    const detected = aiData.brand.trim()
                     const matchedBrand = brandOptions.find(
-                        (b: any) => b.label.toLowerCase() === aiData.brand.toLowerCase()
+                        (b: any) => b && (b.label || "").toLowerCase() === detected.toLowerCase()
                     )
                     if (matchedBrand) {
                         brandId = matchedBrand.value
                         brandName = matchedBrand.label
                     } else {
                         brandId = ""
-                        brandName = aiData.brand
+                        brandName = detected
                     }
                 }
 

@@ -188,7 +188,10 @@ export class AiGeneratorService {
            - Máximo de aproximadamente 700 caracteres no total.
            - Proibido: emojis, exageros ("melhor do mercado", "perfeito", "revolucionário"), promessas falsas, links, jargão técnico excessivo e menção a preço.
         2. MARCA:
-           - Identifique a marca presente no título. Se nenhuma marca estiver clara, retorne string vazia "".
+           - Identifique com precisão a marca comercial ou fabricante mencionado no título (ex: "Nike", "Apple", "Samsung", "Dell", "Sony", "LG", "Adidas", "Motorola", "Xiaomi", "Bosch", "Stanley", "Tramontina", "Natura", "Boticário", "Nestlé", "Lenovo", "Asus", "Mondial", "Philco", "Electrolux", "Brastemp", etc.).
+           - Se for um produto onde o modelo remete diretamente a uma marca (ex: "iPhone 15" -> "Apple", "Galaxy S23" -> "Samsung", "Air Force 1" -> "Nike", "PlayStation 5" -> "Sony", "Xbox Series X" -> "Microsoft"), identifique a respectiva marca ("Apple", "Samsung", "Nike", "Sony", "Microsoft").
+           - Formate o nome da marca com capitalização correta.
+           - Se nenhuma marca for identificada ou se o item for genérico/artesanal sem marca, retorne string vazia "".
         3. TAGS:
            - Gere entre 5 e 10 tags. Nunca mais de 10.
            - Devem ser curtas, minúsculas, sem acentos, sem repetição, relevantes para busca.

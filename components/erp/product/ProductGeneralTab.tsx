@@ -63,18 +63,11 @@ const FormCombobox = ({
 )
 
 const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
+    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
+        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
+        {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+        {children}
+    </div>
 )
 
 interface ProductGeneralTabProps {
@@ -115,37 +108,39 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
 
     const handleBrandChange = useCallback((v: string) => {
-        if (!v) {
+        if (!v || !v.trim()) {
             handleFieldChange({ target: { name: "brand_id", value: "" } })
             handleFieldChange({ target: { name: "brand", value: "" } })
             return
         }
-        const matched = brands.find(b => b.value === v || b.label.toLowerCase() === v.trim().toLowerCase())
+        const trimmed = v.trim()
+        const matched = (brands || []).find(b => b && (b.value === trimmed || (b.label || "").toLowerCase() === trimmed.toLowerCase()))
         if (matched) {
             handleFieldChange({ target: { name: "brand_id", value: matched.value } })
             handleFieldChange({ target: { name: "brand", value: matched.label } })
         } else {
             handleFieldChange({ target: { name: "brand_id", value: "" } })
-            handleFieldChange({ target: { name: "brand", value: v.trim() } })
+            handleFieldChange({ target: { name: "brand", value: trimmed } })
         }
     }, [brands, onFieldChange, handleInputChange])
 
     const handleLocationChange = useCallback((v: string) => {
-        if (!v) {
+        if (!v || !v.trim()) {
             handleFieldChange({ target: { name: "location_id", value: "" } })
             handleFieldChange({ target: { name: "location", value: "" } })
             handleFieldChange({ target: { name: "localizacao", value: "" } })
             return
         }
-        const matched = locations.find(l => l.value === v || l.label.toLowerCase() === v.trim().toLowerCase())
+        const trimmed = v.trim()
+        const matched = (locations || []).find(l => l && (l.value === trimmed || (l.label || "").toLowerCase() === trimmed.toLowerCase()))
         if (matched) {
             handleFieldChange({ target: { name: "location_id", value: matched.value } })
             handleFieldChange({ target: { name: "location", value: matched.label } })
             handleFieldChange({ target: { name: "localizacao", value: matched.label } })
         } else {
             handleFieldChange({ target: { name: "location_id", value: "" } })
-            handleFieldChange({ target: { name: "location", value: v.trim() } })
-            handleFieldChange({ target: { name: "localizacao", value: v.trim() } })
+            handleFieldChange({ target: { name: "location", value: trimmed } })
+            handleFieldChange({ target: { name: "localizacao", value: trimmed } })
         }
     }, [locations, onFieldChange, handleInputChange])
 

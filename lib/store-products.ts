@@ -9,16 +9,18 @@ function buildResolvedProduct(
     product: Product & {
         category?: { name: string } | null
         subcategory?: { name: string } | null
-        brand?: { name: string } | null
-        location?: { name: string } | null
+        brand_rel?: { name: string } | null
+        location_rel?: { name: string } | null
+        brand?: { name: string } | string | null
+        location?: { name: string } | string | null
     }
 ): ResolvedProduct {
     return {
         ...product,
         category: (product.category as any)?.name ?? product.category ?? null,
         subcategory: (product.subcategory as any)?.name ?? product.subcategory ?? null,
-        brand: (product.brand as any)?.name ?? product.brand ?? null,
-        location: (product.location as any)?.name ?? product.location ?? null,
+        brand: product.brand_rel?.name ?? (typeof product.brand === "string" ? product.brand : (product.brand as any)?.name) ?? null,
+        location: product.location_rel?.name ?? (typeof product.location === "string" ? product.location : (product.location as any)?.name) ?? null,
         resolved_price: Number(product.price),
         resolved_stock_quantity: product.stock_quantity,
         resolved_sku: product.sku,
@@ -38,19 +40,14 @@ export async function resolveProduct(
 
     const { data: product, error } = await supabase
         .from("products")
-        .select(`*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand:brands!brand_id(name), location:storage_locations!location_id(name)`)
+        .select(`*, category:product_categories!category_id(name), subcategory:product_categories!subcategory_id(name), brand_rel:brands!brand_id(name), location_rel:storage_locations!location_id(name)`)
         .eq("id", productId)
         .eq("store_id", storeId)
         .maybeSingle()
 
     if (error || !product) return null
 
-    return buildResolvedProduct(product as unknown as Product & {
-        category?: { name: string } | null
-        subcategory?: { name: string } | null
-        brand?: { name: string } | null
-        location?: { name: string } | null
-    })
+    return buildResolvedProduct(product as any)
 }
 
 export async function listStoreProducts(
@@ -76,8 +73,8 @@ export async function listStoreProducts(
             *,
             category:product_categories!category_id(name),
             subcategory:product_categories!subcategory_id(name),
-            brand:brands!brand_id(name),
-            location:storage_locations!location_id(name)
+            brand_rel:brands!brand_id(name),
+            location_rel:storage_locations!location_id(name)
         `)
         .eq("partner_id", partnerId)
         .order("marketplace_score", { ascending: false, nullsFirst: false })

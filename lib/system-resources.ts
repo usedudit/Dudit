@@ -356,6 +356,7 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   "/erp/contas-a-receber": "financial",
   "/erp/caixa": "financial",
   // ── Desempenho
+  "/erp/estatisticas": "reports",
   "/erp/relatorios": "reports",
   "/erp/produtividade": "productivity",
   "/erp/metas": "productivity",
