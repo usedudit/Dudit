@@ -87,7 +87,7 @@ export async function updateSystemSettingsAction(
     // 2. Update/upsert receipt settings in partner_return_policies
     const { data: existingPolicy } = await supabase
       .from("partner_return_policies")
-      .select("id")
+      .select("partner_id")
       .eq("partner_id", partnerId)
       .maybeSingle()
 

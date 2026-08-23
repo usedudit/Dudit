@@ -75,6 +75,10 @@ DECLARE
   v_code TEXT;
   v_salt TEXT;
 BEGIN
+  IF NEW.order_number IS NULL OR NEW.order_number = '' THEN
+    NEW.order_number := generate_service_order_number();
+  END IF;
+
   IF NEW.public_token IS NULL OR NEW.public_token = '' THEN
     NEW.public_token := generate_short_id(6);
   END IF;

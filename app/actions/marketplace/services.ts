@@ -50,7 +50,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       service_categories:service_categories!category_id (name),
       marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
       stores!left(
-        id, name, slug, description, logo_url, banner_url,
+        id, short_id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, business_info,
         rating, vendas_totais,

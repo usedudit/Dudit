@@ -32,7 +32,7 @@ import {
 } from "@/app/actions/erp/servicos"
 
 // Components
-import { Button, IconPlaceholder, Checkbox, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, Checkbox, SelectionBanner } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -43,7 +43,6 @@ import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import ServiceGridCard from "./ServiceGridCard"
 import ServiceListItem from "./ServiceListRow"
-import ServiceMobileItem from "./ServiceMobileItem"
 import ServicePageControls from "./ServicePageControls"
 import { AddServicePage } from "./AddServicePage"
 
@@ -56,6 +55,7 @@ import {
     BlockedIcon,
     UploadIcon,
     EditIcon,
+    UploadSheetIcon,
 } from "@/lib/icons"
 
 // --- TYPES & INTERFACES ---
@@ -733,7 +733,7 @@ export default function ServicesPage({
                                     <Button
                                         variant="outline"
                                         onClick={() => router.push("/erp/servicos/importar")}
-                                        leftIcon={<UploadIcon size={16} />}
+                                        leftIcon={<UploadSheetIcon size={16} />}
                                     >
                                         Importar
                                     </Button>

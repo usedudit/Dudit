@@ -36,7 +36,7 @@ export async function generateFailedRowsReport(
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: colNum === 2 ? "FFC0392B" : "FF2C3E50" },
+      fgColor: { argb: colNum === 2 ? "FFEA580C" : "FF059669" },
     }
     cell.alignment = { horizontal: "center", vertical: "middle" }
   })
@@ -71,7 +71,8 @@ export async function generateFailedRowsReport(
 
   const raw = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
   const buffer = Buffer.from(raw)
-  const filename = `falhas-importacao-${entityType}-${Date.now().toString().slice(-6)}.xlsx`
+  const entitySlug = entityType === "products" ? "produtos" : entityType === "services" ? "servicos" : "clientes"
+  const filename = `falhas-importacao-${entitySlug}-${Date.now().toString().slice(-6)}.xlsx`
 
   return {
     buffer,

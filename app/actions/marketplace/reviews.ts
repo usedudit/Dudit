@@ -627,10 +627,10 @@ export async function getBuyerReviewsAction() {
     .from("reviews")
     .select(`
       *,
-      products(id, name, images, video_thumbnail),
-      services(id, name, images),
+      products(id, short_id, name, images, video_thumbnail),
+      services(id, short_id, name, images),
       partners(id),
-      stores(id, name, logo_url, addresses!store_id!left(city, state))
+      stores(id, short_id, slug, name, logo_url, addresses!store_id!left(city, state))
     `)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

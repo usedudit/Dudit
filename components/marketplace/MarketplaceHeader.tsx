@@ -583,7 +583,7 @@ const Header: React.FC<HeaderProps> = ({
 
         if (simpleTitle) {
             return (
-                <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark">
+                <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark dark:bg-dark-surface border-b border-white/10">
                     <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
                         <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
                             <ChevronLeftIcon size={24} strokeWidth={2.5} />

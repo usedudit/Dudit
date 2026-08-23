@@ -88,7 +88,7 @@ export async function getERPServicesPageAction(
 
         let q = supabase
             .from("services")
-            .select("id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
+            .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {

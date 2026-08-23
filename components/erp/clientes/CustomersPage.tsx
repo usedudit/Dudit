@@ -11,9 +11,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
-
-// Components
-import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, Badge, AlertModal, SavingStatusModal, SelectionBanner, Dropdown, DropdownItem } from "@/components/reusable"
+import { Button, IconPlaceholder, ThreeDotsLoader, Checkbox, AlertModal, SavingStatusModal, SelectionBanner, Dropdown, DropdownItem } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
@@ -23,8 +21,7 @@ import CustomerPageControls from "./CustomerPageControls"
 import CustomerDetailPage from "./CustomerDetailPage"
 import NewCustomerPage from "./NewCustomerPage"
 import { deleteCustomersInBatchAction, toggleCustomersStatusAction, archiveCustomerAction, unarchiveCustomerAction } from "@/app/actions/erp/customers"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, resolveDatePeriodBounds, ymdInBounds, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 // Icons
@@ -37,7 +34,8 @@ import {
     BlockedIcon,
     CheckCircleIcon,
     UploadIcon,
-    Settings2Icon
+    Settings2Icon,
+    UploadSheetIcon
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -574,7 +572,7 @@ export default function CustomersPage({
                                         fullWidth={false}
                                     >
                                         <DropdownItem onClick={() => router.push("/erp/clientes/importar")}>
-                                            <UploadIcon size={16} /> Importar
+                                            <UploadSheetIcon size={16} /> Importar
                                         </DropdownItem>
                                         <DropdownItem onClick={handleExport} disabled={isExporting}>
                                             <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}

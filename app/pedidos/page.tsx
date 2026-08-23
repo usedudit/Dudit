@@ -24,13 +24,13 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes,
     partners(id, is_active),
-    stores!left(id, name, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
+    stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
       product_variants(variant_name, variant_options),
-      products(id, name, images, video_thumbnail, unit),
-      services(id, name, images),
-      recurring_plans(id, name))
+      products(id, short_id, name, images, video_thumbnail, unit),
+      services(id, short_id, name, images),
+      recurring_plans(id, short_id, name))
   `
   const fallbackOrderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
@@ -39,11 +39,11 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
     mp_date_approved, notes,
     partners(id, is_active),
-    stores!left(id, name, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
+    stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
-      services(id, name, images),
-      recurring_plans(id, name))
+      services(id, short_id, name, images),
+      recurring_plans(id, short_id, name))
   `
 
   // Parallelize all independent data fetches

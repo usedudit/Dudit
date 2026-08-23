@@ -56,6 +56,8 @@ async function _getPartnerProfile(partnerId: string) {
 
   if (store) {
     data.store = store
+    data.short_id = store.short_id || data.short_id
+    data.slug = store.slug || data.slug
     data.store_name = store.name
     data.store_description = store.description
     data.store_image_url = store.logo_url

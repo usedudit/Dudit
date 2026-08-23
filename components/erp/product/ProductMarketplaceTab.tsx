@@ -146,11 +146,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                                 {attributes.map((spec: any, i: number) => (
                                     <div
                                         key={i}
-                                        className={`flex justify-between items-center px-5 py-3.5 ${
-                                            i % 2 === 0
-                                                ? "bg-brand-gray dark:bg-dark-border/30"
-                                                : "bg-white dark:bg-dark-surface"
-                                        } ${i < attributes.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
+                                        className={`flex justify-between items-center px-5 py-3.5 ${i % 2 === 0
+                                            ? "bg-brand-gray dark:bg-dark-border/30"
+                                            : "bg-white dark:bg-dark-surface"
+                                            } ${i < attributes.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}
                                     >
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                             {spec.name || spec.label || ""}
@@ -167,10 +166,10 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </FormSection>
 
                     {/* Complementos e Adicionais */}
-                    <FormSection hasSeparator title="Complementos e Adicionais">
+                    <FormSection hasSeparator title="Complementos e Adicionais" description="Ideal para itens de alimentação, lanches, combos ou opções adicionais personalizadas.">
                         <ProductAddonsSection
                             addonGroups={productData?.addon_groups || []}
-                            onChange={() => {}}
+                            onChange={() => { }}
                             isEditing={false}
                         />
                     </FormSection>

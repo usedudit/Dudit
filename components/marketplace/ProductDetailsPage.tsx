@@ -213,6 +213,8 @@ export function ProductDetailsPageClient({
 
         return {
             id: storeId,
+            short_id: store?.short_id || p?.short_id || product.store_short_id || p?.store?.short_id,
+            slug: store?.slug || p?.slug,
             store_id: storeId,
             name: storeName,
             user_id: p?.user_id,
@@ -2246,14 +2248,14 @@ export function ProductDetailsPageClient({
                                         )}
                                         {galleryItems.length > 1 && (
                                             <>
-                                                <Button variant="filled" onClick={() => lightboxNav(-1)}
-                                                    className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
-                                                    <ChevronLeftIcon size={26} />
-                                                </Button>
-                                                <Button variant="filled" onClick={() => lightboxNav(1)}
-                                                    className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center">
-                                                    <ChevronRightIcon size={26} />
-                                                </Button>
+                                                <button onClick={() => lightboxNav(-1)}
+                                                    className="w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors absolute left-6 top-1/2 -translate-y-1/2">
+                                                    <ChevronLeftIcon size={22} />
+                                                </button>
+                                                <button onClick={() => lightboxNav(1)}
+                                                    className="w-11 h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors absolute right-6 top-1/2 -translate-y-1/2">
+                                                    <ChevronRightIcon size={22} />
+                                                </button>
                                             </>
                                         )}
                                     </div>
@@ -2286,7 +2288,7 @@ export function ProductDetailsPageClient({
                     document.body
                 )}
 
-                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12 lg:pt-[50px]">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (

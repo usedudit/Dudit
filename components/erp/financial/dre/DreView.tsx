@@ -5,7 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { Button, ThreeDotsLoader, InfoCard } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import { DashboardSectionCard } from "@/components/erp/dashboard/cards/DashboardSectionCard"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -299,7 +299,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
           </div>
           <div className="text-right text-xs text-gray-700">
             <p><strong>Regime:</strong> {regime === "competencia" ? "Competência" : "Caixa"}</p>
-            <p><strong>Período:</strong> {dates.startDate} até {dates.endDate}</p>
+            <p><strong>Período:</strong> {formatDate(dates.startDate)} até {formatDate(dates.endDate)}</p>
             <p><strong>Gerado em:</strong> {report?.companyInfo?.generatedAt}</p>
           </div>
         </div>
@@ -374,7 +374,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
                       Demonstração do Resultado do Exercício
                     </h2>
                     <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                      Regime de {regime === "competencia" ? "Competência" : "Caixa"} • {report.period.startDate} até {report.period.endDate} • {kpis?.totalSalesAndOrdersCount || 0} operações (Ticket Médio: {formatCurrency(kpis?.averageTicketAmount || 0)})
+                      Regime de {regime === "competencia" ? "Competência" : "Caixa"} • {formatDate(report.period.startDate)} até {formatDate(report.period.endDate)} • {kpis?.totalSalesAndOrdersCount || 0} operações (Ticket Médio: {formatCurrency(kpis?.averageTicketAmount || 0)})
                     </p>
                   </div>
 

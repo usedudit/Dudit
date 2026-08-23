@@ -104,7 +104,18 @@ export default function IconPlaceholder({
     }
 
     return (
-      <Button key={key} onClick={action} variant={variant} className={`mt-4 ${className}`} disabled={disabled}>
+      <Button
+        key={key}
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation()
+          if (typeof action === "function") {
+            action()
+          }
+        }}
+        variant={variant}
+        className={`mt-4 ${className}`}
+        disabled={disabled}
+      >
         {text}
       </Button>
     )

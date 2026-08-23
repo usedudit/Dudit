@@ -37,6 +37,7 @@ import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/typ
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
 import { listStoresAction } from "@/app/actions/erp/stores"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export default async function ERPLayout({
   children,
@@ -46,12 +47,36 @@ export default async function ERPLayout({
   await requireUser() // Ensure authenticated - single auth call for the entire ERP tree
   const user = await getCurrentUser()
 
-  const userProfile = user ? {
-    fullName: user.email?.split("@")[0] || "Usuário",
-    email: user.email || "",
-    initials: (user.email?.[0] || "U").toUpperCase(),
-    avatarColor: "bg-brand-primary"
-  } : undefined
+  let userProfile: {
+    fullName: string
+    email: string
+    initials: string
+    avatarColor: string
+    imageUrl?: string | null
+  } | undefined = undefined
+
+  if (user) {
+    let avatarUrl: string | null = null
+    try {
+      const admin = createAdminClient()
+      const { data: profileData } = await admin
+        .from("user_profiles")
+        .select("avatar_url")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      avatarUrl = profileData?.avatar_url || null
+    } catch {
+      // ignore - avatar_url is optional
+    }
+
+    userProfile = {
+      fullName: user.email?.split("@")[0] || "Usuário",
+      email: user.email || "",
+      initials: (user.email?.[0] || "U").toUpperCase(),
+      avatarColor: "bg-brand-primary",
+      imageUrl: avatarUrl
+    }
+  }
 
   // Single call to get all partner access (cached for child pages via React cache)
   const allAccess = await getAllUserPartnerAccess()

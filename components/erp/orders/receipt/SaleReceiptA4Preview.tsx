@@ -93,9 +93,8 @@ const SaleReceiptA4Preview = ({
 
     return (
         <div
-            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
-                printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
-            }`}
+            className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "border-l border-brand-border dark:border-dark-border"
+                }`}
         >
             <div
                 className={printMode
@@ -330,8 +329,8 @@ const SaleReceiptA4Preview = ({
 
                                                 {/* Aviso para pagamento online */}
                                                 {data.isOnlinePayment && (
-                                                    <div className="mt-2 py-2 px-3 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 text-xs font-bold text-center">
-                                                        ✓ Pedido pago online. Não cobrar do cliente
+                                                    <div className="w-full bg-brand-gray/40 p-6 rounded-2xl text-black space-y-2.5 mt-2">
+                                                        Pedido pago online. Não cobrar do cliente
                                                     </div>
                                                 )}
 

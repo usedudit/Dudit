@@ -34,8 +34,8 @@ export class ProductService {
         ...data,
         category: (data.category as any)?.name || null,
         subcategory: (data.subcategory as any)?.name || null,
-        brand: (data.brand as any)?.name || null,
-        location: (data.location as any)?.name || null,
+        brand: (data.brand as any)?.name || (data as any).brand || null,
+        location: (data.location as any)?.name || (data as any).location || null,
       }
 
       const fiscal = Array.isArray(mapped.product_fiscal_profiles) ? mapped.product_fiscal_profiles[0] : mapped.product_fiscal_profiles
@@ -79,8 +79,8 @@ export class ProductService {
       ...p,
       category: p.category?.name || null,
       subcategory: p.subcategory?.name || null,
-      brand: p.brand?.name || null,
-      location: p.location?.name || null,
+      brand: p.brand?.name || p.brand || null,
+      location: p.location?.name || p.location || null,
     }))
   }
 
@@ -193,8 +193,8 @@ export class ProductService {
       ...p,
       category: p.category?.name || null,
       subcategory: p.subcategory?.name || null,
-      brand: p.brand?.name || null,
-      location: p.location?.name || null,
+      brand: p.brand?.name || p.brand || null,
+      location: p.location?.name || p.location || null,
     }))
   }
 }

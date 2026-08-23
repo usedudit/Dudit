@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox } from "@/components/reusable"
-import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon } from "@/lib/icons"
+import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder, Badge, Input, Combobox, FormSection, ListItem, RadioButton, InfoCard } from "@/components/reusable"
+import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/app/actions/erp/spreadsheet-import"
 import { formatCurrency } from "@/lib/utils"
 import type { ColumnMapping, FailedRow } from "@/lib/erp/import/types"
+import ServiceGridCard from "./ServiceGridCard"
 import { FadeIn } from "@/components/animations/FadeIn"
 
 interface FieldOption {
@@ -267,6 +268,7 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState("")
     const [selection, setSelection] = useState<Set<string>>(new Set())
+    const [viewMode, setViewMode] = useState<"grid" | "list">("list")
 
     // UI Scroll States
     const [isScrolled, setIsScrolled] = useState(false)
@@ -508,57 +510,59 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
             <div className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
                 <div className="mx-auto w-full pt-8 flex flex-col h-full overflow-y-auto px-4 max-w-[800px]">
                     <div className="flex-1 flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center mb-4">
-                            <CheckCircleIcon size={36} />
-                        </div>
-                        <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                            Importação Processada!
-                        </h2>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">
-                            Processamos {totalRows} linhas da sua planilha em {(importStats.durationMs / 1000).toFixed(1)}s.
-                        </p>
+                        <IconPlaceholder
+                            icon={CheckCircleIcon}
+                            title='Importação Processada!'
+                            subtitle={`Processamos ${totalRows} linhas da sua planilha em ${(importStats.durationMs / 1000).toFixed(1)}s.`}
+                            buttons={[
+                                { text: "Voltar", action: "/erp/servicos", variant: "outline" },
+                                {
+                                    text: "Nova Importação", action: () => {
+                                        setStep("upload")
+                                        setImportDone(false)
+                                        setImportStats(null)
+                                        setParsedServices([])
+                                        setMapping([])
+                                    }
+                                }]}
+                        />
 
                         {/* Breakdown Cards */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full mb-8">
-                            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center">
-                                <span className="text-2xl font-bold text-emerald-600">{importStats.createdRows}</span>
-                                <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Novos Criados</span>
-                            </div>
-                            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 flex flex-col items-center">
-                                <span className="text-2xl font-bold text-blue-600">{importStats.updatedRows}</span>
-                                <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Atualizados</span>
-                            </div>
-                            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col items-center">
-                                <span className="text-2xl font-bold text-amber-600">{importStats.duplicateRows}</span>
-                                <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Ignorados</span>
-                            </div>
-                            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex flex-col items-center">
-                                <span className="text-2xl font-bold text-red-600">{importStats.errorRows}</span>
-                                <span className="text-xs text-red-700 dark:text-red-300 font-medium">Com Erro</span>
-                            </div>
+                            <InfoCard
+                                title="Novos Criados"
+                                message={importStats.createdRows}
+                                color="green"
+                            />
+                            <InfoCard
+                                title="Atualizados"
+                                message={importStats.updatedRows}
+                                color="blue"
+                            />
+                            <InfoCard
+                                title="Ignorados"
+                                message={importStats.duplicateRows}
+                                color="orange"
+                            />
+                            <InfoCard
+                                title="Com Erro"
+                                message={importStats.errorRows}
+                                color="red"
+                            />
                         </div>
 
                         {/* Error Download if any */}
                         {importStats.failedRows.length > 0 && (
-                            <div className="w-full p-4 mb-6 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-                                <div>
-                                    <h4 className="text-sm font-bold text-red-900 dark:text-red-300">
-                                        {importStats.failedRows.length} linhas não puderam ser importadas
-                                    </h4>
-                                    <p className="text-xs text-red-700 dark:text-red-400">
-                                        Baixe a planilha com as linhas rejeitadas e o motivo exato de cada erro para corrigir e reimportar.
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    onClick={handleDownloadFailedRows}
-                                    disabled={downloadingFailedRows}
-                                    leftIcon={downloadingFailedRows ? <Spinner /> : <DownloadIcon size={16} />}
-                                    className="shrink-0 text-red-600 border-red-300 hover:bg-red-100"
-                                >
-                                    {downloadingFailedRows ? "Gerando..." : "Baixar Relatório de Falhas (.xlsx)"}
-                                </Button>
-                            </div>
+                            <>
+                                <IconPlaceholder
+                                    icon={AlertCircleIcon}
+                                    title={`${importStats.failedRows.length} linhas não puderam ser importadas`}
+                                    subtitle="Atenção, algumas linhas não puderam ser importadas. Baixe o relatório de falhas para obter mais detalhes."
+                                    itemButton={{
+                                        text: downloadingFailedRows ? "Gerando..." : "Baixar Relatório de Falhas", action: handleDownloadFailedRows, variant: "outline"
+                                    }}
+                                />
+                            </>
                         )}
 
                         {/* Action Buttons */}
@@ -616,16 +620,6 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    {step === "upload" && (
-                                        <Button
-                                            variant="outline"
-                                            leftIcon={downloadingTemplate ? <Spinner /> : <DownloadIcon size={16} />}
-                                            onClick={handleDownloadTemplate}
-                                            disabled={downloadingTemplate}
-                                        >
-                                            {downloadingTemplate ? "Baixando..." : "Baixar Planilha Modelo (.xlsx)"}
-                                        </Button>
-                                    )}
                                     {step === "mapping" && (
                                         <>
                                             <Button variant="outline" leftIcon={<UploadIcon size={18} />} onClick={() => { setStep("upload"); setParsedServices([]); setMapping([]) }}>
@@ -752,39 +746,40 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                         {step === "preview" && (
                             <div className="flex flex-col gap-6">
                                 {/* Import Options Bar */}
-                                <div className="p-4 rounded-2xl bg-brand-gray/40 dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">
-                                            Estratégia para serviços existentes (mesmo SKU):
-                                        </span>
-                                        <div className="flex items-center gap-4 mt-1">
-                                            <label className="flex items-center gap-2 text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                <input
-                                                    type="radio"
+                                <FormSection title="Estratégia para serviços existentes (mesmo SKU/Código)">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <ListItem
+                                            left={
+                                                <RadioButton
                                                     name="duplicateStrategyService"
                                                     value="update"
                                                     checked={duplicateStrategy === "update"}
                                                     onChange={() => setDuplicateStrategy("update")}
-                                                    className="text-brand-primary"
                                                 />
-                                                <span>Atualizar dados existentes (Preço, Duração, etc.)</span>
-                                            </label>
-                                            <label className="flex items-center gap-2 text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                <input
-                                                    type="radio"
+                                            }
+                                            title="Atualizar dados existentes"
+                                            description="Atualiza preços, descrições e dados de serviços já cadastrados"
+                                            onClick={() => setDuplicateStrategy("update")}
+                                            className={duplicateStrategy === "update" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
+                                        />
+                                        <ListItem
+                                            left={
+                                                <RadioButton
                                                     name="duplicateStrategyService"
                                                     value="skip"
                                                     checked={duplicateStrategy === "skip"}
                                                     onChange={() => setDuplicateStrategy("skip")}
-                                                    className="text-brand-primary"
                                                 />
-                                                <span>Ignorar existentes</span>
-                                            </label>
-                                        </div>
+                                            }
+                                            title="Ignorar existentes"
+                                            description="Mantém os serviços existentes sem realizar qualquer alteração"
+                                            onClick={() => setDuplicateStrategy("skip")}
+                                            className={duplicateStrategy === "skip" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
+                                        />
                                     </div>
 
-                                    <div className="flex items-center gap-4 text-xs font-medium">
-                                        <label className="flex items-center gap-2 cursor-pointer text-brand-dark dark:text-dark-heading">
+                                    <div className="pt-2">
+                                        <label className="flex items-center gap-2 cursor-pointer text-brand-dark dark:text-dark-heading text-xs font-medium">
                                             <Checkbox
                                                 checked={autoCreateCategories}
                                                 onCheckedChange={(c) => setAutoCreateCategories(!!c)}
@@ -792,9 +787,9 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                             <span>Cadastrar categorias novas automaticamente</span>
                                         </label>
                                     </div>
-                                </div>
+                                </FormSection>
 
-                                <div className="flex-none">
+                                <div className="flex-none flex items-center justify-between gap-4 flex-wrap">
                                     <div className="w-80">
                                         <Input
                                             name="search"
@@ -807,11 +802,35 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                             label=""
                                         />
                                     </div>
+                                    <div className="flex items-center gap-1 bg-brand-gray/60 dark:bg-dark-border/40 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewMode("list")}
+                                            className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-white dark:bg-dark-surface shadow-xs text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"}`}
+                                            title="Visualização em Lista"
+                                        >
+                                            <ListIcon size={18} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewMode("grid")}
+                                            className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-white dark:bg-dark-surface shadow-xs text-brand-primary" : "text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading"}`}
+                                            title="Visualização em Grade"
+                                        >
+                                            <GridIcon size={18} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {filteredServices.length === 0 ? (
-                                    <div className="flex-1 flex items-center justify-center text-brand-inactive-text dark:text-dark-body text-sm py-12">
-                                        Nenhum serviço encontrado no preview
+                                    <div className="flex-1 flex items-center justify-center">
+                                        <IconPlaceholder
+                                            placeholderType="image"
+                                            imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                            imageAlt="Nenhum serviço encontrado"
+                                            title="Nenhum serviço encontrado"
+                                            subtitle="Parece que a planilha não tem esse serviço. Verifique se você digitou corretamente."
+                                        />
                                     </div>
                                 ) : (
                                     <div className="flex-1">
@@ -824,64 +843,110 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                             singularItemName="serviço"
                                         />
 
-                                        <div className="w-full overflow-hidden rounded-xl relative">
-                                            <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
-                                            <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
-
-                                            <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
-                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
-                                                    <thead>
-                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                            <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
-                                                                <Checkbox
-                                                                    checked={selection.size === paginated.length && paginated.length > 0}
-                                                                    onCheckedChange={(checked) => {
-                                                                        if (checked) {
-                                                                            setSelection((prev) => {
-                                                                                const next = new Set(prev)
-                                                                                paginated.forEach((s: any) => next.add(s.id))
-                                                                                return next
-                                                                            })
-                                                                        } else {
-                                                                            setSelection((prev) => {
-                                                                                const next = new Set(prev)
-                                                                                paginated.forEach((s: any) => next.delete(s.id))
-                                                                                return next
-                                                                            })
-                                                                        }
-                                                                    }}
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
-                                                            </th>
-                                                            {COLUMNS.map((col) => (
-                                                                <th
-                                                                    key={col.id}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : "text-left"
-                                                                        } ${col.id === "status" ? "rounded-r-lg" : ""}`}
-                                                                    style={{ width: col.width }}
-                                                                >
-                                                                    <span>{col.label}</span>
-                                                                </th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {paginated.map((service: any) => (
-                                                            <ServicePreviewRow
-                                                                key={service.id}
-                                                                service={service}
-                                                                selected={selection.has(service.id)}
-                                                                onSelect={(id) => setSelection((prev) => {
-                                                                    const next = new Set(prev)
-                                                                    next.has(id) ? next.delete(id) : next.add(id)
-                                                                    return next
-                                                                })}
-                                                            />
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                        {viewMode === "grid" ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
+                                                {paginated.map((service: any) => (
+                                                    <ServiceGridCard
+                                                        key={service.id}
+                                                        service={service}
+                                                        selected={selection.has(service.id)}
+                                                        onSelect={() => setSelection((prev) => {
+                                                            const next = new Set(prev)
+                                                            next.has(service.id) ? next.delete(service.id) : next.add(service.id)
+                                                            return next
+                                                        })}
+                                                        onEdit={() => { }}
+                                                        onDetails={() => { }}
+                                                        onDelete={() => { }}
+                                                        onDuplicate={() => { }}
+                                                        onShare={() => { }}
+                                                    />
+                                                ))}
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <>
+                                                {/* Mobile/Tablet Card Grid */}
+                                                <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
+                                                    {paginated.map((service: any) => (
+                                                        <ServiceGridCard
+                                                            key={service.id}
+                                                            service={service}
+                                                            selected={selection.has(service.id)}
+                                                            onSelect={() => setSelection((prev) => {
+                                                                const next = new Set(prev)
+                                                                next.has(service.id) ? next.delete(service.id) : next.add(service.id)
+                                                                return next
+                                                            })}
+                                                            onEdit={() => { }}
+                                                            onDetails={() => { }}
+                                                            onDelete={() => { }}
+                                                            onDuplicate={() => { }}
+                                                            onShare={() => { }}
+                                                        />
+                                                    ))}
+                                                </div>
+
+                                                {/* Desktop Table View */}
+                                                <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                                    <div className={`absolute top-0 left-0 h-full w-12 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.left ? "opacity-100" : "opacity-0"}`} />
+                                                    <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
+
+                                                    <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={checkScroll}>
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 pl-6 pr-3 w-12 bg-brand-gray dark:bg-dark-border/50 rounded-l-lg">
+                                                                        <Checkbox
+                                                                            checked={selection.size === paginated.length && paginated.length > 0}
+                                                                            onCheckedChange={(checked) => {
+                                                                                if (checked) {
+                                                                                    setSelection((prev) => {
+                                                                                        const next = new Set(prev)
+                                                                                        paginated.forEach((s: any) => next.add(s.id))
+                                                                                        return next
+                                                                                    })
+                                                                                } else {
+                                                                                    setSelection((prev) => {
+                                                                                        const next = new Set(prev)
+                                                                                        paginated.forEach((s: any) => next.delete(s.id))
+                                                                                        return next
+                                                                                    })
+                                                                                }
+                                                                            }}
+                                                                            className="bg-white dark:bg-dark-background"
+                                                                        />
+                                                                    </th>
+                                                                    {COLUMNS.map((col) => (
+                                                                        <th
+                                                                            key={col.id}
+                                                                            className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "center" ? "text-center" : "text-left"
+                                                                                } ${col.id === "status" ? "rounded-r-lg" : ""}`}
+                                                                            style={{ width: col.width }}
+                                                                        >
+                                                                            <span>{col.label}</span>
+                                                                        </th>
+                                                                    ))}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginated.map((service: any) => (
+                                                                    <ServicePreviewRow
+                                                                        key={service.id}
+                                                                        service={service}
+                                                                        selected={selection.has(service.id)}
+                                                                        onSelect={(id) => setSelection((prev) => {
+                                                                            const next = new Set(prev)
+                                                                            next.has(id) ? next.delete(id) : next.add(id)
+                                                                            return next
+                                                                        })}
+                                                                    />
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
 
                                         <div className="flex justify-center py-4">
                                             <Pagination

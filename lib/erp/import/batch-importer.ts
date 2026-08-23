@@ -4,7 +4,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
 import { enrichAddressData } from "@/lib/services/location.service"
-import { parseNumber } from "./validators"
+import { parseNumber, parseDate } from "./validators"
+import { canUseFeature } from "@/lib/services/subscription.service"
 import type { ColumnMapping, FailedRow, ImportOptions, ImportResult, ImportSession } from "./types"
 
 const BATCH_SIZE = 250
@@ -151,7 +152,7 @@ export async function executeImport(
     }
   }
 
-  // Pre-load / Auto-create suppliers for products
+  // Pre-load / Auto-create suppliers for products (if mapped)
   const hasSupplierCol = mapping.some((m) => m.field === "supplier")
   const supplierCache = new Map<string, string>()
 
@@ -275,6 +276,242 @@ export async function executeImport(
 }
 
 /* ========================================================================= */
+/* PRODUCT VARIANTS PARSER & HELPERS                                         */
+/* ========================================================================= */
+
+export interface ParsedVariant {
+  variant_name: string
+  variant_type: string
+  variant_value: string
+  sku: string
+  price_adjustment: number
+  stock_quantity: number
+  is_active: boolean
+  variant_options: any
+}
+
+function formatForVariantSku(text: string): string {
+  if (!text) return ""
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .substring(0, 10)
+}
+
+export function parseProductVariants(
+  rawVariants: string | null | undefined,
+  rawVariantType: string | null | undefined,
+  productBase: {
+    sku: string
+    price: number
+    stock_quantity: number
+  },
+): ParsedVariant[] {
+  if (!rawVariants || !rawVariants.trim()) return []
+
+  const trimmedRaw = rawVariants.trim()
+
+  // 1. Split items: primary delimiter is semicolon (;)
+  let items: string[] = []
+  if (trimmedRaw.includes(";")) {
+    items = trimmedRaw.split(";").map((s) => s.trim()).filter(Boolean)
+  } else if (trimmedRaw.includes("\n")) {
+    items = trimmedRaw.split("\n").map((s) => s.trim()).filter(Boolean)
+  } else if (!trimmedRaw.includes("(") && trimmedRaw.includes(",")) {
+    items = trimmedRaw.split(",").map((s) => s.trim()).filter(Boolean)
+  } else {
+    // If parentheses are used with commas, e.g. "P (10), M (20)"
+    items = trimmedRaw.split(/,(?![^(]*\))/).map((s) => s.trim()).filter(Boolean)
+  }
+
+  if (items.length === 0) return []
+
+  // Limit maximum 50 variants per product
+  if (items.length > 50) {
+    items = items.slice(0, 50)
+  }
+
+  let defaultType = rawVariantType?.trim() || ""
+
+  // If no variant type provided, attempt smart inference from items
+  if (!defaultType) {
+    const allValues = items.map((it) => it.split(/[\(\[\:\;\|]/)[0].trim())
+    const hasCombo = allValues.some((v) => v.includes("/"))
+    if (hasCombo) {
+      defaultType = "Opção 1 / Opção 2"
+    } else {
+      const sizePattern = /^(PP|P|M|G|GG|XG|XGG|G1|G2|G3|G4|3[4-9]|4[0-9]|5[0-2]|XXS|XS|S|M|L|XL|XXL|XXXL)$/i
+      const colorPattern = /^(azul|preto|preta|branco|branca|vermelho|vermelha|verde|amarelo|amarela|rosa|cinza|bege|marrom|roxo|roxa|laranja|dourado|dourada|prata|off-white|nude|vinho|bordo|coral|turquesa|lilas|grafite|estampado|estampada)$/i
+
+      const allSizes = allValues.every((v) => sizePattern.test(v))
+      const allColors = allValues.every((v) => colorPattern.test(v))
+
+      if (allSizes) {
+        defaultType = "Tamanho"
+      } else if (allColors) {
+        defaultType = "Cor"
+      } else {
+        defaultType = "Variação"
+      }
+    }
+  }
+
+  if (defaultType.length > 50) {
+    defaultType = defaultType.substring(0, 50)
+  }
+
+  const parsedVariants: ParsedVariant[] = []
+  const usedSkus = new Set<string>()
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const rawItem = items[idx]
+    if (!rawItem) continue
+
+    let variantName = ""
+    let stock = 0
+    let price = productBase.price
+    let customSku: string | null = null
+
+    // Check if parentheses or brackets format: e.g. "P (Estoque: 10, Preço: 49.90, SKU: CAM-P)" or "M [15]"
+    if (rawItem.includes("(") || rawItem.includes("[")) {
+      const parenMatch = rawItem.match(/^([^\(\[]+)(?:[\(\[](.*)[\)\]])?$/)
+      if (parenMatch) {
+        variantName = parenMatch[1].trim()
+        const insideParen = parenMatch[2]?.trim()
+
+        if (insideParen) {
+          const parts = insideParen.split(/[,;]/).map((p) => p.trim()).filter(Boolean)
+          let hasNamedKey = false
+
+          for (const part of parts) {
+            const lowerPart = part.toLowerCase()
+            if (
+              lowerPart.startsWith("est") ||
+              lowerPart.startsWith("qtd") ||
+              lowerPart.startsWith("quant") ||
+              lowerPart.startsWith("stock") ||
+              lowerPart.startsWith("saldo") ||
+              lowerPart.startsWith("qty")
+            ) {
+              const val = parseNumber(part.split(":")[1] || part.replace(/^[a-zA-Z\s]+/g, ""))
+              if (val !== null && val >= 0) stock = Math.floor(val)
+              hasNamedKey = true
+            } else if (
+              lowerPart.startsWith("pre") ||
+              lowerPart.startsWith("val") ||
+              lowerPart.startsWith("price") ||
+              lowerPart.startsWith("pv")
+            ) {
+              const val = parseNumber(part.split(":")[1] || part.replace(/^[a-zA-Z\s]+/g, ""))
+              if (val !== null && val >= 0) price = val
+              hasNamedKey = true
+            } else if (
+              lowerPart.startsWith("sku") ||
+              lowerPart.startsWith("cód") ||
+              lowerPart.startsWith("cod") ||
+              lowerPart.startsWith("ref")
+            ) {
+              const val = part.split(":")[1]?.trim()
+              if (val) customSku = val
+              hasNamedKey = true
+            }
+          }
+
+          // Positional values if no named key-values
+          if (!hasNamedKey) {
+            if (parts.length === 1) {
+              const num = parseNumber(parts[0])
+              if (num !== null && num >= 0) stock = Math.floor(num)
+            } else if (parts.length >= 2) {
+              const n1 = parseNumber(parts[0])
+              const n2 = parseNumber(parts[1])
+              if (n1 !== null && n1 >= 0) stock = Math.floor(n1)
+              if (n2 !== null && n2 >= 0) price = n2
+              if (parts[2]) customSku = parts[2]
+            }
+          }
+        }
+      }
+    } else if (rawItem.includes("|")) {
+      // Pipe format: "P | 10 | 49.90 | CAM-P"
+      const parts = rawItem.split("|").map((p) => p.trim())
+      variantName = parts[0]
+      if (parts[1]) {
+        const n = parseNumber(parts[1])
+        if (n !== null && n >= 0) stock = Math.floor(n)
+      }
+      if (parts[2]) {
+        const p = parseNumber(parts[2])
+        if (p !== null && p >= 0) price = p
+      }
+      if (parts[3]) customSku = parts[3]
+    } else if (rawItem.includes(":")) {
+      // Colon format: "P: 10" or "P: 10: 49.90"
+      const parts = rawItem.split(":").map((p) => p.trim())
+      variantName = parts[0]
+      if (parts[1]) {
+        const n = parseNumber(parts[1])
+        if (n !== null && n >= 0) stock = Math.floor(n)
+      }
+      if (parts[2]) {
+        const p = parseNumber(parts[2])
+        if (p !== null && p >= 0) price = p
+      }
+      if (parts[3]) customSku = parts[3]
+    } else {
+      variantName = rawItem.trim()
+    }
+
+    if (!variantName) continue
+
+    if (variantName.length > 50) {
+      variantName = variantName.substring(0, 50)
+    }
+
+    // Generate or validate SKU
+    let variantSku = customSku ? customSku.trim() : ""
+    if (!variantSku) {
+      const baseSku = productBase.sku || "PRD"
+      const suffix = variantName
+        .split("/")
+        .map((p) => formatForVariantSku(p.trim()))
+        .filter(Boolean)
+        .join("-")
+
+      variantSku = `${baseSku}-${suffix || idx + 1}`
+    }
+
+    if (variantSku.length > 100) {
+      variantSku = variantSku.substring(0, 100)
+    }
+
+    // Ensure unique SKU within batch
+    let uniqueVariantSku = variantSku
+    let counter = 1
+    while (usedSkus.has(uniqueVariantSku.toLowerCase())) {
+      uniqueVariantSku = `${variantSku}-${counter}`
+      counter++
+    }
+    usedSkus.add(uniqueVariantSku.toLowerCase())
+
+    parsedVariants.push({
+      variant_name: variantName,
+      variant_type: defaultType,
+      variant_value: variantName,
+      sku: uniqueVariantSku,
+      price_adjustment: price,
+      stock_quantity: stock,
+      is_active: true,
+      variant_options: null,
+    })
+  }
+
+  return parsedVariants
+}
+
+/* ========================================================================= */
 /* PRODUCTS BATCH IMPORT                                                     */
 /* ========================================================================= */
 
@@ -325,6 +562,7 @@ async function importProductBatch(
   const toInsert: any[] = []
   const toUpdate: { id: string; data: any; sku: string }[] = []
   const productProfiles: Record<string, { fiscal: any; logistics: any }> = {}
+  const productVariantsMap = new Map<string, ParsedVariant[]>()
 
   for (let i = 0; i < batch.length; i++) {
     const row = batch[i]
@@ -396,7 +634,6 @@ async function importProductBatch(
       promotional_price: parseNumber(row["promotional_price"]),
       status,
       show_in_marketplace: showInMarketplace,
-      is_active: status === "ativo",
     }
 
     if (row["category"]) {
@@ -422,6 +659,25 @@ async function importProductBatch(
 
     if (row["tags"]) {
       productData.tags = row["tags"].split(",").map((t) => t.trim()).filter(Boolean)
+    }
+
+    // Parse product variants if specified
+    const variantsRaw = row["variants"]?.trim()
+    const variantTypeRaw = row["variant_type"]?.trim()
+    if (variantsRaw) {
+      const parsedVariants = parseProductVariants(variantsRaw, variantTypeRaw, {
+        sku,
+        price,
+        stock_quantity: productData.stock_quantity,
+      })
+      if (parsedVariants.length > 0) {
+        // If variants have stock and the product's main stock is 0, update product stock to sum of variants
+        const totalVariantStock = parsedVariants.reduce((sum, v) => sum + v.stock_quantity, 0)
+        if (totalVariantStock > 0 && productData.stock_quantity === 0) {
+          productData.stock_quantity = totalVariantStock
+        }
+        productVariantsMap.set(sku, parsedVariants)
+      }
     }
 
     productProfiles[sku] = {
@@ -479,6 +735,7 @@ async function importProductBatch(
       // Insert fiscal & logistics profiles
       const fiscalToInsert: any[] = []
       const logisticsToInsert: any[] = []
+      const variantsToInsert: any[] = []
 
       for (const item of inserted || []) {
         if (item.sku && item.id) {
@@ -486,6 +743,16 @@ async function importProductBatch(
           if (prof) {
             fiscalToInsert.push({ product_id: item.id, ...prof.fiscal })
             logisticsToInsert.push({ product_id: item.id, ...prof.logistics })
+          }
+
+          const variants = productVariantsMap.get(item.sku)
+          if (variants && variants.length > 0) {
+            for (const v of variants) {
+              variantsToInsert.push({
+                product_id: item.id,
+                ...v,
+              })
+            }
           }
         }
       }
@@ -496,11 +763,29 @@ async function importProductBatch(
       if (logisticsToInsert.length > 0) {
         await supabase.from("product_logistics").insert(logisticsToInsert)
       }
+
+      // Insert product variants if any
+      if (variantsToInsert.length > 0) {
+        const isVariantsAllowed = await canUseFeature(partnerId, "product_variants")
+        if (isVariantsAllowed) {
+          const { error: variantInsertError } = await supabase
+            .from("product_variants")
+            .upsert(variantsToInsert, { onConflict: "sku" })
+
+          if (variantInsertError) {
+            console.error("[BatchImport] Erro ao inserir variantes:", variantInsertError)
+          }
+        } else {
+          warnings++
+        }
+      }
     }
   }
 
   // Perform updates
   if (toUpdate.length > 0) {
+    const variantsToUpsert: any[] = []
+
     for (const item of toUpdate) {
       const { error } = await supabase
         .from("products")
@@ -522,6 +807,31 @@ async function importProductBatch(
             .from("product_logistics")
             .upsert({ product_id: item.id, ...prof.logistics }, { onConflict: "product_id" })
         }
+
+        const variants = productVariantsMap.get(item.sku)
+        if (variants && variants.length > 0) {
+          for (const v of variants) {
+            variantsToUpsert.push({
+              product_id: item.id,
+              ...v,
+            })
+          }
+        }
+      }
+    }
+
+    if (variantsToUpsert.length > 0) {
+      const isVariantsAllowed = await canUseFeature(partnerId, "product_variants")
+      if (isVariantsAllowed) {
+        const { error: variantUpsertError } = await supabase
+          .from("product_variants")
+          .upsert(variantsToUpsert, { onConflict: "sku" })
+
+        if (variantUpsertError) {
+          console.error("[BatchImport] Erro ao atualizar variantes:", variantUpsertError)
+        }
+      } else {
+        warnings++
       }
     }
   }
@@ -651,7 +961,7 @@ async function importCustomerBatch(
       person_type: personType,
       cpf: cpfEncrypted,
       cnpj,
-      birth_date: row["birth_date"] || null,
+      birth_date: parseDate(row["birth_date"]),
       notes: row["notes"] || null,
       inscricao_estadual: row["inscricao_estadual"]?.trim() || null,
       status,
@@ -859,7 +1169,6 @@ async function importServiceBatch(
       unit: row["unit"] || "Serviço",
       service_type: serviceType,
       status,
-      is_active: status === "ativo",
     }
 
     if (row["category"]) {

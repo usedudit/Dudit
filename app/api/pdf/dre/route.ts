@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import { generatePdf } from "@/lib/pdf/generator"
+import { formatDateToBR } from "@/lib/utils"
 
 export async function GET(request: NextRequest) {
   // 1. Autenticar usuário
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="DRE-${startDate}_a_${endDate}.pdf"`,
+        "Content-Disposition": `attachment; filename="DRE-${formatDateToBR(startDate)}_a_${formatDateToBR(endDate)}.pdf"`,
         "Cache-Control": "no-store, must-revalidate",
       },
     })

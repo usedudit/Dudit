@@ -7,6 +7,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 interface UserProfileData {
   full_name: string | null
   address: string | null
+  avatar_url: string | null
 }
 
 interface UserProfileHookResult {
@@ -21,7 +22,8 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
   // Use sessionData from context if available as higher priority fallback
   const contextProfile = sessionData?.profile ? {
     full_name: sessionData.profile.full_name || null,
-    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null
+    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null,
+    avatar_url: null
   } : null
 
   const effectiveFallback = fallbackData || contextProfile
@@ -29,7 +31,7 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
   const fetcher = useCallback(async () => {
     if (!user) return null
     const [profileRes, addressRes] = await Promise.all([
-      supabase.from("user_profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
       supabase.from("addresses").select("city, state")
         .eq("user_id", user.id)
         .eq("is_default", true)
@@ -43,7 +45,8 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
 
     return {
       full_name: profileRes.data?.full_name || null,
-      address: addressStr
+      address: addressStr,
+      avatar_url: profileRes.data?.avatar_url || null
     }
   }, [user, supabase])
 

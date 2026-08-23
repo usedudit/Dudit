@@ -94,6 +94,8 @@ export function PlanDetailsPageClient({
 
         return {
             id: storeId,
+            short_id: store?.short_id || p.short_id || plan.store_short_id || p?.store?.short_id,
+            slug: store?.slug || p.slug,
             store_id: storeId,
             name: storeName,
             partner_id: p.id || plan.partner_id,
@@ -710,7 +712,7 @@ export function PlanDetailsPageClient({
                     document.body
                 )}
 
-                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12 lg:pt-[50px]">
                     {/* Breadcrumbs */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (

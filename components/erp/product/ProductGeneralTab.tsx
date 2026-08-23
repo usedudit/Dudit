@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner, ListItem } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon } from "@/lib/icons"
@@ -24,7 +24,11 @@ const FormCombobox = ({
     options,
     disabled,
     width = "w-full",
-    actionItem
+    actionItem,
+    creatable = false,
+    createLabel,
+    searchPlaceholder,
+    placeholder
 }: {
     label: string,
     value: any,
@@ -32,7 +36,11 @@ const FormCombobox = ({
     options: { label: string, value: string }[],
     disabled?: boolean,
     width?: string,
-    actionItem?: { label: string | React.ReactNode, icon?: React.ReactNode, onClick: () => void }
+    actionItem?: { label: string | React.ReactNode, icon?: React.ReactNode, onClick: () => void },
+    creatable?: boolean,
+    createLabel?: (search: string) => React.ReactNode,
+    searchPlaceholder?: string,
+    placeholder?: string
 }) => (
     <div className={`flex flex-col gap-1.5 ${width}`}>
         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
@@ -46,6 +54,10 @@ const FormCombobox = ({
             width="w-full"
             className={width}
             actionItem={actionItem}
+            creatable={creatable}
+            createLabel={createLabel}
+            searchPlaceholder={searchPlaceholder}
+            placeholder={placeholder}
         />
     </div>
 )
@@ -101,6 +113,42 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
     const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false)
 
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
+
+    const handleBrandChange = useCallback((v: string) => {
+        if (!v) {
+            handleFieldChange({ target: { name: "brand_id", value: "" } })
+            handleFieldChange({ target: { name: "brand", value: "" } })
+            return
+        }
+        const matched = brands.find(b => b.value === v || b.label.toLowerCase() === v.trim().toLowerCase())
+        if (matched) {
+            handleFieldChange({ target: { name: "brand_id", value: matched.value } })
+            handleFieldChange({ target: { name: "brand", value: matched.label } })
+        } else {
+            handleFieldChange({ target: { name: "brand_id", value: "" } })
+            handleFieldChange({ target: { name: "brand", value: v.trim() } })
+        }
+    }, [brands, onFieldChange, handleInputChange])
+
+    const handleLocationChange = useCallback((v: string) => {
+        if (!v) {
+            handleFieldChange({ target: { name: "location_id", value: "" } })
+            handleFieldChange({ target: { name: "location", value: "" } })
+            handleFieldChange({ target: { name: "localizacao", value: "" } })
+            return
+        }
+        const matched = locations.find(l => l.value === v || l.label.toLowerCase() === v.trim().toLowerCase())
+        if (matched) {
+            handleFieldChange({ target: { name: "location_id", value: matched.value } })
+            handleFieldChange({ target: { name: "location", value: matched.label } })
+            handleFieldChange({ target: { name: "localizacao", value: matched.label } })
+        } else {
+            handleFieldChange({ target: { name: "location_id", value: "" } })
+            handleFieldChange({ target: { name: "location", value: v.trim() } })
+            handleFieldChange({ target: { name: "localizacao", value: v.trim() } })
+        }
+    }, [locations, onFieldChange, handleInputChange])
+
     const { salesPrice, profit, margin } = useMemo(() => {
         const p = Number(productData.price || 0), c = Number(productData.costPrice || 0)
         return { salesPrice: p, profit: p - c, margin: p > 0 ? ((p - c) / p * 100).toFixed(1) : "0.0" }
@@ -690,10 +738,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             <FormCombobox
                                 label="Localização"
                                 options={locations}
-                                value={productData.location_id}
-                                onChange={(v) => handleFieldChange({ target: { name: "location_id", value: v } })}
+                                value={productData.location_id || productData.localizacao || productData.location || ""}
+                                onChange={handleLocationChange}
                                 disabled={!isEditing}
                                 width="w-full"
+                                creatable={true}
+                                searchPlaceholder="Buscar ou digitar novo local..."
+                                placeholder="Selecione ou digite..."
+                                createLabel={(s) => <span>Usar local &ldquo;<strong>{s}</strong>&rdquo;</span>}
                                 actionItem={{
                                     label: metadataPlanBlocked ? (
                                         <span className="inline-flex items-center gap-1.5">
@@ -860,10 +912,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     <FormCombobox
                                         label="Marca"
                                         options={brands}
-                                        value={productData.brand_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
+                                        value={productData.brand_id || productData.brand || ""}
+                                        onChange={handleBrandChange}
                                         disabled={!isEditing}
                                         width="w-full"
+                                        creatable={true}
+                                        searchPlaceholder="Buscar ou digitar nova marca..."
+                                        placeholder="Selecione ou digite..."
+                                        createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
                                         actionItem={{
                                             label: metadataPlanBlocked ? (
                                                 <span className="inline-flex items-center gap-1.5">
@@ -1000,10 +1056,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     <FormCombobox
                                         label="Marca"
                                         options={brands}
-                                        value={productData.brand_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "brand_id", value: v } })}
+                                        value={productData.brand_id || productData.brand || ""}
+                                        onChange={handleBrandChange}
                                         disabled={!isEditing}
                                         width="w-full"
+                                        creatable={true}
+                                        searchPlaceholder="Buscar ou digitar nova marca..."
+                                        placeholder="Selecione ou digite..."
+                                        createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
                                         actionItem={{
                                             label: metadataPlanBlocked ? (
                                                 <span className="inline-flex items-center gap-1.5">

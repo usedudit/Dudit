@@ -113,48 +113,83 @@ export function suggestMapping(
 ): ColumnMapping[] {
   const fields = getFieldsForEntity(entityType)
   const normalizedHeaders = headers.map(normalize)
-  const usedFields = new Set<string>()
 
-  const mappings = normalizedHeaders.map((header, index) => {
-    let bestField: string | null = null
-    let bestLabel = ""
-    let bestConfidence = 0
-    let isCustom = false
-
-    // Extract up to 5 non-empty sample values from the rows for this column
-    const sampleValues: string[] = []
+  // Step 1: Pre-extract sample values per column
+  const columnSamples: string[][] = normalizedHeaders.map((_, index) => {
+    const samples: string[] = []
     if (rows && rows.length > 0) {
       for (const row of rows) {
         if (index < row.length) {
           const val = row[index]?.trim()
-          if (val && !sampleValues.includes(val)) {
-            sampleValues.push(val)
-            if (sampleValues.length >= 5) break
+          if (val && !samples.includes(val)) {
+            samples.push(val)
+            if (samples.length >= 5) break
           }
         }
       }
     }
+    return samples
+  })
+
+  // Step 2: Score each (column, field) pair
+  interface CandidateMatch {
+    colIndex: number
+    fieldName: string
+    fieldLabel: string
+    confidence: number
+    exactness: number
+  }
+
+  const allCandidates: CandidateMatch[] = []
+
+  normalizedHeaders.forEach((header, colIndex) => {
+    const sampleValues = columnSamples[colIndex]
 
     for (const field of fields) {
-      for (const synonym of field.synonyms) {
-        const normalizedSynonym = normalize(synonym)
-        let confidence = 0
+      const searchTerms = [
+        field.label,
+        field.name,
+        ...field.synonyms,
+      ]
 
-        if (header === normalizedSynonym) {
+      let maxConfidence = 0
+      let maxExactness = 0
+
+      for (const term of searchTerms) {
+        const normalizedTerm = normalize(term)
+        if (!normalizedTerm) continue
+
+        let confidence = 0
+        let exactness = 0
+
+        if (header === normalizedTerm) {
           confidence = 1.0
-        } else if (header.startsWith(normalizedSynonym) || normalizedSynonym.startsWith(header)) {
-          confidence = 0.9
-        } else if (header.includes(normalizedSynonym) || normalizedSynonym.includes(header)) {
-          const shorter = Math.min(header.length, normalizedSynonym.length)
-          if (shorter > 3) {
+          exactness = 1000 + normalizedTerm.length
+        } else if (header.startsWith(normalizedTerm)) {
+          const ratio = normalizedTerm.length / header.length
+          confidence = ratio > 0.6 ? 0.95 : 0.9
+          exactness = 500 + normalizedTerm.length
+        } else if (normalizedTerm.startsWith(header)) {
+          const ratio = header.length / normalizedTerm.length
+          confidence = ratio > 0.6 ? 0.92 : 0.88
+          exactness = 400 + header.length
+        } else if (header.includes(normalizedTerm)) {
+          if (normalizedTerm.length > 3) {
+            confidence = 0.82
+            exactness = 200 + normalizedTerm.length
+          }
+        } else if (normalizedTerm.includes(header)) {
+          if (header.length > 3) {
             confidence = 0.8
+            exactness = 100 + header.length
           }
         }
 
-        if (confidence === 0 && header.length > 2 && normalizedSynonym.length > 2) {
-          const sim = similarity(header, normalizedSynonym)
+        if (confidence === 0 && header.length > 2 && normalizedTerm.length > 2) {
+          const sim = similarity(header, normalizedTerm)
           if (sim > 0.72) {
             confidence = Math.round(sim * 10) / 10
+            exactness = Math.round(sim * 100)
           }
         }
 
@@ -163,88 +198,102 @@ export function suggestMapping(
           const firstVal = sampleValues[0]
           if (field.type === "number" && !looksLikeNumber(firstVal)) {
             confidence = 0.3
+            exactness = 0
           }
           if (field.type === "enum" && firstVal.length > 40) {
             confidence = 0.2
+            exactness = 0
           }
         }
 
-        if (confidence > bestConfidence) {
-          bestConfidence = confidence
-          bestField = field.name
-          bestLabel = field.label
+        if (confidence > maxConfidence || (confidence === maxConfidence && exactness > maxExactness)) {
+          maxConfidence = confidence
+          maxExactness = exactness
         }
       }
-    }
 
-    // Heuristics based on sample content if header match was weak or ambiguous
-    if (bestConfidence < 0.7 && sampleValues.length > 0) {
-      const firstSample = sampleValues[0]
+      // Sample heuristic fallback
+      if (maxConfidence < 0.7 && sampleValues.length > 0) {
+        const firstSample = sampleValues[0]
+        if (field.name === "email" && looksLikeEmail(firstSample)) {
+          maxConfidence = 0.95
+          maxExactness = 800
+        } else if (field.name === "gtin" && entityType === "products" && /^\d{8,14}$/.test(firstSample.replace(/\D/g, "")) && firstSample.length >= 8) {
+          maxConfidence = 0.9
+          maxExactness = 700
+        } else if (field.name === "cpf" && entityType === "customers" && firstSample.replace(/\D/g, "").length === 11) {
+          maxConfidence = 0.9
+          maxExactness = 700
+        } else if (field.name === "cnpj" && entityType === "customers" && firstSample.replace(/\D/g, "").length === 14) {
+          maxConfidence = 0.9
+          maxExactness = 700
+        } else if (field.name === "zip_code" && entityType === "customers" && /^\d{5}-?\d{3}$/.test(firstSample.trim())) {
+          maxConfidence = 0.9
+          maxExactness = 700
+        }
+      }
 
-      // Check email
-      if (looksLikeEmail(firstSample)) {
-        bestField = "email"
-        bestLabel = fields.find((f) => f.name === "email")?.label || "E-mail"
-        bestConfidence = 0.95
-      }
-      // Check GTIN / Barcode (numeric 8, 12, 13, 14 digits)
-      else if (entityType === "products" && /^\d{8,14}$/.test(firstSample.replace(/\D/g, "")) && firstSample.length >= 8) {
-        bestField = "gtin"
-        bestLabel = fields.find((f) => f.name === "gtin")?.label || "Código de Barras"
-        bestConfidence = 0.9
-      }
-      // Check CPF
-      else if (entityType === "customers" && firstSample.replace(/\D/g, "").length === 11) {
-        bestField = "cpf"
-        bestLabel = fields.find((f) => f.name === "cpf")?.label || "CPF"
-        bestConfidence = 0.9
-      }
-      // Check CNPJ
-      else if (entityType === "customers" && firstSample.replace(/\D/g, "").length === 14) {
-        bestField = "cnpj"
-        bestLabel = fields.find((f) => f.name === "cnpj")?.label || "CNPJ"
-        bestConfidence = 0.9
-      }
-      // Check CEP
-      else if (entityType === "customers" && /^\d{5}-?\d{3}$/.test(firstSample.trim())) {
-        bestField = "zip_code"
-        bestLabel = fields.find((f) => f.name === "zip_code")?.label || "CEP"
-        bestConfidence = 0.9
+      if (maxConfidence >= 0.5) {
+        allCandidates.push({
+          colIndex,
+          fieldName: field.name,
+          fieldLabel: field.label,
+          confidence: maxConfidence,
+          exactness: maxExactness,
+        })
       }
     }
+  })
 
-    // Prevent duplicate mapping with lower confidence
-    if (bestField && usedFields.has(bestField)) {
-      bestField = null
-      bestConfidence = 0
+  // Step 3: Optimal global assignment - sort candidates by highest confidence & exactness
+  allCandidates.sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence
+    return b.exactness - a.exactness
+  })
+
+  const assignedFields = new Set<string>()
+  const columnAssignments = new Map<number, CandidateMatch>()
+
+  for (const cand of allCandidates) {
+    if (columnAssignments.has(cand.colIndex)) continue
+    if (assignedFields.has(cand.fieldName)) continue
+
+    columnAssignments.set(cand.colIndex, cand)
+    assignedFields.add(cand.fieldName)
+  }
+
+  // Step 4: Construct final mapping array
+  return normalizedHeaders.map((_, index) => {
+    const assigned = columnAssignments.get(index)
+    const sampleValues = columnSamples[index]
+
+    if (assigned && assigned.confidence >= 0.5) {
+      const matchedFieldDef = fields.find((f) => f.name === assigned.fieldName)
+      const typeMismatchWarning = checkTypeMismatch(matchedFieldDef, sampleValues)
+
+      return {
+        headerIndex: index,
+        header: headers[index],
+        field: assigned.fieldName,
+        fieldLabel: assigned.fieldLabel,
+        confidence: assigned.confidence,
+        isCustom: false,
+        sampleValues: sampleValues.length > 0 ? sampleValues : undefined,
+        typeMismatchWarning,
+      }
     }
-
-    if (bestField) {
-      usedFields.add(bestField)
-    }
-
-    if (bestConfidence < 0.5) {
-      isCustom = true
-      bestField = null
-      bestLabel = ""
-    }
-
-    const matchedFieldDef = fields.find((f) => f.name === bestField)
-    const typeMismatchWarning = checkTypeMismatch(matchedFieldDef, sampleValues)
 
     return {
       headerIndex: index,
       header: headers[index],
-      field: bestField,
-      fieldLabel: bestLabel,
-      confidence: bestConfidence,
-      isCustom,
+      field: null,
+      fieldLabel: "",
+      confidence: 0,
+      isCustom: true,
       sampleValues: sampleValues.length > 0 ? sampleValues : undefined,
-      typeMismatchWarning,
+      typeMismatchWarning: undefined,
     }
   })
-
-  return mappings
 }
 
 export function validateMappingCompatibility(

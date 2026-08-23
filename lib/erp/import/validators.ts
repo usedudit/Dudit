@@ -69,6 +69,68 @@ export function parseNumber(v: string | number | null | undefined): number | nul
   return isNaN(n) ? null : n
 }
 
+export function parseDate(v: any): string | null {
+  if (v === null || v === undefined) return null
+  if (typeof v === "object" && v instanceof Date && !isNaN(v.getTime())) {
+    return v.toISOString().split("T")[0]
+  }
+
+  const str = String(v).trim()
+  if (!str) return null
+
+  // If already ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const isoDate = str.slice(0, 10)
+    const [y, m, d] = isoDate.split("-").map(Number)
+    if (y >= 1900 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return isoDate
+    }
+  }
+
+  // Brazilian format DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+  const brMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/)
+  if (brMatch) {
+    let day = parseInt(brMatch[1], 10)
+    let month = parseInt(brMatch[2], 10)
+    let year = parseInt(brMatch[3], 10)
+
+    if (year < 100) {
+      year += year > 40 ? 1900 : 2000
+    }
+
+    // Safety check if user entered MM/DD/YYYY instead
+    if (month > 12 && day <= 12) {
+      const tmp = month
+      month = day
+      day = tmp
+    }
+
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100) {
+      const pad = (n: number) => String(n).padStart(2, "0")
+      return `${year}-${pad(month)}-${pad(day)}`
+    }
+  }
+
+  // Excel serial number (e.g. 32978 -> 1990-04-15)
+  if (!isNaN(Number(str)) && Number(str) > 1000 && Number(str) < 100000) {
+    const excelDate = new Date((Number(str) - 25569) * 86400 * 1000)
+    if (!isNaN(excelDate.getTime())) {
+      return excelDate.toISOString().split("T")[0]
+    }
+  }
+
+  // Native Date parsing fallback
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear()
+    if (y >= 1900 && y <= 2100) {
+      return parsed.toISOString().split("T")[0]
+    }
+  }
+
+  return null
+}
+
 export function validateRow(
   rowData: Record<string, string>,
   rowIndex: number,
@@ -98,6 +160,17 @@ export function validateRow(
           row: rowIndex + 1,
           field: field.label,
           message: `${field.label} deve ser um número válido`,
+        })
+      }
+    }
+
+    if (field.type === "date" && trimmed) {
+      const parsedD = parseDate(trimmed)
+      if (!parsedD) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: field.label,
+          message: `${field.label} inválida (use o formato DD/MM/AAAA)`,
         })
       }
     }
@@ -174,6 +247,18 @@ export function validateRow(
           row: rowIndex + 1,
           field: "Código de Barras",
           message: "GTIN/EAN geralmente possui 8, 12, 13 ou 14 dígitos",
+        })
+      }
+    }
+
+    const variants = rowData["variants"]?.trim()
+    if (variants) {
+      const parts = variants.split(/[;\n]/).filter(Boolean)
+      if (parts.length > 50) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Variações (Grade)",
+          message: `Produto possui ${parts.length} variações. O limite máximo recomendado é de 50 variações por produto.`,
         })
       }
     }

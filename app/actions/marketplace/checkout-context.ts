@@ -37,6 +37,7 @@ export type MarketplaceCheckoutContextResult =
       deposit: MarketplaceCheckoutDepositConfig
       store?: {
         id: string
+        short_id?: string | null
         name: string
         slug: string | null
         logo_url: string | null
@@ -45,8 +46,10 @@ export type MarketplaceCheckoutContextResult =
       } | null
       partner: {
         id: string
+        short_id?: string | null
         slug: string | null
         address: Record<string, unknown> | null
+        name?: string | null
         storeName: string | null
         store_name?: string | null
         mpConnected: boolean
@@ -135,7 +138,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     targetStoreId
       ? admin
           .from("stores")
-          .select("id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .eq("id", targetStoreId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -183,7 +186,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     (() => {
       let q = admin
         .from("products")
-        .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
+        .select("id, short_id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
         .eq("moderation_status", "approved")
@@ -388,6 +391,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     },
     store: storeRowData ? {
       id: (storeRowData as any).id,
+      short_id: (storeRowData as any).short_id || null,
       name: (storeRowData as any).name,
       slug: (storeRowData as any).slug || null,
       logo_url: (storeRowData as any).logo_url || null,
@@ -396,8 +400,10 @@ export async function getMarketplaceCheckoutContextAction(input: {
     } : null,
     partner: {
       id: resolved.partnerId,
+      short_id: (storeRowData as any)?.short_id || null,
       slug: (storeRowData as any)?.slug || null,
       address: (effectiveAddress as Record<string, unknown>) || null,
+      name: effectiveStoreName,
       storeName: effectiveStoreName,
       store_name: effectiveStoreName,
       mpConnected,

@@ -412,6 +412,8 @@ function rowToPreviewEntity(
   const stock = rawStock ? parseInt(rawStock.replace(/\D/g, "")) || 0 : 0
   const rawVis = get("show_in_marketplace")?.toLowerCase()
   const show_in_marketplace = !(rawVis && ["oculto", "privado", "unpublished", "inativo", "0", "false", "nao", "não"].includes(rawVis))
+  const variant_type = get("variant_type")
+  const variants = get("variants")
 
   return {
     id: `import-${Date.now()}-${index}`,
@@ -425,6 +427,8 @@ function rowToPreviewEntity(
     subcategory: get("subcategory"),
     brand: get("brand"),
     supplier: get("supplier"),
+    variant_type,
+    variants,
     unit: get("unit") || "UN",
     description: get("description"),
     ncm: get("ncm"),

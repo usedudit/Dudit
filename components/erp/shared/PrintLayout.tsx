@@ -12,6 +12,12 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
     const [isHeadless, setIsHeadless] = useState(false)
 
     useEffect(() => {
+        // Remove dark mode class from html/body on print view
+        if (typeof document !== "undefined") {
+            document.documentElement.classList.remove("dark")
+            document.body.classList.remove("dark")
+        }
+
         const headlessDetected =
             typeof window !== "undefined" &&
             (window.location.search.includes("headless=true") ||
@@ -51,7 +57,24 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
-                        /* Global print overrides */
+                        /* Global print and dark-mode override */
+                        html, body, :root, .dark {
+                            color-scheme: light !important;
+                            background-color: #ffffff !important;
+                            color: #000000 !important;
+                        }
+
+                        .sale-receipt-thermal-print,
+                        .sale-receipt-thermal-print *,
+                        .thermal-receipt-root,
+                        .thermal-receipt-root * {
+                            color: #000000 !important;
+                            border-color: #000000 !important;
+                            -webkit-text-fill-color: #000000 !important;
+                            text-shadow: none !important;
+                            opacity: 1 !important;
+                        }
+
                         @media print {
                             html, body {
                                 background-color: #ffffff !important;

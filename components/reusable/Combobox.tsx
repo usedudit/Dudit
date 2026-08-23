@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { CancelIcon, ChevronsUpDown, CheckCircleIcon } from "@/lib/icons"
+import { CancelIcon, ChevronsUpDown, CheckCircleIcon, PlusIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import BottomSheet from "@/components/BottomSheet"
@@ -35,6 +35,9 @@ interface ComboboxProps {
     /** Borda vermelha (validação), alinhado ao Input */
     error?: boolean
     errorMessage?: string
+    /** Permite digitar e selecionar um valor customizado livre */
+    creatable?: boolean
+    createLabel?: (search: string) => React.ReactNode
 }
 
 export function Combobox({
@@ -52,6 +55,8 @@ export function Combobox({
     required,
     error = false,
     errorMessage,
+    creatable = false,
+    createLabel,
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -65,7 +70,16 @@ export function Combobox({
 
     const isMobile = useMediaQuery("(max-width: 768px)")
 
-    const selectedOption = options.find((option) => option.value === value)
+    const selectedOption =
+        options.find((option) => option.value === value) ||
+        (value && creatable ? { value, label: value } : undefined)
+
+    const normalizedSearch = search.trim()
+    const hasExactMatch = options.some(
+        (opt) =>
+            opt.label.trim().toLowerCase() === normalizedSearch.toLowerCase() ||
+            opt.value.trim().toLowerCase() === normalizedSearch.toLowerCase()
+    )
 
     const filteredOptions = options.filter(
         (option) =>
@@ -188,6 +202,21 @@ export function Combobox({
                         placeholder={searchPlaceholder}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault()
+                                if (filteredOptions.length === 1 && filteredOptions[0].label.toLowerCase() === normalizedSearch.toLowerCase()) {
+                                    onChange(filteredOptions[0].value)
+                                    closeDropdown()
+                                } else if (creatable && normalizedSearch && !hasExactMatch) {
+                                    onChange(normalizedSearch)
+                                    closeDropdown()
+                                } else if (filteredOptions.length > 0) {
+                                    onChange(filteredOptions[0].value)
+                                    closeDropdown()
+                                }
+                            }
+                        }}
                         onFocus={() => setIsSearchFocused(true)}
                         onBlur={() => setIsSearchFocused(false)}
                         className={cn(
@@ -210,8 +239,29 @@ export function Combobox({
             </div>
 
             <div className="max-h-[240px] overflow-y-auto p-1 custom-scrollbar bg-white dark:bg-dark-surface">
+                {creatable && normalizedSearch && !hasExactMatch && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onChange(normalizedSearch)
+                            closeDropdown()
+                        }}
+                        className={cn(
+                            "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-md transition-colors duration-150",
+                            "hover:bg-brand-green/10 dark:hover:bg-brand-green/20 text-brand-green font-medium border-b border-brand-border/40 dark:border-dark-border/40 mb-1 text-left"
+                        )}
+                    >
+                        <PlusIcon className="w-4 h-4 shrink-0 text-brand-green" />
+                        <span className="truncate">
+                            {createLabel ? createLabel(normalizedSearch) : `Usar "${normalizedSearch}"`}
+                        </span>
+                    </button>
+                )}
+
                 {filteredOptions.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">{emptyMessage}</div>
+                    !creatable || !normalizedSearch ? (
+                        <div className="px-3 py-6 text-center text-sm text-brand-inactive-text dark:text-dark-body">{emptyMessage}</div>
+                    ) : null
                 ) : (
                     filteredOptions.map((option) => {
                         const isSelected = option.value === value
@@ -224,13 +274,13 @@ export function Combobox({
                                     closeDropdown()
                                 }}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors duration-150",
+                                    "w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors duration-150 text-left",
                                     "hover:bg-gray-100 dark:hover:bg-dark-border text-brand-dark dark:text-dark-heading",
                                     isSelected && "bg-brand-green-secondary/10 text-brand-green font-medium",
                                 )}
                             >
                                 <span>{option.label}</span>
-                                {isSelected && <CheckCircleIcon className="w-4 h-4 text-brand-green" />}
+                                {isSelected && <CheckCircleIcon className="w-4 h-4 text-brand-green shrink-0" />}
                             </button>
                         )
                     })

@@ -34,6 +34,8 @@ import {
     TrashIcon,
 } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { ShareModal } from "@/components/marketplace/ShareModal"
+import { getPlanUrl } from "@/lib/utils/url-generator"
 import { listRecurringPlansAction, deleteRecurringPlanAction } from "@/app/actions/erp/recurring-plans"
 import type { RecurringPlan } from "@/lib/types/recurring"
 import { getRecurringFrequencyLabel } from "@/lib/types/recurring"
@@ -251,16 +253,10 @@ export default function RecurringPlansPage({
     const handleEditPlan = (plan: any) => openEntity("edit", plan.id)
     const handleDetailsPlan = (plan: any) => openEntity("view", plan.id)
 
+    const [sharingPlan, setSharingPlan] = useState<any | null>(null)
+
     const handleSharePlan = (plan: any) => {
-        const shareUrl = `${window.location.origin}/erp/plans?view=${plan.id}`
-        navigator.clipboard.writeText(shareUrl)
-            .then(() => {
-                notifySuccess("Link do plano copiado para a área de transferência!")
-            })
-            .catch((err) => {
-                console.error("Erro ao copiar link: ", err)
-                notifyError("Erro ao copiar o link.")
-            })
+        setSharingPlan(plan)
     }
 
     const handleDeleteTrigger = (plan: any) => {
@@ -568,6 +564,17 @@ export default function RecurringPlansPage({
                 confirmText={isDeleting ? "Excluindo..." : "Excluir Selecionados"}
                 variant="danger"
             />
+
+            {sharingPlan && (
+                <ShareModal
+                    isOpen={!!sharingPlan}
+                    onClose={() => setSharingPlan(null)}
+                    url={typeof window !== "undefined" ? `${window.location.origin}${getPlanUrl(sharingPlan)}` : ""}
+                    title={sharingPlan.name}
+                    shareMessage={`🔥 Conheça nosso plano de assinatura na Dudit!\n\n*${sharingPlan.name}*\nConfira os detalhes aqui:`}
+                    label="Link do plano"
+                />
+            )}
         </>
     )
 }

@@ -12,19 +12,18 @@ const ENTITY_SHEET_NAMES: Record<EntityType, string> = {
 const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
   products: [
     {
-      name: "Camiseta Algodão Básica Preta M",
-      sku: "CAM-BAS-BLK-M",
+      name: "Camiseta Algodão Básica",
+      sku: "CAM-BAS-001",
       gtin: "7891234567890",
       price: 49.90,
       cost_price: 22.00,
       promotional_price: 39.90,
-      stock_quantity: 50,
+      stock_quantity: 65,
       min_stock: 10,
       unit: "UN",
-      category: "Vestuário",
-      subcategory: "Camisetas",
       brand: "Dudit Wear",
-      supplier: "Distribuidora Têxtil Ltda",
+      variant_type: "Tamanho",
+      variants: "P (Estoque: 15, Preço: 49.90); M (Estoque: 30, Preço: 49.90); G (Estoque: 20, Preço: 49.90)",
       status: "Ativo",
       show_in_marketplace: "Sim",
       description: "Camiseta unissex 100% algodão, corte clássico e costura reforçada.",
@@ -32,19 +31,15 @@ const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
       condition: "Novo",
       ncm: "61091000",
       cest: "2803800",
-      origin: "0 - Nacional",
       weight_gross: 200,
       weight_net: 180,
       width: 20,
       height: 4,
       length: 28,
-      packaging_type: "Pacote/Caixa",
-      preparation_days: 1,
-      tags: "camiseta, algodão, basica, moda",
     },
     {
-      name: "Tênis Esportivo Running Pro 41",
-      sku: "TEN-RUN-PRO-41",
+      name: "Tênis Esportivo Running Pro",
+      sku: "TEN-RUN-PRO",
       gtin: "7899876543210",
       price: 299.90,
       cost_price: 140.00,
@@ -52,10 +47,9 @@ const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
       stock_quantity: 15,
       min_stock: 3,
       unit: "PAR",
-      category: "Calçados",
-      subcategory: "Tênis",
       brand: "Sprint Runner",
-      supplier: "Importadora Brasil",
+      variant_type: "Cor / Tamanho",
+      variants: "Preto / 40 (Estoque: 5); Preto / 41 (Estoque: 5); Azul / 41 (Estoque: 5)",
       status: "Ativo",
       show_in_marketplace: "Sim",
       description: "Tênis com amortecimento em gel, ideal para corridas e treinos diários.",
@@ -63,15 +57,11 @@ const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
       condition: "Novo",
       ncm: "64041100",
       cest: "2805900",
-      origin: "0 - Nacional",
       weight_gross: 850,
       weight_net: 750,
       width: 24,
       height: 12,
       length: 34,
-      packaging_type: "Pacote/Caixa",
-      preparation_days: 1,
-      tags: "tenis, corrida, esporte, running",
     },
   ],
   customers: [
@@ -184,6 +174,7 @@ export async function generateImportTemplate(
   headerRow.height = 28
   headerRow.eachCell((cell, colNumber) => {
     const field = fields[colNumber - 1]
+    const isReq = !!field.required
     cell.font = {
       bold: true,
       color: { argb: "FFFFFFFF" },
@@ -193,7 +184,7 @@ export async function generateImportTemplate(
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: field.required ? "FF1E824C" : "FF2C3E50" },
+      fgColor: { argb: isReq ? "FFEA580C" : "FF059669" }, // Brand Orange (obrigatórios) e Brand Green (demais)
     }
     cell.alignment = {
       horizontal: "center",
@@ -201,10 +192,10 @@ export async function generateImportTemplate(
       wrapText: false,
     }
     cell.border = {
-      top: { style: "thin", color: { argb: "FF115E30" } },
-      bottom: { style: "medium", color: { argb: "FF0E4724" } },
-      left: { style: "thin", color: { argb: "FF115E30" } },
-      right: { style: "thin", color: { argb: "FF115E30" } },
+      top: { style: "thin", color: { argb: isReq ? "FFC2410C" : "FF047857" } },
+      bottom: { style: "medium", color: { argb: isReq ? "FF9A3412" : "FF065F46" } },
+      left: { style: "thin", color: { argb: isReq ? "FFC2410C" : "FF047857" } },
+      right: { style: "thin", color: { argb: isReq ? "FFC2410C" : "FF047857" } },
     }
   })
 
@@ -265,7 +256,7 @@ export async function generateImportTemplate(
   guideHeader.height = 26
   guideHeader.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11, name: "Segoe UI" }
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2C3E50" } }
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF059669" } } // Brand Green
     cell.alignment = { horizontal: "center", vertical: "middle" }
   })
 
@@ -288,14 +279,15 @@ export async function generateImportTemplate(
         right: { style: "thin", color: { argb: "FFE0E0E0" } },
       }
       if (colNumber === 2 && field.required) {
-        cell.font = { bold: true, color: { argb: "FFC0392B" } }
+        cell.font = { bold: true, color: { argb: "FFEA580C" } } // Brand Orange text para obrigatórios
       }
     })
   }
 
   const raw = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
   const buffer = Buffer.from(raw)
-  const filename = `modelo-importacao-${entityType}.xlsx`
+  const entitySlug = entityType === "products" ? "produtos" : entityType === "services" ? "servicos" : "clientes"
+  const filename = `modelo-importacao-${entitySlug}.xlsx`
 
   return {
     buffer,

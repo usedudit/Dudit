@@ -29,7 +29,7 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const activeStoreId = await getActiveStoreId();
 
   // Store e queries de fallback
-  const STORE_SELECT = "id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, addresses!store_id!left(city, state)"
+  const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, addresses!store_id!left(city, state)"
 
   // 1. Executa todas as consultas ao DB de forma paralela e agregada
   const [

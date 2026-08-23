@@ -348,7 +348,6 @@ export async function getUserFavoritesAction(params?: {
             }
         }
 
-
         // Merge favorites with item data, preserving order
         const items = favorites
             .map((fav: any) => {

@@ -845,6 +845,7 @@ interface UpdateProductData {
     subcategory_id?: string
     marketplace_category_id?: string | null
     marketplaceCategoryId?: string | null
+    location?: string
     locationId?: string
     featured?: boolean
     productType?: string
@@ -913,7 +914,7 @@ export async function updateProductComprehensiveAction(productId: string, data: 
 
         // Campos diretos
         const directMapFields = [
-            'name', 'description', 'category', 'brand', 'sku', 'gtin', 'condition',
+            'name', 'description', 'category', 'brand', 'location', 'sku', 'gtin', 'condition',
             'price', 'images',
             'availability_value', 'availability_unit', 'warranty', 'unit',
             'category_id', 'brand_id', 'location_id', 'subcategory_id', 'marketplace_category_id'
@@ -2225,7 +2226,7 @@ const fetchProductsStatic = unstable_cache(
         const supabase = getAdminClient()
         const { data, error } = await supabase
             .from("products")
-            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
             .limit(100)
             .order("created_at", { ascending: false })
@@ -2272,8 +2273,8 @@ const fetchProductByIdStatic = unstable_cache(
                 ...product,
                 category: product.category?.name || null,
                 subcategory: product.subcategory?.name || null,
-                brand: product.brand?.name || null,
-                location: product.location?.name || null
+                brand: product.brand?.name || (product as any).brand || null,
+                location: product.location?.name || (product as any).location || null
             }
         }
         return product
@@ -2418,7 +2419,7 @@ export async function getERPProductsPageAction(
 
         let q = supabase
             .from("products")
-            .select("id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
+            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand:brands!brand_id(name)")
             .eq("partner_id", partnerId)
 
         if (options?.storeId) {

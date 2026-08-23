@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Portal from "@/components/Portal"
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger, FormTextarea, ListItem } from "@/components/reusable"
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger, ListItem } from "@/components/reusable"
 import { XIcon, PrinterIcon, DownloadIcon, FileTextIcon } from "@/lib/icons"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useStore } from "@/lib/store-context"
@@ -162,9 +162,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
         <Portal>
             <div className="fixed inset-0 z-[130] flex flex-col bg-black/60">
                 <div
-                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${
-                        isAnimating ? "opacity-100" : "opacity-0"
-                    }`}
+                    className={`relative flex flex-col w-full h-full bg-white dark:bg-dark-background transition-opacity duration-200 ${isAnimating ? "opacity-100" : "opacity-0"
+                        }`}
                 >
                     {/* Header */}
                     <div className="shrink-0 flex items-center justify-between px-4 md:px-6 py-4 border-b border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
@@ -205,9 +204,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
                             {/* Left - options */}
                             <div
-                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${
-                                    activeTab === "Visualização" ? "hidden lg:flex" : "flex"
-                                }`}
+                                className={`w-full lg:w-1/2 flex flex-col border-r border-brand-border dark:border-dark-border overflow-hidden ${activeTab === "Visualização" ? "hidden lg:flex" : "flex"
+                                    }`}
                             >
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
                                     <div>
@@ -220,18 +218,12 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                                 title="Impressora térmica (80mm)"
                                                 description="Formato em bobina contínua, ideal para impressoras térmicas e comprovante rápido de balcão."
                                                 onClick={() => setFormat("thermal")}
-                                                className={`transition-all ${
-                                                    format === "thermal"
-                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                        : "opacity-80 hover:opacity-100"
-                                                }`}
                                                 right={
                                                     <div
-                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                                            format === "thermal"
-                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                : "border-brand-border dark:border-dark-border"
-                                                        }`}
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal"
+                                                            ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                            : "border-brand-border dark:border-dark-border"
+                                                            }`}
                                                     >
                                                         {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
                                                     </div>
@@ -242,18 +234,12 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                                 title="Documento A4 (PDF)"
                                                 description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
                                                 onClick={() => setFormat("a4")}
-                                                className={`transition-all ${
-                                                    format === "a4"
-                                                        ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                        : "opacity-80 hover:opacity-100"
-                                                }`}
                                                 right={
                                                     <div
-                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                                            format === "a4"
-                                                                ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                : "border-brand-border dark:border-dark-border"
-                                                        }`}
+                                                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "a4"
+                                                            ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                            : "border-brand-border dark:border-dark-border"
+                                                            }`}
                                                     >
                                                         {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
                                                     </div>
@@ -261,17 +247,6 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                             />
                                         </div>
                                     </div>
-
-                                    <FormTextarea
-                                        name="receiptFooterMessage"
-                                        label="Mensagem final do recibo"
-                                        value={footerMessage}
-                                        onChange={(e) => setFooterMessage(e.target.value)}
-                                        rows={2}
-                                        placeholder={DEFAULT_RECEIPT_FOOTER_MESSAGE}
-                                        maxLength={500}
-                                        showCharacterCount
-                                    />
 
                                     <div className="hidden lg:flex gap-3 pt-2">
                                         <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
@@ -308,9 +283,8 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
 
                             {/* Right - preview */}
                             <div
-                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${
-                                    activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
-                                }`}
+                                className={`w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 flex flex-col min-h-0 overflow-hidden ${activeTab === "Visualização" ? "flex flex-1" : "hidden lg:flex"
+                                    }`}
                             >
                                 <TabsContent
                                     value="Visualização"

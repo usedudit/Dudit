@@ -2,7 +2,7 @@
 
 import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, MoneyInput, Button, Checkbox, Badge } from "@/components/reusable"
+import { Input, MoneyInput, Button, Checkbox, Badge, IconPlaceholder } from "@/components/reusable"
 import { PlusIcon, TrashIcon, ChevronDownIcon } from "@/lib/icons"
 import type { ProductAddonGroup, ProductAddonOption } from "@/lib/types/product"
 import { formatCurrency } from "@/lib/utils"
@@ -162,47 +162,21 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
     // ── MODO EDIÇÃO ─────────────────────────────────────────────
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h4 className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                        Grupos de Complementos e Adicionais
-                    </h4>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                        Ideal para itens de alimentação, lanches, combos ou opções adicionais personalizadas.
-                    </p>
-                </div>
-
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addGroup}
-                    leftIcon={<PlusIcon className="w-4 h-4" />}
-                    className="text-xs h-9 px-3"
-                >
-                    Novo Grupo
-                </Button>
-            </div>
-
             {!addonGroups || addonGroups.length === 0 ? (
-                <div className="p-6 rounded-2xl border-2 border-dashed border-brand-border dark:border-dark-border text-center flex flex-col items-center justify-center bg-brand-gray/20 dark:bg-dark-border/10">
+                <div className="flex flex-col items-center justify-center">
+                    <IconPlaceholder
+                        icon={PlusIcon}
+                        title="Nenhum complemento adicionado"
+                        subtitle="Exemplo: Escolha o Molho, Ponto da Carne, Borda Recheada ou Adicionais Extras."
+                        itemButton={{
+                            text: "Criar primeiro grupo",
+                            action: addGroup,
+                            variant: "outline",
+                        }}
+                    />
                     <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center mb-2 text-brand-inactive-text">
                         <PlusIcon className="w-5 h-5" />
                     </div>
-                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                        Nenhum complemento adicionado
-                    </p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 max-w-sm">
-                        Exemplo: "Escolha o Molho", "Ponto da Carne", "Borda Recheada" ou "Adicionais Extras".
-                    </p>
-                    <Button
-                        type="button"
-                        variant="default"
-                        onClick={addGroup}
-                        leftIcon={<PlusIcon className="w-4 h-4" />}
-                        className="mt-4 text-xs h-8 px-3"
-                    >
-                        Criar primeiro grupo
-                    </Button>
                 </div>
             ) : (
                 <div className="space-y-4">

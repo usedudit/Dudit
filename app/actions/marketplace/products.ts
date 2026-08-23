@@ -33,8 +33,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       is_active, status, moderation_status,
       category_id, category:product_categories!category_id(name),
       subcategory_id, subcategory:product_categories!subcategory_id(name),
-      brand_id, brand:brands!brand_id(name),
-      location_id, location:storage_locations!location_id(name),
+      brand, brand_id, brand_entity:brands!brand_id(name),
+      location, location_id, location_entity:storage_locations!location_id(name),
       images, rating, partner_id, sku, 
       condition, show_in_marketplace, technical_specs, created_at,
       show_price_in_store,
@@ -47,7 +47,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
         payment_methods(*)
       ),
       stores!left(
-        id, name, slug, description, logo_url, banner_url,
+        id, short_id, name, slug, description, logo_url, banner_url,
         phone, opening_hours, gallery,
         is_showcase_active, business_info,
         rating, vendas_totais,
@@ -106,8 +106,8 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
   if (data) {
     data.category = (data.category as any)?.name || null
     data.subcategory = (data.subcategory as any)?.name || null
-    data.brand = (data.brand as any)?.name || null
-    data.location = (data.location as any)?.name || null
+    data.brand = (data.brand_entity as any)?.name || data.brand || null
+    data.location = (data.location_entity as any)?.name || data.location || null
     data.marketplace_category = data.marketplace_category as any
 
     let p: any = data.partners

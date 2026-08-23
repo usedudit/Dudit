@@ -20,8 +20,8 @@ export async function listMarketplaceRecurringPlansAction(partnerId: string) {
         *,
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
-          products:product_id(id, name, price, images),
-          services:service_id(id, name, price, duration_minutes)
+          products:product_id(id, short_id, name, price, images),
+          services:service_id(id, short_id, name, price, duration_minutes)
         )
       `)
       .eq("partner_id", partnerId)
@@ -176,9 +176,9 @@ export async function getMyRecurringSubscriptionsAction() {
       .from("recurring_subscriptions")
       .select(`
         *,
-        recurring_plans(id, name, description, frequency_type, frequency_interval, status),
+        recurring_plans(id, short_id, name, description, frequency_type, frequency_interval, status),
         partners:partner_id(id),
-        stores(id, name, logo_url)
+        stores(id, short_id, name, slug, logo_url, addresses!store_id!left(city, state))
       `)
       .in("customer_id", customerIds)
       .order("created_at", { ascending: false })
@@ -195,7 +195,16 @@ export async function getMyRecurringSubscriptionsAction() {
           ? getRecurringFrequencyLabel(row.recurring_plans.frequency_type, row.recurring_plans.frequency_interval)
           : "",
         plan: row.recurring_plans,
-        partner: row.partners,
+        partner: row.stores ? {
+          ...row.stores,
+          id: row.stores.id || row.partners?.id,
+          short_id: row.stores.short_id,
+          slug: row.stores.slug,
+          name: row.stores.name,
+          store_name: row.stores.name,
+          city: row.stores.addresses?.[0]?.city || null,
+          state: row.stores.addresses?.[0]?.state || null,
+        } : row.partners,
       })),
     }
   } catch (e: unknown) {
@@ -318,11 +327,11 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
-        stores(id, name, logo_url, banner_url, rating, vendas_totais),
+        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
-          products:product_id(id, name, price, images),
-          services:service_id(id, name, price, duration_minutes)
+          products:product_id(id, short_id, name, price, images),
+          services:service_id(id, short_id, name, price, duration_minutes)
         )
       `)
 

@@ -54,7 +54,6 @@ type ActivePage =
   | "team"
   | "subscription"
   | "payment-methods"
-  | "crediario"
   | "comissao"
   | "trocas"
   | "vitrine"
@@ -79,7 +78,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "team": "equipe-e-acessos",
     "subscription": "assinatura",
     "payment-methods": "formas-de-pagamento",
-    "crediario": "crediario",
     "comissao": "comissao",
     "trocas": "trocas-devolucoes",
     "vitrine": "vitrine",
@@ -136,7 +134,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         setActivePage(SLUG_TO_PAGE[tab])
         if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("empresa")
-        } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+        } else if (["payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("vendas")
         } else {
           setActiveTab("adicionais")
@@ -157,7 +155,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         setActivePage(SLUG_TO_PAGE[tab])
         if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("empresa")
-        } else if (["payment-methods", "crediario", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+        } else if (["payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("vendas")
         } else {
           setActiveTab("adicionais")
@@ -180,7 +178,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "team": "Equipe e Acessos",
         "subscription": "Minha Assinatura",
         "payment-methods": "Formas de Pagamentos",
-        "crediario": "Crediário",
         "comissao": "Comissão",
         "trocas": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
@@ -350,14 +347,21 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 className="px-4 py-3 gap-4"
                               />
                             )}
-                            <ListItem
-                              icon={CreditCardIcon}
-                              title="Crediário"
-                              description="Gerencie as regras de parcelamento e limites para vendas no fiado."
-                              onClick={() => navigateToSubpage("crediario")}
-                              showChevron
-                              className="px-4 py-3 gap-4"
-                            />
+                            {canAccessDelivery && (
+                              <ListItem
+                                icon={PackageReceiveIcon}
+                                title={deliveryPlanBlocked ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    Logística e Entrega
+                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                  </span>
+                                ) : "Logística e Entrega"}
+                                description="Configure taxas de entrega, raios de atendimento e horários."
+                                onClick={() => navigateToSubpage("delivery")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                             {canAccessCommissions && (
                               <ListItem
                                 icon={TagIcon}
@@ -408,21 +412,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 title="Configurações do Sistema"
                                 description="Fuso horário e configurações gerais do sistema."
                                 onClick={() => navigateToSubpage("system-settings")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
-                            {canAccessDelivery && (
-                              <ListItem
-                                icon={PackageReceiveIcon}
-                                title={deliveryPlanBlocked ? (
-                                  <span className="inline-flex items-center gap-2">
-                                    Logística e Entrega
-                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                  </span>
-                                ) : "Logística e Entrega"}
-                                description="Configure taxas de entrega, raios de atendimento e horários."
-                                onClick={() => navigateToSubpage("delivery")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -494,7 +483,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
           {activePage === "team" && <TeamSubPage key="team" partnerId={partner.id} onBack={() => navigateToSubpage("home")} teamPlanBlocked={teamPlanBlocked} />}
           {activePage === "subscription" && canAccessSubscription && <SubscriptionSubPage key="subscription" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
-          {activePage === "crediario" && <SimpleSettingsSubPage key="crediario" title="Crediário" onBack={() => navigateToSubpage("home")} />}
           {activePage === "comissao" && canAccessCommissions && <CommissionsSubPage key="comissao" partnerId={partner.id} onBack={() => navigateToSubpage("home")} planGate={commissionsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
           {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}

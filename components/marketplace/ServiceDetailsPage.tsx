@@ -241,7 +241,9 @@ export function ServiceDetailsPageClient({
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
 
         return {
-            id: partnerId,
+            id: storeId || partnerId,
+            short_id: store?.short_id || p?.short_id || service.store_short_id || p?.store?.short_id,
+            slug: store?.slug || p?.slug,
             partner_id: partnerId,
             store_id: storeId,
             name: storeName,
@@ -2013,7 +2015,7 @@ export function ServiceDetailsPageClient({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="min-h-screen bg-white dark:bg-dark-background lg:pt-[50px] font-sans flex flex-col"
             >
-                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12 lg:pt-[50px]">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (

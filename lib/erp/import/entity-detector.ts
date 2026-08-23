@@ -14,6 +14,7 @@ const patterns: Record<EntityType, { keywords: string[] }> = {
       "ean", "ncm", "cest", "categoria", "marca", "unidade", "quantidade",
       "qtd", "custo", "peso", "altura", "largura", "comprimento",
       "barras", "valor unitario", "produto", "name", "nome",
+      "variacao", "variacao", "variante", "variantes", "grade",
     ],
   },
   customers: {

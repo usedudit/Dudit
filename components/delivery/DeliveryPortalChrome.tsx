@@ -229,7 +229,7 @@ export function DeliveryPortalHeader({
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="pt-3 py-3">
+                            <div className="pt-3 px-3 py-3">
                                 <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
                                     <div
                                         className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}

@@ -243,6 +243,11 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
             req.continue().catch(() => {})
         })
 
+        // Emulate light color scheme
+        await page.emulateMediaFeatures([
+            { name: "prefers-color-scheme", value: "light" },
+        ])
+
         // Open internal print URL - fast DOM lifecycle
         await page.goto(urlObj.toString(), {
             waitUntil: "domcontentloaded",
@@ -255,6 +260,13 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                 timeout: 4000,
             })
         } catch { }
+
+        // Remove dark mode classes and force light color scheme on document
+        await page.evaluate(() => {
+            document.documentElement.classList.remove("dark")
+            document.body.classList.remove("dark")
+            document.documentElement.style.colorScheme = "light"
+        })
 
         // Fast check: wait for fonts and images to be ready
         await page.evaluate(async () => {
@@ -275,22 +287,32 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
             )
         })
 
-        // Inject styles ensuring .no-print is removed and text is crisp black
+        // Inject styles ensuring .no-print is removed, dark mode is neutralized, and text is pure black #000000
         await page.addStyleTag({
             content: `
                 .no-print { display: none !important; }
-                html, body {
+                html, body, :root, .dark {
                     background-color: #ffffff !important;
                     color: #000000 !important;
                     margin: 0 !important;
                     padding: 0 !important;
+                    color-scheme: light !important;
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                }
+                .sale-receipt-thermal-print,
+                .sale-receipt-thermal-print *,
+                .thermal-receipt-root,
+                .thermal-receipt-root * {
+                    color: #000000 !important;
+                    border-color: #000000 !important;
+                    -webkit-text-fill-color: #000000 !important;
+                    text-shadow: none !important;
+                    opacity: 1 !important;
                 }
                 .sale-receipt-thermal-print {
                     margin: 0 auto !important;
                     background-color: #ffffff !important;
-                    color: #000000 !important;
                     box-shadow: none !important;
                     border: none !important;
                 }

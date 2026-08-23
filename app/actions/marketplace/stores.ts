@@ -156,8 +156,8 @@ export const getCachedStoreReviews = async (storeId: string) => {
                     .from("reviews")
                     .select(`
                         id, rating, comment, created_at, product_id, service_id, store_id,
-                        products:product_id(name, images, unit),
-                        services:service_id(name, images, unit)
+                        products:product_id(id, short_id, name, images, unit),
+                        services:service_id(id, short_id, name, images, unit)
                     `)
                     .eq("store_id", storeId)
                     .order("created_at", { ascending: false })

@@ -325,12 +325,13 @@ export function buildSaleReceiptFromOrder(
             : "delivery"
 
     const paymentProvider = String(order.payment_provider || "").toLowerCase()
+    const paymentMethod = String(order.payment_method || "").toLowerCase()
     const isOnlinePayment = Boolean(
         order.mp_payment_id ||
+        order.mpPaymentId ||
         paymentProvider.includes("mercado") ||
-        paymentProvider.includes("online") ||
-        order.is_online_payment ||
-        (isOnlineOrder && paymentProvider !== "pickup" && paymentProvider !== "manual" && paymentProvider !== "presencial")
+        paymentMethod.includes("mercado") ||
+        order.is_online_payment === true
     )
 
     const notes = (order.notes || order.observation || order.customer_notes || "").trim() || null

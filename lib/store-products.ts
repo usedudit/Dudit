@@ -115,7 +115,9 @@ export async function listStoreProducts(
         if (product.category?.name) product.category = product.category.name as any
         if (product.subcategory?.name) product.subcategory = product.subcategory.name as any
         if (product.brand?.name) product.brand = product.brand.name as any
+        else if (typeof (row as any).brand === 'string') product.brand = (row as any).brand
         if (product.location?.name) product.location = product.location.name as any
+        else if (typeof (row as any).location === 'string') product.location = (row as any).location
 
         return buildResolvedProduct(product)
     })

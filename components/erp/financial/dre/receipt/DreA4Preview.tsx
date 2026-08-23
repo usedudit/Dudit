@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
   QUOTE_PREVIEW_PRIMARY_COLOR,
@@ -137,7 +137,7 @@ export function DreA4Preview({
                       Demonstração do Resultado
                     </h1>
                     <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
-                      Período: {startDate} até {endDate} • Regime de {regime === "competencia" ? "Competência" : "Caixa"}
+                      Período: {formatDate(startDate)} até {formatDate(endDate)} • Regime de {regime === "competencia" ? "Competência" : "Caixa"}
                     </p>
                   </div>
                 </div>

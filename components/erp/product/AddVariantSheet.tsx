@@ -636,7 +636,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             // 2. Comprimir e fazer upload apenas das imagens distintas
             const fileUploadMap = new Map<File, string | null>()
             if (uniqueFiles.size > 0) {
-                setSavingStatusText(`Otimizando e enviando ${uniqueFiles.size} imagem(ns)...`)
+                setSavingStatusText("Salvando variantes...")
                 const uniqueFilesArray = Array.from(uniqueFiles)
                 await Promise.all(
                     uniqueFilesArray.map(async (rawFile) => {
@@ -1105,13 +1105,13 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     updateRow(selectedVariantForAdjustment.rowId, "stock", newStock)
                     setExistingVariants(prev => prev.map(ev => {
                         if (ev.id === selectedVariantForAdjustment.id) {
-                                return { ...ev, stock: newStock }
-                            }
-                            return ev
-                        }))
-                        onSaveSuccess?.()
-                    }}
-                />
+                            return { ...ev, stock: newStock }
+                        }
+                        return ev
+                    }))
+                    onSaveSuccess?.()
+                }}
+            />
 
             <SavingStatusModal isOpen={isSaving} text={savingStatusText} />
         </div>

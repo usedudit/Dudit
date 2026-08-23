@@ -506,8 +506,8 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const sellerName = data.store?.name || data.partner?.name || "Loja"
                                 const sellerImage = data.store?.logo_url || data.partner?.logo_url || data.partner?.store_image_url
                                 const storeObj = data.store
-                                    ? { ...data.store, id: data.store.id, name: data.store.name }
-                                    : { ...data.partner, id: data.partner?.store_id || data.partner?.id, name: data.partner?.name || sellerName }
+                                    ? { ...data.store, id: data.store.id, short_id: data.store.short_id, slug: data.store.slug, name: data.store.name }
+                                    : { ...data.partner, id: data.partner?.store_id || data.partner?.id, short_id: data.partner?.short_id, slug: data.partner?.slug, name: data.partner?.name || sellerName }
 
                                 return (
                                     <Fragment key={storeKey}>

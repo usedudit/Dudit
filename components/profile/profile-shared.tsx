@@ -30,7 +30,7 @@ export const SectionCard = ({
     className?: string
 }) => (
     <div className={`bg-white dark:bg-dark-surface rounded-[12px] border border-brand-border dark:border-dark-border overflow-hidden ${className}`}>
-        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-emerald-900/10 font-bold text-brand-dark dark:text-dark-heading">
+        <div className="px-6 py-4 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 font-bold text-brand-dark dark:text-dark-heading">
             {title}
         </div>
         <div className="p-6">{children}</div>

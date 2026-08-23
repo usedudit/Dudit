@@ -11,7 +11,7 @@ import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { StoreSwitcher } from "../store-switcher"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { UserProfileImage, getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useSidebar } from "@/lib/sidebar-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import BottomSheet from "../BottomSheet"
@@ -30,6 +30,7 @@ interface ERPHeaderProps {
         email: string
         initials: string
         avatarColor: string
+        imageUrl?: string | null
     }
 }
 
@@ -38,12 +39,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const router = useRouter()
     const pathname = usePathname()
     const [isTransitioning, setIsTransitioning] = useState(false)
-    const { profile, isLoading: isProfileLoading } = useUserProfile(userProfile ? { full_name: userProfile.fullName, address: null } : null)
+    const { profile, isLoading: isProfileLoading } = useUserProfile(userProfile ? { full_name: userProfile.fullName, address: null, avatar_url: userProfile.imageUrl || null } : null)
 
     const [userName, setUserName] = useState(userProfile?.fullName || profile?.full_name || "Usuário")
     const [userEmail, setUserEmail] = useState(userProfile?.email || "")
     const [userInitials, setUserInitials] = useState(userProfile?.initials || getUserInitials(userProfile?.fullName || profile?.full_name || "U"))
     const [avatarColor, setAvatarColor] = useState(userProfile?.avatarColor || getAvatarColor(userProfile?.fullName || profile?.full_name || "Usuário"))
+    const [imageUrl, setImageUrl] = useState<string | null>(userProfile?.imageUrl || null)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const { setIsMobileOpen, headerOverride } = useSidebar()
     const searchParams = useSearchParams()
@@ -56,6 +58,9 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
             setUserName(profile.full_name)
             setUserInitials(getUserInitials(profile.full_name))
             setAvatarColor(getAvatarColor(profile.full_name))
+            if ((profile as any).avatar_url) {
+                setImageUrl((profile as any).avatar_url)
+            }
         }
     }, [profile, userProfile])
     // supabase singleton imported directly
@@ -264,22 +269,22 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
                         <div className="h-6 w-px bg-brand-border dark:border-dark-border" />
 
-                        <div className="md:hidden flex items-center" onClick={() => setIsProfileOpen(true)}>
-                            <div
-                                className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm cursor-pointer border border-brand-border dark:border-dark-border shadow-sm relative`}
-                            >
-                                {userInitials || getUserInitials(userName)}
-                            </div>
+                        <div className="md:hidden flex items-center cursor-pointer" onClick={() => setIsProfileOpen(true)}>
+                            <UserProfileImage
+                                fullName={userName}
+                                imageUrl={imageUrl}
+                                className="w-8 h-8 border border-brand-border dark:border-dark-border shadow-sm"
+                            />
                         </div>
 
                         <Dropdown
                             trigger={
                                 <div className="hidden md:flex items-center space-x-2 p-1 cursor-pointer hover:bg-brand-gray dark:hover:bg-dark-border rounded-full transition-colors group">
-                                    <div
-                                        className={`w-8 h-8 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border transition-all relative`}
-                                    >
-                                        {userInitials || getUserInitials(userName)}
-                                    </div>
+                                    <UserProfileImage
+                                        fullName={userName}
+                                        imageUrl={imageUrl}
+                                        className="w-8 h-8 border border-brand-border dark:border-dark-border"
+                                    />
                                     <ChevronDownIcon
                                         className="w-4 h-4 mr-2 text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors"
                                     />
@@ -289,13 +294,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             showChevron={false}
                             width="w-64"
                         >
-                            <div className="pt-3 py-3">
+                            <div className="pt-3 px-3 py-3">
                                 <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
-                                    <div
-                                        className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
-                                    >
-                                        {userInitials || getUserInitials(userName)}
-                                    </div>
+                                    <UserProfileImage
+                                        fullName={userName}
+                                        imageUrl={imageUrl}
+                                        className="w-10 h-10 border border-brand-border dark:border-dark-border"
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
@@ -351,13 +356,13 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                 </div>
             </div>
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
-                <div className="pt-3 py-3">
+                <div className="pt-3 px-3 py-3">
                     <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
-                        <div
-                            className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
-                        >
-                            {userInitials || getUserInitials(userName)}
-                        </div>
+                        <UserProfileImage
+                            fullName={userName}
+                            imageUrl={imageUrl}
+                            className="w-10 h-10 border border-brand-border dark:border-dark-border"
+                        />
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                                 <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">

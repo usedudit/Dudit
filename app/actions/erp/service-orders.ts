@@ -189,6 +189,7 @@ export async function createServiceOrderAction(
   partnerId: string,
   input: {
     store_id?: string
+    order_number?: string
     title: string
     description?: string
     diagnosis?: string
@@ -228,7 +229,7 @@ export async function createServiceOrderAction(
         .eq("id", customerId)
         .eq("partner_id", partnerId)
         .maybeSingle()
-      if (!customer?.id) return { success: false, error: "Cliente invÃ¡lido para este parceiro." }
+      if (!customer?.id) return { success: false, error: "Cliente inválido para este parceiro." }
       customerId = customer.id
     }
 
@@ -253,6 +254,7 @@ export async function createServiceOrderAction(
       .insert({
         partner_id: partnerId,
         store_id: storeId,
+        order_number: input.order_number || undefined,
         public_token: publicToken,
         title: sanitizeInput(input.title, 150),
         description: sanitizeNotes(input.description),
@@ -323,9 +325,9 @@ export async function createServiceOrderAction(
       partner_id: partnerId,
       store_id: storeId,
       buyer_id: customerId,
+      customer_id: customerId,
       customer_name: (data.customer_snapshot as any)?.name || null,
       total_amount: total,
-      subtotal_value: 0,
       discount_value: input.discount_value || 0,
       discount_type: input.discount_type || "fixed",
       discount_amount: 0,
@@ -1017,7 +1019,6 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
     await admin
       .from("orders")
       .update({
-        subtotal_value: subtotal,
         total_amount: finalTotal,
         discount_value: discVal,
         discount_type: discType,
@@ -1712,7 +1713,6 @@ export async function confirmServiceOrderPaymentAction(payload: {
       .from("orders")
       .update({
         total_amount: finalAmount,
-        subtotal_value: subtotal,
         discount_value: order.discount_value || 0,
         discount_type: order.discount_type || "fixed",
         discount_amount: discountAmount,

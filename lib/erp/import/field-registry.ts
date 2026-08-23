@@ -9,9 +9,9 @@ const productFields: FieldDef[] = [
     example: "Camiseta Algodão Premium",
     description: "Nome ou título principal do produto",
     synonyms: [
-      "nome", "produto", "item", "descrição produto", "nome produto", "descricao",
-      "nome do produto", "product name", "name", "descricao produto", "produto nome",
-      "produto/serviço", "titulo", "título", "designação", "descrição do item"
+      "nome do produto", "nome produto", "produto nome", "produto", "nome",
+      "item", "product name", "name", "produto/serviço", "titulo", "título",
+      "título do produto", "titulo do produto", "designação"
     ]
   },
   {
@@ -22,9 +22,11 @@ const productFields: FieldDef[] = [
     example: "CAM-ALG-001",
     description: "Código interno único para controle de estoque",
     synonyms: [
-      "sku", "código", "codigo", "codigo interno", "referencia", "ref",
-      "código do produto", "cód interno", "code", "part number", "cod prod",
-      "código sku", "cod_item", "código item"
+      "sku", "sku / código", "sku / codigo", "sku/código", "sku/codigo",
+      "código sku", "codigo sku", "código interno", "codigo interno",
+      "referencia", "ref", "código do produto", "codigo do produto",
+      "cód interno", "cod interno", "code", "part number", "cod prod",
+      "cód prod", "cod_item", "código item", "codigo item", "código", "codigo"
     ]
   },
   {
@@ -34,9 +36,16 @@ const productFields: FieldDef[] = [
     example: "7891234567890",
     description: "Código de barras universal (EAN-13, EAN-8, UPC, etc.)",
     synonyms: [
-      "gtin", "ean", "código barras", "codigo barras", "barra", "barcode",
-      "ean13", "código de barras", "codigo de barras", "barras", "gtin/ean",
-      "ean/gtin", "código gtin", "codigo ean"
+      "código de barras (gtin/ean)", "codigo de barras (gtin/ean)",
+      "código de barras (gtin / ean)", "codigo de barras (gtin / ean)",
+      "código de barras gtin/ean", "codigo de barras gtin/ean",
+      "codigo de barras gtin ean", "código de barras gtin ean",
+      "código de barras", "codigo de barras", "código de barra", "codigo de barra",
+      "cód de barras", "cod de barras", "cód barras", "cod barras",
+      "código barras", "codigo barras", "barra", "barras", "barcode",
+      "gtin", "ean", "ean13", "ean-13", "ean8", "ean-8", "upc",
+      "gtin/ean", "ean/gtin", "gtin ean", "ean gtin", "código gtin",
+      "codigo gtin", "código ean", "codigo ean"
     ]
   },
   {
@@ -47,9 +56,10 @@ const productFields: FieldDef[] = [
     example: "49.90",
     description: "Valor de venda cobrado do cliente",
     synonyms: [
-      "preço", "preco", "valor", "preço venda", "preco venda", "valor unitario",
-      "valor venda", "price", "sale price", "preço de venda", "preco de venda",
-      "pv", "preço final", "preco final", "valor unitário", "preço unitário"
+      "preço de venda", "preco de venda", "preço venda", "preco venda",
+      "valor de venda", "valor venda", "preço unitário", "preco unitario",
+      "valor unitário", "valor unitario", "preço final", "preco final",
+      "preço", "preco", "valor", "price", "sale price", "pv"
     ]
   },
   {
@@ -59,9 +69,9 @@ const productFields: FieldDef[] = [
     example: "25.00",
     description: "Custo de aquisição ou fabricação",
     synonyms: [
-      "custo", "preço custo", "preco custo", "custo unitario", "preço de custo",
-      "preco de custo", "cost", "cost price", "valor custo", "preço de compra",
-      "custo unitário", "valor de custo"
+      "preço de custo", "preco de custo", "preço custo", "preco custo",
+      "custo unitário", "custo unitario", "valor de custo", "valor custo",
+      "preço de compra", "preco de compra", "cost", "cost price", "custo"
     ]
   },
   {
@@ -82,9 +92,8 @@ const productFields: FieldDef[] = [
     example: "100",
     description: "Quantidade disponível em estoque",
     synonyms: [
-      "qtd", "quantidade", "estoque", "saldo", "quantidade estoque", "stock",
-      "quantity", "qtde", "qty", "estoque atual", "saldo estoque", "quant",
-      "quantidade atual"
+      "estoque atual", "saldo estoque", "quantidade estoque", "quantidade atual",
+      "qtd", "quantidade", "estoque", "saldo", "stock", "quantity", "qtde", "qty", "quant"
     ]
   },
   {
@@ -105,26 +114,7 @@ const productFields: FieldDef[] = [
     options: ["UN", "KG", "G", "L", "ML", "M", "M2", "CX", "PC", "PAR"],
     example: "UN",
     description: "Unidade comercial de venda",
-    synonyms: ["unidade", "un", "unit", "und", "medida", "unid", "u.m.", "unidade medida"]
-  },
-  {
-    name: "category",
-    label: "Categoria",
-    type: "string",
-    example: "Vestuário",
-    description: "Categoria principal do produto",
-    synonyms: [
-      "categoria", "cat", "category", "categoria produto", "categoria do produto",
-      "departamento", "depto", "seção", "grupo"
-    ]
-  },
-  {
-    name: "subcategory",
-    label: "Subcategoria",
-    type: "string",
-    example: "Camisetas",
-    description: "Subdivisão da categoria",
-    synonyms: ["subcategoria", "sub categoria", "subcategory", "sub-categoria", "subgrupo"]
+    synonyms: ["unidade de medida", "unidade medida", "unidade", "un", "unit", "und", "medida", "unid", "u.m."]
   },
   {
     name: "brand",
@@ -132,15 +122,32 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "Dudit Wear",
     description: "Marca ou fabricante do produto",
-    synonyms: ["marca", "brand", "marca produto", "marca do produto", "fabricante", "marca/fabricante"]
+    synonyms: ["marca do produto", "marca produto", "marca", "brand", "fabricante", "marca/fabricante"]
   },
   {
-    name: "supplier",
-    label: "Fornecedor",
+    name: "variant_type",
+    label: "Tipo de Variação",
     type: "string",
-    example: "Distribuidora Nacional",
-    description: "Fornecedor padrão",
-    synonyms: ["fornecedor", "fornecedor principal", "supplier", "forn", "vendedor", "fabricante fornecedor"]
+    example: "Tamanho",
+    description: "Nome do atributo ou atributos da variação (ex: Tamanho, Cor, Cor / Tamanho)",
+    synonyms: [
+      "tipo de variacao", "tipo de variação", "tipo de variante", "tipo variacao",
+      "tipo variação", "tipo variante", "variacao tipo", "variante tipo",
+      "grade tipo", "tipo grade", "atributo variacao", "atributo", "atributos"
+    ]
+  },
+  {
+    name: "variants",
+    label: "Variações (Grade)",
+    type: "string",
+    example: "P (Estoque: 10, Preço: 49.90); M (Estoque: 20, Preço: 49.90); G (Estoque: 15, Preço: 54.90)",
+    description: "Lista de variações separadas por ponto e vírgula (;). Ex: P; M; G ou P (Estoque: 10, Preço: 49.90, SKU: CAM-P); M (Estoque: 20)",
+    synonyms: [
+      "variações (grade)", "variacoes (grade)", "lista variacoes", "lista variações",
+      "lista variantes", "itens grade", "grade produtos", "valores variacao",
+      "valores variação", "variacoes produto", "variantes produto", "variacoes",
+      "variações", "variantes", "grade", "opcoes", "opções"
+    ]
   },
   {
     name: "status",
@@ -149,7 +156,7 @@ const productFields: FieldDef[] = [
     options: ["Ativo", "Inativo", "Rascunho"],
     example: "Ativo",
     description: "Situação do cadastro no sistema",
-    synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo", "ativo", "inativo", "status produto"]
+    synonyms: ["status produto", "status", "situação", "situacao", "estado", "ativo/inativo", "ativo", "inativo"]
   },
   {
     name: "show_in_marketplace",
@@ -158,7 +165,7 @@ const productFields: FieldDef[] = [
     options: ["Sim", "Não"],
     example: "Sim",
     description: "Exibir o produto no catálogo/marketplace online",
-    synonyms: ["visibilidade", "visibility", "exibir", "publicado", "exibir na loja", "mostrar", "marketplace", "loja", "catálogo", "catalogo"]
+    synonyms: ["visibilidade na loja", "visibilidade", "visibility", "exibir na loja", "exibir", "publicado", "mostrar", "marketplace", "loja", "catálogo", "catalogo"]
   },
   {
     name: "description",
@@ -166,7 +173,13 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "Camiseta 100% algodão fio 30.1 penteado",
     description: "Descrição detalhada do produto",
-    synonyms: ["descrição", "descricao", "description", "detalhes", "desc completa", "desc detalhada", "descricao completa", "sobre o produto"]
+    synonyms: [
+      "descrição do produto", "descricao do produto", "descrição produto",
+      "descricao produto", "descrição detalhada", "descricao detalhada",
+      "descrição completa", "descricao completa", "sobre o produto",
+      "descrição", "descricao", "description", "detalhes", "desc",
+      "observações", "observacoes", "obs", "especificações", "especificacoes"
+    ]
   },
   {
     name: "product_type",
@@ -175,7 +188,7 @@ const productFields: FieldDef[] = [
     options: ["Físico", "Digital", "Serviço"],
     example: "Físico",
     description: "Natureza do produto",
-    synonyms: ["tipo", "tipo produto", "product type", "tipo de produto", "natureza"]
+    synonyms: ["tipo de produto", "tipo produto", "product type", "natureza", "tipo"]
   },
   {
     name: "condition",
@@ -184,7 +197,7 @@ const productFields: FieldDef[] = [
     options: ["Novo", "Usado", "Recondicionado"],
     example: "Novo",
     description: "Estado de conservação",
-    synonyms: ["condição", "condicao", "condition", "estado conservacao", "novo/usado"]
+    synonyms: ["estado conservacao", "condição", "condicao", "condition", "novo/usado"]
   },
   {
     name: "ncm",
@@ -192,7 +205,7 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "61091000",
     description: "Código NCM (8 dígitos)",
-    synonyms: ["ncm", "ncm/sh", "ncm sh", "código ncm", "codigo ncm", "classificação fiscal", "classificacao fiscal"]
+    synonyms: ["classificação fiscal", "classificacao fiscal", "código ncm", "codigo ncm", "ncm/sh", "ncm sh", "ncm"]
   },
   {
     name: "cest",
@@ -200,16 +213,7 @@ const productFields: FieldDef[] = [
     type: "string",
     example: "2803800",
     description: "Código CEST (7 dígitos)",
-    synonyms: ["cest", "código cest", "codigo cest"]
-  },
-  {
-    name: "origin",
-    label: "Origem Fiscal",
-    type: "enum",
-    options: ["0 - Nacional", "1 - Estrangeira Importação Direta", "2 - Estrangeira Adquirida no Mercado Interno"],
-    example: "0 - Nacional",
-    description: "Origem da mercadoria para emissão fiscal",
-    synonyms: ["origem", "origin", "origem produto", "origem mercadoria", "origem fiscal"]
+    synonyms: ["código cest", "codigo cest", "cest"]
   },
   {
     name: "weight_gross",
@@ -217,7 +221,11 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "250",
     description: "Peso total incluindo embalagem em gramas",
-    synonyms: ["peso", "weight", "peso bruto", "peso g", "gross weight", "peso total", "peso em gramas"]
+    synonyms: [
+      "peso bruto (g)", "peso bruto g", "peso bruto (gramas)", "peso bruto gramas",
+      "peso total (g)", "peso total g", "peso bruto", "gross weight", "peso total",
+      "peso com embalagem", "peso embalagem"
+    ]
   },
   {
     name: "weight_net",
@@ -225,7 +233,12 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "200",
     description: "Peso do produto em gramas",
-    synonyms: ["peso líquido", "peso liquido", "peso l", "net weight", "peso sem embalagem"]
+    synonyms: [
+      "peso líquido (g)", "peso liquido (g)", "peso líquido g", "peso liquido g",
+      "peso líquido (gramas)", "peso liquido (gramas)", "peso líquido", "peso liquido",
+      "peso liq (g)", "peso líq (g)", "peso liq", "peso líq", "peso l", "net weight",
+      "peso sem embalagem", "peso produto", "peso real", "peso real (g)"
+    ]
   },
   {
     name: "width",
@@ -233,7 +246,7 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "20",
     description: "Largura do pacote em centímetros",
-    synonyms: ["largura", "width", "larg", "largura cm", "w", "cm largura"]
+    synonyms: ["largura (cm)", "largura cm", "cm largura", "largura", "width", "larg", "w"]
   },
   {
     name: "height",
@@ -241,7 +254,7 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "5",
     description: "Altura do pacote em centímetros",
-    synonyms: ["altura", "height", "alt", "altura cm", "h", "cm altura"]
+    synonyms: ["altura (cm)", "altura cm", "cm altura", "altura", "height", "alt", "h"]
   },
   {
     name: "length",
@@ -249,32 +262,10 @@ const productFields: FieldDef[] = [
     type: "number",
     example: "25",
     description: "Comprimento ou profundidade em centímetros",
-    synonyms: ["comprimento", "length", "comp", "compr", "profundidade", "prof", "cm comprimento", "l", "profundidade cm"]
-  },
-  {
-    name: "packaging_type",
-    label: "Tipo de Embalagem",
-    type: "enum",
-    options: ["Pacote/Caixa", "Envelope", "Rolo/Cilindro"],
-    example: "Pacote/Caixa",
-    description: "Tipo de embalagem logística",
-    synonyms: ["embalagem", "packaging", "tipo embalagem", "packaging type"]
-  },
-  {
-    name: "preparation_days",
-    label: "Dias de Preparação",
-    type: "number",
-    example: "1",
-    description: "Prazo em dias para postagem/preparo",
-    synonyms: ["dias preparo", "preparation days", "dias para preparo", "prazo preparo", "tempo preparo"]
-  },
-  {
-    name: "tags",
-    label: "Tags",
-    type: "string",
-    example: "moda, verao, casual",
-    description: "Palavras-chave separadas por vírgula",
-    synonyms: ["tags", "etiquetas", "labels", "palavras chave", "palavras-chave", "keywords"]
+    synonyms: [
+      "comprimento (cm)", "comprimento cm", "cm comprimento", "profundidade (cm)",
+      "profundidade cm", "comprimento", "profundidade", "length", "comp", "compr", "prof", "l"
+    ]
   },
 ]
 
@@ -358,7 +349,7 @@ const customerFields: FieldDef[] = [
     options: ["Ativo", "Inativo", "Bloqueado"],
     example: "Ativo",
     description: "Status da conta do cliente",
-    synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo", "status cliente"]
+    synonyms: ["status cliente", "status", "situação", "situacao", "ativo/inativo", "ativo", "inativo", "status do cliente"]
   },
   {
     name: "zip_code",
@@ -415,7 +406,11 @@ const customerFields: FieldDef[] = [
     options: ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"],
     example: "SP",
     description: "Sigla da Unidade Federativa com 2 letras",
-    synonyms: ["estado", "state", "uf", "sigla estado", "sigla uf", "uf estado"]
+    synonyms: [
+      "estado (uf)", "estado ( uf )", "estado/uf", "estado uf", "uf / estado",
+      "uf/estado", "uf estado", "estado", "uf", "sigla do estado", "sigla estado",
+      "sigla da uf", "sigla uf", "state", "província", "provincia"
+    ]
   },
   {
     name: "inscricao_estadual",
@@ -444,8 +439,9 @@ const serviceFields: FieldDef[] = [
     example: "Formatação e Limpeza de PC",
     description: "Nome ou título do serviço prestado",
     synonyms: [
-      "nome", "name", "serviço", "servico", "service", "nome serviço", "nome servico",
-      "service name", "título", "titulo", "descrição do serviço", "descricao servico"
+      "nome do serviço", "nome do servico", "nome serviço", "nome servico",
+      "serviço nome", "servico nome", "service name", "serviço", "servico",
+      "service", "nome", "name", "título", "titulo", "título do serviço", "titulo do servico"
     ]
   },
   {
@@ -455,7 +451,12 @@ const serviceFields: FieldDef[] = [
     isIdentifier: true,
     example: "SERV-001",
     description: "Código interno do serviço",
-    synonyms: ["sku", "código", "codigo", "ref", "referencia", "código serviço", "codigo servico", "cód serviço"]
+    synonyms: [
+      "sku", "sku / código", "sku / codigo", "sku/código", "sku/codigo",
+      "código do serviço", "codigo do servico", "código serviço", "codigo servico",
+      "cód serviço", "cod servico", "código interno", "codigo interno",
+      "referencia", "ref", "código", "codigo"
+    ]
   },
   {
     name: "price",
@@ -465,8 +466,10 @@ const serviceFields: FieldDef[] = [
     example: "150.00",
     description: "Valor cobrado pelo serviço",
     synonyms: [
-      "preço", "preco", "price", "valor", "preço serviço", "preco servico",
-      "valor serviço", "valor servico", "preço unitário", "valor unitario"
+      "preço do serviço", "preco do servico", "preço serviço", "preco servico",
+      "valor do serviço", "valor do servico", "valor serviço", "valor servico",
+      "preço de venda", "preco de venda", "preço unitário", "preco unitario",
+      "valor unitário", "valor unitario", "preço", "preco", "price", "valor"
     ]
   },
   {
@@ -475,7 +478,12 @@ const serviceFields: FieldDef[] = [
     type: "number",
     example: "30.00",
     description: "Custo operacional estimado do serviço",
-    synonyms: ["custo", "cost", "preço custo", "preco custo", "custo serviço", "valor de custo"]
+    synonyms: [
+      "preço de custo", "preco de custo", "preço custo", "preco custo",
+      "custo do serviço", "custo do servico", "custo serviço", "custo servico",
+      "valor de custo", "valor custo", "custo operacional", "custo estimado",
+      "custo", "cost", "cost price"
+    ]
   },
   {
     name: "duration_minutes",
@@ -484,8 +492,10 @@ const serviceFields: FieldDef[] = [
     example: "60",
     description: "Tempo estimado de execução em minutos",
     synonyms: [
-      "duração", "duracao", "duration", "tempo", "minutes", "minutos",
-      "duração minutos", "tempo serviço", "tempo servico", "duracao (min)", "tempo estimado"
+      "duração (minutos)", "duracao (minutos)", "duração minutos", "duracao minutos",
+      "duração em minutos", "duracao em minutos", "duracao (min)", "duração (min)",
+      "tempo estimado", "tempo do serviço", "tempo do servico", "tempo serviço",
+      "tempo servico", "duração", "duracao", "duration", "tempo", "minutes", "minutos"
     ]
   },
   {
@@ -494,7 +504,7 @@ const serviceFields: FieldDef[] = [
     type: "string",
     example: "Assistência Técnica",
     description: "Categoria do serviço",
-    synonyms: ["categoria", "category", "cat", "categoria serviço", "categoria servico", "tipo serviço", "tipo servico", "grupo"]
+    synonyms: ["categoria do serviço", "categoria do servico", "categoria serviço", "categoria servico", "categoria", "category", "cat", "tipo serviço", "tipo servico", "grupo"]
   },
   {
     name: "service_type",
@@ -503,7 +513,12 @@ const serviceFields: FieldDef[] = [
     options: ["Presencial", "Online", "Híbrido"],
     example: "Presencial",
     description: "Modo de execução do atendimento",
-    synonyms: ["tipo atendimento", "modo atendimento", "presencial/online", "service type", "modalidade"]
+    synonyms: [
+      "tipo de atendimento", "tipo atendimento", "modo de atendimento", "modo atendimento",
+      "modalidade de atendimento", "modalidade atendimento", "presencial / online",
+      "presencial/online", "presencial ou online", "atendimento presencial / online",
+      "atendimento", "service type", "modalidade", "tipo"
+    ]
   },
   {
     name: "status",
@@ -512,7 +527,7 @@ const serviceFields: FieldDef[] = [
     options: ["Ativo", "Inativo"],
     example: "Ativo",
     description: "Situação do serviço",
-    synonyms: ["status", "situação", "situacao", "estado", "ativo/inativo", "status servico"]
+    synonyms: ["status serviço", "status servico", "status", "situação", "situacao", "estado", "ativo/inativo"]
   },
   {
     name: "unit",
@@ -520,7 +535,7 @@ const serviceFields: FieldDef[] = [
     type: "string",
     example: "Serviço",
     description: "Unidade de cobrança (ex: Hora, Diária, Serviço)",
-    synonyms: ["unidade", "un", "unit", "medida", "unidade cobrança"]
+    synonyms: ["unidade de cobrança", "unidade cobranca", "unidade de medida", "unidade medida", "unidade", "un", "unit", "medida"]
   },
   {
     name: "description",
@@ -528,7 +543,11 @@ const serviceFields: FieldDef[] = [
     type: "string",
     example: "Instalação do SO, drivers e limpeza física dos componentes",
     description: "Detalhes do que está incluso no serviço",
-    synonyms: ["descrição", "descricao", "description", "detalhes", "desc serviço", "desc servico", "escopo"]
+    synonyms: [
+      "descrição do serviço", "descricao do servico", "descrição serviço", "descricao servico",
+      "descrição detalhada", "descricao detalhada", "descrição completa", "descricao completa",
+      "descrição", "descricao", "description", "detalhes", "desc", "escopo", "sobre o serviço"
+    ]
   },
 ]
 

@@ -393,11 +393,18 @@ const AddProductPage: FC<AddProductPageProps> = ({
             const aiData = data.data
             setProductData((prev: any) => {
                 let brandId = prev.brand_id
+                let brandName = prev.brand
                 if (aiData.brand) {
                     const matchedBrand = brandOptions.find(
                         (b: any) => b.label.toLowerCase() === aiData.brand.toLowerCase()
                     )
-                    brandId = matchedBrand ? matchedBrand.value : ""
+                    if (matchedBrand) {
+                        brandId = matchedBrand.value
+                        brandName = matchedBrand.label
+                    } else {
+                        brandId = ""
+                        brandName = aiData.brand
+                    }
                 }
 
                 // Mapear especificações (specs) para attributes
@@ -410,6 +417,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 return {
                     ...prev,
                     description: aiData.description || prev.description,
+                    brand: brandName,
                     brand_id: brandId,
                     tags: aiData.tags || prev.tags,
                     attributes: newAttrs,
@@ -592,7 +600,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 description: d.description,
                 sku: hasVariants ? null : (d.sku || null),
                 gtin: d.gtin,
-                brand: d.brand,
+                brand: d.brand || null,
                 brand_id: d.brand_id || null,
                 category_id: d.category_id || null,
                 location_id: d.location_id || null,
@@ -602,7 +610,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 unit: d.unidade,
                 subcategory_id: d.subcategory_id || null,
                 productType: d.productType,
-                location: d.localizacao,
+                location: d.localizacao || d.location || null,
                 deliveryFormat: d.digital_format,
                 costPrice: hasVariants ? 0 : (Number(d.costPrice) || 0),
                 price: hasVariants ? 0 : Number(d.price),
