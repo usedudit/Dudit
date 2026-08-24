@@ -1012,7 +1012,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div className={`hidden lg:block fixed top-[108px] left-0 right-0 bg-white dark:bg-dark-surface border-b border-brand-border z-[80] transition-all duration-200 ${isStickyVisible ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0 pointer-events-none"}`}>
                 <div className="max-w-[1400px] mx-auto h-[76px] flex items-center gap-4">
-                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
+                    <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-12 h-12 shrink-0" />
                     <div className="min-w-0">
                         <h2 className="text-[17px] font-bold text-brand-dark dark:text-dark-heading truncate">{partner.storeName}</h2>
                         <div className="flex items-center gap-2 text-[12px] text-brand-inactive-text dark:text-dark-body">
@@ -1046,7 +1046,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[80px] h-[80px] shrink-0" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <h1 className="text-[24px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
@@ -1084,7 +1084,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {/* Mobile/Tablet Layout (lg:hidden) */}
                     <div className="lg:hidden flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[60px] h-[60px] shrink-0" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                                     <h1 className="text-[16px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
@@ -1488,7 +1488,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 <div className="flex flex-col">
                     <div className="px-1 py-2 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30" />
+                            <UserProfileImage fullName={partner.storeName} imageUrl={partnerProfileImageUrl?.includes("Placeholder.png") ? null : partnerProfileImageUrl} className="w-[50px] h-[50px] shrink-0" />
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                                     <h2 className="text-[16px] font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h2>

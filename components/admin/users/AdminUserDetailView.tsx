@@ -27,6 +27,7 @@ import {
     DefaultModal,
     Input,
 } from "@/components/reusable"
+import EnforcementActionModal from "../EnforcementActionModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
@@ -185,22 +186,20 @@ export function AdminUserDetailView({
     const { authUser, partner, orders, returns, auditEvents } = detail
     const isBanned = !!profile.banned_at
 
-    const handleConfirmBan = () => {
-        startTransition(async () => {
-            try {
-                const res = await banUser(userId, "Banimento manual via detalhes de usuário")
-                if (res.success) {
-                    toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
-                    setBanModalOpen(false)
-                    loadDetail()
-                    onUserUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao banir usuário")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+    const handleConfirmBan = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        try {
+            const res = await banUser(userId, reason, null, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setBanModalOpen(false)
+                loadDetail()
+                onUserUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao banir usuário")
             }
-        })
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+        }
     }
 
     const handleConfirmUnban = () => {
@@ -688,14 +687,21 @@ export function AdminUserDetailView({
             </DefaultModal>
 
             {/* Modal: Banir Usuário */}
-            <AlertModal
+            <EnforcementActionModal
                 isOpen={banModalOpen}
                 onClose={() => setBanModalOpen(false)}
                 onConfirm={handleConfirmBan}
                 title="Banir Usuário"
-                description={`Tem certeza que deseja banir ${profile.full_name || authUser?.email}? O usuário perderá acesso imediato à plataforma.`}
-                confirmText="Banir Usuário"
-                variant="danger"
+                entityName={profile.full_name || authUser?.email || "Usuário"}
+                entityTypeLabel="Usuário"
+                currentRiskScore={profile.risk_score}
+                description={`O usuário "${profile.full_name || authUser?.email}" perderá acesso imediato à plataforma.`}
+                consequences={[
+                    "O usuário será impedido de realizar novos pedidos e acessar serviços.",
+                    "Se possuir lojas ativas, os produtos serão suspensos preventivamente.",
+                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
+                ]}
+                confirmButtonText="Banir Usuário"
             />
 
             {/* Modal: Desbanir Usuário */}

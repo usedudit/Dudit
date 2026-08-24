@@ -19,6 +19,7 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getCitiesData } from "@/lib/data/cities-loader"
+import { IconPlaceholder } from "../reusable"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -617,7 +618,7 @@ const Header: React.FC<HeaderProps> = ({
                         {(!isHome || isProductDetail) ? (
                             <Button
                                 variant="filled"
-                                className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -627,7 +628,7 @@ const Header: React.FC<HeaderProps> = ({
                                     }
                                 }}
                             >
-                                <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
+                                <ChevronLeftIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} strokeWidth={2.5} />
                             </Button>
                         ) : user ? (
                             <button
@@ -720,9 +721,9 @@ const Header: React.FC<HeaderProps> = ({
                                     <Button
                                         variant="filled"
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                        className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
                                     >
-                                        <ShareIcon size={20} className="" />
+                                        <ShareIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} />
                                     </Button>
                                 ) : <div className="w-1" />
                             ) : isProductDetail ? (
@@ -731,9 +732,9 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                            className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                            className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
                                         >
-                                            <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
+                                            <ShareIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} />
                                         </Button>
                                     )}
                                     {favoriteButton ? (
@@ -742,16 +743,16 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                            className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
                                         >
-                                            <HeartIcon size={20} className={isFavorite ? "fill-current" : ""} />
+                                            <HeartIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"} ${isFavorite ? "fill-current" : ""}`} />
                                         </Button>
                                     ) : null}
                                 </>
                             ) : (
                                 <>
                                     <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
-                                        <ShoppingBagIcon size={24} strokeWidth={2} />
+                                        <ShoppingBagIcon size={20} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                                 {cartCount}
@@ -810,8 +811,13 @@ const Header: React.FC<HeaderProps> = ({
                         >
                             <ChevronLeftIcon size={24} strokeWidth={2.5} />
                         </button>
+
                         <div className="flex-1 flex items-center h-[40px] bg-brand-gray dark:bg-dark-border/30 rounded-full px-4">
-                            <SearchIcon size={18} className="text-brand-green dark:text-brand-green shrink-0 mr-2" />
+                            <SearchIcon
+                                size={18}
+                                className="text-brand-green dark:text-brand-green shrink-0 mr-2"
+                            />
+
                             <input
                                 type="text"
                                 autoFocus
@@ -821,11 +827,12 @@ const Header: React.FC<HeaderProps> = ({
                                 onChange={(e) => setSearchValue(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter") {
-                                        handleSearch()
+                                        handleSearch(searchValue)
                                         setIsMobileSearchOpen(false)
                                     }
                                 }}
                             />
+
                             {searchValue.length > 0 && (
                                 <button
                                     onClick={() => {
@@ -846,6 +853,7 @@ const Header: React.FC<HeaderProps> = ({
                                 {filteredSuggestions.map((suggestion, index) => (
                                     <button
                                         key={index}
+                                        type="button"
                                         className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors text-left"
                                         onClick={() => {
                                             setSearchValue(suggestion.label)
@@ -853,48 +861,37 @@ const Header: React.FC<HeaderProps> = ({
                                             handleSearch(suggestion.label)
                                         }}
                                     >
-                                        <SearchIcon size={18} className="text-gray-300 dark:text-gray-500 shrink-0" />
-                                        <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">{suggestion.label}</span>
-                                        <ChevronRightIcon size={16} className="text-gray-300 dark:text-gray-500 shrink-0 rotate-180" />
+                                        <SearchIcon
+                                            size={18}
+                                            className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                        />
+
+                                        <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">
+                                            {suggestion.label}
+                                        </span>
+
+                                        <ChevronRightIcon
+                                            size={16}
+                                            className="text-brand-inactive-text dark:text-dark-body shrink-0"
+                                        />
                                     </button>
                                 ))}
                             </div>
                         ) : searchValue.trim().length >= 2 ? (
                             <div className="flex flex-col items-center justify-center py-16 px-6">
-                                <SearchIcon size={40} className="text-gray-200 dark:text-gray-600 mb-4" />
-                                <p className="text-[14px] text-gray-400 dark:text-gray-500 text-center">
-                                    Nenhuma sugestão para &quot;{searchValue}&quot;
-                                </p>
-                                <button
-                                    onClick={() => {
-                                        setIsMobileSearchOpen(false)
-                                        handleSearch()
+                                <IconPlaceholder
+                                    icon={SearchIcon}
+                                    title={`Nenhuma sugestão para "${searchValue}"`}
+                                    itemButton={{
+                                        text: "Buscar mesmo assim",
+                                        action: () => {
+                                            setIsMobileSearchOpen(false)
+                                            handleSearch(searchValue)
+                                        },
                                     }}
-                                    className="mt-4 text-brand-green font-bold text-[14px]"
-                                >
-                                    Buscar mesmo assim
-                                </button>
+                                />
                             </div>
-                        ) : (
-                            <div className="px-5 py-6">
-                                <p className="text-[12px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Buscas populares</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {["Ofertas", "Eletrônicos", "Roupas", "Casa", "Esportes", "Beleza"].map((term) => (
-                                        <button
-                                            key={term}
-                                            onClick={() => {
-                                                setSearchValue(term)
-                                                setIsMobileSearchOpen(false)
-                                                handleSearch(term)
-                                            }}
-                                            className="px-4 py-2 rounded-full bg-brand-gray dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading text-[13px] font-medium hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors"
-                                        >
-                                            {term}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             )}

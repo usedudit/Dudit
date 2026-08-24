@@ -774,7 +774,8 @@ export async function getPartners(
 
 export async function enableTenantAccess(
     partnerId: string,
-    reason: string = "Reativação administrativa de acesso ao ERP"
+    reason: string = "Reativação administrativa de acesso ao ERP",
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -829,8 +830,34 @@ export async function enableTenantAccess(
         actionType: AdminActionType.PARTNER_ENABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName },
+        metadata: { reason: finalReason, storeName },
     })
+
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Acesso ao ERP Reativado: ${storeName}`,
+                    message: `O acesso ao painel ERP da sua organização foi restabelecido com sucesso.`,
+                    entityType: "announcement",
+                    entityId: partnerId,
+                    data: {
+                        partner_id: partnerId,
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `erp_enabled:${partnerId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send ERP enable notification:", notifErr)
+        }
+    }
 
     return { success: true }
 }
@@ -841,7 +868,9 @@ export async function banUser(
     targetUserId: string,
     reason: string,
     durationDays: number | null = null,
-    stepUpToken: string = "admin-confirmed"
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyUser: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -860,7 +889,7 @@ export async function banUser(
     // Anti-IDOR: re-fetch user
     const { data: user, error: fetchError } = await supabase
         .from("user_profiles")
-        .select("user_id, full_name, banned_at")
+        .select("user_id, full_name, banned_at, risk_score")
         .eq("user_id", targetUserId)
         .single()
 
@@ -879,15 +908,21 @@ export async function banUser(
 
     const caseId = generateCaseId("CAS")
 
+    const updatePayload: any = {
+        banned_at: new Date().toISOString(),
+        banned_until: bannedUntil,
+        banned_reason: reason.trim(),
+        banned_by: admin.userId,
+        banned_case_id: caseId,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     const { error: updateError } = await supabase
         .from("user_profiles")
-        .update({
-            banned_at: new Date().toISOString(),
-            banned_until: bannedUntil,
-            banned_reason: reason.trim(),
-            banned_by: admin.userId,
-            banned_case_id: caseId,
-        } as any)
+        .update(updatePayload)
         .eq("user_id", targetUserId)
 
     if (updateError) {
@@ -899,7 +934,7 @@ export async function banUser(
         actionType: AdminActionType.USER_BAN,
         targetType: "user",
         targetId: targetUserId,
-        metadata: { case_id: caseId, reason: reason.trim(), targetName: user.full_name, durationDays: durationDays || "permanent", bannedUntil },
+        metadata: { case_id: caseId, reason: reason.trim(), targetName: user.full_name, durationDays: durationDays || "permanent", bannedUntil, riskScore },
     })
 
     // If user has partner, deactivate their products + increment risk_score
@@ -911,7 +946,33 @@ export async function banUser(
 
     if (partner) {
         await deactivatePartnerProducts(partner.id)
-        await incrementRiskScore(partner.id, 10)
+        if (riskScore === undefined || riskScore === null) {
+            await incrementRiskScore(partner.id, 10)
+        }
+    }
+
+    if (notifyUser) {
+        try {
+            const { createNotification } = await import("@/lib/services/notification.service")
+            await createNotification({
+                userId: targetUserId,
+                type: "admin_announcement",
+                title: "Conta suspensa pela administração",
+                message: `Sua conta foi suspensa. Motivo: ${reason.trim()}. Protocolo do caso: ${caseId}.`,
+                entityType: "announcement",
+                entityId: targetUserId,
+                data: {
+                    case_id: caseId,
+                    reason: reason.trim(),
+                    audience: "customer",
+                    url: "/banned",
+                },
+                idempotencyKey: `user_banned:${targetUserId}:${caseId}:${Date.now()}`,
+                origin: "system",
+            })
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send ban notification:", notifErr)
+        }
     }
 
     return { success: true, caseId }
@@ -978,7 +1039,9 @@ export async function unbanUser(
 export async function suspendPartner(
     partnerId: string,
     reason: string,
-    stepUpToken: string = "admin-confirmed"
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -1036,16 +1099,22 @@ export async function suspendPartner(
         return { success: false, error: updateError.message }
     }
 
+    const storeUpdatePayload: any = {
+        is_active: false,
+        suspended_at: new Date().toISOString(),
+        suspended_reason: `Parceiro suspenso: ${reason.trim()}`,
+        suspended_by: admin.userId,
+        suspended_case_id: caseId,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        storeUpdatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     // Also suspend all stores of this partner
     await supabase
         .from("stores")
-        .update({
-            is_active: false,
-            suspended_at: new Date().toISOString(),
-            suspended_reason: `Parceiro suspenso: ${reason.trim()}`,
-            suspended_by: admin.userId,
-            suspended_case_id: caseId,
-        } as any)
+        .update(storeUpdatePayload as any)
         .eq("partner_id", partnerId)
 
     await adminAuditLog({
@@ -1053,8 +1122,36 @@ export async function suspendPartner(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName, riskScore },
     })
+
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Organização Suspensa: ${storeName}`,
+                    message: `Sua organização e todas as suas lojas foram suspensas pela administração. Motivo: ${reason.trim()}. Protocolo do caso: ${caseId}.`,
+                    entityType: "announcement",
+                    entityId: partnerId,
+                    data: {
+                        partner_id: partnerId,
+                        case_id: caseId,
+                        reason: reason.trim(),
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `partner_suspended:${partnerId}:${caseId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send partner suspend notification:", notifErr)
+        }
+    }
 
     return { success: true, caseId }
 }
@@ -1063,7 +1160,8 @@ export async function suspendPartner(
 
 export async function unsuspendPartner(
     partnerId: string,
-    reason: string
+    reason: string,
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -1134,6 +1232,32 @@ export async function unsuspendPartner(
         metadata: { reason: reason.trim(), storeName },
     })
 
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Organização Reativada: ${storeName}`,
+                    message: `Sua organização e lojas foram reativadas pela administração.`,
+                    entityType: "announcement",
+                    entityId: partnerId,
+                    data: {
+                        partner_id: partnerId,
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `partner_unsuspended:${partnerId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send partner unsuspend notification:", notifErr)
+        }
+    }
+
     return { success: true }
 }
 
@@ -1142,7 +1266,9 @@ export async function unsuspendPartner(
 export async function suspendStore(
     storeId: string,
     reason: string,
-    stepUpToken: string = "admin-confirmed"
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -1156,7 +1282,7 @@ export async function suspendStore(
 
     const { data: store, error: fetchError } = await supabase
         .from("stores")
-        .select("id, name, partner_id, is_active, suspended_at")
+        .select("id, name, partner_id, is_active, suspended_at, risk_score")
         .eq("id", storeId)
         .single()
 
@@ -1170,15 +1296,21 @@ export async function suspendStore(
 
     const caseId = generateCaseId("CAS")
 
+    const updatePayload: any = {
+        is_active: false,
+        suspended_at: new Date().toISOString(),
+        suspended_reason: reason.trim(),
+        suspended_by: admin.userId,
+        suspended_case_id: caseId,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     const { error: updateError } = await supabase
         .from("stores")
-        .update({
-            is_active: false,
-            suspended_at: new Date().toISOString(),
-            suspended_reason: reason.trim(),
-            suspended_by: admin.userId,
-            suspended_case_id: caseId,
-        } as any)
+        .update(updatePayload)
         .eq("id", storeId)
 
     if (updateError) {
@@ -1190,8 +1322,48 @@ export async function suspendStore(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: storeId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName: store.name, storeId },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName: store.name, storeId, riskScore },
     })
+
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getStoreTeamUserIds, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            let teamUserIds: string[] = []
+            if (store.partner_id) {
+                teamUserIds = await getStoreTeamUserIds({
+                    partnerId: store.partner_id,
+                    storeId: storeId,
+                })
+                if (teamUserIds.length === 0) {
+                    teamUserIds = await getPartnerTeamUserIds(store.partner_id)
+                }
+            }
+
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Loja Suspensa: ${store.name}`,
+                    message: `A loja "${store.name}" foi suspensa pela administração. Motivo: ${reason.trim()}. Protocolo do caso: ${caseId}.`,
+                    entityType: "announcement",
+                    entityId: storeId,
+                    data: {
+                        store_id: storeId,
+                        store_name: store.name,
+                        partner_id: store.partner_id,
+                        case_id: caseId,
+                        reason: reason.trim(),
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `store_suspended:${storeId}:${caseId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send store suspend notification:", notifErr)
+        }
+    }
 
     return { success: true, caseId }
 }
@@ -1200,7 +1372,8 @@ export async function suspendStore(
 
 export async function unsuspendStore(
     storeId: string,
-    reason: string
+    reason: string,
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -1213,7 +1386,7 @@ export async function unsuspendStore(
 
     const { data: store, error: fetchError } = await supabase
         .from("stores")
-        .select("id, name, suspended_at")
+        .select("id, name, partner_id, suspended_at")
         .eq("id", storeId)
         .single()
 
@@ -1248,6 +1421,44 @@ export async function unsuspendStore(
         metadata: { reason: reason.trim(), storeName: store.name },
     })
 
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getStoreTeamUserIds, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            let teamUserIds: string[] = []
+            if (store.partner_id) {
+                teamUserIds = await getStoreTeamUserIds({
+                    partnerId: store.partner_id,
+                    storeId: storeId,
+                })
+                if (teamUserIds.length === 0) {
+                    teamUserIds = await getPartnerTeamUserIds(store.partner_id)
+                }
+            }
+
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Loja Reativada: ${store.name}`,
+                    message: `O funcionamento da loja "${store.name}" foi restabelecido pela administração.`,
+                    entityType: "announcement",
+                    entityId: storeId,
+                    data: {
+                        store_id: storeId,
+                        store_name: store.name,
+                        partner_id: store.partner_id,
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `store_unsuspended:${storeId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send store unsuspend notification:", notifErr)
+        }
+    }
+
     return { success: true }
 }
 
@@ -1257,7 +1468,9 @@ export async function disableTenantAccess(
     partnerId: string,
     reason: string,
     durationDays: number | null = null,
-    stepUpToken: string = "admin-confirmed"
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -1279,6 +1492,16 @@ export async function disableTenantAccess(
     if (fetchError || !partner) {
         return { success: false, error: "Parceiro não encontrado" }
     }
+
+    // Get store name from stores table
+    const { data: hqStore } = await supabase
+        .from("stores")
+        .select("name")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    const storeName = hqStore?.name || "Loja"
 
     assertNotSelf(admin.userId, partner.user_id)
     await assertNotProtected(partner.user_id)
@@ -1309,13 +1532,48 @@ export async function disableTenantAccess(
         return { success: false, error: updateError.message }
     }
 
+    if (riskScore !== undefined && riskScore !== null) {
+        await supabase
+            .from("stores")
+            .update({ risk_score: Math.min(Math.max(Number(riskScore) || 0, 0), 100) } as any)
+            .eq("partner_id", partnerId)
+    }
+
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.PARTNER_DISABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName: partner.store_name },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName, riskScore },
     })
+
+    if (notifyOwner) {
+        try {
+            const { createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: `Acesso ao ERP Desativado: ${storeName}`,
+                    message: `O acesso ao painel de gestão /erp da sua organização foi desativado pela administração. Motivo: ${reason.trim()}. Protocolo do caso: ${caseId}.`,
+                    entityType: "announcement",
+                    entityId: partnerId,
+                    data: {
+                        partner_id: partnerId,
+                        case_id: caseId,
+                        reason: reason.trim(),
+                        audience: "seller",
+                        url: "/select-erp",
+                    },
+                    idempotencyKey: `erp_disabled:${partnerId}:${caseId}:${Date.now()}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send ERP disable notification:", notifErr)
+        }
+    }
 
     return { success: true, caseId }
 }

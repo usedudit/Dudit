@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
+import EnforcementActionModal from "../EnforcementActionModal"
 import UserEnforcementListRow from "./UserEnforcementListRow"
 import UserEnforcementPageControls from "./UserEnforcementPageControls"
 import AdminUserDetailView from "./AdminUserDetailView"
@@ -77,23 +78,20 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         })
     }, [])
 
-    const handleConfirmBan = () => {
+    const handleConfirmBan = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!banTarget) return
-        startTransition(async () => {
-            try {
-                const res = await banUser(banTarget.user_id, actionReason || "Violação dos termos de uso")
-                if (res.success) {
-                    toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
-                    setBanTarget(null)
-                    setActionReason("")
-                    refreshUsers()
-                } else {
-                    toast.error(res.error || "Erro ao banir usuário")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await banUser(banTarget.user_id, reason, null, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setBanTarget(null)
+                refreshUsers()
+            } else {
+                toast.error(res.error || "Erro ao banir usuário")
             }
-        })
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+        }
     }
 
     const handleConfirmUnban = () => {
@@ -370,17 +368,21 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             </div>
 
             {/* Modal: Banir Usuário */}
-            <AlertModal
+            <EnforcementActionModal
                 isOpen={!!banTarget}
-                onClose={() => {
-                    setBanTarget(null)
-                    setActionReason("")
-                }}
+                onClose={() => setBanTarget(null)}
                 onConfirm={handleConfirmBan}
                 title="Banir Usuário"
-                description={`Tem certeza que deseja banir a conta de ${banTarget?.full_name || banTarget?.email}? O usuário perderá acesso imediato à plataforma.`}
-                confirmText="Banir Conta"
-                variant="danger"
+                entityName={banTarget?.full_name || banTarget?.email || "Usuário"}
+                entityTypeLabel="Usuário"
+                currentRiskScore={banTarget?.risk_score}
+                description={`A conta de ${banTarget?.full_name || banTarget?.email} perderá acesso imediato à plataforma.`}
+                consequences={[
+                    "O usuário será impedido de realizar novos pedidos e acessar serviços.",
+                    "Se possuir lojas ativas, os produtos serão suspensos preventivamente.",
+                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
+                ]}
+                confirmButtonText="Banir Conta"
             />
 
             {/* Modal: Desbanir Usuário */}

@@ -374,91 +374,13 @@ export async function syncSubscriptionToBilling(
     }
 
     // ── 6. NEXT cycle purchase (upcoming invoice to pay) ──
-    let nextPurchaseId: string | null = null
+    // NOTE: Next-cycle purchase is NOT pre-generated here.
+    // It will be created when the next payment webhook fires (approved → completed, failed → past_due).
+    // This avoids stale "Próxima Fatura" entries with wrong dates.
     const isRenewing = isActiveOrTrialing && !sub.cancel_at_period_end && planPrice > 0
 
-    if (isRenewing) {
-        if (nextPurchase) {
-            const { error: nextErr } = await supabase
-                .from("billing_purchases")
-                .update({
-                    status: "pending",
-                    amount: planPrice,
-                    total_amount: planPrice,
-                    description,
-                    billing_period_start: periods.nextStart.toISOString(),
-                    billing_period_end: periods.nextEnd.toISOString(),
-                    updated_at: nowIso,
-                    metadata: {
-                        ...(nextPurchase.metadata || {}),
-                        plan_name: plan?.name || null,
-                        plan_slug: plan?.slug || null,
-                        billing_cycle: "next",
-                        due_date: periods.nextStart.toISOString(),
-                        subscription_status: sub.status,
-                        synced_via: context,
-                        synced_at: nowIso,
-                    },
-                })
-                .eq("id", nextPurchase.id)
-
-            if (!nextErr) {
-                nextPurchaseId = nextPurchase.id
-                console.log(`[BillingSync] Updated next-cycle purchase ${nextPurchase.id} for sub ${subscriptionId}`)
-            }
-        } else {
-            const { data: newNext, error: nextErr } = await supabase
-                .from("billing_purchases")
-                .insert({
-                    partner_id: sub.partner_id,
-                    user_id: partner?.user_id || null,
-                    purchase_type: "subscription",
-                    purchaseable_type: "plan",
-                    purchaseable_id: plan?.id || null,
-                    amount: planPrice,
-                    total_amount: planPrice,
-                    discount_amount: 0,
-                    currency: "BRL",
-                    status: "pending",
-                    gateway: "mercado_pago",
-                    gateway_payment_id: mpSubId || null,
-                    gateway_status: sub.status,
-                    subscription_id: subscriptionId,
-                    description,
-                    billing_period_start: periods.nextStart.toISOString(),
-                    billing_period_end: periods.nextEnd.toISOString(),
-                    metadata: {
-                        plan_name: plan?.name || null,
-                        plan_slug: plan?.slug || null,
-                        billing_cycle: "next",
-                        due_date: periods.nextStart.toISOString(),
-                        subscription_status: sub.status,
-                        synced_via: context,
-                        synced_at: nowIso,
-                    },
-                })
-                .select("id")
-                .single()
-
-            if (newNext && !nextErr) {
-                nextPurchaseId = newNext.id
-                console.log(`[BillingSync] Created next-cycle purchase ${newNext.id} for sub ${subscriptionId}`)
-            } else {
-                console.error(`[BillingSync] Failed to create next-cycle purchase for sub ${subscriptionId}:`, nextErr?.message)
-            }
-        }
-
-        // ── 7. Invoice for the NEXT cycle (the "Próxima Fatura") ──
-        if (nextPurchaseId) {
-            const nextInv = await generateInvoiceForPurchase(nextPurchaseId, partner?.user_id || undefined)
-            if (nextInv.success && nextInv.data) {
-                console.log(`[BillingSync] Next-cycle invoice ${nextInv.data.invoice_number} ensured for purchase ${nextPurchaseId}`)
-            } else {
-                console.warn(`[BillingSync] Next-cycle invoice skipped for purchase ${nextPurchaseId}:`, nextInv.error || "already exists")
-            }
-        }
-    } else {
-        // Subscription no longer bills (e.g. past_due, cancelled, scheduled to cancel, refunded, pending) → cancel any stale pending "next" purchase
+    // Cancel any stale pending "next" purchases if subscription is no longer renewing
+    if (!isRenewing) {
         for (const p of allPurchases) {
             if (p.status === "pending" && p.id !== currentPurchase.id) {
                 await supabase.from("billing_purchases").update({ status: "cancelled", updated_at: nowIso }).eq("id", p.id)
@@ -477,7 +399,7 @@ export async function syncSubscriptionToBilling(
     return {
         purchaseId: currentPurchase.id,
         created,
-        nextPurchaseId,
+        nextPurchaseId: null,
         subscriptionStatus: sub.status,
         purchaseStatus,
     }

@@ -146,7 +146,7 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                                         <UserProfileImage
                                             fullName={authorName}
                                             imageUrl={collection.author?.avatar_url || null}
-                                            className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
+                                            className="w-6 h-6 shrink-0"
                                         />
                                         <span className="font-medium text-brand-dark dark:text-dark-heading whitespace-nowrap">{authorName}</span>
                                         <span className="text-brand-inactive-text dark:text-dark-body">•</span>
@@ -189,7 +189,7 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
                             <UserProfileImage
                                 fullName={authorName}
                                 imageUrl={collection.author?.avatar_url || null}
-                                className="w-6 h-6 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
+                                className="w-6 h-6 shrink-0"
                             />
                             <span className="font-medium text-brand-dark dark:text-dark-heading truncate">{authorName}</span>
                             <span className="text-brand-inactive-text dark:text-dark-body">|</span>

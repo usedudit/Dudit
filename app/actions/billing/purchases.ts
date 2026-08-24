@@ -288,3 +288,26 @@ export async function updatePurchaseStatusAction(
     }
 }
 
+export async function getLatestPurchaseForSubscriptionAction(subscriptionId: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+
+        const admin = getAdminClient()
+        const { data, error } = await admin
+            .from("billing_purchases")
+            .select("id, description, total_amount, status, created_at, partner_id, metadata")
+            .eq("subscription_id", subscriptionId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (error) return { success: false, error: error.message }
+        if (!data) return { success: false, error: "Nenhuma fatura encontrada para esta assinatura." }
+
+        return { success: true, data }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+

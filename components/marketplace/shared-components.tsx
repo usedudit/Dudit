@@ -101,7 +101,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                 <UserProfileImage
                     fullName={storeName}
                     imageUrl={storeAvatar && !storeAvatar.includes("Placeholder.png") ? storeAvatar : null}
-                    className="w-12 h-12 border border-brand-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
+                    className="w-12 h-12 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">

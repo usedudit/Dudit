@@ -32,6 +32,7 @@ import {
     ActionsDropdown,
     DropdownItem,
 } from "@/components/reusable"
+import EnforcementActionModal from "../EnforcementActionModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
@@ -251,23 +252,21 @@ export function AdminPartnerDetailView({
     }, [store?.partner_id, detail?.partner?.id])
 
     // ── Handlers: Loja Específica ──
-    const handleConfirmSuspendStore = () => {
+    const handleConfirmSuspendStore = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!store?.id) return
-        startTransition(async () => {
-            try {
-                const res = await suspendStore(store.id, "Suspensão de loja via painel administrativo")
-                if (res.success) {
-                    toast.success(`Loja suspensa com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
-                    setSuspendStoreModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao suspender loja")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await suspendStore(store.id, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success(`Loja suspensa com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setSuspendStoreModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao suspender loja")
             }
-        })
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+        }
     }
 
     const handleConfirmUnsuspendStore = () => {
@@ -290,24 +289,22 @@ export function AdminPartnerDetailView({
     }
 
     // ── Handlers: Acesso ao ERP (Tenant) ──
-    const handleConfirmDisableERP = () => {
+    const handleConfirmDisableERP = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         const partnerId = store?.partner_id || partner?.id
         if (!partnerId) return
-        startTransition(async () => {
-            try {
-                const res = await disableTenantAccess(partnerId, "Desativação de acesso ao ERP via painel administrativo")
-                if (res.success) {
-                    toast.success(`Acesso ao ERP desativado! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
-                    setDisableErpModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao desativar ERP")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await disableTenantAccess(partnerId, reason, null, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success(`Acesso ao ERP desativado! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setDisableErpModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao desativar ERP")
             }
-        })
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+        }
     }
 
     const handleConfirmEnableERP = () => {
@@ -331,24 +328,22 @@ export function AdminPartnerDetailView({
     }
 
     // ── Handlers: Parceiro Completo ──
-    const handleConfirmSuspendPartner = () => {
+    const handleConfirmSuspendPartner = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         const partnerId = store?.partner_id || partner?.id
         if (!partnerId) return
-        startTransition(async () => {
-            try {
-                const res = await suspendPartner(partnerId, "Suspensão completa de parceiro via painel administrativo")
-                if (res.success) {
-                    toast.success(`Parceiro e todas as lojas suspensos! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
-                    setSuspendPartnerModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao suspender parceiro")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await suspendPartner(partnerId, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success(`Parceiro e todas as lojas suspensos! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                setSuspendPartnerModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao suspender parceiro")
             }
-        })
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+        }
     }
 
     const handleConfirmUnsuspendPartner = () => {
@@ -1259,14 +1254,21 @@ export function AdminPartnerDetailView({
             </DefaultModal>
 
             {/* 1. Modal: Suspender Loja (Apenas esta filial) */}
-            <AlertModal
+            <EnforcementActionModal
                 isOpen={suspendStoreModalOpen}
                 onClose={() => setSuspendStoreModalOpen(false)}
                 onConfirm={handleConfirmSuspendStore}
                 title="Suspender Esta Loja"
-                description={`Tem certeza que deseja suspender apenas a loja "${store.name}"? A loja deixará de receber pedidos e seus produtos ficarão ocultos na vitrine. Outras lojas do mesmo parceiro continuarão ativas.`}
-                confirmText="Suspender Esta Loja"
-                variant="danger"
+                entityName={store.name}
+                entityTypeLabel="Loja / Filial"
+                currentRiskScore={store.risk_score}
+                description={`Apenas a filial "${store.name}" deixará de receber pedidos e seus produtos ficarão ocultos na vitrine. Outras lojas do mesmo parceiro continuarão ativas normalmente.`}
+                consequences={[
+                    "A vitrine e produtos desta filial ficarão indisponíveis para os clientes.",
+                    "Novos pedidos para esta loja serão bloqueados.",
+                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
+                ]}
+                confirmButtonText="Suspender Esta Loja"
             />
 
             {/* 2. Modal: Reativar Loja (Apenas esta filial) */}
@@ -1281,14 +1283,21 @@ export function AdminPartnerDetailView({
             />
 
             {/* 3. Modal: Desativar Acesso ao ERP (Conta do Parceiro) */}
-            <AlertModal
+            <EnforcementActionModal
                 isOpen={disableErpModalOpen}
                 onClose={() => setDisableErpModalOpen(false)}
                 onConfirm={handleConfirmDisableERP}
                 title="Desativar Acesso ao ERP"
-                description={`Atenção: Ao desativar o acesso ao ERP, todos os administradores e colaboradores da organização perderão acesso ao painel de gestão /erp.`}
-                confirmText="Desativar Acesso ao ERP"
-                variant="danger"
+                entityName={partner?.store_name || store.name}
+                entityTypeLabel="Acesso ao ERP (Organização)"
+                currentRiskScore={store.risk_score}
+                description="Todos os administradores e colaboradores da organização parceira perderão o acesso ao painel de gestão /erp."
+                consequences={[
+                    "O login e acesso a qualquer funcionalidade do ERP serão bloqueados para toda a equipe.",
+                    "A gestão de produtos, pedidos e financeiro ficará inacessível.",
+                    "Um protocolo de caso (CAS-XXXXXXXX) será atribuído à organização.",
+                ]}
+                confirmButtonText="Desativar Acesso ao ERP"
             />
 
             {/* 4. Modal: Reativar Acesso ao ERP (Conta do Parceiro) */}
@@ -1303,14 +1312,22 @@ export function AdminPartnerDetailView({
             />
 
             {/* 5. Modal: Suspender Parceiro Inteiro */}
-            <AlertModal
+            <EnforcementActionModal
                 isOpen={suspendPartnerModalOpen}
                 onClose={() => setSuspendPartnerModalOpen(false)}
                 onConfirm={handleConfirmSuspendPartner}
                 title="Suspender Parceiro Completo"
-                description={`ATENÇÃO: Esta ação suspenderá a organização inteira, bloqueando o acesso ao ERP e desativando TODAS as suas lojas e filiais cadastradas.`}
-                confirmText="Suspender Parceiro Inteiro"
-                variant="danger"
+                entityName={partner?.store_name || store.name}
+                entityTypeLabel="Parceiro (Organização Inteira)"
+                currentRiskScore={store.risk_score}
+                description="A organização inteira será suspensa, bloqueando o acesso ao painel ERP e desativando TODAS as suas lojas e filiais cadastradas."
+                consequences={[
+                    "O acesso ao painel do ERP será bloqueado para todos os membros da organização.",
+                    "TODAS as lojas e filiais vinculadas a este parceiro serão suspensas na vitrine.",
+                    "Todos os produtos e anúncios de todas as lojas ficarão indisponíveis.",
+                    "Um protocolo de caso (CAS-XXXXXXXX) será atribuído para recurso administrativo.",
+                ]}
+                confirmButtonText="Suspender Parceiro Inteiro"
             />
 
             {/* 6. Modal: Reativar Parceiro Inteiro */}

@@ -16,6 +16,7 @@ import {
   updateMySubscriptionDetailsAction,
   getMySubscriptionCreditsAction,
 } from "@/app/actions/marketplace/recurring-subscriptions"
+import { getLatestPurchaseForSubscriptionAction } from "@/app/actions/billing/purchases"
 import { formatFullDate, formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPlanUrl, getStoreUrl } from "@/lib/utils/url-generator"
@@ -62,6 +63,8 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
   // Refund state
   const [refundOpen, setRefundOpen] = useState(false)
   const [refundSub, setRefundSub] = useState<any>(null)
+  const [refundPurchase, setRefundPurchase] = useState<any>(null)
+  const [loadingRefund, setLoadingRefund] = useState(false)
 
   useEffect(() => {
     if (activeTab === "credits") {
@@ -393,12 +396,21 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                           variant="outline"
                           size="sm"
                           className="text-brand-purple"
-                          onClick={() => {
+                          onClick={async () => {
+                            setLoadingRefund(true)
                             setRefundSub(sub)
-                            setRefundOpen(true)
+                            const res = await getLatestPurchaseForSubscriptionAction(sub.id)
+                            setLoadingRefund(false)
+                            if (res.success && res.data) {
+                              setRefundPurchase(res.data)
+                              setRefundOpen(true)
+                            } else {
+                              toast({ title: "Erro", description: res.error || "Nenhuma fatura encontrada para reembolso.", variant: "destructive" })
+                            }
                           }}
+                          disabled={loadingRefund}
                         >
-                          Solicitar Reembolso
+                          {loadingRefund ? "Carregando..." : "Solicitar Reembolso"}
                         </Button>
                       </>
                     )}
@@ -604,9 +616,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
         onClose={() => {
           setRefundOpen(false)
           setRefundSub(null)
+          setRefundPurchase(null)
         }}
-        purchase={refundSub?.lastPurchase || null}
-        partnerId={refundSub?.partnerId || ""}
+        purchase={refundPurchase}
+        partnerId={refundPurchase?.partnerId || refundPurchase?.partner_id || refundSub?.partnerId || ""}
       />
     </div>
   )

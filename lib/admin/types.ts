@@ -282,6 +282,7 @@ export interface EnforcementUser {
     user_id: string
     email: string
     full_name: string
+    risk_score?: number
     banned_at: string | null
     banned_until: string | null
     banned_reason: string | null

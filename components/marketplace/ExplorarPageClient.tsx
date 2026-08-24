@@ -1217,7 +1217,7 @@ export function ExplorarPageClient({
                                         <UserProfileImage
                                             fullName={sellerName}
                                             imageUrl={sellerLogoUrl}
-                                            className="w-8 h-8 border border-gray-100 dark:border-dark-border shrink-0 bg-gray-50 dark:bg-dark-border/30"
+                                            className="w-8 h-8 shrink-0"
                                         />
                                         <div className="flex flex-col min-w-0">
                                             <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-medium truncate leading-tight">
@@ -1528,7 +1528,7 @@ export function ExplorarPageClient({
                                         subtitle={emptySubtitle}
                                         buttons={[
                                             {
-                                                text: "Eu vendo algo",
+                                                text: "Eu vendo",
                                                 action: () => {
                                                     router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
                                                 },
@@ -1607,7 +1607,7 @@ export function ExplorarPageClient({
                                                 subtitle="Ainda não temos itens nessa cidade ou com essa combinação de filtros. Que tal limpar os filtros?"
                                                 buttons={[
                                                     {
-                                                        text: "Eu vendo algo",
+                                                        text: "Eu vendo",
                                                         action: () => {
                                                             router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
                                                         },
