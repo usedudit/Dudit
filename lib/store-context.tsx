@@ -49,6 +49,10 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
 
+function getStoreStorageKey(name: string, partnerId: string | null) {
+  return `${name}:${partnerId || "unknown"}`
+}
+
 export function StoreProvider({
   children,
   partnerId: propPartnerId,
@@ -80,10 +84,11 @@ export function StoreProvider({
 
   useEffect(() => {
     if (initialStores && initialStores.length > 0) return
+    if (!partnerId) return
 
-    const cached = localStorage.getItem("cachedStores")
-    const cachedTime = localStorage.getItem("cachedStoresTimestamp")
-    const cachedSelected = localStorage.getItem("selectedStoreId")
+    const cached = localStorage.getItem(getStoreStorageKey("cachedStores", partnerId))
+    const cachedTime = localStorage.getItem(getStoreStorageKey("cachedStoresTimestamp", partnerId))
+    const cachedSelected = localStorage.getItem(getStoreStorageKey("selectedStoreId", partnerId))
 
     // M3: Invalidate cache after 5 minutes
     const isCacheValid = cachedTime && (Date.now() - Number(cachedTime)) < 5 * 60 * 1000
@@ -101,7 +106,7 @@ export function StoreProvider({
         console.error("Error loading cached stores:", e)
       }
     }
-  }, [initialStores])
+  }, [initialStores, partnerId])
 
   useEffect(() => {
     if (propPartnerId && propPartnerId !== partnerId) {
@@ -113,7 +118,8 @@ export function StoreProvider({
   useEffect(() => {
     if (initialStores && initialStores.length > 0) {
       setStores(initialStores)
-      const savedStoreId = typeof window !== "undefined" ? localStorage.getItem("selectedStoreId") : null
+      const selectedStoreKey = getStoreStorageKey("selectedStoreId", partnerId)
+      const savedStoreId = typeof window !== "undefined" ? localStorage.getItem(selectedStoreKey) : null
       const targetId = savedStoreId || propActiveStoreId
 
       if (targetId && initialStores.some((s) => s.id === targetId)) {
@@ -123,10 +129,13 @@ export function StoreProvider({
         }
       } else if (!selectedStore || !initialStores.some((s) => s.id === selectedStore.id)) {
         setSelectedStore(initialStores[0])
+        if (typeof window !== "undefined") {
+          localStorage.setItem(selectedStoreKey, initialStores[0].id)
+        }
       }
       setIsLoading(false)
     }
-  }, [initialStores, propActiveStoreId])
+  }, [initialStores, propActiveStoreId, partnerId])
 
   const fetchStores = useCallback(async () => {
     if (!partnerId) {
@@ -151,21 +160,24 @@ export function StoreProvider({
 
       setHasError(false)
       setStores(data || [])
+      const selectedStoreKey = getStoreStorageKey("selectedStoreId", partnerId)
+      const cachedStoresKey = getStoreStorageKey("cachedStores", partnerId)
+      const cachedStoresTimestampKey = getStoreStorageKey("cachedStoresTimestamp", partnerId)
       if (data && data.length > 0) {
-        localStorage.setItem("cachedStores", JSON.stringify(data))
-        localStorage.setItem("cachedStoresTimestamp", String(Date.now()))
+        localStorage.setItem(cachedStoresKey, JSON.stringify(data))
+        localStorage.setItem(cachedStoresTimestampKey, String(Date.now()))
       }
 
-      const savedStoreId = localStorage.getItem("selectedStoreId")
+      const savedStoreId = localStorage.getItem(selectedStoreKey)
 
       if (savedStoreId && data?.find((s: any) => s.id === savedStoreId)) {
         setSelectedStore(data.find((s: any) => s.id === savedStoreId) || null)
       } else if (propActiveStoreId && data?.find((s: any) => s.id === propActiveStoreId)) {
         setSelectedStore(data.find((s: any) => s.id === propActiveStoreId) || null)
-        localStorage.setItem("selectedStoreId", propActiveStoreId)
+        localStorage.setItem(selectedStoreKey, propActiveStoreId)
       } else if (data && data.length > 0) {
-        setSelectedStore((prev) => prev || data[0])
-        if (!savedStoreId) localStorage.setItem("selectedStoreId", data[0].id)
+        setSelectedStore(data[0])
+        localStorage.setItem(selectedStoreKey, data[0].id)
       } else {
         setSelectedStore(null)
       }
@@ -187,7 +199,7 @@ export function StoreProvider({
     const store = stores.find((s) => s.id === storeId)
     if (store) {
       setSelectedStore(store)
-      localStorage.setItem("selectedStoreId", storeId)
+      localStorage.setItem(getStoreStorageKey("selectedStoreId", store.partner_id), storeId)
 
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
         setActiveStoreAction(storeId, store.partner_id).then(() => {

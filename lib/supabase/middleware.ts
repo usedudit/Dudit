@@ -465,7 +465,10 @@ export async function middleware(request: NextRequest) {
           const hasAuthCookie = request.cookies.getAll().some(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
           if (!hasAuthCookie) {
             const loginUrl = new URL("/auth/login", request.url)
-            return NextResponse.redirect(loginUrl)
+            const responseRedirect = NextResponse.redirect(loginUrl)
+            responseRedirect.cookies.delete("active_partner_id")
+            responseRedirect.cookies.delete("active_store_id")
+            return responseRedirect
           }
         }
 
@@ -623,7 +626,18 @@ export async function middleware(request: NextRequest) {
         // Se não estiver logado e tentar acessar rotas protegidas -> Manda pro Login
         if (!user && isProtected) {
           const loginUrl = new URL("/auth/login", request.url)
-          return NextResponse.redirect(loginUrl)
+          const responseRedirect = NextResponse.redirect(loginUrl)
+          responseRedirect.cookies.delete("active_partner_id")
+          responseRedirect.cookies.delete("active_store_id")
+          return responseRedirect
+        }
+
+        // A logout can remove Supabase auth cookies before the next request,
+        // while the HttpOnly ERP context cookies are still present. Clear both
+        // so the next account starts with a clean partner/store context.
+        if (!user) {
+          response.cookies.delete("active_partner_id")
+          response.cookies.delete("active_store_id")
         }
 
         // SECURITY: If already logged in and trying to access auth pages -> redirect to home

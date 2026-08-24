@@ -71,6 +71,9 @@ export interface StoreAccessRecord {
 export async function setActivePartner(partnerId: string): Promise<void> {
     const cookieStore = await cookies()
     cookieStore.set(ACTIVE_PARTNER_COOKIE, partnerId, COOKIE_OPTIONS)
+    // A store belongs to exactly one partner. Never carry the previous
+    // partner's selected store into the new ERP context.
+    cookieStore.delete(ACTIVE_STORE_COOKIE)
 }
 
 /**
@@ -80,6 +83,7 @@ export async function setActivePartner(partnerId: string): Promise<void> {
 export async function clearActivePartner(): Promise<void> {
     const cookieStore = await cookies()
     cookieStore.delete(ACTIVE_PARTNER_COOKIE)
+    cookieStore.delete(ACTIVE_STORE_COOKIE)
 }
 
 /**
@@ -624,6 +628,10 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
                 businessInfo: match.businessInfo,
             }
         }
+
+        // The active ERP belongs to a previous account or is no longer
+        // available. Clear both context cookies before falling back.
+        await clearActivePartner()
     }
 
     // If no valid cookie, and they only have 1 ERP that belongs to them, auto-resolve

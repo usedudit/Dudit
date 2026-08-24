@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { LockIcon, CheckCircleIcon, AlertCircleIcon, ArrowRightIcon } from "@/lib/icons"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
 import { Button, PasswordInput, PasswordStrengthMeter, InfoCard, Spinner } from "@/components/reusable"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
@@ -34,9 +35,27 @@ function UpdatePasswordContent() {
     const [formError, setFormError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [countdown, setCountdown] = useState(3)
+    const [activeAuthClient, setActiveAuthClient] = useState<any>(null)
 
     useEffect(() => {
         let isMounted = true
+        let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+        const recoveryClient = getPasswordRecoveryClient()
+
+        const setRecoveryForm = (client: any) => {
+            if (!isMounted) return
+            setActiveAuthClient(client)
+            setStatus("form")
+        }
+
+        // Register before initialization so PASSWORD_RECOVERY cannot be lost
+        // while the client parses the implicit-flow hash.
+        const { data: { subscription } } = recoveryClient.auth.onAuthStateChange((event: any, session: any) => {
+            if (!isMounted) return
+            if (event === "PASSWORD_RECOVERY" && session) {
+                setRecoveryForm(recoveryClient)
+            }
+        })
 
         const checkRecoveryStatus = async () => {
             // 1. Verifica erros na URL (Query Params)
@@ -56,17 +75,15 @@ function UpdatePasswordContent() {
 
             // 2. Verifica erros no Hash Fragment (Ex: Supabase #error=access_denied&error_code=otp_expired&...)
             if (typeof window !== "undefined" && window.location.hash) {
-                const hash = window.location.hash
-                if (hash.includes("error=")) {
-                    const descMatch = hash.match(/error_description=([^&]+)/)
-                    const codeMatch = hash.match(/error_code=([^&]+)/)
-                    const rawDesc = descMatch ? decodeURIComponent(descMatch[1].replace(/\+/g, " ")) : (codeMatch ? codeMatch[1] : "Link expirado ou inválido")
+                const hashParams = new URLSearchParams(window.location.hash.slice(1))
+                if (hashParams.has("error")) {
+                    const rawDesc = hashParams.get("error_description") || hashParams.get("error_code") || "Link expirado ou inválido"
                     const message = getErrorMessage(rawDesc)
                     if (isMounted) {
                         setErrorMessage(message)
                         setStatus("error")
                     }
-                    window.history.replaceState(null, "", window.location.pathname)
+                    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`)
                     return
                 }
             }
@@ -84,7 +101,10 @@ function UpdatePasswordContent() {
                         return
                     }
                     if (data?.session && isMounted) {
-                        setStatus("form")
+                        // Legacy PKCE links are accepted only when an explicit
+                        // code was supplied. Never fall back to an arbitrary
+                        // session already present in the normal client.
+                        setRecoveryForm(supabase)
                         window.history.replaceState(null, "", window.location.pathname)
                         return
                     }
@@ -97,50 +117,47 @@ function UpdatePasswordContent() {
                 }
             }
 
-            // 4. Verifica se já existe uma sessão de autenticação ativa ou token no hash
+            // 4. Only the isolated recovery client can authorize this form.
+            // A normal logged-in session must never unlock password recovery.
             try {
-                const { data: { session } } = await supabase.auth.getSession()
+                const { data: { session }, error } = await recoveryClient.auth.getSession()
+                if (error) throw error
                 if (session && isMounted) {
-                    setStatus("form")
+                    setRecoveryForm(recoveryClient)
                     return
                 }
-            } catch {}
-
-            // Aguarda brevemente para capturar qualquer evento de onAuthStateChange
-            const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-                if (!isMounted) return
-                if (event === "PASSWORD_RECOVERY" || session) {
-                    setStatus("form")
+            } catch (error: any) {
+                if (isMounted && error) {
+                    setErrorMessage(getErrorMessage(error))
                 }
-            })
+            }
 
-            // Timeout de fallback: se em 2.5s nenhuma sessão ou token foi identificado
-            const timer = setTimeout(() => {
-                if (isMounted && status === "checking") {
-                    supabase.auth.getSession().then(({ data }: any) => {
+            // Timeout de fallback: se nenhum recovery session foi identificado
+            fallbackTimer = setTimeout(() => {
+                if (isMounted) {
+                    recoveryClient.auth.getSession().then(({ data, error }: any) => {
                         if (!isMounted) return
-                        if (data?.session) {
-                            setStatus("form")
+                        if (data?.session && !error) {
+                            setRecoveryForm(recoveryClient)
                         } else {
-                            setErrorMessage("Nenhum link de recuperação válido foi encontrado. Solicite um novo link para redefinir sua senha.")
+                            if (error) setErrorMessage(getErrorMessage(error))
+                            else setErrorMessage("Nenhum link de recuperação válido foi encontrado. Solicite um novo link para redefinir sua senha.")
                             setStatus("error")
                         }
                     })
                 }
             }, 2500)
 
-            return () => {
-                subscription.unsubscribe()
-                clearTimeout(timer)
-            }
         }
 
-        checkRecoveryStatus()
+        void checkRecoveryStatus()
 
         return () => {
             isMounted = false
+            subscription.unsubscribe()
+            if (fallbackTimer) clearTimeout(fallbackTimer)
         }
-    }, [searchParams, status])
+    }, [searchParams])
 
     // Countdown para redirecionamento após sucesso
     useEffect(() => {
@@ -150,7 +167,7 @@ function UpdatePasswordContent() {
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval)
-                    window.location.assign("/")
+                    window.location.assign("/auth/login")
                     return 0
                 }
                 return prev - 1
@@ -182,9 +199,16 @@ function UpdatePasswordContent() {
         setIsLoading(true)
 
         try {
-            const { error } = await supabase.auth.updateUser({ password })
+            if (!activeAuthClient) {
+                throw new Error("Nenhuma sessão de recuperação válida foi encontrada. Solicite um novo link.")
+            }
+
+            const { error } = await activeAuthClient.auth.updateUser({ password })
             if (error) throw error
 
+            // A recovery session is single-purpose. It must not become a
+            // normal logged-in session after the password change.
+            await activeAuthClient.auth.signOut({ scope: "local" })
             setStatus("success")
         } catch (err: any) {
             setFormError(getErrorMessage(err))
@@ -395,15 +419,15 @@ function UpdatePasswordContent() {
                                         Senha alterada com sucesso!
                                     </h2>
                                     <p className="text-brand-inactive-text dark:text-dark-body text-sm max-w-sm">
-                                        Sua senha foi redefinida com segurança. Você será redirecionado para a página inicial em <strong>{countdown}</strong> segundo{countdown === 1 ? "" : "s"}.
+                                        Sua senha foi redefinida com segurança. Por segurança, você será redirecionado para o login em <strong>{countdown}</strong> segundo{countdown === 1 ? "" : "s"}.
                                     </p>
                                 </div>
 
                                 <Button
-                                    onClick={() => window.location.assign("/")}
+                                    onClick={() => window.location.assign("/auth/login")}
                                     className="w-full h-[46px] font-semibold flex items-center justify-center gap-2"
                                 >
-                                    <span>Ir para a Página Inicial</span>
+                                    <span>Ir para o Login</span>
                                     <ArrowRightIcon size={18} />
                                 </Button>
                             </motion.div>

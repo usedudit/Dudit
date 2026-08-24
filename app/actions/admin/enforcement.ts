@@ -25,7 +25,7 @@ import type { EnforcementUser, EnforcementPartner, CursorPaginatedResult } from 
 
 // ─── Helper: Generate Clean Human-Readable Case Protocol ID (CAS-XXXXXXXX) ───
 
-export function generateCaseId(prefix: string = "CAS"): string {
+function generateCaseId(prefix: string = "CAS"): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // 32 chars, no 0/O, 1/I to avoid user confusion
     let result = ""
     for (let i = 0; i < 8; i++) {

@@ -58,7 +58,14 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
 
     // Loja por ID ativo (pode não existir se o cookie estiver desatualizado)
     activeStoreId
-      ? supabase.from("stores").select(STORE_SELECT).eq("id", activeStoreId).maybeSingle()
+      ? supabase
+        .from("stores")
+        .select(STORE_SELECT)
+        .eq("id", activeStoreId)
+        // Never let a stale store cookie from another ERP/account influence
+        // the dashboard or the public seller URL.
+        .eq("partner_id", partnerId)
+        .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
 
     // Fallback: sempre busca a primeira loja do parceiro

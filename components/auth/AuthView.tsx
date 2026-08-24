@@ -14,6 +14,7 @@ import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
+import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
 
 // Types
 type AuthMode = "login" | "signup" | "verify-email" | "forgot-password"
@@ -260,7 +261,13 @@ export default function AuthView({
         setError(null)
         try {
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
-            const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+            const recoveryClient = getPasswordRecoveryClient()
+
+            // A previous recovery attempt must never be reused for a new email.
+            // The recovery client is isolated from the normal login session.
+            await recoveryClient.auth.signOut({ scope: "local" })
+
+            const { error } = await recoveryClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
                 redirectTo: `${origin}/auth/update-password`,
             })
             if (error) {

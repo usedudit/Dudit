@@ -31,6 +31,19 @@ export function SupabaseProvider({
     const [isSessionLoading, setIsSessionLoading] = useState(false)
 
     useEffect(() => {
+        const clearAccountScopedBrowserState = () => {
+            if (typeof window === "undefined") return
+
+            // These values used to be global browser state. Clear them on
+            // account transitions so a new user cannot inherit the previous
+            // user's ERP/store selection or marketplace city.
+            localStorage.removeItem("dudit_city")
+            localStorage.removeItem("cachedStores")
+            localStorage.removeItem("cachedStoresTimestamp")
+            localStorage.removeItem("selectedStoreId")
+            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0"
+        }
+
         // Only fetch user client-side if SSR didn't provide one.
         // When initialUser is available (the common case), this avoids a redundant
         // Supabase GoTrue API round-trip (~50-150ms) on every page load.
@@ -44,8 +57,8 @@ export function SupabaseProvider({
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event: any, session: any) => {
             setUser(session?.user ?? null)
-            if (event === "SIGNED_IN") {
-                localStorage.removeItem("dudit_city")
+            if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+                clearAccountScopedBrowserState()
             }
         })
 
