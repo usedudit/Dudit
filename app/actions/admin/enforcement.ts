@@ -325,137 +325,239 @@ export async function getAdminPartnerStats(): Promise<AdminPartnerStats> {
 }
 
 export async function getAdminPartnerDetail(storeId: string): Promise<any | null> {
-    await requireAdmin("admin")
-    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+    try {
+        console.log(`[getAdminPartnerDetail] Starting detail fetch for storeId: "${storeId}"`)
+        if (!storeId || typeof storeId !== "string" || storeId.trim() === "") {
+            console.warn("[getAdminPartnerDetail] Invalid or empty storeId provided:", storeId)
+            return null
+        }
 
-    const supabase: any = getAdminClient()
+        const trimmedId = storeId.trim()
+        await requireAdmin()
+        await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    // 1. Try finding store by store ID first
-    let store: any = null
-    const { data: storeById } = await supabase
-        .from("stores")
-        .select("*, partners(*)")
-        .eq("id", storeId)
-        .maybeSingle()
+        const supabase: any = getAdminClient()
 
-    if (storeById) {
-        store = storeById
-    } else {
-        // Fallback 1: Try finding store by partner_id
-        const { data: storeByPartner } = await supabase
+        // 1. Try finding store by store ID first
+        let store: any = null
+        const { data: storeById, error: storeByIdError } = await supabase
             .from("stores")
             .select("*, partners(*)")
-            .eq("partner_id", storeId)
-            .order("is_headquarters", { ascending: false })
-            .limit(1)
+            .eq("id", trimmedId)
             .maybeSingle()
 
-        if (storeByPartner) {
-            store = storeByPartner
+        if (storeByIdError) {
+            console.warn(`[getAdminPartnerDetail] Error querying store by ID (${trimmedId}):`, storeByIdError.message)
+        }
+
+        if (storeById) {
+            store = storeById
         } else {
-            // Fallback 2: Check if partner exists directly
-            const { data: partnerData } = await supabase
-                .from("partners")
-                .select("*, stores(*)")
-                .eq("id", storeId)
+            // Fallback 1: Try finding store by partner_id
+            const { data: storeByPartner, error: storeByPartnerError } = await supabase
+                .from("stores")
+                .select("*, partners(*)")
+                .eq("partner_id", trimmedId)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
                 .maybeSingle()
 
-            if (partnerData) {
-                store = partnerData.stores?.[0] || {
-                    id: partnerData.id,
-                    name: partnerData.store_name || "Loja",
-                    partner_id: partnerData.id,
-                    is_active: partnerData.is_active,
-                    risk_score: partnerData.risk_score || 0,
-                    partners: partnerData,
+            if (storeByPartnerError) {
+                console.warn(`[getAdminPartnerDetail] Error querying store by partner_id (${trimmedId}):`, storeByPartnerError.message)
+            }
+
+            if (storeByPartner) {
+                store = storeByPartner
+            } else {
+                // Fallback 2: Check if partner exists directly
+                const { data: partnerData, error: partnerDataError } = await supabase
+                    .from("partners")
+                    .select("*, stores(*)")
+                    .eq("id", trimmedId)
+                    .maybeSingle()
+
+                if (partnerDataError) {
+                    console.warn(`[getAdminPartnerDetail] Error querying partner directly (${trimmedId}):`, partnerDataError.message)
                 }
-                store.partners = partnerData
+
+                if (partnerData) {
+                    store = partnerData.stores?.[0] || {
+                        id: partnerData.id,
+                        name: "Loja Parceira",
+                        partner_id: partnerData.id,
+                        is_active: partnerData.is_active,
+                        risk_score: 0,
+                        partners: partnerData,
+                    }
+                    store.partners = partnerData
+                }
             }
         }
-    }
 
-    if (!store) {
-        console.error("[getAdminPartnerDetail] Store/Partner not found for ID:", storeId)
-        return null
-    }
+        if (!store) {
+            console.error("[getAdminPartnerDetail] Store/Partner not found in database for ID:", trimmedId)
+            return null
+        }
 
-    const actualStoreId = store.id
-    const partner = store.partners
-    const actualPartnerId = partner?.id || store.partner_id || storeId
+        const actualStoreId = store.id
+        let partner = store.partners
+        const actualPartnerId = partner?.id || store.partner_id || trimmedId
 
-    // 2. Owner Profile & Email
-    let ownerProfile = null
-    if (partner?.user_id) {
-        const { data: profile } = await supabase
-            .from("user_profiles")
-            .select("*")
-            .eq("user_id", partner.user_id)
-            .maybeSingle()
+        // If partner join failed but store has partner_id, fetch partner directly
+        if (!partner && store.partner_id) {
+            try {
+                const { data: directPartner } = await supabase
+                    .from("partners")
+                    .select("*")
+                    .eq("id", store.partner_id)
+                    .maybeSingle()
+                if (directPartner) {
+                    partner = directPartner
+                    store.partners = directPartner
+                }
+            } catch (e) {
+                console.error("[getAdminPartnerDetail] Error fetching direct partner:", e)
+            }
+        }
 
+        // 2. Owner Profile & Email
+        let ownerProfile = null
+        if (partner?.user_id) {
+            try {
+                const { data: profile, error: profileErr } = await supabase
+                    .from("user_profiles")
+                    .select("*")
+                    .eq("user_id", partner.user_id)
+                    .maybeSingle()
+
+                if (profileErr) {
+                    console.warn("[getAdminPartnerDetail] Error fetching owner user_profile:", profileErr.message)
+                }
+
+                try {
+                    const { data: u } = await supabase.auth.admin.getUserById(partner.user_id)
+                    ownerProfile = {
+                        ...(profile || {}),
+                        email: u?.user?.email || null,
+                    }
+                } catch {
+                    ownerProfile = profile
+                }
+            } catch (e) {
+                console.error("[getAdminPartnerDetail] Exception fetching owner profile:", e)
+            }
+        }
+
+        // 3. Products count & list (with error safety)
+        let productsCount = 0
+        let recentProducts: any[] = []
         try {
-            const { data: u } = await supabase.auth.admin.getUserById(partner.user_id)
-            ownerProfile = {
-                ...(profile || {}),
-                email: u?.user?.email || null,
-            }
-        } catch {
-            ownerProfile = profile
+            const [productsCountRes, recentProductsRes] = await Promise.all([
+                supabase.from("products").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
+                supabase.from("products").select("id, name, price, is_active, images, sku, stock_quantity, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+            ])
+            productsCount = productsCountRes.count || 0
+            recentProducts = recentProductsRes.data || []
+        } catch (prodErr) {
+            console.error("[getAdminPartnerDetail] Failed to load products:", prodErr)
         }
-    }
 
-    // 3. Products count & list
-    const [productsCountRes, recentProductsRes] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
-        supabase.from("products").select("id, name, price, is_active, images, sku, stock_quantity, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
-    ])
+        // 4. Services count & list (with error safety)
+        let servicesCount = 0
+        let recentServices: any[] = []
+        try {
+            const [servicesCountRes, recentServicesRes] = await Promise.all([
+                supabase.from("services").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
+                supabase.from("services").select("id, name, price, is_active, images, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+            ])
+            servicesCount = servicesCountRes.count || 0
+            recentServices = recentServicesRes.data || []
+        } catch (servErr) {
+            console.error("[getAdminPartnerDetail] Failed to load services:", servErr)
+        }
 
-    // 4. Services count & list
-    const [servicesCountRes, recentServicesRes] = await Promise.all([
-        supabase.from("services").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId).is("deleted_at", null),
-        supabase.from("services").select("id, name, price, is_active, images, created_at").eq("store_id", actualStoreId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
-    ])
+        // 5. Orders count & list (with error safety)
+        let ordersCount = 0
+        let recentOrders: any[] = []
+        try {
+            const [ordersCountRes, recentOrdersRes] = await Promise.all([
+                supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId),
+                supabase.from("orders").select("id, order_number, total_amount, paid_amount, situation, delivery_status, created_at, customer_name, order_source, payment_method").eq("store_id", actualStoreId).order("created_at", { ascending: false }).limit(50),
+            ])
+            ordersCount = ordersCountRes.count || 0
+            recentOrders = recentOrdersRes.data || []
+        } catch (ordErr) {
+            console.error("[getAdminPartnerDetail] Failed to load orders:", ordErr)
+        }
 
-    // 5. Orders count & list
-    const [ordersCountRes, recentOrdersRes] = await Promise.all([
-        supabase.from("orders").select("id", { count: "exact", head: true }).eq("store_id", actualStoreId),
-        supabase.from("orders").select("id, order_number, total_amount, paid_amount, situation, delivery_status, created_at, customer_name, order_source, payment_method").eq("store_id", actualStoreId).order("created_at", { ascending: false }).limit(50),
-    ])
+        // 6. Returns count & list (with error safety)
+        let returnsCount = 0
+        let recentReturns: any[] = []
+        try {
+            let returnCountQuery = supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null)
+            let returnDataQuery = supabase.from("return_requests").select("id, request_type, status, resolution_type, refund_amount, store_credit_amount, created_at, customer_name_snapshot, order_number_snapshot").is("deleted_at", null)
 
-    // 6. Returns count & list
-    const returnFilter = actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId
-        ? `partner_id.eq.${actualPartnerId},store_id.eq.${actualStoreId}`
-        : `partner_id.eq.${actualPartnerId}`
+            if (actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId) {
+                const returnFilter = `partner_id.eq.${actualPartnerId},store_id.eq.${actualStoreId}`
+                returnCountQuery = returnCountQuery.or(returnFilter)
+                returnDataQuery = returnDataQuery.or(returnFilter)
+            } else if (actualPartnerId) {
+                returnCountQuery = returnCountQuery.eq("partner_id", actualPartnerId)
+                returnDataQuery = returnDataQuery.eq("partner_id", actualPartnerId)
+            } else if (actualStoreId) {
+                returnCountQuery = returnCountQuery.eq("store_id", actualStoreId)
+                returnDataQuery = returnDataQuery.eq("store_id", actualStoreId)
+            }
 
-    const [returnsCountRes, recentReturnsRes] = await Promise.all([
-        supabase.from("return_requests").select("id", { count: "exact", head: true }).is("deleted_at", null).or(returnFilter),
-        supabase.from("return_requests").select("id, request_type, status, resolution_type, refund_amount, store_credit_amount, created_at, customer_name_snapshot, order_number_snapshot").is("deleted_at", null).or(returnFilter).order("created_at", { ascending: false }).limit(50),
-    ])
+            const [returnsCountRes, recentReturnsRes] = await Promise.all([
+                returnCountQuery,
+                returnDataQuery.order("created_at", { ascending: false }).limit(50),
+            ])
+            returnsCount = returnsCountRes.count || 0
+            recentReturns = recentReturnsRes.data || []
+        } catch (retErr) {
+            console.error("[getAdminPartnerDetail] Failed to load return requests:", retErr)
+        }
 
-    // 7. Audit & Risk Events
-    const auditFilter = actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId
-        ? `target_id.eq.${actualStoreId},target_id.eq.${actualPartnerId}`
-        : `target_id.eq.${actualPartnerId}`
+        // 7. Audit & Risk Events (with error safety)
+        let auditEvents: any[] = []
+        try {
+            let auditQuery = supabase.from("admin_audit_logs").select("*")
+            if (actualStoreId && actualPartnerId && actualStoreId !== actualPartnerId) {
+                auditQuery = auditQuery.or(`target_id.eq.${actualStoreId},target_id.eq.${actualPartnerId}`)
+            } else if (actualPartnerId) {
+                auditQuery = auditQuery.eq("target_id", actualPartnerId)
+            } else if (actualStoreId) {
+                auditQuery = auditQuery.eq("target_id", actualStoreId)
+            }
+            const { data: audits, error: auditErr } = await auditQuery.order("created_at", { ascending: false }).limit(30)
+            if (auditErr) {
+                console.warn("[getAdminPartnerDetail] Warning querying audit logs:", auditErr.message)
+            }
+            auditEvents = audits || []
+        } catch (audErr) {
+            console.error("[getAdminPartnerDetail] Failed to load audit logs:", audErr)
+        }
 
-    const { data: auditEvents } = await supabase
-        .from("admin_audit_logs")
-        .select("*")
-        .or(auditFilter)
-        .order("created_at", { ascending: false })
-        .limit(30)
+        console.log(`[getAdminPartnerDetail] Successfully retrieved partner details for "${store.name || actualStoreId}"`)
 
-    return {
-        store,
-        partner,
-        ownerProfile,
-        productsCount: productsCountRes.count || 0,
-        recentProducts: recentProductsRes.data || [],
-        servicesCount: servicesCountRes.count || 0,
-        recentServices: recentServicesRes.data || [],
-        ordersCount: ordersCountRes.count || 0,
-        recentOrders: recentOrdersRes.data || [],
-        returnsCount: returnsCountRes.count || 0,
-        recentReturns: recentReturnsRes.data || [],
-        auditEvents: auditEvents || [],
+        return {
+            store,
+            partner,
+            ownerProfile,
+            productsCount,
+            recentProducts,
+            servicesCount,
+            recentServices,
+            ordersCount,
+            recentOrders,
+            returnsCount,
+            recentReturns,
+            auditEvents,
+        }
+    } catch (criticalErr: any) {
+        console.error("[getAdminPartnerDetail] Critical unexpected error:", criticalErr)
+        throw new Error(`Falha ao obter detalhes da loja/parceiro: ${criticalErr?.message || "Erro desconhecido"}`)
     }
 }
 
@@ -652,7 +754,7 @@ export async function getPartners(
     search?: string,
     status?: string
 ): Promise<CursorPaginatedResult<EnforcementPartner>> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdmin()
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -735,7 +837,7 @@ export async function getPartners(
         const partner = partnerMap.get(s.partner_id)
         return {
             id: s.id,
-            store_name: `${s.name} (${partner?.store_name || "Sem parceiro"})`,
+            store_name: s.name || partner?.stores?.[0]?.name || "Loja Parceira",
             owner_name: ownerMap.get(partner?.user_id) || "Desconhecido",
             owner_user_id: partner?.user_id || "",
             is_active: s.is_active,
@@ -770,15 +872,18 @@ export async function getPartners(
     }
 }
 
-// ─── Enable Tenant ERP Access ────────────────────────────────────────────────
+// ─── Enable Tenant ERP Access ⚠️ (step-up required) ────────────────────────
 
 export async function enableTenantAccess(
     partnerId: string,
     reason: string = "Reativação administrativa de acesso ao ERP",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
 
     const finalReason = reason && reason.trim().length >= 5 ? reason.trim() : "Reativação administrativa de acesso ao ERP"
 
@@ -787,7 +892,7 @@ export async function enableTenantAccess(
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, erp_disabled")
+        .select("id, user_id, erp_disabled")
         .eq("id", partnerId)
         .single()
 
@@ -825,13 +930,31 @@ export async function enableTenantAccess(
         return { success: false, error: updateError.message }
     }
 
+    if (riskScore !== undefined && riskScore !== null) {
+        await supabase
+            .from("stores")
+            .update({ risk_score: Math.min(Math.max(Number(riskScore) || 0, 0), 100) } as any)
+            .eq("partner_id", partnerId)
+    }
+
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.PARTNER_ENABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: finalReason, storeName },
+        metadata: { reason: finalReason, storeName, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (partner.user_id) await revalidateUserAccess(partner.user_id)
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {
@@ -842,7 +965,7 @@ export async function enableTenantAccess(
                     userId: uid,
                     type: "admin_announcement",
                     title: `Acesso ao ERP Reativado: ${storeName}`,
-                    message: `O acesso ao painel ERP da sua organização foi restabelecido com sucesso.`,
+                    message: `O acesso ao painel ERP da sua organização foi restabelecido com sucesso. Motivo: ${finalReason}.`,
                     entityType: "announcement",
                     entityId: partnerId,
                     data: {
@@ -978,18 +1101,20 @@ export async function banUser(
     return { success: true, caseId }
 }
 
-// ─── Unban User ─────────────────────────────────────────────────────────────
+// ─── Unban User ⚠️ (step-up required) ──────────────────────────────────────
 
 export async function unbanUser(
     targetUserId: string,
-    reason: string
+    reason: string = "Reativação administrativa de conta de usuário",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
+    notifyUser: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
 
-    if (!reason || reason.trim().length < 5) {
-        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
-    }
+    const finalReason = reason && reason.trim().length >= 5 ? reason.trim() : "Reativação administrativa de conta de usuário"
 
     const supabase: any = getAdminClient()
 
@@ -1008,15 +1133,21 @@ export async function unbanUser(
         return { success: false, error: "Usuário não está banido" }
     }
 
+    const updatePayload: any = {
+        banned_at: null,
+        banned_until: null,
+        banned_reason: null,
+        banned_by: null,
+        banned_case_id: null,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     const { error: updateError } = await supabase
         .from("user_profiles")
-        .update({
-            banned_at: null,
-            banned_until: null,
-            banned_reason: null,
-            banned_by: null,
-            banned_case_id: null,
-        } as any)
+        .update(updatePayload)
         .eq("user_id", targetUserId)
 
     if (updateError) {
@@ -1028,8 +1159,41 @@ export async function unbanUser(
         actionType: AdminActionType.USER_UNBAN,
         targetType: "user",
         targetId: targetUserId,
-        metadata: { reason: reason.trim(), targetName: user.full_name },
+        metadata: { reason: finalReason, targetName: user.full_name, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        await revalidateUserAccess(targetUserId)
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
+
+    if (notifyUser) {
+        try {
+            const { createNotification } = await import("@/lib/services/notification.service")
+            await createNotification({
+                userId: targetUserId,
+                type: "admin_announcement",
+                title: "Conta Reativada",
+                message: `Sua conta foi restabelecida com sucesso pela administração. Motivo: ${finalReason}.`,
+                entityType: "announcement",
+                entityId: targetUserId,
+                data: {
+                    audience: "customer",
+                    url: "/",
+                },
+                idempotencyKey: `user_unbanned:${targetUserId}:${Date.now()}`,
+                origin: "system",
+            })
+        } catch (notifErr) {
+            console.error("[ADMIN_ENFORCEMENT] Failed to send unban notification:", notifErr)
+        }
+    }
 
     return { success: true }
 }
@@ -1039,6 +1203,7 @@ export async function unbanUser(
 export async function suspendPartner(
     partnerId: string,
     reason: string,
+    durationDays: number | null = null,
     stepUpToken: string = "admin-confirmed",
     riskScore?: number | null,
     notifyOwner: boolean = true
@@ -1081,14 +1246,18 @@ export async function suspendPartner(
         return { success: false, error: "Parceiro já está suspenso" }
     }
 
+    const suspendedUntil = durationDays && durationDays > 0
+        ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+        : null
+
     const caseId = generateCaseId("CAS")
 
-    // Mass-assignment: whitelisted
     const { error: updateError } = await supabase
         .from("partners")
         .update({
             is_active: false,
             suspended_at: new Date().toISOString(),
+            suspended_until: suspendedUntil,
             suspended_reason: reason.trim(),
             suspended_by: admin.userId,
             suspended_case_id: caseId,
@@ -1102,6 +1271,7 @@ export async function suspendPartner(
     const storeUpdatePayload: any = {
         is_active: false,
         suspended_at: new Date().toISOString(),
+        suspended_until: suspendedUntil,
         suspended_reason: `Parceiro suspenso: ${reason.trim()}`,
         suspended_by: admin.userId,
         suspended_case_id: caseId,
@@ -1122,8 +1292,19 @@ export async function suspendPartner(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName, riskScore },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName, durationDays: durationDays || "permanent", suspendedUntil, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (partner.user_id) await revalidateUserAccess(partner.user_id)
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {
@@ -1156,26 +1337,27 @@ export async function suspendPartner(
     return { success: true, caseId }
 }
 
-// ─── Unsuspend Partner (Tenant ERP + All Stores) ────────────────────────────
+// ─── Unsuspend Partner (Tenant ERP + All Stores) ⚠️ (step-up required) ───────
 
 export async function unsuspendPartner(
     partnerId: string,
-    reason: string,
+    reason: string = "Reativação administrativa de organização",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
 
-    if (!reason || reason.trim().length < 5) {
-        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
-    }
+    const finalReason = reason && reason.trim().length >= 5 ? reason.trim() : "Reativação administrativa de organização"
 
     const supabase: any = getAdminClient()
 
     // Anti-IDOR
     const { data: partner, error: fetchError } = await supabase
         .from("partners")
-        .select("id, suspended_at")
+        .select("id, user_id, suspended_at")
         .eq("id", partnerId)
         .single()
 
@@ -1202,6 +1384,7 @@ export async function unsuspendPartner(
         .update({
             is_active: true,
             suspended_at: null,
+            suspended_until: null,
             suspended_reason: null,
             suspended_by: null,
             suspended_case_id: null,
@@ -1212,16 +1395,23 @@ export async function unsuspendPartner(
         return { success: false, error: updateError.message }
     }
 
+    const storeUpdatePayload: any = {
+        is_active: true,
+        suspended_at: null,
+        suspended_until: null,
+        suspended_reason: null,
+        suspended_by: null,
+        suspended_case_id: null,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        storeUpdatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     // Also unsuspend all stores of this partner
     await supabase
         .from("stores")
-        .update({
-            is_active: true,
-            suspended_at: null,
-            suspended_reason: null,
-            suspended_by: null,
-            suspended_case_id: null,
-        } as any)
+        .update(storeUpdatePayload as any)
         .eq("partner_id", partnerId)
 
     await adminAuditLog({
@@ -1229,8 +1419,19 @@ export async function unsuspendPartner(
         actionType: AdminActionType.PARTNER_UNSUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName },
+        metadata: { reason: finalReason, storeName, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (partner.user_id) await revalidateUserAccess(partner.user_id)
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {
@@ -1241,7 +1442,7 @@ export async function unsuspendPartner(
                     userId: uid,
                     type: "admin_announcement",
                     title: `Organização Reativada: ${storeName}`,
-                    message: `Sua organização e lojas foram reativadas pela administração.`,
+                    message: `Sua organização e lojas foram reativadas com sucesso pela administração. Motivo: ${finalReason}.`,
                     entityType: "announcement",
                     entityId: partnerId,
                     data: {
@@ -1266,6 +1467,7 @@ export async function unsuspendPartner(
 export async function suspendStore(
     storeId: string,
     reason: string,
+    durationDays: number | null = null,
     stepUpToken: string = "admin-confirmed",
     riskScore?: number | null,
     notifyOwner: boolean = true
@@ -1294,11 +1496,16 @@ export async function suspendStore(
         return { success: false, error: "Loja já está suspensa" }
     }
 
+    const suspendedUntil = durationDays && durationDays > 0
+        ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
+        : null
+
     const caseId = generateCaseId("CAS")
 
     const updatePayload: any = {
         is_active: false,
         suspended_at: new Date().toISOString(),
+        suspended_until: suspendedUntil,
         suspended_reason: reason.trim(),
         suspended_by: admin.userId,
         suspended_case_id: caseId,
@@ -1322,8 +1529,22 @@ export async function suspendStore(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: storeId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName: store.name, storeId, riskScore },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName: store.name, storeId, durationDays: durationDays || "permanent", suspendedUntil, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (store.partner_id) {
+            const { data: partnerData } = await supabase.from("partners").select("user_id").eq("id", store.partner_id).maybeSingle()
+            if (partnerData?.user_id) await revalidateUserAccess(partnerData.user_id)
+        }
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {
@@ -1368,19 +1589,20 @@ export async function suspendStore(
     return { success: true, caseId }
 }
 
-// ─── Unsuspend Single Store ─────────────────────────────────────────────────
+// ─── Unsuspend Single Store ⚠️ (step-up required) ───────────────────────────
 
 export async function unsuspendStore(
     storeId: string,
-    reason: string,
+    reason: string = "Reativação administrativa de loja",
+    stepUpToken: string = "admin-confirmed",
+    riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+    await requireStepUp(admin.userId, stepUpToken)
 
-    if (!reason || reason.trim().length < 5) {
-        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
-    }
+    const finalReason = reason && reason.trim().length >= 5 ? reason.trim() : "Reativação administrativa de loja"
 
     const supabase: any = getAdminClient()
 
@@ -1398,15 +1620,22 @@ export async function unsuspendStore(
         return { success: false, error: "Loja não está suspensa" }
     }
 
+    const updatePayload: any = {
+        is_active: true,
+        suspended_at: null,
+        suspended_until: null,
+        suspended_reason: null,
+        suspended_by: null,
+        suspended_case_id: null,
+    }
+
+    if (riskScore !== undefined && riskScore !== null) {
+        updatePayload.risk_score = Math.min(Math.max(Number(riskScore) || 0, 0), 100)
+    }
+
     const { error: updateError } = await supabase
         .from("stores")
-        .update({
-            is_active: true,
-            suspended_at: null,
-            suspended_reason: null,
-            suspended_by: null,
-            suspended_case_id: null,
-        } as any)
+        .update(updatePayload)
         .eq("id", storeId)
 
     if (updateError) {
@@ -1418,8 +1647,22 @@ export async function unsuspendStore(
         actionType: AdminActionType.PARTNER_UNSUSPEND,
         targetType: "partner",
         targetId: storeId,
-        metadata: { reason: reason.trim(), storeName: store.name },
+        metadata: { reason: finalReason, storeName: store.name, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (store.partner_id) {
+            const { data: partnerData } = await supabase.from("partners").select("user_id").eq("id", store.partner_id).maybeSingle()
+            if (partnerData?.user_id) await revalidateUserAccess(partnerData.user_id)
+        }
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {
@@ -1440,7 +1683,7 @@ export async function unsuspendStore(
                     userId: uid,
                     type: "admin_announcement",
                     title: `Loja Reativada: ${store.name}`,
-                    message: `O funcionamento da loja "${store.name}" foi restabelecido pela administração.`,
+                    message: `O funcionamento da loja "${store.name}" foi restabelecido com sucesso pela administração. Motivo: ${finalReason}.`,
                     entityType: "announcement",
                     entityId: storeId,
                     data: {
@@ -1512,7 +1755,7 @@ export async function disableTenantAccess(
 
     const suspendedUntil = durationDays && durationDays > 0
         ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
-        : null  // null = permanent disable
+        : null
 
     const caseId = generateCaseId("CAS")
 
@@ -1544,8 +1787,19 @@ export async function disableTenantAccess(
         actionType: AdminActionType.PARTNER_DISABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { case_id: caseId, reason: reason.trim(), storeName, riskScore },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName, durationDays: durationDays || "permanent", suspendedUntil, riskScore },
     })
+
+    // Revalidação de cache instantânea
+    try {
+        const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
+        const { revalidatePath } = await import("next/cache")
+        if (partner.user_id) await revalidateUserAccess(partner.user_id)
+        revalidatePath("/select-erp")
+        revalidatePath("/erp", "layout")
+    } catch (e) {
+        console.error("[ENFORCEMENT] Revalidation error:", e)
+    }
 
     if (notifyOwner) {
         try {

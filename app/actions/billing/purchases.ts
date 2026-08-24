@@ -294,7 +294,20 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
         if (!user) return { success: false, error: "Não autenticado" }
 
         const admin = getAdminClient()
-        const { data, error } = await admin
+
+        // 1. Busca por recurring_subscription_id (marketplace recurring subscriptions)
+        const { data: byRecurring } = await admin
+            .from("billing_purchases")
+            .select("id, description, total_amount, status, created_at, partner_id, metadata")
+            .eq("recurring_subscription_id", subscriptionId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (byRecurring) return { success: true, data: byRecurring }
+
+        // 2. Busca por subscription_id (SaaS platform subscriptions)
+        const { data: bySaaS } = await admin
             .from("billing_purchases")
             .select("id, description, total_amount, status, created_at, partner_id, metadata")
             .eq("subscription_id", subscriptionId)
@@ -302,10 +315,30 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
             .limit(1)
             .maybeSingle()
 
-        if (error) return { success: false, error: error.message }
-        if (!data) return { success: false, error: "Nenhuma fatura encontrada para esta assinatura." }
+        if (bySaaS) return { success: true, data: bySaaS }
 
-        return { success: true, data }
+        // 3. Fallback: busca a purchase mais recente do mesmo parceiro com tipo subscription
+        // (para quando o sync SQL foi rodado e criou billing_purchases vinculados ao SaaS subscription)
+        const { data: sub } = await admin
+            .from("recurring_subscriptions")
+            .select("partner_id")
+            .eq("id", subscriptionId)
+            .maybeSingle()
+
+        if (sub?.partner_id) {
+            const { data: byPartner } = await admin
+                .from("billing_purchases")
+                .select("id, description, total_amount, status, created_at, partner_id, metadata")
+                .eq("partner_id", sub.partner_id)
+                .eq("purchase_type", "subscription")
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (byPartner) return { success: true, data: byPartner }
+        }
+
+        return { success: false, error: "Nenhuma fatura encontrada para esta assinatura." }
     } catch (error: any) {
         return { success: false, error: error.message }
     }

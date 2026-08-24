@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
-import EnforcementActionModal from "../EnforcementActionModal"
+import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import UserEnforcementListRow from "./UserEnforcementListRow"
 import UserEnforcementPageControls from "./UserEnforcementPageControls"
 import AdminUserDetailView from "./AdminUserDetailView"
@@ -78,10 +78,10 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
         })
     }, [])
 
-    const handleConfirmBan = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmBan = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!banTarget) return
         try {
-            const res = await banUser(banTarget.user_id, reason, null, stepUpToken, riskScore, notifyOwner)
+            const res = await banUser(banTarget.user_id, reason, durationDays, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
                 toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setBanTarget(null)
@@ -89,28 +89,29 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             } else {
                 toast.error(res.error || "Erro ao banir usuário")
             }
+            return res
         } catch (err: any) {
             toast.error(err.message || "Erro inesperado")
+            throw err
         }
     }
 
-    const handleConfirmUnban = () => {
+    const handleConfirmUnban = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!unbanTarget) return
-        startTransition(async () => {
-            try {
-                const res = await unbanUser(unbanTarget.user_id, actionReason || "Revisão administrativa")
-                if (res.success) {
-                    toast.success("Usuário desbanido com sucesso!")
-                    setUnbanTarget(null)
-                    setActionReason("")
-                    refreshUsers()
-                } else {
-                    toast.error(res.error || "Erro ao desbanir usuário")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await unbanUser(unbanTarget.user_id, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Usuário desbanido com sucesso!")
+                setUnbanTarget(null)
+                refreshUsers()
+            } else {
+                toast.error(res.error || "Erro ao desbanir usuário")
             }
-        })
+            return res
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
     }
 
     // Instant in-memory filtering (0ms)
@@ -368,36 +369,32 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             </div>
 
             {/* Modal: Banir Usuário */}
-            <EnforcementActionModal
-                isOpen={!!banTarget}
-                onClose={() => setBanTarget(null)}
-                onConfirm={handleConfirmBan}
-                title="Banir Usuário"
-                entityName={banTarget?.full_name || banTarget?.email || "Usuário"}
-                entityTypeLabel="Usuário"
-                currentRiskScore={banTarget?.risk_score}
-                description={`A conta de ${banTarget?.full_name || banTarget?.email} perderá acesso imediato à plataforma.`}
-                consequences={[
-                    "O usuário será impedido de realizar novos pedidos e acessar serviços.",
-                    "Se possuir lojas ativas, os produtos serão suspensos preventivamente.",
-                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
-                ]}
-                confirmButtonText="Banir Conta"
-            />
+            {banTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!banTarget}
+                    onClose={() => setBanTarget(null)}
+                    onConfirm={handleConfirmBan}
+                    actionType="suspend"
+                    scope="user"
+                    entityId={banTarget.user_id}
+                    entityName={banTarget.full_name || banTarget.email || "Usuário"}
+                    currentRiskScore={banTarget.risk_score}
+                />
+            )}
 
             {/* Modal: Desbanir Usuário */}
-            <AlertModal
-                isOpen={!!unbanTarget}
-                onClose={() => {
-                    setUnbanTarget(null)
-                    setActionReason("")
-                }}
-                onConfirm={handleConfirmUnban}
-                title="Desbanir Usuário"
-                description={`Deseja restabelecer o acesso de ${unbanTarget?.full_name || unbanTarget?.email}? O usuário poderá voltar a comprar e acessar a plataforma.`}
-                confirmText="Desbanir Conta"
-                variant="success"
-            />
+            {unbanTarget && (
+                <AdminEnforcementModal
+                    isOpen={!!unbanTarget}
+                    onClose={() => setUnbanTarget(null)}
+                    onConfirm={handleConfirmUnban}
+                    actionType="unsuspend"
+                    scope="user"
+                    entityId={unbanTarget.user_id}
+                    entityName={unbanTarget.full_name || unbanTarget.email || "Usuário"}
+                    currentRiskScore={unbanTarget.risk_score}
+                />
+            )}
         </FadeIn>
     )
 }

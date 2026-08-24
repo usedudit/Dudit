@@ -167,10 +167,6 @@ import { getPermissionTemplate } from "@/lib/permissions/rbac-template-loader"
 import { normalizePermissions, mergePermissionsWithRole } from "@/lib/permissions/rbac-normalize"
 
 // ─── Extracted Cache Factory for stability and strict keying ────────────────
-//
-// unstable_cache must NOT call cookies(), headers(), or createClient() (session).
-// We load access by userId using the service role; userId is always resolved from
-// getCurrentUser() outside this scope, so rows cannot cross users.
 
 const fetchUserAccessStatic = (userId: string) => unstable_cache(
     async (): Promise<PartnerAccessRecord[]> => {
@@ -179,7 +175,7 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
 
         const [ownedPartnersRes, invitedRowsRes] = await Promise.all([
             admin.from("partners")
-                .select("id, user_id, business_info, is_active, erp_disabled, stores(name)")
+                .select("id, user_id, business_info, is_active, erp_disabled, suspended_at, stores(id, name, is_active, suspended_at, is_headquarters)")
                 .eq("user_id", userId),
             admin.from("partner_users")
                 .select("id, partner_id, user_id, role_id, permissions")
@@ -193,11 +189,20 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
         const ownedPartnerIds = new Set<string>()
 
         for (const partner of ownedPartners) {
-            if (partner.is_active === false || partner.erp_disabled === true) {
+            if (partner.is_active === false || partner.erp_disabled === true || partner.suspended_at !== null) {
                 continue
             }
+            const partnerStores = (partner.stores || []) as any[]
+            const activeStores = partnerStores.filter((s: any) => s.is_active !== false && !s.suspended_at)
+
+            // Se o parceiro possui lojas cadastradas mas TODAS estão suspensas, bloqueia entrada no ERP
+            if (partnerStores.length > 0 && activeStores.length === 0) {
+                continue
+            }
+
             ownedPartnerIds.add(partner.id)
-            const storeName = partner.stores?.[0]?.name || "Loja sem nome"
+            const hqStore = activeStores.find((s: any) => s.is_headquarters) || activeStores[0]
+            const storeName = hqStore?.name || "Loja sem nome"
             accessRecords[partner.id] = {
                 partnerId: partner.id,
                 userId: userId,
@@ -216,11 +221,13 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
         if (invitedPartnerIds.length > 0) {
             const [invitedPartnersRes, storesRes, rolesRes] = await Promise.all([
                 admin.from("partners")
-                    .select("id, user_id, business_info, is_active, erp_disabled")
+                    .select("id, user_id, business_info, is_active, erp_disabled, suspended_at")
                     .in("id", invitedPartnerIds),
                 admin.from("stores")
-                    .select("id, name, partner_id, is_headquarters")
-                    .in("partner_id", invitedPartnerIds),
+                    .select("id, name, partner_id, is_headquarters, is_active, suspended_at")
+                    .in("partner_id", invitedPartnerIds)
+                    .eq("is_active", true)
+                    .is("suspended_at", null),
                 admin.from("roles")
                     .select("id, permissions")
             ])
@@ -252,7 +259,8 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
             for (const record of invitedRows as any[]) {
                 const partner = partnerMap.get(record.partner_id)
                 if (!partner) continue
-                if (partner.is_active === false || partner.erp_disabled === true) continue
+                if (partner.is_active === false || partner.erp_disabled === true || partner.suspended_at !== null) continue
+                if (!storeNameMap.has(record.partner_id)) continue // Nenhuma loja ativa no parceiro
 
                 if (!accessRecords[record.partner_id]) {
                     const roleId = (String(record.role_id || "delivery").toLowerCase() as RoleId)
@@ -281,7 +289,7 @@ const fetchUserAccessStatic = (userId: string) => unstable_cache(
         tags: [TAGS.userAccess(userId)],
         revalidate: 900
     }
-);
+)
 
 const getCachedUserAccess = async (userId: string) => fetchUserAccessStatic(userId)()
 
@@ -324,8 +332,8 @@ export const getAllUserPartnerAccess = cache(async (resolvedUser?: any): Promise
     const user = resolvedUser || await getCurrentUser()
     if (!user) return []
 
-    const records = await getCachedUserAccess(user.id);
-    return records;
+    const records = await getCachedUserAccess(user.id)
+    return records
 })
 
 /**
@@ -346,11 +354,15 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
 
         // Get all partner_ids the user has access to (owned + invited)
         const [ownedPartnersRes, invitedRes] = await Promise.all([
-            admin.from("partners").select("id, user_id, business_info").eq("user_id", userId).eq("is_active", true).neq("erp_disabled", true),
+            admin.from("partners")
+                .select("id, user_id, business_info, is_active, erp_disabled, suspended_at")
+                .eq("user_id", userId)
+                .eq("is_active", true)
+                .is("suspended_at", null),
             admin.from("partner_users").select("id, partner_id, role_id").eq("user_id", userId)
         ])
 
-        const ownedPartners = (ownedPartnersRes.data || []) as any[]
+        const ownedPartners = ((ownedPartnersRes.data || []) as any[]).filter((p: any) => p.erp_disabled !== true)
         const invitedRows = (invitedRes.data || []) as any[]
         const ownedPartnerIds = ownedPartners.map((p: any) => p.id)
         const invitedPartnerIds = [...new Set(invitedRows.map((pu: any) => pu.partner_id))]
@@ -358,10 +370,12 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
 
         if (allPartnerIds.length === 0) return []
 
-        // Get all stores for these partners
+        // Get only ACTIVE, NON-SUSPENDED stores for these partners
         const { data: stores } = await admin.from("stores")
-            .select("id, name, partner_id, is_headquarters")
+            .select("id, name, partner_id, is_headquarters, is_active, suspended_at")
             .in("partner_id", allPartnerIds)
+            .eq("is_active", true)
+            .is("suspended_at", null)
 
         if (!stores || stores.length === 0) return []
 
@@ -384,7 +398,7 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
 
         // Partner names + owner resolution in batch (no N+1)
         const { data: partners } = await admin.from("partners")
-            .select("id, user_id, business_info")
+            .select("id, user_id, business_info, is_active, erp_disabled, suspended_at")
             .in("id", allPartnerIds)
         const partnerById = new Map<string, any>()
         for (const p of partners || []) partnerById.set(p.id, p)
@@ -413,8 +427,6 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
             return ownerId ? ownerNames.get(ownerId) || "Desconhecido" : "Desconhecido"
         }
 
-        // Normaliza role para o id canônico (lowercase). store_members.role é a
-        // coluna legacy uppercase (ex.: "MANAGER"); partner_users.role_id é canônica.
         const normalizeRoleId = (raw: string | null | undefined, fallback: RoleId = "delivery"): RoleId => {
             switch (String(raw || "").trim().toLowerCase()) {
                 case "owner": return "owner"
@@ -433,10 +445,9 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
 
         const storeRecords: StoreAccessRecord[] = []
 
-        // ── ERPs próprios: 1 card por parceiro (matriz). O usuário troca de
-        //    filial depois de entrar (StoreSwitcher) ──
+        // ── ERPs próprios: 1 card por parceiro (matriz ativa). ──
         for (const partner of ownedPartners) {
-            const partnerStores = stores.filter((s: any) => s.partner_id === partner.id)
+            const partnerStores = stores.filter((s: any) => s.partner_id === partner.id && s.is_active !== false && !s.suspended_at)
             if (partnerStores.length === 0) continue
             const hq = pickHeadquarters(partnerStores)
 
@@ -456,15 +467,14 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
             })
         }
 
-        // ── Lojas convidadas (outros parceiros): 1 card por loja com o cargo
-        //    real. Convites legados aceitos sem store_members caem na matriz ──
+        // ── Lojas convidadas (outros parceiros): 1 card por loja ativa ──
         for (const pu of invitedRows) {
-            if (ownedPartnerIds.includes(pu.partner_id)) continue // dono já coberto acima
+            if (ownedPartnerIds.includes(pu.partner_id)) continue
             const partner = partnerById.get(pu.partner_id)
             if (!partner) continue
-            if (partner.is_active === false || partner.erp_disabled === true) continue
+            if (partner.is_active === false || partner.erp_disabled === true || partner.suspended_at !== null) continue
 
-            const partnerStores = stores.filter((s: any) => s.partner_id === pu.partner_id)
+            const partnerStores = stores.filter((s: any) => s.partner_id === pu.partner_id && s.is_active !== false && !s.suspended_at)
             if (partnerStores.length === 0) continue
 
             const baseRoleId = normalizeRoleId(pu.role_id, "delivery")
@@ -472,7 +482,6 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
             const roleByStore = memberRoleByStore.get(pu.id) || new Map<string, string | null>()
 
             if (storeIds.size === 0) {
-                // Fallback defensivo: convite legado sem store_members → matriz
                 const hq = pickHeadquarters(partnerStores)
                 storeRecords.push({
                     storeId: hq.id,
@@ -493,7 +502,7 @@ const getCachedUserStoreAccess = (userId: string) => unstable_cache(
 
             for (const sid of storeIds) {
                 const store = storeById.get(sid)
-                if (!store) continue
+                if (!store || store.is_active === false || store.suspended_at) continue
                 const roleId = normalizeRoleId(roleByStore.get(sid) ?? null, baseRoleId)
 
                 storeRecords.push({
@@ -562,7 +571,12 @@ const checkRealTimePartnerAccess = (partnerId: string, userId: string) => unstab
 async function resolveDefaultStoreId(partnerId: string): Promise<string | null> {
     try {
         const admin = createAdminClient()
-        const { data: stores } = await admin.from("stores").select("id, is_headquarters").eq("partner_id", partnerId).order("created_at", { ascending: true })
+        const { data: stores } = await admin.from("stores")
+            .select("id, is_headquarters, is_active, suspended_at")
+            .eq("partner_id", partnerId)
+            .eq("is_active", true)
+            .is("suspended_at", null)
+            .order("created_at", { ascending: true })
         if (stores && stores.length > 0) {
             const hq = stores.find((s: any) => s.is_headquarters) || stores[0]
             return hq.id
@@ -594,13 +608,9 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
         const match = allAccess.find(a => a.partnerId === activePartnerId)
         if (match) {
             // Real-time DB check: verify the user still has access (defense against stale cache)
-            // This prevents removed users from accessing the ERP during the cache TTL window.
-            // P1: usa uma única RPC (owner OR membro) em vez de 2 queries separadas por request.
             const { stillHasAccess, hasError } = await checkRealTimePartnerAccess(activePartnerId, user.id)()
 
-            // Em caso de erro inesperado na RPC, não bloqueamos o acesso já validado pelo cache.
             if (!hasError && stillHasAccess === false) {
-                // Access revoked - clear stale cookie and invalidate cached access
                 await clearActivePartner()
                 const { revalidateUserAccess } = await import("@/lib/utils/revalidation")
                 revalidateUserAccess(user.id)
@@ -610,12 +620,24 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             let activeStoreId = await getActiveStoreId()
             if (activeStoreId) {
                 const admin = createAdminClient()
-                const { data: validStore } = await admin.from("stores").select("id").eq("id", activeStoreId).eq("partner_id", match.partnerId).maybeSingle()
+                const { data: validStore } = await admin.from("stores")
+                    .select("id")
+                    .eq("id", activeStoreId)
+                    .eq("partner_id", match.partnerId)
+                    .eq("is_active", true)
+                    .is("suspended_at", null)
+                    .maybeSingle()
                 if (!validStore) {
                     activeStoreId = await resolveDefaultStoreId(match.partnerId)
                 }
             } else {
                 activeStoreId = await resolveDefaultStoreId(match.partnerId)
+            }
+
+            // If no active store exists for this partner, partner is not accessible
+            if (!activeStoreId) {
+                await clearActivePartner()
+                return null
             }
 
             return {
@@ -629,8 +651,6 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
             }
         }
 
-        // The active ERP belongs to a previous account or is no longer
-        // available. Clear both context cookies before falling back.
         await clearActivePartner()
     }
 
@@ -639,16 +659,25 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
         const match = allAccess[0]
         let activeStoreId = await getActiveStoreId()
         if (activeStoreId) {
-            // Validate against the stores table (same as the multi-partner path above)
-            // so a stale/deleted store in the cookie cannot leak into inserts (e.g. cash_sessions).
             const admin = createAdminClient()
-            const { data: validStore } = await admin.from("stores").select("id").eq("id", activeStoreId).eq("partner_id", match.partnerId).maybeSingle()
+            const { data: validStore } = await admin.from("stores")
+                .select("id")
+                .eq("id", activeStoreId)
+                .eq("partner_id", match.partnerId)
+                .eq("is_active", true)
+                .is("suspended_at", null)
+                .maybeSingle()
             if (!validStore) {
                 activeStoreId = await resolveDefaultStoreId(match.partnerId)
             }
         } else {
             activeStoreId = await resolveDefaultStoreId(match.partnerId)
         }
+
+        if (!activeStoreId) {
+            return null
+        }
+
         return {
             userId: match.userId,
             partnerId: match.partnerId,
@@ -717,7 +746,7 @@ export const getUserSuspendedAccess = cache(async (userId?: string): Promise<Sus
 
     // 2. Get stores for these partners
     const { data: stores } = await admin.from("stores")
-        .select("id, name, partner_id, is_active, suspended_at, suspended_reason, suspended_case_id, is_headquarters")
+        .select("id, name, partner_id, is_active, suspended_at, suspended_until, suspended_reason, suspended_case_id, is_headquarters")
         .in("partner_id", allPartnerIds)
 
     const storesList = stores || []
@@ -797,7 +826,7 @@ export const getUserSuspendedAccess = cache(async (userId?: string): Promise<Sus
                     caseId: st.suspended_case_id || partner.suspended_case_id || null,
                     reason: st.suspended_reason || "Loja temporariamente desativada pela administração.",
                     suspendedAt: st.suspended_at || null,
-                    suspendedUntil: null,
+                    suspendedUntil: st.suspended_until || partner.suspended_until || null,
                     ownerName,
                 })
             }
@@ -806,4 +835,3 @@ export const getUserSuspendedAccess = cache(async (userId?: string): Promise<Sus
 
     return suspendedRecords
 })
-

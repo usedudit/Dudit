@@ -32,7 +32,7 @@ import {
     ActionsDropdown,
     DropdownItem,
 } from "@/components/reusable"
-import EnforcementActionModal from "../EnforcementActionModal"
+import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
@@ -148,16 +148,22 @@ export function AdminPartnerDetailView({
 
     const loadDetail = useCallback(async () => {
         try {
+            console.log(`[AdminPartnerDetailView] Fetching partner detail for storeId: "${storeId}"`)
+            setIsLoading(true)
             const data = await getAdminPartnerDetail(storeId)
-            if (data) {
+            if (data && data.store) {
+                console.log(`[AdminPartnerDetailView] Partner detail loaded successfully for "${data.store.name || storeId}"`, data)
                 setDetail(data)
                 setNewRiskScore(String(data.store?.risk_score || 0))
             } else {
+                console.warn(`[AdminPartnerDetailView] Store/Partner not found in database for storeId: "${storeId}"`)
                 toast.error(`Loja ou parceiro não encontrado (ID: ${storeId})`)
+                setDetail(null)
             }
         } catch (err: any) {
-            console.error("Error fetching partner detail:", err)
+            console.error("[AdminPartnerDetailView] Error fetching partner detail:", err)
             toast.error(`Erro ao carregar dados: ${err?.message || "Falha desconhecida"}`)
+            setDetail(null)
         } finally {
             setIsLoading(false)
         }
@@ -190,19 +196,24 @@ export function AdminPartnerDetailView({
 
     if (!detail || !detail.store) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+            <div className="flex flex-col items-center justify-center min-h-[450px] p-6 text-center max-w-lg mx-auto">
                 <IconPlaceholder
                     icon={StoreIcon}
                     containerSize="w-16 h-16 mb-2"
                     iconSize="w-6 h-6"
-                    title="Loja não encontrada"
-                    subtitle="A loja pode ter sido removida ou o link está incorreto."
+                    title="Loja ou Parceiro não encontrado"
+                    subtitle={`Não foi possível carregar os dados para o identificador "${storeId}". O registro pode ter sido excluído ou o ID está incorreto.`}
                     itemButton={{
                         text: "Voltar para lista",
                         action: onBack,
                         variant: "outline",
                     }}
                 />
+                <div className="mt-4 flex gap-2">
+                    <Button variant="filled" onClick={loadDetail} size="sm">
+                        Tentar Novamente
+                    </Button>
+                </div>
             </div>
         )
     }
@@ -252,10 +263,10 @@ export function AdminPartnerDetailView({
     }, [store?.partner_id, detail?.partner?.id])
 
     // ── Handlers: Loja Específica ──
-    const handleConfirmSuspendStore = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmSuspendStore = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!store?.id) return
         try {
-            const res = await suspendStore(store.id, reason, stepUpToken, riskScore, notifyOwner)
+            const res = await suspendStore(store.id, reason, durationDays, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
                 toast.success(`Loja suspensa com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setSuspendStoreModalOpen(false)
@@ -264,36 +275,38 @@ export function AdminPartnerDetailView({
             } else {
                 toast.error(res.error || "Erro ao suspender loja")
             }
+            return res
         } catch (err: any) {
             toast.error(err.message || "Erro inesperado")
+            throw err
         }
     }
 
-    const handleConfirmUnsuspendStore = () => {
+    const handleConfirmUnsuspendStore = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         if (!store?.id) return
-        startTransition(async () => {
-            try {
-                const res = await unsuspendStore(store.id, "Reativação de loja via painel administrativo")
-                if (res.success) {
-                    toast.success("Loja reativada com sucesso!")
-                    setUnsuspendStoreModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao reativar loja")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await unsuspendStore(store.id, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Loja reativada com sucesso!")
+                setUnsuspendStoreModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao reativar loja")
             }
-        })
+            return res
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
     }
 
     // ── Handlers: Acesso ao ERP (Tenant) ──
-    const handleConfirmDisableERP = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmDisableERP = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         const partnerId = store?.partner_id || partner?.id
         if (!partnerId) return
         try {
-            const res = await disableTenantAccess(partnerId, reason, null, stepUpToken, riskScore, notifyOwner)
+            const res = await disableTenantAccess(partnerId, reason, durationDays, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
                 toast.success(`Acesso ao ERP desativado! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setDisableErpModalOpen(false)
@@ -302,37 +315,39 @@ export function AdminPartnerDetailView({
             } else {
                 toast.error(res.error || "Erro ao desativar ERP")
             }
+            return res
         } catch (err: any) {
             toast.error(err.message || "Erro inesperado")
+            throw err
         }
     }
 
-    const handleConfirmEnableERP = () => {
-        const partnerId = store?.partner_id || partner?.id
-        if (!partnerId) return
-        startTransition(async () => {
-            try {
-                const res = await enableTenantAccess(partnerId)
-                if (res.success) {
-                    toast.success("Acesso ao ERP restabelecido com sucesso!")
-                    setEnableErpModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao reativar ERP")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
-            }
-        })
-    }
-
-    // ── Handlers: Parceiro Completo ──
-    const handleConfirmSuspendPartner = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmEnableERP = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         const partnerId = store?.partner_id || partner?.id
         if (!partnerId) return
         try {
-            const res = await suspendPartner(partnerId, reason, stepUpToken, riskScore, notifyOwner)
+            const res = await enableTenantAccess(partnerId, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Acesso ao ERP restabelecido com sucesso!")
+                setEnableErpModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao reativar ERP")
+            }
+            return res
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
+    }
+
+    // ── Handlers: Parceiro Completo ──
+    const handleConfirmSuspendPartner = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        try {
+            const res = await suspendPartner(partnerId, reason, durationDays, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
                 toast.success(`Parceiro e todas as lojas suspensos! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setSuspendPartnerModalOpen(false)
@@ -341,29 +356,31 @@ export function AdminPartnerDetailView({
             } else {
                 toast.error(res.error || "Erro ao suspender parceiro")
             }
+            return res
         } catch (err: any) {
             toast.error(err.message || "Erro inesperado")
+            throw err
         }
     }
 
-    const handleConfirmUnsuspendPartner = () => {
+    const handleConfirmUnsuspendPartner = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         const partnerId = store?.partner_id || partner?.id
         if (!partnerId) return
-        startTransition(async () => {
-            try {
-                const res = await unsuspendPartner(partnerId, "Reativação de parceiro via painel administrativo")
-                if (res.success) {
-                    toast.success("Parceiro e lojas reativados com sucesso!")
-                    setUnsuspendPartnerModalOpen(false)
-                    loadDetail()
-                    onPartnerUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao reativar parceiro")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+        try {
+            const res = await unsuspendPartner(partnerId, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Parceiro e lojas reativados com sucesso!")
+                setUnsuspendPartnerModalOpen(false)
+                loadDetail()
+                onPartnerUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao reativar parceiro")
             }
-        })
+            return res
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
     }
 
     const handleSaveRiskScore = () => {
@@ -528,599 +545,597 @@ export function AdminPartnerDetailView({
 
                             {/* Content */}
                             <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
-                                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                                    {/* Aba 1: Dados da Loja */}
-                                    <TabsContent value="general" className="mt-0">
-                                        <FadeIn key="general">
-                                            {/* Banner: ERP Desativado */}
-                                            {isErpDisabled && (
-                                                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 mb-6">
-                                                    <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h3 className="text-sm font-bold text-amber-950 dark:text-amber-300">
-                                                                Acesso ao ERP Desativado (Conta do Parceiro)
-                                                            </h3>
-                                                            {partner?.suspended_case_id && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        navigator.clipboard.writeText(partner.suspended_case_id)
-                                                                        toast.success("Protocolo do caso copiado!")
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-mono text-xs font-bold border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-200"
-                                                                >
-                                                                    <span>Caso: {partner.suspended_case_id}</span>
-                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-amber-900/80 dark:text-amber-400/80 mt-0.5">
-                                                            Motivo: {partner?.suspended_reason || "Sem motivo informado."}
-                                                            {partner?.suspended_until ? ` • Vigência até: ${formatDate(partner.suspended_until)}` : " • Permanente"}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Banner: Loja Suspensa */}
-                                            {isStoreSuspended && (
-                                                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
-                                                    <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                                Loja Suspensa Administrativamente
-                                                            </h3>
-                                                            {(store.suspended_case_id || partner?.suspended_case_id) && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
-                                                                        toast.success("Protocolo do caso copiado!")
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
-                                                                >
-                                                                    <span>Caso: {store.suspended_case_id || partner?.suspended_case_id}</span>
-                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
-                                                            Motivo: {store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                                {/* Coluna principal */}
-                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Informações Cadastrais" hasSeparator>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Nome Comercial</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">{store.name}</span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Tipo de Pessoa</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {formatPersonTypeLabel(store.person_type)}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Telefone</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {store.phone || "Não informado"}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Criado em</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                                    {formatDate(store.created_at)}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">ID da Loja (UUID)</span>
-                                                                <div className="flex items-center gap-2 mt-0.5">
-                                                                    <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.id}</span>
-                                                                    <button onClick={handleCopyStoreId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">ID do Parceiro (Tenant)</span>
-                                                                <div className="flex items-center gap-2 mt-0.5">
-                                                                    <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.partner_id || "-"}</span>
-                                                                    {store.partner_id && <button onClick={handleCopyPartnerId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>}
-                                                                </div>
-                                                            </div>
-                                                            <div className="sm:col-span-2">
-                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Descrição</span>
-                                                                <p className="text-sm text-brand-dark dark:text-dark-heading mt-0.5">
-                                                                    {store.description || "Sem descrição informada."}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </FormSection>
-                                                </div>
-
-                                                {/* Sidebar */}
-                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Proprietário / Titular
+                                {/* Aba 1: Dados da Loja */}
+                                <TabsContent value="general" className="mt-0">
+                                    <FadeIn key="general">
+                                        {/* Banner: ERP Desativado */}
+                                        {isErpDisabled && (
+                                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 mb-6">
+                                                <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-sm font-bold text-amber-950 dark:text-amber-300">
+                                                            Acesso ao ERP Desativado (Conta do Parceiro)
                                                         </h3>
-                                                        <div className="flex items-center gap-3">
-                                                            <UserProfileImage
-                                                                fullName={ownerProfile?.full_name || "Proprietário"}
-                                                                imageUrl={ownerProfile?.avatar_url}
-                                                                className="w-12 h-12 text-lg shrink-0"
-                                                            />
-                                                            <div className="min-w-0">
-                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                                                    {ownerProfile?.full_name || "Lojista"}
-                                                                </h3>
-                                                                <span className="text-xs text-brand-inactive-text truncate block">
-                                                                    {ownerProfile?.email || "Sem e-mail"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {partner?.user_id && (
-                                                            <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border">
-                                                                <Link
-                                                                    href={`/ddt-admin/users?view=${partner.user_id}`}
-                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                >
-                                                                    Ver perfil completo do usuário →
-                                                                </Link>
-                                                            </div>
+                                                        {partner?.suspended_case_id && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(partner.suspended_case_id)
+                                                                    toast.success("Protocolo do caso copiado!")
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-mono text-xs font-bold border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-200"
+                                                            >
+                                                                <span>Caso: {partner.suspended_case_id}</span>
+                                                                <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
+                                                            </button>
                                                         )}
                                                     </div>
+                                                    <p className="text-xs text-amber-900/80 dark:text-amber-400/80 mt-0.5">
+                                                        Motivo: {partner?.suspended_reason || "Sem motivo informado."}
+                                                        {partner?.suspended_until ? ` • Vigência até: ${formatDate(partner.suspended_until)}` : " • Permanente"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
 
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                            Avaliação de Risco
+                                        {/* Banner: Loja Suspensa */}
+                                        {isStoreSuspended && (
+                                            <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
+                                                <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
+                                                            Loja Suspensa Administrativamente
                                                         </h3>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-brand-inactive-text">Score Atual</span>
-                                                            <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
-                                                                {store.risk_score || 0} pts
-                                                            </Badge>
+                                                        {(store.suspended_case_id || partner?.suspended_case_id) && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
+                                                                    toast.success("Protocolo do caso copiado!")
+                                                                }}
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
+                                                            >
+                                                                <span>Caso: {store.suspended_case_id || partner?.suspended_case_id}</span>
+                                                                <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
+                                                        Motivo: {store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                            {/* Coluna principal */}
+                                            <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                <FormSection title="Informações Cadastrais" hasSeparator>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">Nome Comercial</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">{store.name}</span>
                                                         </div>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => {
-                                                                setNewRiskScore(String(store.risk_score || 0))
-                                                                setRiskModalOpen(true)
-                                                            }}
-                                                            className="w-full mt-4 text-xs"
-                                                        >
-                                                            Ajustar Score
-                                                        </Button>
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">Tipo de Pessoa</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                {formatPersonTypeLabel(store.person_type)}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">Telefone</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                {store.phone || "Não informado"}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">Criado em</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                {formatDate(store.created_at)}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">ID da Loja (UUID)</span>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.id || "-"}</span>
+                                                                {store.id && <button onClick={handleCopyStoreId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">ID do Parceiro (Tenant)</span>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className="font-mono text-xs text-brand-dark dark:text-dark-heading select-all truncate">{store.partner_id || "-"}</span>
+                                                                {store.partner_id && <button onClick={handleCopyPartnerId} className="text-xs font-bold text-brand-green hover:underline shrink-0">Copiar</button>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="sm:col-span-2">
+                                                            <span className="text-xs font-semibold text-brand-inactive-text block">Descrição</span>
+                                                            <p className="text-sm text-brand-dark dark:text-dark-heading mt-0.5">
+                                                                {store.description || "Sem descrição informada."}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </FormSection>
+                                            </div>
+
+                                            {/* Sidebar */}
+                                            <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
+                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                        Proprietário / Titular
+                                                    </h3>
+                                                    <div className="flex items-center gap-3">
+                                                        <UserProfileImage
+                                                            fullName={ownerProfile?.full_name || "Proprietário"}
+                                                            imageUrl={ownerProfile?.avatar_url}
+                                                            className="w-12 h-12 text-lg shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                {ownerProfile?.full_name || "Lojista"}
+                                                            </h3>
+                                                            <span className="text-xs text-brand-inactive-text truncate block">
+                                                                {ownerProfile?.email || "Sem e-mail"}
+                                                            </span>
+                                                        </div>
                                                     </div>
 
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
-                                                            Identificadores
-                                                        </h3>
-                                                        <div className="space-y-2 text-xs">
+                                                    {partner?.user_id && (
+                                                        <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border">
+                                                            <Link
+                                                                href={`/ddt-admin/users?view=${partner.user_id}`}
+                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                            >
+                                                                Ver perfil completo do usuário →
+                                                            </Link>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
+                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
+                                                        Avaliação de Risco
+                                                    </h3>
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="text-brand-inactive-text">Score Atual</span>
+                                                        <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
+                                                            {store.risk_score || 0} pts
+                                                        </Badge>
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setNewRiskScore(String(store.risk_score || 0))
+                                                            setRiskModalOpen(true)
+                                                        }}
+                                                        className="w-full mt-4 text-xs"
+                                                    >
+                                                        Ajustar Score
+                                                    </Button>
+                                                </div>
+
+                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
+                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
+                                                        Identificadores
+                                                    </h3>
+                                                    <div className="space-y-2 text-xs">
+                                                        <div>
+                                                            <span className="text-brand-inactive-text block">ID da Loja</span>
+                                                            <div className="flex items-center justify-between mt-0.5">
+                                                                <span className="font-mono text-brand-dark dark:text-dark-heading">{store.id ? `${store.id.slice(0, 14)}...` : "-"}</span>
+                                                                {store.id && <button onClick={handleCopyStoreId} className="text-brand-green font-bold hover:underline">Copiar</button>}
+                                                            </div>
+                                                        </div>
+                                                        {store.partner_id && (
                                                             <div>
-                                                                <span className="text-brand-inactive-text block">ID da Loja</span>
+                                                                <span className="text-brand-inactive-text block">ID do Parceiro</span>
                                                                 <div className="flex items-center justify-between mt-0.5">
-                                                                    <span className="font-mono text-brand-dark dark:text-dark-heading">{store.id.slice(0, 14)}...</span>
-                                                                    <button onClick={handleCopyStoreId} className="text-brand-green font-bold hover:underline">Copiar</button>
+                                                                    <span className="font-mono text-brand-dark dark:text-dark-heading">{store.partner_id ? `${store.partner_id.slice(0, 14)}...` : "-"}</span>
+                                                                    <button onClick={handleCopyPartnerId} className="text-brand-green font-bold hover:underline">Copiar</button>
                                                                 </div>
                                                             </div>
-                                                            {store.partner_id && (
-                                                                <div>
-                                                                    <span className="text-brand-inactive-text block">ID do Parceiro</span>
-                                                                    <div className="flex items-center justify-between mt-0.5">
-                                                                        <span className="font-mono text-brand-dark dark:text-dark-heading">{store.partner_id.slice(0, 14)}...</span>
-                                                                        <button onClick={handleCopyPartnerId} className="text-brand-green font-bold hover:underline">Copiar</button>
-                                                                    </div>
+                                                        )}
+                                                        {(store.suspended_case_id || partner?.suspended_case_id) && (
+                                                            <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                <span className="text-brand-inactive-text block">Protocolo do Caso</span>
+                                                                <div className="flex items-center justify-between mt-0.5">
+                                                                    <span className="font-mono font-bold text-red-600 dark:text-red-400">{store.suspended_case_id || partner?.suspended_case_id}</span>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
+                                                                            toast.success("Protocolo copiado!")
+                                                                        }}
+                                                                        className="text-brand-green font-bold hover:underline"
+                                                                    >
+                                                                        Copiar
+                                                                    </button>
                                                                 </div>
-                                                            )}
-                                                            {(store.suspended_case_id || partner?.suspended_case_id) && (
-                                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                    <span className="text-brand-inactive-text block">Protocolo do Caso</span>
-                                                                    <div className="flex items-center justify-between mt-0.5">
-                                                                        <span className="font-mono font-bold text-red-600 dark:text-red-400">{store.suspended_case_id || partner?.suspended_case_id}</span>
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
-                                                                                toast.success("Protocolo copiado!")
-                                                                            }}
-                                                                            className="text-brand-green font-bold hover:underline"
-                                                                        >
-                                                                            Copiar
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </FadeIn>
-                                    </TabsContent>
+                                        </div>
+                                    </FadeIn>
+                                </TabsContent>
 
-                                    {/* Aba 2: Produtos */}
-                                    <TabsContent value="products" className="mt-0">
-                                        <FadeIn key="products">
-                                            <FormSection title={`Produtos Cadastrados (${recentProducts.length})`} hasSeparator>
-                                                {recentProducts.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={PackageIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhum produto cadastrado"
-                                                        subtitle="Esta loja ainda não possui produtos no catálogo."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        {/* Desktop Table */}
-                                                        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-                                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">SKU</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Estoque</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
-                                                                        <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                {/* Aba 2: Produtos */}
+                                <TabsContent value="products" className="mt-0">
+                                    <FadeIn key="products">
+                                        <FormSection title={`Produtos Cadastrados (${recentProducts.length})`} hasSeparator>
+                                            {recentProducts.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={PackageIcon}
+                                                    containerSize="w-14 h-14 mb-2"
+                                                    iconSize="w-6 h-6"
+                                                    title="Nenhum produto cadastrado"
+                                                    subtitle="Esta loja ainda não possui produtos no catálogo."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {/* Desktop Table */}
+                                                    <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">SKU</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Estoque</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedProducts.map((p: any) => (
+                                                                    <tr key={p.id} className="border-b border-brand-border dark:border-dark-border">
+                                                                        <td className="py-3 px-3 flex items-center gap-3">
+                                                                            <div className="w-10 h-10 rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden shrink-0">
+                                                                                {p.images ? (
+                                                                                    <img src={getR2ImageUrl(p.images)} alt="" className="w-full h-full object-cover" />
+                                                                                ) : (
+                                                                                    <PackageIcon className="w-5 h-5 text-brand-inactive-text" />
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                {p.name}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-xs text-brand-inactive-text font-mono">
+                                                                            {p.sku || "-"}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-center font-semibold">
+                                                                            {p.stock_quantity ?? "-"}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
+                                                                            {formatCurrency(Number(p.price || 0))}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Badge variant={p.is_active ? "green" : "gray"}>
+                                                                                {p.is_active ? "Ativo" : "Inativo"}
+                                                                            </Badge>
+                                                                        </td>
                                                                     </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedProducts.map((p: any) => (
-                                                                        <tr key={p.id} className="border-b border-brand-border dark:border-dark-border">
-                                                                            <td className="py-3 px-3 flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden shrink-0">
-                                                                                    {p.images ? (
-                                                                                        <img src={getR2ImageUrl(p.images)} alt="" className="w-full h-full object-cover" />
-                                                                                    ) : (
-                                                                                        <PackageIcon className="w-5 h-5 text-brand-inactive-text" />
-                                                                                    )}
-                                                                                </div>
-                                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                    {p.name}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-xs text-brand-inactive-text font-mono">
-                                                                                {p.sku || "-"}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-center font-semibold">
-                                                                                {p.stock_quantity ?? "-"}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
-                                                                                {formatCurrency(Number(p.price || 0))}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 pr-4 text-center">
-                                                                                <Badge variant={p.is_active ? "green" : "gray"}>
-                                                                                    {p.is_active ? "Ativo" : "Inativo"}
-                                                                                </Badge>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        {/* Mobile Cards */}
-                                                        <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
-                                                            {paginatedProducts.map((p: any) => (
-                                                                <div key={p.id} className="py-3 flex items-center justify-between gap-3">
-                                                                    <div className="flex items-center gap-3 min-w-0">
-                                                                        <div className="w-10 h-10 rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden shrink-0">
-                                                                            {p.images ? (
-                                                                                <img src={getR2ImageUrl(p.images)} alt="" className="w-full h-full object-cover" />
-                                                                            ) : (
-                                                                                <PackageIcon className="w-5 h-5 text-brand-inactive-text" />
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="min-w-0 flex flex-col">
-                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{p.name}</span>
-                                                                            <span className="text-xs text-brand-inactive-text">Estoque: {p.stock_quantity ?? "-"}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(p.price || 0))}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {totalProductPages > 1 && (
-                                                            <div className="pt-4">
-                                                                <Pagination currentPage={productPage} totalPages={totalProductPages} onPageChange={setProductPage} />
-                                                            </div>
-                                                        )}
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
                                                     </div>
-                                                )}
-                                            </FormSection>
-                                        </FadeIn>
-                                    </TabsContent>
 
-                                    {/* Aba 3: Serviços */}
-                                    <TabsContent value="services" className="mt-0">
-                                        <FadeIn key="services">
-                                            <FormSection title={`Serviços Cadastrados (${recentServices.length})`} hasSeparator>
-                                                {recentServices.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={CalendarIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhum serviço cadastrado"
-                                                        subtitle="Esta loja ainda não possui serviços disponíveis para agendamento."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-                                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Serviço</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</th>
-                                                                        <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedServices.map((s: any) => (
-                                                                        <tr key={s.id} className="border-b border-brand-border dark:border-dark-border">
-                                                                            <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                {s.name}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
-                                                                                {formatCurrency(Number(s.price || 0))}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-xs text-center text-brand-inactive-text">
-                                                                                {formatDate(s.created_at)}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 pr-4 text-center">
-                                                                                <Badge variant={s.is_active ? "green" : "gray"}>
-                                                                                    {s.is_active ? "Ativo" : "Inativo"}
-                                                                                </Badge>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
-                                                            {paginatedServices.map((s: any) => (
-                                                                <div key={s.id} className="py-3 flex items-center justify-between gap-3">
+                                                    {/* Mobile Cards */}
+                                                    <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                                                        {paginatedProducts.map((p: any) => (
+                                                            <div key={p.id} className="py-3 flex items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className="w-10 h-10 rounded-lg bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden shrink-0">
+                                                                        {p.images ? (
+                                                                            <img src={getR2ImageUrl(p.images)} alt="" className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <PackageIcon className="w-5 h-5 text-brand-inactive-text" />
+                                                                        )}
+                                                                    </div>
                                                                     <div className="min-w-0 flex flex-col">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
-                                                                    </div>
-                                                                    <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(s.price || 0))}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {totalServicePages > 1 && (
-                                                            <div className="pt-4">
-                                                                <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </FormSection>
-                                        </FadeIn>
-                                    </TabsContent>
-
-                                    {/* Aba 4: Pedidos */}
-                                    <TabsContent value="orders" className="mt-0">
-                                        <FadeIn key="orders">
-                                            <FormSection title={`Vendas Registradas (${recentOrders.length})`} hasSeparator>
-                                                {recentOrders.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={ShoppingCartIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhuma venda registrada"
-                                                        subtitle="Esta loja ainda não realizou vendas na plataforma."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-                                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Pedido</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Cliente</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Canal</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Total</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
-                                                                        <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedOrders.map((o: any) => (
-                                                                        <tr key={o.id} className="border-b border-brand-border dark:border-dark-border">
-                                                                            <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                #{o.order_number || o.id.slice(0, 8)}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                {o.customer_name || "Cliente"}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-xs text-brand-inactive-text">
-                                                                                {o.order_source || "Marketplace"}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
-                                                                                {formatCurrency(Number(o.total_amount || o.paid_amount || 0))}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-center">
-                                                                                <Badge variant={o.situation === "paid" ? "green" : o.situation === "cancelled" ? "red" : "orange"}>
-                                                                                    {o.situation === "paid" ? "Pago" : o.situation === "cancelled" ? "Cancelado" : "Pendente"}
-                                                                                </Badge>
-                                                                            </td>
-                                                                            <td className="py-3 px-3 pr-4 text-center">
-                                                                                <Link
-                                                                                    href={`/ddt-admin/orders?view=${o.id}`}
-                                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                                >
-                                                                                    Ver Pedido →
-                                                                                </Link>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
-                                                            {paginatedOrders.map((o: any) => (
-                                                                <div key={o.id} className="py-3 flex items-center justify-between gap-3">
-                                                                    <div className="min-w-0 flex flex-col">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">#{o.order_number || o.id.slice(0, 8)}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">{o.customer_name || "Cliente"}</span>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(o.total_amount || 0))}</span>
-                                                                        <Link href={`/ddt-admin/orders?view=${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{p.name}</span>
+                                                                        <span className="text-xs text-brand-inactive-text">Estoque: {p.stock_quantity ?? "-"}</span>
                                                                     </div>
                                                                 </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {totalOrderPages > 1 && (
-                                                            <div className="pt-4">
-                                                                <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </FormSection>
-                                        </FadeIn>
-                                    </TabsContent>
-
-                                    {/* Aba 5: Devoluções */}
-                                    <TabsContent value="returns" className="mt-0">
-                                        <FadeIn key="returns">
-                                            <FormSection title={`Solicitações de Troca & Devolução (${recentReturns.length})`} hasSeparator>
-                                                {recentReturns.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={ReturnIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhuma devolução registrada"
-                                                        subtitle="Esta loja não possui pós-vendas ou disputas em andamento."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-                                                            <table className="w-full text-left border-separate border-spacing-0">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Solicitação</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Cliente</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Tipo</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Reembolso</th>
-                                                                        <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
-                                                                        <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedReturns.map((r: any) => (
-                                                                        <tr key={r.id} className="border-b border-brand-border dark:border-dark-border">
-                                                                            <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                #{r.id.slice(0, 8)}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                                {r.customer_name_snapshot || "Consumidor"}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-center">
-                                                                                <Badge variant="blue">
-                                                                                    {formatRequestTypeLabel(r.request_type)}
-                                                                                </Badge>
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
-                                                                                {formatCurrency(Number(r.refund_amount || 0))}
-                                                                            </td>
-                                                                            <td className="py-3 px-3 text-center">
-                                                                                <Badge variant={r.status === "approved" || r.status === "completed" ? "green" : r.status === "rejected" ? "red" : "orange"}>
-                                                                                    {formatReturnStatusLabel(r.status)}
-                                                                                </Badge>
-                                                                            </td>
-                                                                            <td className="py-3 px-3 pr-4 text-center">
-                                                                                <Link
-                                                                                    href={`/ddt-admin/returns?view=${r.id}`}
-                                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                                >
-                                                                                    Ver Devolução →
-                                                                                </Link>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-
-                                                        <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
-                                                            {paginatedReturns.map((r: any) => (
-                                                                <div key={r.id} className="py-3 flex items-center justify-between gap-3">
-                                                                    <div className="min-w-0 flex flex-col">
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">#{r.id.slice(0, 8)}</span>
-                                                                        <span className="text-xs text-brand-inactive-text">{r.customer_name_snapshot || "Cliente"}</span>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-1 shrink-0">
-                                                                        <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(r.refund_amount || 0))}</span>
-                                                                        <Link href={`/ddt-admin/returns?view=${r.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {totalReturnPages > 1 && (
-                                                            <div className="pt-4">
-                                                                <Pagination currentPage={returnPage} totalPages={totalReturnPages} onPageChange={setReturnPage} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </FormSection>
-                                        </FadeIn>
-                                    </TabsContent>
-
-                                    {/* Aba 6: Auditoria & Risco */}
-                                    <TabsContent value="audit" className="mt-0">
-                                        <FadeIn key="audit">
-                                            <FormSection title={`Histórico de Auditoria (${auditEvents.length})`} hasSeparator>
-                                                {auditEvents.length === 0 ? (
-                                                    <IconPlaceholder
-                                                        icon={ClockIcon}
-                                                        containerSize="w-14 h-14 mb-2"
-                                                        iconSize="w-6 h-6"
-                                                        title="Nenhum evento registrado"
-                                                        subtitle="Não há logs administrativos ou alterações registradas para este parceiro."
-                                                    />
-                                                ) : (
-                                                    <div className="space-y-3">
-                                                        {auditEvents.map((ev: any) => (
-                                                            <div
-                                                                key={ev.id}
-                                                                className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                                                            >
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                        {ev.action_type || "Ação Administrativa"}
-                                                                    </span>
-                                                                    <span className="text-xs text-brand-inactive-text">
-                                                                        {ev.details?.reason || JSON.stringify(ev.details || {})}
-                                                                    </span>
-                                                                </div>
-                                                                <span className="text-xs text-brand-inactive-text shrink-0">
-                                                                    {formatDateTime(ev.created_at)}
-                                                                </span>
+                                                                <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(p.price || 0))}</span>
                                                             </div>
                                                         ))}
                                                     </div>
-                                                )}
-                                            </FormSection>
-                                        </FadeIn>
-                                    </TabsContent>
-                                </Tabs>
+
+                                                    {totalProductPages > 1 && (
+                                                        <div className="pt-4">
+                                                            <Pagination currentPage={productPage} totalPages={totalProductPages} onPageChange={setProductPage} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </FormSection>
+                                    </FadeIn>
+                                </TabsContent>
+
+                                {/* Aba 3: Serviços */}
+                                <TabsContent value="services" className="mt-0">
+                                    <FadeIn key="services">
+                                        <FormSection title={`Serviços Cadastrados (${recentServices.length})`} hasSeparator>
+                                            {recentServices.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={CalendarIcon}
+                                                    containerSize="w-14 h-14 mb-2"
+                                                    iconSize="w-6 h-6"
+                                                    title="Nenhum serviço cadastrado"
+                                                    subtitle="Esta loja ainda não possui serviços disponíveis para agendamento."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Serviço</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Preço</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Criado em</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedServices.map((s: any) => (
+                                                                    <tr key={s.id} className="border-b border-brand-border dark:border-dark-border">
+                                                                        <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                            {s.name}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
+                                                                            {formatCurrency(Number(s.price || 0))}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-xs text-center text-brand-inactive-text">
+                                                                            {formatDate(s.created_at)}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Badge variant={s.is_active ? "green" : "gray"}>
+                                                                                {s.is_active ? "Ativo" : "Inativo"}
+                                                                            </Badge>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                                                        {paginatedServices.map((s: any) => (
+                                                            <div key={s.id} className="py-3 flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 flex flex-col">
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">{s.name}</span>
+                                                                    <span className="text-xs text-brand-inactive-text">{formatDate(s.created_at)}</span>
+                                                                </div>
+                                                                <span className="font-bold text-sm text-brand-green shrink-0">{formatCurrency(Number(s.price || 0))}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {totalServicePages > 1 && (
+                                                        <div className="pt-4">
+                                                            <Pagination currentPage={servicePage} totalPages={totalServicePages} onPageChange={setServicePage} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </FormSection>
+                                    </FadeIn>
+                                </TabsContent>
+
+                                {/* Aba 4: Pedidos */}
+                                <TabsContent value="orders" className="mt-0">
+                                    <FadeIn key="orders">
+                                        <FormSection title={`Vendas Registradas (${recentOrders.length})`} hasSeparator>
+                                            {recentOrders.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={ShoppingCartIcon}
+                                                    containerSize="w-14 h-14 mb-2"
+                                                    iconSize="w-6 h-6"
+                                                    title="Nenhuma venda registrada"
+                                                    subtitle="Esta loja ainda não realizou vendas na plataforma."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Pedido</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Cliente</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Canal</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Total</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedOrders.map((o: any) => (
+                                                                    <tr key={o.id} className="border-b border-brand-border dark:border-dark-border">
+                                                                        <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                            #{o.order_number || (o.id ? o.id.slice(0, 8) : "")}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                            {o.customer_name || "Cliente"}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-xs text-brand-inactive-text">
+                                                                            {o.order_source || "Marketplace"}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
+                                                                            {formatCurrency(Number(o.total_amount || o.paid_amount || 0))}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-center">
+                                                                            <Badge variant={o.situation === "paid" ? "green" : o.situation === "cancelled" ? "red" : "orange"}>
+                                                                                {o.situation === "paid" ? "Pago" : o.situation === "cancelled" ? "Cancelado" : "Pendente"}
+                                                                            </Badge>
+                                                                        </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Link
+                                                                                href={`/ddt-admin/orders?view=${o.id}`}
+                                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                                            >
+                                                                                Ver Pedido →
+                                                                            </Link>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                                                        {paginatedOrders.map((o: any) => (
+                                                            <div key={o.id} className="py-3 flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 flex flex-col">
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">#{o.order_number || (o.id ? o.id.slice(0, 8) : "")}</span>
+                                                                    <span className="text-xs text-brand-inactive-text">{o.customer_name || "Cliente"}</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                    <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(o.total_amount || 0))}</span>
+                                                                    <Link href={`/ddt-admin/orders?view=${o.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {totalOrderPages > 1 && (
+                                                        <div className="pt-4">
+                                                            <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </FormSection>
+                                    </FadeIn>
+                                </TabsContent>
+
+                                {/* Aba 5: Devoluções */}
+                                <TabsContent value="returns" className="mt-0">
+                                    <FadeIn key="returns">
+                                        <FormSection title={`Solicitações de Troca & Devolução (${recentReturns.length})`} hasSeparator>
+                                            {recentReturns.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={ReturnIcon}
+                                                    containerSize="w-14 h-14 mb-2"
+                                                    iconSize="w-6 h-6"
+                                                    title="Nenhum devolução registrada"
+                                                    subtitle="Esta loja não possui pós-vendas ou disputas em andamento."
+                                                />
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="hidden md:block overflow-x-auto custom-scrollbar">
+                                                        <table className="w-full text-left border-separate border-spacing-0">
+                                                            <thead>
+                                                                <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                    <th className="py-3 px-3 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body">Solicitação</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body">Cliente</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Tipo</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Reembolso</th>
+                                                                    <th className="py-3 px-3 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Status</th>
+                                                                    <th className="py-3 px-3 pr-4 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body text-center">Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {paginatedReturns.map((r: any) => (
+                                                                    <tr key={r.id} className="border-b border-brand-border dark:border-dark-border">
+                                                                        <td className="py-3 px-3 font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                            #{r.id ? r.id.slice(0, 8) : ""}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                            {r.customer_name_snapshot || "Consumidor"}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-center">
+                                                                            <Badge variant="blue">
+                                                                                {formatRequestTypeLabel(r.request_type)}
+                                                                            </Badge>
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-sm text-center font-bold text-brand-green">
+                                                                            {formatCurrency(Number(r.refund_amount || 0))}
+                                                                        </td>
+                                                                        <td className="py-3 px-3 text-center">
+                                                                            <Badge variant={r.status === "approved" || r.status === "completed" ? "green" : r.status === "rejected" ? "red" : "orange"}>
+                                                                                {formatReturnStatusLabel(r.status)}
+                                                                            </Badge>
+                                                                        </td>
+                                                                        <td className="py-3 px-3 pr-4 text-center">
+                                                                            <Link
+                                                                                href={`/ddt-admin/returns?view=${r.id}`}
+                                                                                className="text-xs font-bold text-brand-green hover:underline"
+                                                                            >
+                                                                                Ver Devolução →
+                                                                            </Link>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    <div className="md:hidden divide-y divide-brand-border dark:divide-dark-border">
+                                                        {paginatedReturns.map((r: any) => (
+                                                            <div key={r.id} className="py-3 flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 flex flex-col">
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">#{r.id ? r.id.slice(0, 8) : ""}</span>
+                                                                    <span className="text-xs text-brand-inactive-text">{r.customer_name_snapshot || "Cliente"}</span>
+                                                                </div>
+                                                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                                                    <span className="font-bold text-sm text-brand-green">{formatCurrency(Number(r.refund_amount || 0))}</span>
+                                                                    <Link href={`/ddt-admin/returns?view=${r.id}`} className="text-xs text-brand-green font-semibold">Ver →</Link>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    {totalReturnPages > 1 && (
+                                                        <div className="pt-4">
+                                                            <Pagination currentPage={returnPage} totalPages={totalReturnPages} onPageChange={setReturnPage} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </FormSection>
+                                    </FadeIn>
+                                </TabsContent>
+
+                                {/* Aba 6: Auditoria & Risco */}
+                                <TabsContent value="audit" className="mt-0">
+                                    <FadeIn key="audit">
+                                        <FormSection title={`Histórico de Auditoria (${auditEvents.length})`} hasSeparator>
+                                            {auditEvents.length === 0 ? (
+                                                <IconPlaceholder
+                                                    icon={ClockIcon}
+                                                    containerSize="w-14 h-14 mb-2"
+                                                    iconSize="w-6 h-6"
+                                                    title="Nenhum evento registrado"
+                                                    subtitle="Não há logs administrativos ou alterações registradas para este parceiro."
+                                                />
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {auditEvents.map((ev: any) => (
+                                                        <div
+                                                            key={ev.id || `${ev.created_at}-${Math.random()}`}
+                                                            className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                    {ev.action_type || "Ação Administrativa"}
+                                                                </span>
+                                                                <span className="text-xs text-brand-inactive-text">
+                                                                    {ev.metadata?.reason || ev.details?.reason || (typeof ev.metadata === 'object' && ev.metadata ? JSON.stringify(ev.metadata) : ev.details ? JSON.stringify(ev.details) : "Ação administrativa registrada")}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs text-brand-inactive-text shrink-0">
+                                                                {formatDateTime(ev.created_at)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </FormSection>
+                                    </FadeIn>
+                                </TabsContent>
                             </div>
                         </div>
                     </Tabs>
@@ -1254,91 +1269,75 @@ export function AdminPartnerDetailView({
             </DefaultModal>
 
             {/* 1. Modal: Suspender Loja (Apenas esta filial) */}
-            <EnforcementActionModal
+            <AdminEnforcementModal
                 isOpen={suspendStoreModalOpen}
                 onClose={() => setSuspendStoreModalOpen(false)}
                 onConfirm={handleConfirmSuspendStore}
-                title="Suspender Esta Loja"
+                actionType="suspend"
+                scope="store"
+                entityId={store.id}
                 entityName={store.name}
-                entityTypeLabel="Loja / Filial"
                 currentRiskScore={store.risk_score}
-                description={`Apenas a filial "${store.name}" deixará de receber pedidos e seus produtos ficarão ocultos na vitrine. Outras lojas do mesmo parceiro continuarão ativas normalmente.`}
-                consequences={[
-                    "A vitrine e produtos desta filial ficarão indisponíveis para os clientes.",
-                    "Novos pedidos para esta loja serão bloqueados.",
-                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
-                ]}
-                confirmButtonText="Suspender Esta Loja"
             />
 
             {/* 2. Modal: Reativar Loja (Apenas esta filial) */}
-            <AlertModal
+            <AdminEnforcementModal
                 isOpen={unsuspendStoreModalOpen}
                 onClose={() => setUnsuspendStoreModalOpen(false)}
                 onConfirm={handleConfirmUnsuspendStore}
-                title="Reativar Loja"
-                description={`Deseja restabelecer o funcionamento da loja "${store.name}"? A loja voltará a operar normalmente na vitrine.`}
-                confirmText="Reativar Loja"
-                variant="success"
+                actionType="unsuspend"
+                scope="store"
+                entityId={store.id}
+                entityName={store.name}
+                currentRiskScore={store.risk_score}
             />
 
             {/* 3. Modal: Desativar Acesso ao ERP (Conta do Parceiro) */}
-            <EnforcementActionModal
+            <AdminEnforcementModal
                 isOpen={disableErpModalOpen}
                 onClose={() => setDisableErpModalOpen(false)}
                 onConfirm={handleConfirmDisableERP}
-                title="Desativar Acesso ao ERP"
+                actionType="suspend"
+                scope="erp"
+                entityId={partner?.id || store.partner_id}
                 entityName={partner?.store_name || store.name}
-                entityTypeLabel="Acesso ao ERP (Organização)"
                 currentRiskScore={store.risk_score}
-                description="Todos os administradores e colaboradores da organização parceira perderão o acesso ao painel de gestão /erp."
-                consequences={[
-                    "O login e acesso a qualquer funcionalidade do ERP serão bloqueados para toda a equipe.",
-                    "A gestão de produtos, pedidos e financeiro ficará inacessível.",
-                    "Um protocolo de caso (CAS-XXXXXXXX) será atribuído à organização.",
-                ]}
-                confirmButtonText="Desativar Acesso ao ERP"
             />
 
             {/* 4. Modal: Reativar Acesso ao ERP (Conta do Parceiro) */}
-            <AlertModal
+            <AdminEnforcementModal
                 isOpen={enableErpModalOpen}
                 onClose={() => setEnableErpModalOpen(false)}
                 onConfirm={handleConfirmEnableERP}
-                title="Reativar Acesso ao ERP"
-                description={`Deseja restabelecer o acesso ao ERP para todos os operadores e administradores deste parceiro?`}
-                confirmText="Reativar Acesso ao ERP"
-                variant="success"
+                actionType="unsuspend"
+                scope="erp"
+                entityId={partner?.id || store.partner_id}
+                entityName={partner?.store_name || store.name}
+                currentRiskScore={store.risk_score}
             />
 
             {/* 5. Modal: Suspender Parceiro Inteiro */}
-            <EnforcementActionModal
+            <AdminEnforcementModal
                 isOpen={suspendPartnerModalOpen}
                 onClose={() => setSuspendPartnerModalOpen(false)}
                 onConfirm={handleConfirmSuspendPartner}
-                title="Suspender Parceiro Completo"
+                actionType="suspend"
+                scope="partner"
+                entityId={partner?.id || store.partner_id}
                 entityName={partner?.store_name || store.name}
-                entityTypeLabel="Parceiro (Organização Inteira)"
                 currentRiskScore={store.risk_score}
-                description="A organização inteira será suspensa, bloqueando o acesso ao painel ERP e desativando TODAS as suas lojas e filiais cadastradas."
-                consequences={[
-                    "O acesso ao painel do ERP será bloqueado para todos os membros da organização.",
-                    "TODAS as lojas e filiais vinculadas a este parceiro serão suspensas na vitrine.",
-                    "Todos os produtos e anúncios de todas as lojas ficarão indisponíveis.",
-                    "Um protocolo de caso (CAS-XXXXXXXX) será atribuído para recurso administrativo.",
-                ]}
-                confirmButtonText="Suspender Parceiro Inteiro"
             />
 
             {/* 6. Modal: Reativar Parceiro Inteiro */}
-            <AlertModal
+            <AdminEnforcementModal
                 isOpen={unsuspendPartnerModalOpen}
                 onClose={() => setUnsuspendPartnerModalOpen(false)}
                 onConfirm={handleConfirmUnsuspendPartner}
-                title="Reativar Parceiro Completo"
-                description={`Deseja reativar a organização do parceiro e restabelecer o funcionamento de todas as suas lojas?`}
-                confirmText="Reativar Parceiro Completo"
-                variant="success"
+                actionType="unsuspend"
+                scope="partner"
+                entityId={partner?.id || store.partner_id}
+                entityName={partner?.store_name || store.name}
+                currentRiskScore={store.risk_score}
             />
         </>
     )

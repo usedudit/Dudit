@@ -25,6 +25,7 @@ import {
     ListItem,
     DefaultModal,
     Input,
+    InfoCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
@@ -264,15 +265,15 @@ export function AdminOrderDetailView({
                                         <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                             <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                                 <span className="hidden md:inline truncate">Pedido #{orderNumber}</span>
-                                            </h1>
-                                            <Badge variant={paymentMeta.variant}>
-                                                {paymentMeta.label}
-                                            </Badge>
-                                            {order.delivery_status && (
-                                                <Badge variant="blue">
-                                                    {deliveryStatusLabel}
+                                                <Badge variant={paymentMeta.variant}>
+                                                    {paymentMeta.label}
                                                 </Badge>
-                                            )}
+                                                {order.delivery_status && (
+                                                    <Badge variant="blue">
+                                                        {deliveryStatusLabel}
+                                                    </Badge>
+                                                )}
+                                            </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                                 Criado em {formatDateTime(order.created_at)} • Origem: {order.order_source || "Marketplace"} • UUID: {order.id}
@@ -339,24 +340,34 @@ export function AdminOrderDetailView({
                                         <FadeIn key="general">
                                             {/* Banner de Troca / Devolução Vinculada */}
                                             {returns.length > 0 && (
-                                                <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
-                                                    <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
-                                                            Solicitação de Troca ou Devolução Registrada ({returns.length})
-                                                        </h3>
-                                                        <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
-                                                            Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
-                                                        </p>
-                                                    </div>
-                                                    <Link
-                                                        href="/ddt-admin/returns"
-                                                        className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
-                                                    >
-                                                        Ver em Devoluções →
-                                                    </Link>
-                                                </div>
+                                                <InfoCard
+                                                    title="Solicitação de Troca ou Devolução Registrada"
+                                                    message={`Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.`}
+                                                    color="orange"
+                                                    rightElement={
+                                                        <Link href="/ddt-admin/returns">
+                                                            <Button variant="link">Ver em Devoluções</Button>
+                                                        </Link>
+                                                    }
+                                                />
                                             )}
+                                            <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
+                                                <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
+                                                        Solicitação de Troca ou Devolução Registrada ({returns.length})
+                                                    </h3>
+                                                    <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
+                                                        Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
+                                                    </p>
+                                                </div>
+                                                <Link
+                                                    href="/ddt-admin/returns"
+                                                    className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
+                                                >
+                                                    Ver em Devoluções →
+                                                </Link>
+                                            </div>
 
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}

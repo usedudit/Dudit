@@ -27,7 +27,7 @@ import {
     DefaultModal,
     Input,
 } from "@/components/reusable"
-import EnforcementActionModal from "../EnforcementActionModal"
+import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getPaymentStatusMeta } from "@/lib/orders/status"
@@ -186,9 +186,9 @@ export function AdminUserDetailView({
     const { authUser, partner, orders, returns, auditEvents } = detail
     const isBanned = !!profile.banned_at
 
-    const handleConfirmBan = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+    const handleConfirmBan = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
         try {
-            const res = await banUser(userId, reason, null, stepUpToken, riskScore, notifyOwner)
+            const res = await banUser(userId, reason, durationDays, stepUpToken, riskScore, notifyOwner)
             if (res.success) {
                 toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                 setBanModalOpen(false)
@@ -197,27 +197,29 @@ export function AdminUserDetailView({
             } else {
                 toast.error(res.error || "Erro ao banir usuário")
             }
+            return res
         } catch (err: any) {
             toast.error(err.message || "Erro inesperado")
+            throw err
         }
     }
 
-    const handleConfirmUnban = () => {
-        startTransition(async () => {
-            try {
-                const res = await unbanUser(userId, "Desbanimento via detalhes de usuário")
-                if (res.success) {
-                    toast.success("Acesso do usuário restabelecido com sucesso")
-                    setUnbanModalOpen(false)
-                    loadDetail()
-                    onUserUpdated?.()
-                } else {
-                    toast.error(res.error || "Erro ao desbanir usuário")
-                }
-            } catch (err: any) {
-                toast.error(err.message || "Erro inesperado")
+    const handleConfirmUnban = async ({ reason, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {
+        try {
+            const res = await unbanUser(userId, reason, stepUpToken, riskScore, notifyOwner)
+            if (res.success) {
+                toast.success("Acesso do usuário restabelecido com sucesso")
+                setUnbanModalOpen(false)
+                loadDetail()
+                onUserUpdated?.()
+            } else {
+                toast.error(res.error || "Erro ao desbanir usuário")
             }
-        })
+            return res
+        } catch (err: any) {
+            toast.error(err.message || "Erro inesperado")
+            throw err
+        }
     }
 
     const handleSaveRiskScore = () => {
@@ -687,32 +689,27 @@ export function AdminUserDetailView({
             </DefaultModal>
 
             {/* Modal: Banir Usuário */}
-            <EnforcementActionModal
+            <AdminEnforcementModal
                 isOpen={banModalOpen}
                 onClose={() => setBanModalOpen(false)}
                 onConfirm={handleConfirmBan}
-                title="Banir Usuário"
+                actionType="suspend"
+                scope="user"
+                entityId={userId}
                 entityName={profile.full_name || authUser?.email || "Usuário"}
-                entityTypeLabel="Usuário"
                 currentRiskScore={profile.risk_score}
-                description={`O usuário "${profile.full_name || authUser?.email}" perderá acesso imediato à plataforma.`}
-                consequences={[
-                    "O usuário será impedido de realizar novos pedidos e acessar serviços.",
-                    "Se possuir lojas ativas, os produtos serão suspensos preventivamente.",
-                    "Um protocolo oficial de caso (CAS-XXXXXXXX) será gerado para acompanhamento e recurso.",
-                ]}
-                confirmButtonText="Banir Usuário"
             />
 
             {/* Modal: Desbanir Usuário */}
-            <AlertModal
+            <AdminEnforcementModal
                 isOpen={unbanModalOpen}
                 onClose={() => setUnbanModalOpen(false)}
                 onConfirm={handleConfirmUnban}
-                title="Desbanir Usuário"
-                description={`Deseja restabelecer o acesso de ${profile.full_name || authUser?.email}?`}
-                confirmText="Desbanir Usuário"
-                variant="success"
+                actionType="unsuspend"
+                scope="user"
+                entityId={userId}
+                entityName={profile.full_name || authUser?.email || "Usuário"}
+                currentRiskScore={profile.risk_score}
             />
         </>
     )

@@ -46,6 +46,8 @@ export async function listStoresAction(partnerId: string) {
         .from("stores")
         .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
         .eq("partner_id", partnerId)
+        .eq("is_active", true)
+        .is("suspended_at", null)
     if (allowedStoreIds !== null) {
         query = query.in("id", allowedStoreIds)
     }

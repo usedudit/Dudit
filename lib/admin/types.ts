@@ -324,6 +324,7 @@ export interface AdminStoreEntry {
     name: string
     is_active: boolean
     suspended_at: string | null
+    suspended_until?: string | null
     suspended_reason: string | null
     suspended_case_id?: string | null
     risk_score: number
