@@ -2175,9 +2175,9 @@ export function ProductDetailsPageClient({
                     onShare={() => setShowShareModal(true)}
                     favoriteButton={
                         <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
-                            className="flex items-center justify-center p-1.5 transition-all duration-200 cursor-pointer select-none"
+                            className="flex items-center justify-center w-8 h-8 transition-all duration-200 cursor-pointer select-none"
                             title={isFav(product.id, "produto") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                            <HeartIcon size={18} className={isFav(product.id, "produto") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                            <HeartIcon size={20} className={isFav(product.id, "produto") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
                         </button>
                     }
                 />

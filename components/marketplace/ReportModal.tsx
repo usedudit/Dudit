@@ -63,7 +63,7 @@ export function ReportModal({
         }
     }
 
-    const targetLabel = targetType === "product" ? "este produto" : targetType === "partner" ? "este vendedor" : "este item"
+    const targetLabel = targetType === "product" ? "este produto" : targetType === "service" ? "este serviço" : targetType === "partner" ? "este vendedor" : "este item"
 
     // Filtra as opções baseadas no targetType
     const getRelevantReasons = (): ReportReasonCode[] => {
@@ -86,7 +86,17 @@ export function ReportModal({
                 "other"
             ];
         }
-        // Para products, services, rental_items, etc
+        if (targetType === "service") {
+            return [
+                "scam_or_fraud",
+                "fake_listing",
+                "illegal_or_dangerous",
+                "inappropriate_content",
+                "spam_or_misleading",
+                "other"
+            ];
+        }
+        // Para products, rental_items, etc
         return [
             "counterfeit",
             "illegal_or_dangerous",
@@ -126,7 +136,7 @@ export function ReportModal({
                 </div>
 
                 <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
-                    Comunicar algo errado sobre {targetType === "partner" ? "este vendedor" : targetType === "review" ? "esta avaliação" : "este produto"}
+                    Comunicar algo errado sobre {targetType === "partner" ? "este vendedor" : targetType === "review" ? "esta avaliação" : targetType === "service" ? "este serviço" : "este produto"}
                 </h4>
                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-8 text-center leading-relaxed">
                     Percebeu algo que não parece correto em <strong>{targetName}</strong>? Conte para nós. Seu relato é anônimo e será analisado pela nossa equipe.

@@ -1,16 +1,10 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useTransition } from "react"
+import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
 import {
     ChevronLeftIcon,
     TruckIcon,
-    PackageIcon,
-    ClockIcon,
     StoreIcon,
-    UserIcon,
-    MailIcon,
-    PhoneIcon,
-    MapPinIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -24,6 +18,7 @@ import {
     IconPlaceholder,
     Pagination,
     AlertModal,
+    ListItem,
 } from "@/components/reusable"
 import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -55,6 +50,8 @@ export function AdminDeliveryDriverDetailView({
     const [activeTab, setActiveTab] = useState("general")
     const [historyPage, setHistoryPage] = useState(1)
     const [isPending, startTransition] = useTransition()
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollRef = useRef<HTMLDivElement>(null)
 
     // Modals
     const [toggleModalOpen, setToggleModalOpen] = useState(false)
@@ -98,6 +95,10 @@ export function AdminDeliveryDriverDetailView({
     useEffect(() => {
         fetchDetail()
     }, [fetchDetail])
+
+    const handleScroll = useCallback(() => {
+        setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
+    }, [])
 
     const handleToggleStatus = () => {
         if (!driver) return
@@ -159,327 +160,413 @@ export function AdminDeliveryDriverDetailView({
     const paginatedAssignments = assignments.slice((historyPage - 1) * ITEMS_PER_PAGE, historyPage * ITEMS_PER_PAGE)
     const totalHistoryPages = Math.ceil(assignments.length / ITEMS_PER_PAGE) || 1
 
+    const ToggleActionButton = ({ full }: { full?: boolean }) => (
+        driver.is_active ? (
+            <Button
+                variant="destructive"
+                onClick={() => setToggleModalOpen(true)}
+                className={full ? "flex-1" : ""}
+            >
+                Desativar Entregador
+            </Button>
+        ) : (
+            <Button
+                variant="outline"
+                onClick={() => setToggleModalOpen(true)}
+                className={`text-brand-green border-brand-green/30 hover:bg-brand-green/10 ${full ? "flex-1" : ""}`}
+            >
+                Ativar Entregador
+            </Button>
+        )
+    )
+
     return (
-        <FadeIn className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
-            {/* Header Desktop */}
-            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-4">
-                    <Button
-                        variant="filled"
-                        onClick={onBack}
-                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
-                    >
-                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                    </Button>
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading tracking-tight truncate">
-                                {profile.full_name || "Entregador"}
-                            </h1>
-                            <Badge variant={driver.is_active ? "green" : "red"}>
-                                {driver.is_active ? "Ativo" : "Inativo"}
-                            </Badge>
-                            <Badge variant={driver.availability_status === "available" ? "blue" : "gray"}>
-                                {driver.availability_status === "available" ? "Disponível" : "Offline"}
-                            </Badge>
-                            <Badge variant="purple" className="capitalize">
-                                {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
-                            </Badge>
-                        </div>
-                        <p className="text-xs text-brand-inactive-text mt-0.5">
-                            {driver.email || "Sem e-mail cadastrado"} • ID: <span className="font-mono">{driver.user_id}</span>
-                        </p>
-                    </div>
-                </div>
+        <>
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-                <div className="flex items-center gap-3 shrink-0">
-                    {driver.is_active ? (
-                        <Button
-                            variant="destructive"
-                            onClick={() => setToggleModalOpen(true)}
-                        >
-                            Desativar Entregador
-                        </Button>
-                    ) : (
-                        <Button
-                            variant="outline"
-                            onClick={() => setToggleModalOpen(true)}
-                            className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
-                        >
-                            Ativar Entregador
-                        </Button>
-                    )}
-                </div>
-            </div>
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-            <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 py-6 space-y-6">
-                {/* Tabs */}
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <div className="mb-6">
-                        <TabsList className="px-0">
-                            <TabsTrigger value="general" icon={UserIcon}>
-                                Dados Cadastrais & Métricas
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="history"
-                                icon={TruckIcon}
-                                badge={<TabCountBadge count={assignments.length} variant="gray" />}
-                            >
-                                Histórico de Entregas
-                            </TabsTrigger>
-                        </TabsList>
-                    </div>
-
-                    {/* Aba 1: Dados & Métricas */}
-                    <TabsContent value="general" className="mt-0">
-                        <FadeIn key="general" className="space-y-6">
-                            {/* Cards de Métricas */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs text-brand-inactive-text font-medium">Entregas Concluídas</span>
-                                    <p className="text-2xl font-bold text-brand-green mt-1">{metrics.completed}</p>
-                                </div>
-                                <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs text-brand-inactive-text font-medium">Total de Atribuições</span>
-                                    <p className="text-2xl font-bold text-brand-dark dark:text-dark-heading mt-1">{metrics.total}</p>
-                                </div>
-                                <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs text-brand-inactive-text font-medium">Taxa de Sucesso</span>
-                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{metrics.successRate}%</p>
-                                </div>
-                                <div className="p-4 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs text-brand-inactive-text font-medium">Falhas / Cancelamentos</span>
-                                    <p className="text-2xl font-bold text-brand-red mt-1">{metrics.failed}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
-                                {/* Coluna principal: Informações Cadastrais */}
-                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                    <FormSection title="Informações do Entregador" hasSeparator>
-                                        <div className="flex items-center gap-4 mb-6">
-                                            <UserProfileImage
-                                                fullName={profile.full_name || "Entregador"}
-                                                imageUrl={profile.avatar_url}
-                                                className="w-16 h-16 text-2xl shrink-0"
-                                            />
-                                            <div className="flex flex-col min-w-0">
-                                                <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
-                                                    {profile.full_name || "Entregador"}
-                                                </h3>
-                                                <span className="text-xs text-brand-inactive-text">
-                                                    Cadastrado em {formatDate(driver.created_at)}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Telefone / WhatsApp</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                    {profile.phone || "Não informado"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">E-mail</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                    {driver.email || "Não informado"}
-                                                </span>
-                                            </div>
-                                            <div className="sm:col-span-2">
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Endereço de Atuação</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                    {driver.street
-                                                        ? `${driver.street}, ${driver.number || "S/N"}${driver.complement ? ` - ${driver.complement}` : ""} - ${driver.neighborhood}, ${driver.city} - ${driver.state || "SP"}`
-                                                        : `${driver.neighborhood}, ${driver.city}${driver.state ? ` - ${driver.state}` : ""}`}
-                                                </span>
-                                                {driver.zip_code && (
-                                                    <span className="text-xs text-brand-inactive-text block mt-0.5">
-                                                        CEP: {driver.zip_code}
-                                                    </span>
-                                                )}
-                                                {driver.latitude && driver.longitude && (
-                                                    <a
-                                                        href={`https://www.google.com/maps/search/?api=1&query=${driver.latitude},${driver.longitude}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline mt-1 font-medium"
-                                                    >
-                                                        Ver coordenadas no Google Maps ({Number(driver.latitude).toFixed(5)}, {Number(driver.longitude).toFixed(5)})
-                                                    </a>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Veículo</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block capitalize">
-                                                    {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-xs font-semibold text-brand-inactive-text block">Disponibilidade</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block capitalize">
-                                                    {driver.availability_status === "available" ? "Disponível para corridas" : "Offline"}
-                                                </span>
-                                            </div>
-                                            {driver.terms_accepted_at && (
-                                                <div>
-                                                    <span className="text-xs font-semibold text-brand-inactive-text block">Termos de Uso</span>
-                                                    <span className="text-xs text-brand-dark dark:text-dark-heading mt-0.5 block">
-                                                        Aceito em {formatDateTime(driver.terms_accepted_at)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {driver.notes && (
-                                                <div className="sm:col-span-2">
-                                                    <span className="text-xs font-semibold text-brand-inactive-text block">Observações</span>
-                                                    <p className="text-sm text-brand-dark dark:text-dark-heading mt-0.5 p-3 rounded-xl bg-brand-gray/30 dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                                        {driver.notes}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </FormSection>
-                                </div>
-
-                                {/* Sidebar: Lojas Parceiras Vinculadas */}
-                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                            Lojas Vinculadas ({partners.length})
-                                        </h3>
-                                        {partners.length === 0 ? (
-                                            <p className="text-xs text-brand-inactive-text">
-                                                Entregador autônomo da plataforma (atende a todas as lojas da região sem vínculos exclusivos).
-                                            </p>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {partners.map((partner: any) => (
-                                                    <div key={partner.id} className="p-3 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-between">
-                                                        <div className="flex items-center gap-2 min-w-0">
-                                                            <StoreIcon size={16} className="text-brand-inactive-text shrink-0" />
-                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                {partner.partner_name || "Loja Parceira"}
-                                                            </span>
-                                                        </div>
-                                                        <Badge variant={partner.is_active ? "green" : "gray"}>
-                                                            {partner.is_active ? "Ativo" : "Inativo"}
-                                                        </Badge>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
                                     </div>
-                                </div>
-                            </div>
-                        </FadeIn>
-                    </TabsContent>
 
-                    {/* Aba 2: Histórico de Entregas */}
-                    <TabsContent value="history" className="mt-0">
-                        <FadeIn key="history">
-                            <FormSection title={`Histórico de Entregas (${assignments.length})`} hasSeparator>
-                                {assignments.length === 0 ? (
-                                    <div className="py-12">
-                                        <IconPlaceholder
-                                            icon={TruckIcon}
-                                            title="Nenhuma entrega registrada"
-                                            subtitle="Este entregador ainda não realizou corridas pela plataforma."
+                                    {/* Title row - desktop */}
+                                    <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">{profile.full_name || "Entregador"}</span>
+                                                <Badge variant={driver.is_active ? "green" : "red"}>
+                                                    {driver.is_active ? "Ativo" : "Inativo"}
+                                                </Badge>
+                                                <Badge variant={driver.availability_status === "available" ? "blue" : "gray"}>
+                                                    {driver.availability_status === "available" ? "Disponível" : "Offline"}
+                                                </Badge>
+                                                <Badge variant="purple">
+                                                    {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
+                                                </Badge>
+                                            </h1>
+
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Cadastrado em {formatDate(driver.created_at)} • {driver.city || "Cidade não informada"} • UUID: {driver.user_id}
+                                            </div>
+                                        </div>
+
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <ToggleActionButton />
+                                        </div>
+                                    </div>
+
+                                    {/* Title row - mobile */}
+                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
+                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </Button>
+                                            <div className="flex flex-col gap-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        {profile.full_name || "Entregador"}
+                                                    </h1>
+                                                    <Badge variant={driver.is_active ? "green" : "red"}>
+                                                        {driver.is_active ? "Ativo" : "Inativo"}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-brand-inactive-text truncate">
+                                                    {driver.availability_status === "available" ? "Disponível" : "Offline"} • {driver.city || "-"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <UserProfileImage
+                                            fullName={profile.full_name || "Entregador"}
+                                            imageUrl={profile.avatar_url}
+                                            className="w-10 h-10 shrink-0"
                                         />
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {/* Desktop Table */}
-                                        <div className="hidden md:block overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
-                                            <table className="w-full text-left text-sm">
-                                                <thead className="bg-brand-gray/80 dark:bg-dark-border/40 text-brand-inactive-text font-medium border-b border-brand-border dark:border-dark-border">
-                                                    <tr>
-                                                        <th className="py-3 px-4">Pedido</th>
-                                                        <th className="py-3 px-4">Loja</th>
-                                                        <th className="py-3 px-4">Taxa de Entrega</th>
-                                                        <th className="py-3 px-4">Data</th>
-                                                        <th className="py-3 px-4 text-center">Status</th>
-                                                        <th className="py-3 px-4 text-right">Ações</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-brand-border/60 dark:divide-dark-border/40">
-                                                    {paginatedAssignments.map((a: any) => (
-                                                        <tr key={a.id} className="hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 transition-colors">
-                                                            <td className="py-3 px-4 font-mono font-bold text-brand-dark dark:text-dark-heading">
-                                                                #{String(a.order_id).slice(0, 8)}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-brand-dark dark:text-dark-heading font-medium">
-                                                                {a.partner_name || "Loja Parceira"}
-                                                            </td>
-                                                            <td className="py-3 px-4 font-bold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(Number(a.delivery_fee || 0))}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-xs text-brand-inactive-text">
-                                                                {formatDateTime(a.assigned_at)}
-                                                            </td>
-                                                            <td className="py-3 px-4 text-center">
-                                                                <Badge variant={a.status === "delivered" ? "green" : a.status === "failed" ? "red" : "blue"}>
-                                                                    {a.status === "delivered" ? "Entregue" : a.status === "failed" ? "Falhou" : a.status === "out_for_delivery" ? "Em rota" : a.status}
-                                                                </Badge>
-                                                            </td>
-                                                            <td className="py-3 px-4 text-right">
-                                                                <Link
-                                                                    href={`/ddt-admin/orders?view=${a.order_id}`}
-                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                >
-                                                                    Ver Pedido →
-                                                                </Link>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
 
-                                        {/* Mobile Cards */}
-                                        <div className="md:hidden space-y-3">
-                                            {paginatedAssignments.map((a: any) => (
-                                                <div key={a.id} className="p-4 rounded-xl border border-brand-border dark:border-dark-border space-y-2">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-mono font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                Pedido #{String(a.order_id).slice(0, 8)}
-                                                            </span>
-                                                            <span className="text-xs text-brand-inactive-text">
-                                                                {a.partner_name}
-                                                            </span>
+                                    {/* Tabs */}
+                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Dados & Métricas</TabsTrigger>
+                                            <TabsTrigger
+                                                value="history"
+                                                badge={<TabCountBadge count={assignments.length} variant="gray" />}
+                                            >
+                                                Histórico de Entregas
+                                            </TabsTrigger>
+                                        </TabsList>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                    {/* Aba 1: Dados & Métricas */}
+                                    <TabsContent value="general" className="mt-0">
+                                        <FadeIn key="general">
+                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                {/* Coluna principal: Informações Cadastrais */}
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                    <FormSection title="Informações do Entregador" hasSeparator>
+                                                        <ListItem
+                                                            left={
+                                                                <UserProfileImage
+                                                                    fullName={profile.full_name || "Entregador"}
+                                                                    imageUrl={profile.avatar_url}
+                                                                    className="w-12 h-12 text-lg shrink-0"
+                                                                />
+                                                            }
+                                                            title={profile.full_name || "Entregador"}
+                                                            description={`Cadastrado em ${formatDate(driver.created_at)}`}
+                                                        />
+
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Telefone / WhatsApp</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                    {profile.phone || "Não informado"}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">E-mail</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 break-all">
+                                                                    {driver.email || "Não informado"}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Veículo</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block capitalize">
+                                                                    {driver.vehicle_type === "moto" ? "Motocicleta" : "Automóvel"}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Disponibilidade</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block capitalize">
+                                                                    {driver.availability_status === "available" ? "Disponível para corridas" : "Offline"}
+                                                                </span>
+                                                            </div>
+                                                            <div className="sm:col-span-2">
+                                                                <span className="text-xs font-semibold text-brand-inactive-text block">Endereço de Atuação</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                    {driver.street
+                                                                        ? `${driver.street}, ${driver.number || "S/N"}${driver.complement ? ` - ${driver.complement}` : ""} - ${driver.neighborhood}, ${driver.city} - ${driver.state || "SP"}`
+                                                                        : `${driver.neighborhood || "-"}, ${driver.city || "-"}${driver.state ? ` - ${driver.state}` : ""}`}
+                                                                </span>
+                                                                {driver.zip_code && (
+                                                                    <span className="text-xs text-brand-inactive-text block mt-0.5">
+                                                                        CEP: {driver.zip_code}
+                                                                    </span>
+                                                                )}
+                                                                {driver.latitude && driver.longitude && (
+                                                                    <a
+                                                                        href={`https://www.google.com/maps/search/?api=1&query=${driver.latitude},${driver.longitude}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-1 text-xs text-brand-primary hover:underline mt-1 font-medium"
+                                                                    >
+                                                                        Ver coordenadas no Google Maps ({Number(driver.latitude).toFixed(5)}, {Number(driver.longitude).toFixed(5)})
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                            {driver.terms_accepted_at && (
+                                                                <div>
+                                                                    <span className="text-xs font-semibold text-brand-inactive-text block">Termos de Uso</span>
+                                                                    <span className="text-xs text-brand-dark dark:text-dark-heading mt-0.5 block">
+                                                                        Aceito em {formatDateTime(driver.terms_accepted_at)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {driver.notes && (
+                                                                <div className="sm:col-span-2">
+                                                                    <span className="text-xs font-semibold text-brand-inactive-text block">Observações</span>
+                                                                    <p className="text-sm text-brand-dark dark:text-dark-heading mt-0.5 p-3 rounded-xl bg-brand-gray/30 dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                                                        {driver.notes}
+                                                                    </p>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        <Badge variant={a.status === "delivered" ? "green" : a.status === "failed" ? "red" : "blue"}>
-                                                            {a.status === "delivered" ? "Entregue" : a.status === "failed" ? "Falhou" : a.status}
-                                                        </Badge>
+                                                    </FormSection>
+                                                </div>
+
+                                                {/* Sidebar */}
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                    {/* Card de Desempenho */}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Desempenho
+                                                        </h3>
+                                                        <div className="space-y-2.5 text-sm">
+                                                            <div className="flex justify-between text-brand-inactive-text">
+                                                                <span>Entregas concluídas</span>
+                                                                <span className="font-semibold text-brand-green">{metrics.completed}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-brand-inactive-text">
+                                                                <span>Total de atribuições</span>
+                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{metrics.total}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-brand-inactive-text">
+                                                                <span>Taxa de sucesso</span>
+                                                                <span className="font-semibold text-blue-600 dark:text-blue-400">{metrics.successRate}%</span>
+                                                            </div>
+                                                            <div className="pt-3 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">Falhas / Cancelamentos</span>
+                                                                <span className="font-bold text-red-600 dark:text-red-400">{metrics.failed}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center justify-between text-xs pt-2 border-t border-brand-border dark:border-dark-border">
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(a.delivery_fee || 0))}</span>
-                                                        <Link href={`/ddt-admin/orders?view=${a.order_id}`} className="font-bold text-brand-green">
-                                                            Ver Pedido →
-                                                        </Link>
+
+                                                    {/* Card de Lojas Vinculadas */}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Lojas Vinculadas ({partners.length})
+                                                        </h3>
+                                                        {partners.length === 0 ? (
+                                                            <p className="text-xs text-brand-inactive-text">
+                                                                Entregador autônomo da plataforma (atende a todas as lojas da região sem vínculos exclusivos).
+                                                            </p>
+                                                        ) : (
+                                                            <div className="space-y-3">
+                                                                {partners.map((partner: any) => (
+                                                                    <div key={partner.id} className="p-3 rounded-xl border border-brand-border dark:border-dark-border flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                            <StoreIcon size={16} className="text-brand-inactive-text shrink-0" />
+                                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                                {partner.partner_name || "Loja Parceira"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <Badge variant={partner.is_active ? "green" : "gray"}>
+                                                                            {partner.is_active ? "Ativo" : "Inativo"}
+                                                                        </Badge>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Card de Identificadores */}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Identificadores
+                                                        </h3>
+                                                        <div className="space-y-2 text-xs">
+                                                            <div>
+                                                                <span className="text-brand-inactive-text block">UUID do Entregador</span>
+                                                                <span className="font-mono text-brand-dark dark:text-dark-heading select-all break-all">{driver.user_id}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Pagination */}
-                                        {totalHistoryPages > 1 && (
-                                            <div className="pt-4">
-                                                <Pagination
-                                                    currentPage={historyPage}
-                                                    totalPages={totalHistoryPages}
-                                                    onPageChange={setHistoryPage}
-                                                    inline
-                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                )}
-                            </FormSection>
-                        </FadeIn>
-                    </TabsContent>
-                </Tabs>
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    {/* Aba 2: Histórico de Entregas */}
+                                    <TabsContent value="history" className="mt-0">
+                                        <FadeIn key="history">
+                                            <FormSection title={`Histórico de Entregas (${assignments.length})`} hasSeparator>
+                                                {assignments.length === 0 ? (
+                                                    <div className="py-12">
+                                                        <IconPlaceholder
+                                                            icon={TruckIcon}
+                                                            title="Nenhuma entrega registrada"
+                                                            subtitle="Este entregador ainda não realizou corridas pela plataforma."
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        {/* Desktop Table */}
+                                                        <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                                            <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                                                <table className="w-full text-left border-separate border-spacing-0 min-w-[900px]">
+                                                                    <thead>
+                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                                            <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                                                Pedido
+                                                                            </th>
+                                                                            <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                                                Loja
+                                                                            </th>
+                                                                            <th className="py-3 px-2 w-36 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                                                Taxa de Entrega
+                                                                            </th>
+                                                                            <th className="py-3 px-2 w-40 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                                                Data
+                                                                            </th>
+                                                                            <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                                                Status
+                                                                            </th>
+                                                                            <th className="py-3 px-2 w-32 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                                                Ações
+                                                                            </th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {paginatedAssignments.map((a: any) => (
+                                                                            <tr key={a.id} className="bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors">
+                                                                                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
+                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading font-mono">
+                                                                                        #{String(a.order_id).slice(0, 8)}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                                                                                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                        {a.partner_name || "Loja Parceira"}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                        {formatCurrency(Number(a.delivery_fee || 0))}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                                        {formatDateTime(a.assigned_at)}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                    <div className="flex justify-center">
+                                                                                        <Badge variant={a.status === "delivered" ? "green" : a.status === "failed" ? "red" : "blue"}>
+                                                                                            {a.status === "delivered" ? "Entregue" : a.status === "failed" ? "Falhou" : a.status === "out_for_delivery" ? "Em rota" : a.status}
+                                                                                        </Badge>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                    <Link
+                                                                                        href={`/ddt-admin/orders?view=${a.order_id}`}
+                                                                                        className="text-xs font-bold text-brand-green hover:underline"
+                                                                                    >
+                                                                                        Ver Pedido →
+                                                                                    </Link>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Mobile Cards */}
+                                                        <div className="md:hidden space-y-3">
+                                                            {paginatedAssignments.map((a: any) => (
+                                                                <div key={a.id} className="p-4 rounded-xl border border-brand-border dark:border-dark-border space-y-2">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-mono font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                                Pedido #{String(a.order_id).slice(0, 8)}
+                                                                            </span>
+                                                                            <span className="text-xs text-brand-inactive-text">
+                                                                                {a.partner_name}
+                                                                            </span>
+                                                                        </div>
+                                                                        <Badge variant={a.status === "delivered" ? "green" : a.status === "failed" ? "red" : "blue"}>
+                                                                            {a.status === "delivered" ? "Entregue" : a.status === "failed" ? "Falhou" : a.status}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between text-xs pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(a.delivery_fee || 0))}</span>
+                                                                        <Link href={`/ddt-admin/orders?view=${a.order_id}`} className="font-bold text-brand-green">
+                                                                            Ver Pedido →
+                                                                        </Link>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Pagination */}
+                                                        {totalHistoryPages > 1 && (
+                                                            <div className="pt-4">
+                                                                <Pagination
+                                                                    currentPage={historyPage}
+                                                                    totalPages={totalHistoryPages}
+                                                                    onPageChange={setHistoryPage}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </FormSection>
+                                        </FadeIn>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </div>
+                    </Tabs>
+                </div>
+            </FadeIn>
+
+            {/* Mobile bottom bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <ToggleActionButton full />
             </div>
 
             {/* Modal: Ativar/Desativar */}
@@ -496,7 +583,7 @@ export function AdminDeliveryDriverDetailView({
                 confirmText={driver.is_active ? "Desativar" : "Ativar"}
                 variant={driver.is_active ? "danger" : "success"}
             />
-        </FadeIn>
+        </>
     )
 }
 

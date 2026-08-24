@@ -11,18 +11,7 @@ import {
 } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { toast } from "@/hooks/use-notification"
-import {
-    SearchIcon,
-    PlusIcon,
-    TruckIcon,
-    MailIcon,
-    ArrowUpDownIcon,
-    CheckCircleIcon,
-    CancelCircleIcon,
-    ClockIcon,
-    CopyIcon,
-    ReloadIcon,
-} from "@/lib/icons"
+import { PlusIcon, TruckIcon, MailIcon } from "@/lib/icons"
 import {
     listDeliveryDriversAdminAction,
     updateDeliveryDriverAdminAction,
@@ -35,6 +24,7 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import { formatDate, formatDateTime } from "@/lib/utils"
+import { useMediaQuery } from "@/components/erp/hooks"
 import { useEntityState } from "@/hooks/use-entity-state"
 import DeliveryDriversPageControls, {
     type DriverFilterState,
@@ -65,12 +55,14 @@ interface DeliveryDriversManagerProps {
 const ITEMS_PER_PAGE = 8
 
 export default function DeliveryDriversManager({ initialData, initialStats }: DeliveryDriversManagerProps) {
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
     const [drivers, setDrivers] = useState<any[]>(initialData?.items || [])
     const [invites, setInvites] = useState<any[]>([])
     const [stats, setStats] = useState(initialStats)
     const [statusTab, setStatusTab] = useState("all")
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<DriverFilterState>(INITIAL_DRIVER_FILTERS)
@@ -385,6 +377,8 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                     filters={filters}
                     setFilters={setFilters}
                     hasActiveFilters={hasActiveFilters}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
                     stats={stats}
                 />
 
@@ -469,111 +463,185 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                     })}
                                 </div>
 
-                                {/* Desktop Invites Table */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse min-w-[900px]">
-                                            <thead>
-                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border select-none">
-                                                    <th className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                        Entregador Convidado
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                        Contato
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                        Localização
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                        Veículo
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Enviado em
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Status
-                                                    </th>
-                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Ações
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {paginatedItems.map((inv: any) => {
-                                                    const isUsed = !!inv.used_at
-                                                    const isRevoked = !!inv.revoked_at
-                                                    const isExpired = !isUsed && !isRevoked && new Date(inv.expires_at) < new Date()
-                                                    const isPendingInvite = !isUsed && !isRevoked && !isExpired
+                                {/* Desktop Invites View */}
+                                {viewMode === "grid" ? (
+                                    <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {paginatedItems.map((inv: any) => {
+                                            const isUsed = !!inv.used_at
+                                            const isRevoked = !!inv.revoked_at
+                                            const isExpired = !isUsed && !isRevoked && new Date(inv.expires_at) < new Date()
+                                            const isPendingInvite = !isUsed && !isRevoked && !isExpired
 
-                                                    return (
-                                                        <tr
-                                                            key={inv.id}
-                                                            className="border-b border-brand-border/60 dark:border-dark-border/40 hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-colors"
-                                                        >
-                                                            <td className="py-3 px-3 pl-6">
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                        {inv.full_name}
-                                                                    </span>
-                                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                                        {inv.email}
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-3 px-3 text-xs font-medium text-brand-dark dark:text-dark-heading">
-                                                                {inv.phone || "—"}
-                                                            </td>
-                                                            <td className="py-3 px-3 text-xs text-brand-inactive-text">
-                                                                {inv.city}{inv.neighborhood ? ` (${inv.neighborhood})` : ""}
-                                                            </td>
-                                                            <td className="py-3 px-3">
-                                                                <Badge variant={inv.vehicle_type === "moto" ? "purple" : "blue"}>
-                                                                    {inv.vehicle_type === "moto" ? "Moto" : "Carro"}
-                                                                </Badge>
-                                                            </td>
-                                                            <td className="py-3 px-3 text-xs text-brand-inactive-text text-center">
-                                                                {formatDate(inv.created_at)}
-                                                            </td>
-                                                            <td className="py-3 px-3 text-center">
-                                                                <Badge variant={isUsed ? "green" : isRevoked ? "red" : isExpired ? "gray" : "orange"}>
-                                                                    {isUsed ? "Aceito" : isRevoked ? "Revogado" : isExpired ? "Expirado" : "Pendente"}
-                                                                </Badge>
-                                                            </td>
-                                                            <td className="py-3 px-3 pr-6 text-center">
-                                                                {isPendingInvite ? (
-                                                                    <div className="flex items-center justify-center gap-2">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="text-xs px-2.5 h-8"
-                                                                            onClick={() => handleResendInvite(inv.id)}
-                                                                            disabled={isPending}
-                                                                            title="Reenviar e-mail de convite"
-                                                                        >
-                                                                            Reenviar
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outlinered"
-                                                                            className="text-xs px-2.5 h-8"
-                                                                            onClick={() => setRevokeTarget(inv)}
-                                                                            disabled={isPending}
-                                                                            title="Revogar convite"
-                                                                        >
-                                                                            Revogar
-                                                                        </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="text-xs text-brand-inactive-text">—</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                })}
-                                            </tbody>
-                                        </table>
+                                            return (
+                                                <div
+                                                    key={inv.id}
+                                                    className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all flex flex-col justify-between gap-4"
+                                                >
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                {inv.full_name}
+                                                            </h3>
+                                                            <p className="text-xs text-brand-inactive-text mt-0.5 truncate">{inv.email}</p>
+                                                        </div>
+                                                        <Badge variant={isUsed ? "green" : isRevoked ? "red" : isExpired ? "gray" : "orange"}>
+                                                            {isUsed ? "Aceito" : isRevoked ? "Revogado" : isExpired ? "Expirado" : "Pendente"}
+                                                        </Badge>
+                                                    </div>
+
+                                                    <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
+                                                        <div className="flex justify-between">
+                                                            <span>Veículo</span>
+                                                            <span>{inv.vehicle_type === "moto" ? "Moto" : "Carro"}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>Cidade</span>
+                                                            <span className="truncate max-w-[120px]">{inv.city || "-"}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {isPendingInvite && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="text-xs flex-1"
+                                                                onClick={() => handleResendInvite(inv.id)}
+                                                                disabled={isPending}
+                                                            >
+                                                                Reenviar
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outlinered"
+                                                                className="text-xs"
+                                                                onClick={() => setRevokeTarget(inv)}
+                                                                disabled={isPending}
+                                                            >
+                                                                Revogar
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                        <th className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                            Entregador Convidado
+                                                        </th>
+                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                            Contato
+                                                        </th>
+                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                            Localização
+                                                        </th>
+                                                        <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Veículo
+                                                        </th>
+                                                        <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Enviado em
+                                                        </th>
+                                                        <th className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Status
+                                                        </th>
+                                                        <th className="py-3 px-2 w-44 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Ações
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedItems.map((inv: any) => {
+                                                        const isUsed = !!inv.used_at
+                                                        const isRevoked = !!inv.revoked_at
+                                                        const isExpired = !isUsed && !isRevoked && new Date(inv.expires_at) < new Date()
+                                                        const isPendingInvite = !isUsed && !isRevoked && !isExpired
+
+                                                        return (
+                                                            <tr
+                                                                key={inv.id}
+                                                                className="bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors"
+                                                            >
+                                                                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                            {inv.full_name}
+                                                                        </span>
+                                                                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 truncate">
+                                                                            {inv.email}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                                                                    <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                        {inv.phone || "—"}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                        {inv.city}{inv.neighborhood ? ` (${inv.neighborhood})` : ""}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                    <div className="flex justify-center">
+                                                                        <Badge variant={inv.vehicle_type === "moto" ? "purple" : "blue"}>
+                                                                            {inv.vehicle_type === "moto" ? "Moto" : "Carro"}
+                                                                        </Badge>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                        {formatDate(inv.created_at)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                    <div className="flex justify-center">
+                                                                        <Badge variant={isUsed ? "green" : isRevoked ? "red" : isExpired ? "gray" : "orange"}>
+                                                                            {isUsed ? "Aceito" : isRevoked ? "Revogado" : isExpired ? "Expirado" : "Pendente"}
+                                                                        </Badge>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                                                                    {isPendingInvite ? (
+                                                                        <div className="flex items-center justify-center gap-2 action-btn" onClick={(e) => e.stopPropagation()}>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="text-xs px-2.5 h-8"
+                                                                                onClick={() => handleResendInvite(inv.id)}
+                                                                                disabled={isPending}
+                                                                                title="Reenviar e-mail de convite"
+                                                                            >
+                                                                                Reenviar
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outlinered"
+                                                                                className="text-xs px-2.5 h-8"
+                                                                                onClick={() => setRevokeTarget(inv)}
+                                                                                disabled={isPending}
+                                                                                title="Revogar convite"
+                                                                            >
+                                                                                Revogar
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-[13px] text-brand-inactive-text">—</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
                             </FadeIn>
                         ) : (
                             /* DRIVERS LIST / TABLE VIEW */
@@ -612,128 +680,191 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                     ))}
                                 </div>
 
-                                {/* Desktop Drivers Table */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse min-w-[950px]">
-                                            <thead>
-                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border select-none">
-                                                    <th
-                                                        onClick={() => handleSort("name")}
-                                                        className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Entregador</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "name" ? "text-brand-green" : "opacity-40"} />
+                                {/* Desktop Drivers View */}
+                                {viewMode === "grid" ? (
+                                    <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {paginatedItems.map((driver: any) => (
+                                            <div
+                                                key={driver.user_id}
+                                                onClick={() => openEntity("view", driver.user_id)}
+                                                className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col justify-between gap-4"
+                                            >
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <UserProfileImage
+                                                            fullName={driver.profile?.full_name || driver.email || "Entregador"}
+                                                            className="w-10 h-10 text-xs shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                {driver.profile?.full_name || "Sem Nome"}
+                                                            </h3>
+                                                            <p className="text-xs text-brand-inactive-text mt-0.5 truncate">{driver.email}</p>
                                                         </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                                        Contato
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("city")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    </div>
+                                                    <Badge variant={driver.is_active ? "green" : "gray"}>
+                                                        {driver.is_active ? "Ativo" : "Inativo"}
+                                                    </Badge>
+                                                </div>
+
+                                                <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
+                                                    <div className="flex justify-between">
+                                                        <span>Cidade</span>
+                                                        <span className="truncate max-w-[120px]">{driver.city || "-"}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span>Veículo</span>
+                                                        <Badge variant={driver.vehicle_type === "moto" ? "purple" : "blue"}>
+                                                            {driver.vehicle_type === "moto" ? "Moto" : "Carro"}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>Cadastro</span>
+                                                        <span>{formatDate(driver.created_at)}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-between items-center">
+                                                    <Badge variant={driver.availability_status === "available" ? "green" : "gray"}>
+                                                        {driver.availability_status === "available" ? "Disponível" : "Offline"}
+                                                    </Badge>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="text-xs h-8 px-2.5"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setToggleTarget(driver)
+                                                        }}
                                                     >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Localização</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "city" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("vehicle")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Veículo</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "vehicle" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Disponibilidade
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("status")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <span>Status</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "status" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center w-28">
-                                                        Ações
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {paginatedItems.map((driver: any) => (
-                                                    <tr
-                                                        key={driver.user_id}
-                                                        className="border-b border-brand-border/60 dark:border-dark-border/40 hover:bg-brand-gray/40 dark:hover:bg-dark-border/20 transition-colors"
-                                                    >
-                                                        <td className="py-3 px-3 pl-6">
-                                                            <div className="flex items-center gap-3">
-                                                                <UserProfileImage
-                                                                    fullName={driver.profile?.full_name || driver.email || "Entregador"}
-                                                                    className="w-9 h-9 text-xs shrink-0"
-                                                                />
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                        {driver.profile?.full_name || "Sem Nome"}
-                                                                    </span>
-                                                                    <span className="text-xs text-brand-inactive-text truncate">
-                                                                        {driver.email}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-3 px-3 text-xs text-brand-dark dark:text-dark-heading font-medium">
-                                                            {driver.profile?.phone || "—"}
-                                                        </td>
-                                                        <td className="py-3 px-3 text-xs text-brand-inactive-text">
-                                                            {driver.city}{driver.neighborhood ? ` (${driver.neighborhood})` : ""}
-                                                        </td>
-                                                        <td className="py-3 px-3">
-                                                            <Badge variant={driver.vehicle_type === "moto" ? "purple" : "blue"}>
-                                                                {driver.vehicle_type === "moto" ? "Moto" : "Carro"}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-3 px-3 text-center">
-                                                            <Badge variant={driver.availability_status === "available" ? "green" : "gray"}>
-                                                                {driver.availability_status === "available" ? "Disponível" : "Offline"}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-3 px-3 text-center">
-                                                            <Badge variant={driver.is_active ? "green" : "gray"}>
-                                                                {driver.is_active ? "Ativo" : "Inativo"}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-3 px-3 pr-6 text-center">
-                                                            <div className="flex items-center justify-center gap-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="text-xs h-8 px-2.5"
-                                                                    onClick={() => openEntity("view", driver.user_id)}
-                                                                >
-                                                                    Detalhes
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant={driver.is_active ? "outlinered" : "outline"}
-                                                                    className="text-xs h-8 px-2.5"
-                                                                    onClick={() => setToggleTarget(driver)}
-                                                                >
-                                                                    {driver.is_active ? "Desativar" : "Ativar"}
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                        {driver.is_active ? "Desativar" : "Ativar"}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                        <th
+                                                            onClick={() => handleSort("name")}
+                                                            className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Entregador {sortConfig?.key === "name" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight">
+                                                            Contato
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("city")}
+                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Localização {sortConfig?.key === "city" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("vehicle")}
+                                                            className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Veículo {sortConfig?.key === "vehicle" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Disponibilidade
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("status")}
+                                                            className="py-3 px-2 w-28 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th className="py-3 px-2 w-44 pr-6 rounded-r-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Ações
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedItems.map((driver: any) => (
+                                                        <tr
+                                                            key={driver.user_id}
+                                                            className="bg-white dark:bg-dark-background hover:bg-brand-gray dark:hover:bg-dark-border/10 transition-colors cursor-pointer"
+                                                            onClick={() => openEntity("view", driver.user_id)}
+                                                        >
+                                                            <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
+                                                                <div className="flex items-center gap-3">
+                                                                    <UserProfileImage
+                                                                        fullName={driver.profile?.full_name || driver.email || "Entregador"}
+                                                                        className="w-9 h-9 text-xs shrink-0"
+                                                                    />
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                                                            {driver.profile?.full_name || "Sem Nome"}
+                                                                        </span>
+                                                                        <span className="text-[11px] font-medium text-brand-inactive-text opacity-70 truncate">
+                                                                            {driver.email}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                                                                <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                    {driver.profile?.phone || "—"}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-left">
+                                                                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+                                                                    {driver.city}{driver.neighborhood ? ` (${driver.neighborhood})` : ""}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                <div className="flex justify-center">
+                                                                    <Badge variant={driver.vehicle_type === "moto" ? "purple" : "blue"}>
+                                                                        {driver.vehicle_type === "moto" ? "Moto" : "Carro"}
+                                                                    </Badge>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                <div className="flex justify-center">
+                                                                    <Badge variant={driver.availability_status === "available" ? "green" : "gray"}>
+                                                                        {driver.availability_status === "available" ? "Disponível" : "Offline"}
+                                                                    </Badge>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
+                                                                <div className="flex justify-center">
+                                                                    <Badge variant={driver.is_active ? "green" : "gray"}>
+                                                                        {driver.is_active ? "Ativo" : "Inativo"}
+                                                                    </Badge>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 pr-6 border-b border-brand-border dark:border-dark-border text-center">
+                                                                <div className="flex items-center justify-center gap-2 action-btn" onClick={(e) => e.stopPropagation()}>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="text-xs h-8 px-2.5"
+                                                                        onClick={() => openEntity("view", driver.user_id)}
+                                                                    >
+                                                                        Detalhes
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant={driver.is_active ? "outlinered" : "outline"}
+                                                                        className="text-xs h-8 px-2.5"
+                                                                        onClick={() => setToggleTarget(driver)}
+                                                                    >
+                                                                        {driver.is_active ? "Desativar" : "Ativar"}
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
                             </FadeIn>
                         )}
                     </AnimatePresence>
@@ -745,7 +876,6 @@ export default function DeliveryDriversManager({ initialData, initialStats }: De
                                 currentPage={page}
                                 totalPages={totalPages}
                                 onPageChange={setPage}
-                                inline
                             />
                         </div>
                     )}

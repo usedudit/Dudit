@@ -26,6 +26,7 @@ import {
     StoreIcon,
     MapPinIcon,
     FileTextIcon,
+    FlagIcon,
 } from "@/lib/icons"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -39,6 +40,7 @@ import { getBillingUnitSuffix } from "@/lib/utils/formatters"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
 import { RequestQuoteModal } from "./RequestQuoteModal"
+import { ReportModal } from "./ReportModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
@@ -209,6 +211,7 @@ export function ServiceDetailsPageClient({
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showResponsibilityModal, setShowResponsibilityModal] = useState(false)
     const [showPoliciesModal, setShowPoliciesModal] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
     const [deliveryFee, setDeliveryFee] = useState<number | null>(null)
     const [deliveryError, setDeliveryError] = useState<string | null>(null)
     const [deliveryLoading, setDeliveryLoading] = useState(false)
@@ -1632,6 +1635,18 @@ export function ServiceDetailsPageClient({
 
             {/* Sponsored ad below seller card */}
             <SponsoredAdDetailSlot ad={sponsoredAd} />
+
+            {
+                !(user?.id && user.id === partner.user_id) && (
+                    <button
+                        onClick={() => setShowReportModal(true)}
+                        className="w-full mt-4 flex items-center justify-center gap-2 py-2 text-xs font-medium text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] transition-colors"
+                    >
+                        <FlagIcon size={14} />
+                        Comunicar algo errado
+                    </button>
+                )
+            }
         </div>
     )
 
@@ -1654,6 +1669,14 @@ export function ServiceDetailsPageClient({
                 onClose={() => setShowCollectionModal(false)}
                 itemType="service"
                 itemId={service.id}
+            />
+
+            <ReportModal
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                targetType="service"
+                targetId={service.id}
+                targetName={service.name}
             />
 
             <VendorPaymentMethodsModal
@@ -1895,9 +1918,9 @@ export function ServiceDetailsPageClient({
                 onShare={() => setShowShareModal(true)}
                 favoriteButton={
                     <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
-                        className="flex items-center justify-center p-1.5 transition-all duration-200 cursor-pointer select-none"
+                        className="flex items-center justify-center w-8 h-8 transition-all duration-200 cursor-pointer select-none"
                         title={isFav(service.id, "servico") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                        <HeartIcon size={18} className={isFav(service.id, "servico") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                        <HeartIcon size={20} className={isFav(service.id, "servico") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
                     </button>
                 }
             />

@@ -249,18 +249,18 @@ export function AdminPartnerDetailView({
     const paginatedReturns = recentReturns.slice((returnPage - 1) * ITEMS_PER_PAGE, returnPage * ITEMS_PER_PAGE)
     const totalReturnPages = Math.ceil(recentReturns.length / ITEMS_PER_PAGE) || 1
 
-    const handleCopyStoreId = useCallback(() => {
+    const handleCopyStoreId = () => {
         if (!store?.id) return
         navigator.clipboard.writeText(store.id)
         toast.success("ID da loja copiado com sucesso!")
-    }, [store?.id])
+    }
 
-    const handleCopyPartnerId = useCallback(() => {
+    const handleCopyPartnerId = () => {
         const partnerId = store?.partner_id || detail?.partner?.id
         if (!partnerId) return
         navigator.clipboard.writeText(partnerId)
         toast.success("ID do parceiro copiado com sucesso!")
-    }, [store?.partner_id, detail?.partner?.id])
+    }
 
     // ── Handlers: Loja Específica ──
     const handleConfirmSuspendStore = async ({ reason, durationDays, stepUpToken, riskScore, notifyOwner }: { reason: string; durationDays: number | null; stepUpToken: string; riskScore?: number | null; notifyOwner: boolean }) => {

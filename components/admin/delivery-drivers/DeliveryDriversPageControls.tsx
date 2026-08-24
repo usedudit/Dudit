@@ -9,13 +9,14 @@ import { TabCountBadge } from "@/components/reusable/TabCountBadge"
 import {
     SearchIcon,
     FilterIcon,
+    GridIcon,
+    ListIcon,
     TruckIcon,
     CheckCircleIcon,
     CancelCircleIcon,
     ClockIcon,
     MailIcon,
     MapPinIcon,
-    XIcon,
 } from "@/lib/icons"
 
 export interface DriverFilterState {
@@ -39,6 +40,8 @@ interface DeliveryDriversPageControlsProps {
     filters: DriverFilterState
     setFilters: React.Dispatch<React.SetStateAction<DriverFilterState>>
     hasActiveFilters: boolean
+    viewMode: "list" | "grid"
+    onViewModeChange: (mode: "list" | "grid") => void
     stats?: {
         total?: number
         active?: number
@@ -58,6 +61,8 @@ export default function DeliveryDriversPageControls({
     filters,
     setFilters,
     hasActiveFilters,
+    viewMode,
+    onViewModeChange,
     stats,
 }: DeliveryDriversPageControlsProps) {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -77,9 +82,6 @@ export default function DeliveryDriversPageControls({
         window.addEventListener("resize", checkFilterScroll)
         return () => window.removeEventListener("resize", checkFilterScroll)
     }, [checkFilterScroll, filters])
-
-    const totalActiveFilterCount =
-        filters.city.length + filters.vehicleType.length + filters.status.length
 
     const BadgeList = () => (
         <AnimatePresence>
@@ -103,6 +105,7 @@ export default function DeliveryDriversPageControls({
                 <FilterChip
                     label="Status"
                     value={filters.status.join(", ")}
+                    icon={<CheckCircleIcon size={12} />}
                     onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
                 />
             )}
@@ -110,9 +113,9 @@ export default function DeliveryDriversPageControls({
     )
 
     return (
-        <div className="w-full flex-none px-4 md:px-8 mb-4">
-            {/* TABS HEADER */}
-            <div className="mb-4">
+        <>
+            {/* --- TABS --- */}
+            <div className="mb-6 px-4 md:px-8">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="px-0">
                         <TabsTrigger
@@ -132,7 +135,7 @@ export default function DeliveryDriversPageControls({
                         <TabsTrigger
                             value="inactive"
                             icon={CancelCircleIcon}
-                            badge={<TabCountBadge count={stats?.inactive || 0} variant="gray" />}
+                            badge={<TabCountBadge count={stats?.inactive || 0} variant="yellow" />}
                         >
                             Inativos
                         </TabsTrigger>
@@ -146,7 +149,7 @@ export default function DeliveryDriversPageControls({
                         <TabsTrigger
                             value="offline"
                             icon={ClockIcon}
-                            badge={<TabCountBadge count={stats?.offline || 0} variant="yellow" />}
+                            badge={<TabCountBadge count={stats?.offline || 0} variant="gray" />}
                         >
                             Offline
                         </TabsTrigger>
@@ -161,121 +164,103 @@ export default function DeliveryDriversPageControls({
                 </Tabs>
             </div>
 
-            {/* MOBILE CONTROLS */}
-            <div className="flex md:hidden items-center gap-2 mb-3">
-                <div className="flex-1 relative">
-                    <Input
-                        name="search"
-                        placeholder="Buscar entregador ou convite..."
-                        value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                        className="h-[42px] w-full"
-                        variant="full-rounded"
-                        prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
-                        label=""
-                    />
-                    {search && (
-                        <button
-                            onClick={() => onSearchChange("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                        >
-                            <XIcon size={14} />
-                        </button>
-                    )}
-                </div>
-
-                {activeTab !== "invites" && (
-                    <Button
-                        variant="outline"
-                        onClick={onOpenFilter}
-                        className="w-[42px] h-[42px] p-0 flex items-center justify-center relative shrink-0"
-                        aria-label="Abrir filtros"
-                    >
-                        <FilterIcon className="w-4 h-4" />
-                        {hasActiveFilters && (
-                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-green" />
-                        )}
-                    </Button>
-                )}
-            </div>
-
-            {/* DESKTOP CONTROLS */}
-            <div className="hidden md:flex items-center w-full gap-4">
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-80 relative">
+            {/* --- CONTROLS BAR --- */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8">
+                {/* MOBILE CONTROLS */}
+                <div className="md:hidden flex items-center gap-2 w-full">
+                    <div className="flex-1 min-w-0">
                         <Input
-                            name="search"
-                            placeholder="Buscar por nome, e-mail, telefone ou cidade..."
-                            prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
+                            placeholder="Buscar entregador ou convite..."
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
-                            className="h-[42px]"
+                            className="h-[42px] w-full"
                             variant="full-rounded"
-                            label=""
+                            prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                         />
-                        {search && (
-                            <button
-                                onClick={() => onSearchChange("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
-                            >
-                                <XIcon size={14} />
-                            </button>
-                        )}
                     </div>
-
                     {activeTab !== "invites" && (
-                        <Button
-                            variant="outline"
-                            onClick={onOpenFilter}
-                            leftIcon={<FilterIcon size={18} />}
-                            className="relative"
-                        >
-                            Filtros
-                            {totalActiveFilterCount > 0 && (
-                                <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-brand-green text-white text-[10px] font-bold">
-                                    {totalActiveFilterCount}
-                                </span>
-                            )}
+                        <Button variant="outline" onClick={onOpenFilter} className="w-[42px] h-[42px] p-0 shrink-0">
+                            <FilterIcon className="w-4 h-4" />
                         </Button>
-                    )}
-
-                    {hasActiveFilters && activeTab !== "invites" && (
-                        <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1" />
                     )}
                 </div>
 
-                {/* Scrollable Badges Area */}
-                {activeTab !== "invites" && (
-                    <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
-                        <div
-                            className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                filterScrollState.left ? "opacity-100" : "opacity-0"
-                            }`}
-                        />
-                        <div
-                            ref={filtersContainerRef}
-                            onScroll={checkFilterScroll}
-                            className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full"
-                        >
-                            <BadgeList />
+                {/* DESKTOP CONTROLS */}
+                <div className="hidden md:flex items-center w-full gap-4">
+                    <div className="flex items-center gap-3 shrink-0">
+                        <div className="w-80">
+                            <Input
+                                placeholder="Buscar por nome, e-mail, telefone ou cidade..."
+                                value={search}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                                className="h-[42px]"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                            />
                         </div>
-                        <div
-                            className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                                filterScrollState.right ? "opacity-100" : "opacity-0"
-                            }`}
-                        />
+                        {activeTab !== "invites" && (
+                            <Button
+                                variant="outline"
+                                onClick={onOpenFilter}
+                                leftIcon={<FilterIcon size={18} />}
+                            >
+                                Filtros
+                            </Button>
+                        )}
+                        {hasActiveFilters && activeTab !== "invites" && (
+                            <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1" />
+                        )}
                     </div>
-                )}
+
+                    {/* Scrollable Badges Area */}
+                    {activeTab !== "invites" ? (
+                        <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
+                            <div
+                                className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.left ? "opacity-100" : "opacity-0"}`}
+                            />
+                            <div
+                                ref={filtersContainerRef}
+                                onScroll={checkFilterScroll}
+                                className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full"
+                            >
+                                <BadgeList />
+                            </div>
+                            <div
+                                className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.right ? "opacity-100" : "opacity-0"}`}
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex-1 min-w-0" />
+                    )}
+
+                    {/* View Toggles */}
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
+                        <button
+                            onClick={() => onViewModeChange("list")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                            aria-label="Visualização em Lista"
+                        >
+                            <ListIcon className="w-[18px] h-[18px]" />
+                        </button>
+                        <button
+                            onClick={() => onViewModeChange("grid")}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid" ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading" : "text-gray-400 hover:text-gray-600 dark:text-dark-body"}`}
+                            aria-label="Visualização em Grade"
+                        >
+                            <GridIcon className="w-[18px] h-[18px]" />
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* MOBILE ACTIVE CHIPS */}
+            {/* MOBILE CHIPS */}
             {activeTab !== "invites" && (
-                <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-2 flex-none">
+                <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
                     <div className="flex items-center gap-2">
                         <BadgeList />
                     </div>
                 </div>
             )}
-        </div>
+        </>
     )
 }

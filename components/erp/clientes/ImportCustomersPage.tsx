@@ -376,12 +376,12 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
             }
 
             setSessionId(result.sessionId)
-            setHeaders(result.headers || [])
-            setTotalRows(result.totalRows || 0)
+            setHeaders(Array.isArray(result.headers) ? result.headers : [])
+            setTotalRows(typeof result.totalRows === "number" ? result.totalRows : 0)
             setFileName(result.fileName || file.name)
-            setMapping(result.suggestedMapping || [])
-            setAvailableFields(result.availableFields || [])
-            setParsedCustomers(result.previewProducts || [])
+            setMapping(Array.isArray(result.suggestedMapping) ? result.suggestedMapping : [])
+            setAvailableFields(Array.isArray(result.availableFields) ? result.availableFields : [])
+            setParsedCustomers(Array.isArray(result.previewProducts) ? result.previewProducts : [])
             setUploading(false)
             setStep("mapping")
         },
@@ -403,8 +403,9 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     })
 
     const updateMapping = useCallback((headerIndex: number, newField: string | null) => {
-        setMapping((prev) =>
-            prev.map((m) =>
+        setMapping((prev) => {
+            const prevArray = Array.isArray(prev) ? prev : []
+            return prevArray.map((m) =>
                 m.headerIndex === headerIndex
                     ? {
                         ...m,
@@ -414,13 +415,14 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                         confidence: newField ? 1.0 : 0,
                     }
                     : m,
-            ),
-        )
+            )
+        })
     }, [availableFields])
 
     const mappedFieldCounts = useMemo(() => {
         const counts = new Map<string, number>()
-        for (const m of mapping) {
+        const mappingArray = Array.isArray(mapping) ? mapping : []
+        for (const m of mappingArray) {
             if (m.field) {
                 counts.set(m.field, (counts.get(m.field) || 0) + 1)
             }
@@ -447,7 +449,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
             return
         }
 
-        setParsedCustomers(result.previewProducts || [])
+        setParsedCustomers(Array.isArray(result.previewProducts) ? result.previewProducts : [])
         setPage(1)
         setSearch("")
         setSelection(new Set())
@@ -486,10 +488,10 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     }, [sessionId, partnerId, mapping, duplicateStrategy, notifyError])
 
     const filteredCustomers = useMemo(() => {
-        let items = parsedCustomers
+        const items = Array.isArray(parsedCustomers) ? parsedCustomers : []
         if (search) {
             const q = search.toLowerCase()
-            items = items.filter((c: any) => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q))
+            return items.filter((c: any) => c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q))
         }
         return items
     }, [parsedCustomers, search])
@@ -500,7 +502,7 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
     }, [filteredCustomers, page])
 
     const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE)
-    const mappedCount = mapping.filter((m) => m.field).length
+    const mappedCount = (Array.isArray(mapping) ? mapping : []).filter((m) => m.field).length
 
     if (importDone && importStats) {
         return (

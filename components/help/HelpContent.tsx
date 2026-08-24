@@ -7,8 +7,16 @@ import { Badge, InfoCard, Button } from "@/components/reusable"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { submitFeedbackAction } from "@/app/actions/feedback"
+import { getClientFeedbackContext } from "@/lib/utils/client-feedback-context"
+import { ThumbsUp, ThumbsDown, Send, Check } from "lucide-react"
+
 export default function HelpContent({ article }: { article: HelpArticle }) {
     const [copied, setCopied] = useState(false)
+    const [reactionStatus, setReactionStatus] = useState<"idle" | "helpful" | "unhelpful" | "feedback_submitted">("idle")
+    const [improvementText, setImprovementText] = useState("")
+    const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
+    const [feedbackAuthError, setFeedbackAuthError] = useState(false)
     const router = useRouter()
 
     const handleCopyLink = () => {
@@ -16,6 +24,82 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
             navigator.clipboard.writeText(window.location.href)
             setCopied(true)
             setTimeout(() => setCopied(false), 2000)
+        }
+    }
+
+    const handleHelpfulReaction = async () => {
+        setFeedbackAuthError(false)
+        setIsSubmittingFeedback(true)
+        try {
+            const clientContext = getClientFeedbackContext()
+            const res = await submitFeedbackAction({
+                type: "help_article",
+                sentiment: "positive",
+                message: `Artigo útil: "${article.title}" (/ajuda/${article.category}/${article.slug})`,
+                pageUrl: clientContext.pageUrl,
+                metadata: {
+                    browser: clientContext.browser,
+                    screen: clientContext.screen,
+                    app_area: "Central de Ajuda",
+                    article_id: article.id,
+                    article_title: article.title,
+                    article_category: article.category,
+                },
+            })
+
+            if (res.success) {
+                setReactionStatus("helpful")
+            } else if (res.error?.includes("autenticado")) {
+                setFeedbackAuthError(true)
+            }
+        } catch {
+            // Silently handle
+        } finally {
+            setIsSubmittingFeedback(false)
+        }
+    }
+
+    const handleUnhelpfulClick = () => {
+        setFeedbackAuthError(false)
+        setReactionStatus("unhelpful")
+    }
+
+    const handleImprovementSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setFeedbackAuthError(false)
+        setIsSubmittingFeedback(true)
+
+        try {
+            const clientContext = getClientFeedbackContext()
+            const text = improvementText.trim()
+            const message = text
+                ? `Artigo não ajudou ("${article.title}"): ${text}`
+                : `Artigo marcado como não útil: "${article.title}"`
+
+            const res = await submitFeedbackAction({
+                type: "help_article",
+                sentiment: "negative",
+                message,
+                pageUrl: clientContext.pageUrl,
+                metadata: {
+                    browser: clientContext.browser,
+                    screen: clientContext.screen,
+                    app_area: "Central de Ajuda",
+                    article_id: article.id,
+                    article_title: article.title,
+                    article_category: article.category,
+                },
+            })
+
+            if (res.success) {
+                setReactionStatus("feedback_submitted")
+            } else if (res.error?.includes("autenticado")) {
+                setFeedbackAuthError(true)
+            }
+        } catch {
+            // Silently handle
+        } finally {
+            setIsSubmittingFeedback(false)
         }
     }
 
@@ -241,6 +325,109 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
             <article className="prose prose-slate dark:prose-invert max-w-none">
                 {renderMarkdown(article.content)}
             </article>
+
+            {/* Helpfulness Feedback Section */}
+            <div className="mt-12 p-6 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50/60 dark:bg-dark-surface">
+                {reactionStatus === "helpful" || reactionStatus === "feedback_submitted" ? (
+                    <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center shrink-0">
+                            <Check className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Obrigado pelo seu feedback!
+                            </p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Sua opinião ajuda a manter a documentação da Dudit sempre clara e atualizada.
+                            </p>
+                        </div>
+                    </div>
+                ) : reactionStatus === "unhelpful" ? (
+                    <form onSubmit={handleImprovementSubmit} className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">🙁</span>
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    O que podemos melhorar neste artigo?
+                                </h4>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setReactionStatus("idle")}
+                                className="text-xs text-brand-inactive-text hover:text-brand-dark dark:hover:text-white"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+
+                        <textarea
+                            value={improvementText}
+                            onChange={(e) => setImprovementText(e.target.value)}
+                            placeholder="Conte o que faltou, o que não funcionou ou o que ficou confuso..."
+                            rows={3}
+                            maxLength={1000}
+                            className="w-full text-xs p-3 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-border/20 text-brand-dark dark:text-white focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        />
+
+                        {feedbackAuthError && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                Você precisa estar autenticado para enviar feedback. <Link href={`/auth/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/ajuda")}`} className="underline font-semibold">Entrar na conta</Link>
+                            </p>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                variant="filled"
+                                type="submit"
+                                disabled={isSubmittingFeedback}
+                                className="text-xs h-8 px-4"
+                            >
+                                <Send className="w-3 h-3 mr-1.5" />
+                                {isSubmittingFeedback ? "Enviando..." : "Enviar Sugestão"}
+                            </Button>
+                        </div>
+                    </form>
+                ) : (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                Este artigo foi útil?
+                            </h4>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Seu retorno nos ajuda a melhorar nossos guias e tutoriais.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                type="button"
+                                onClick={handleHelpfulReaction}
+                                disabled={isSubmittingFeedback}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-border/50 text-xs font-medium text-gray-700 dark:text-dark-body transition-colors"
+                            >
+                                <ThumbsUp className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Sim, ajudou</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleUnhelpfulClick}
+                                disabled={isSubmittingFeedback}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-100 dark:hover:bg-dark-border/50 text-xs font-medium text-gray-700 dark:text-dark-body transition-colors"
+                            >
+                                <ThumbsDown className="w-3.5 h-3.5 text-rose-500" />
+                                <span>Não ajudou</span>
+                            </button>
+                        </div>
+
+                        {feedbackAuthError && (
+                            <p className="w-full text-xs text-amber-600 dark:text-amber-400">
+                                Você precisa estar autenticado para enviar feedback. <Link href={`/auth/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/ajuda")}`} className="underline font-semibold">Entrar na conta</Link>
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Footer Navigation */}
             <div className="mt-20 pt-10 border-t border-brand-border dark:border-dark-border flex justify-between items-center gap-4">

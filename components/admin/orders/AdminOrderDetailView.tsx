@@ -25,7 +25,6 @@ import {
     ListItem,
     DefaultModal,
     Input,
-    InfoCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
@@ -338,20 +337,8 @@ export function AdminOrderDetailView({
                                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                                     <TabsContent value="general" className="mt-0">
                                         <FadeIn key="general">
-                                            {/* Banner de Troca / Devolução Vinculada */}
                                             {returns.length > 0 && (
-                                                <InfoCard
-                                                    title="Solicitação de Troca ou Devolução Registrada"
-                                                    message={`Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.`}
-                                                    color="orange"
-                                                    rightElement={
-                                                        <Link href="/ddt-admin/returns">
-                                                            <Button variant="link">Ver em Devoluções</Button>
-                                                        </Link>
-                                                    }
-                                                />
-                                            )}
-                                            <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
+                                                <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
                                                 <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
@@ -367,7 +354,8 @@ export function AdminOrderDetailView({
                                                 >
                                                     Ver em Devoluções →
                                                 </Link>
-                                            </div>
+                                                </div>
+                                            )}
 
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
@@ -446,10 +434,25 @@ export function AdminOrderDetailView({
                                                                                         </span>
                                                                                     </div>
 
-                                                                                    <div className="flex flex-col items-end shrink-0">
-                                                                                        <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                                                                            {isGift ? "Grátis" : formatCurrency(lineTotal)}
-                                                                                        </span>
+                                                                                    <div className="flex flex-col items-end shrink-0 gap-0.5">
+                                                                                        {!isGift && (
+                                                                                            <>
+                                                                                                <span className="text-[10px] text-brand-inactive-text">Valor do item</span>
+                                                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                                                    {formatCurrency(lineTotal)}
+                                                                                                </span>
+                                                                                                {item.quantity && item.quantity > 1 && (
+                                                                                                    <span className="text-[11px] font-medium text-brand-inactive-text">
+                                                                                                        {item.quantity} × {formatCurrency(unitPrice)}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </>
+                                                                                        )}
+                                                                                        {isGift && (
+                                                                                            <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                                                                                                Grátis
+                                                                                            </span>
+                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>

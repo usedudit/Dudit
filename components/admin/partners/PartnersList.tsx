@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo, useCallback } from "react"
+import { useState, useEffect, useTransition, useMemo, useCallback } from "react"
 import { Button, Badge, IconPlaceholder, Pagination, AlertModal } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import PartnerListRow from "./PartnerListRow"
@@ -270,7 +270,7 @@ export default function PartnersList({ initialData, initialStats }: PartnersList
     }, [filteredPartners, page])
 
     // Reset to page 1 on filter/tab/search change
-    useMemo(() => {
+    useEffect(() => {
         setPage(1)
     }, [statusTab, search])
 

@@ -20,6 +20,7 @@ import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getCitiesData } from "@/lib/data/cities-loader"
 import { IconPlaceholder } from "../reusable"
+import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -167,6 +168,7 @@ const Header: React.FC<HeaderProps> = ({
     const [rpcSuggestions, setRpcSuggestions] = useState<{ label: string; type: string }[]>([])
     const [isSearchInputFocused, setIsSearchInputFocused] = useState(false)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
     const [isThemeTransitioning, setIsThemeTransitioning] = useState(false)
     const { theme, setTheme } = useTheme()
     const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false)
@@ -594,7 +596,7 @@ const Header: React.FC<HeaderProps> = ({
                 <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark dark:bg-dark-surface border-b border-white/10">
                     <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
                         <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
-                            <ChevronLeftIcon size={24} strokeWidth={2.5} />
+                            <ChevronLeftIcon size={20} strokeWidth={2.5} />
                         </button>
                         <div className="flex-1 text-center min-w-0">
                             <h1 className="text-white font-bold text-[16px] truncate px-4">
@@ -618,7 +620,7 @@ const Header: React.FC<HeaderProps> = ({
                         {(!isHome || isProductDetail) ? (
                             <Button
                                 variant="filled"
-                                className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
+                                className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -628,7 +630,7 @@ const Header: React.FC<HeaderProps> = ({
                                     }
                                 }}
                             >
-                                <ChevronLeftIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} strokeWidth={2.5} />
+                                <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
                             </Button>
                         ) : user ? (
                             <button
@@ -712,7 +714,7 @@ const Header: React.FC<HeaderProps> = ({
                                         e.stopPropagation()
                                         onVendorCategorySearchOpenChange?.(!vendorCategorySearchOpen)
                                     }}
-                                    className="w-9 h-9 flex items-center justify-center text-white"
+                                    className="w-8 h-8 flex items-center justify-center text-white"
                                 >
                                     {vendorCategorySearchOpen ? <span className="text-[22px] leading-none">×</span> : <SearchIcon size={20} />}
                                 </button>
@@ -721,9 +723,9 @@ const Header: React.FC<HeaderProps> = ({
                                     <Button
                                         variant="filled"
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
+                                        className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                     >
-                                        <ShareIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} />
+                                        <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                     </Button>
                                 ) : <div className="w-1" />
                             ) : isProductDetail ? (
@@ -732,9 +734,9 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                            className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
+                                            className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                         >
-                                            <ShareIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"}`} />
+                                            <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                         </Button>
                                     )}
                                     {favoriteButton ? (
@@ -743,9 +745,9 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className={`h-8 w-8 ${!isScrolled ? "bg-transparent shadow-none" : ""}`}
+                                            className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                         >
-                                            <HeartIcon size={20} className={`${!isScrolled ? "text-white" : "text-brand-dark dark:text-dark-heading"} ${isFavorite ? "fill-current" : ""}`} />
+                                            <HeartIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"} ${isFavorite ? "fill-current" : ""}`} />
                                         </Button>
                                     ) : null}
                                 </>
@@ -913,11 +915,12 @@ const Header: React.FC<HeaderProps> = ({
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                 { label: "Minhas Coleções", href: "/colecoes" },
                                 { label: "Central do Vendedor", href: "/erp/trocar-erp" },
+                                { label: "Enviar Feedback", action: () => { setIsMobileUserMenuOpen(false); setIsFeedbackOpen(true); } },
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
                                 const wrapProps = item.href
                                     ? { href: item.href, prefetch: false }
-                                    : { onClick: item.action };
+                                    : { onClick: item.action || item.onClick };
 
                                 return (
                                     <ItemWrapper
@@ -1111,11 +1114,12 @@ const Header: React.FC<HeaderProps> = ({
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                             { label: "Minhas Coleções", href: "/colecoes" },
                                             { label: "Central do Vendedor", href: "/erp/trocar-erp" },
+                                            { label: "Enviar Feedback", action: () => { setIsUserMenuOpen(false); setIsFeedbackOpen(true); } },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
                                                 ? { href: item.href, prefetch: false }
-                                                : { onClick: item.action };
+                                                : { onClick: item.action || item.onClick };
 
                                             return (
                                                 <ItemWrapper
@@ -1199,6 +1203,10 @@ const Header: React.FC<HeaderProps> = ({
             </header>
 
             {renderVisitorModal()}
+            <GeneralFeedbackModal
+                isOpen={isFeedbackOpen}
+                onClose={() => setIsFeedbackOpen(false)}
+            />
         </>
     )
 }

@@ -50,6 +50,7 @@ export enum RateLimitCategory {
   REFUND_EXECUTE = "REFUND_EXECUTE",
   COLLECTION_CREATE = "COLLECTION_CREATE",
   COMMUNITY_VIDEO_UPLOAD = "COMMUNITY_VIDEO_UPLOAD",
+  FEEDBACK_CREATE = "FEEDBACK_CREATE",
   DEFAULT = "DEFAULT",
 }
 
@@ -296,6 +297,12 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
     maxRequests: 5,
     window: "1 h",
     identifierType: IdentifierType.USER,
+    failClosed: false,
+  },
+  [RateLimitCategory.FEEDBACK_CREATE]: {
+    maxRequests: 10,
+    window: "10 m",
+    identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: false,
   },
   [RateLimitCategory.DEFAULT]: {

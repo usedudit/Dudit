@@ -354,10 +354,10 @@ export async function getReports(
     await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    const supabase = await getSupabaseServerClient()
-    const pageSize = Math.min(Math.max(1, Math.floor(limit || DEFAULT_PAGE_SIZE)), MAX_PAGE_SIZE)
+    const adminClient = getAdminClient()
+    const pageSize = Math.min(Math.max(1, Math.floor(limit || DEFAULT_PAGE_SIZE)), 200)
 
-    let query = supabase
+    let query = adminClient
         .from("reports")
         .select(`
             id, reporter_user_id, target_type, target_id,
@@ -369,13 +369,15 @@ export async function getReports(
     const statusFilter = filters?.status
     if (statusFilter && statusFilter !== "all") {
         query = query.eq("status", statusFilter)
-    } else if (!statusFilter || statusFilter === undefined) {
-        query = query.eq("status", "pending")
     }
 
     // Target type filter.
     if (filters?.targetType && filters.targetType !== "all") {
-        query = query.eq("target_type", filters.targetType)
+        if (filters.targetType === "partner") {
+            query = query.or("target_type.eq.partner,target_type.eq.store")
+        } else {
+            query = query.eq("target_type", filters.targetType)
+        }
     }
 
     // Search across reason / description (server-side).
@@ -414,47 +416,96 @@ export async function getReports(
     // Resolve target names in batch (no N+1) per target type.
     const productIds = items.filter((r: any) => r.target_type === "product").map((r: any) => r.target_id)
     const serviceIds = items.filter((r: any) => r.target_type === "service").map((r: any) => r.target_id)
-    const partnerIds = items.filter((r: any) => r.target_type === "partner").map((r: any) => r.target_id)
+    const partnerIds = items.filter((r: any) => r.target_type === "partner" || r.target_type === "store").map((r: any) => r.target_id)
     const reviewIds = items.filter((r: any) => r.target_type === "review").map((r: any) => r.target_id)
+    const returnRequestIds = items.filter((r: any) => r.target_type === "return_request").map((r: any) => r.target_id)
 
     const targetNames = new Map<string, string>()
 
     const fetches: any[] = []
     if (productIds.length > 0) {
         fetches.push(
-            supabase.from("products").select("id, name").in("id", productIds).then(({ data }: any) => {
-                ; (data || []).forEach((p: any) => targetNames.set(`product:${p.id}`, p.name))
-            })
+            adminClient
+                .from("products")
+                .select("id, name")
+                .in("id", productIds)
+                .then(({ data }: any) => {
+                    ;(data || []).forEach((p: any) => {
+                        targetNames.set(`product:${p.id}`, p.name)
+                    })
+                })
         )
     }
     if (serviceIds.length > 0) {
         fetches.push(
-            supabase.from("services").select("id, name").in("id", serviceIds).then(({ data }: any) => {
-                ; (data || []).forEach((s: any) => targetNames.set(`service:${s.id}`, s.name))
-            })
+            adminClient
+                .from("services")
+                .select("id, name")
+                .in("id", serviceIds)
+                .then(({ data }: any) => {
+                    ;(data || []).forEach((s: any) => {
+                        targetNames.set(`service:${s.id}`, s.name)
+                    })
+                })
         )
     }
     if (partnerIds.length > 0) {
+        const idListStr = partnerIds.join(",")
         fetches.push(
-            supabase
+            adminClient
                 .from("stores")
                 .select("id, partner_id, name")
-                .in("partner_id", partnerIds)
+                .or(`partner_id.in.(${idListStr}),id.in.(${idListStr})`)
                 .then(({ data }: any) => {
-                    ; (data || []).forEach((s: any) => targetNames.set(`partner:${s.partner_id}`, s.name))
+                    ;(data || []).forEach((s: any) => {
+                        if (s.partner_id) {
+                            targetNames.set(`partner:${s.partner_id}`, s.name)
+                            targetNames.set(`store:${s.partner_id}`, s.name)
+                        }
+                        if (s.id) {
+                            targetNames.set(`partner:${s.id}`, s.name)
+                            targetNames.set(`store:${s.id}`, s.name)
+                        }
+                    })
+                })
+        )
+        fetches.push(
+            adminClient
+                .from("partners")
+                .select("id, name")
+                .in("id", partnerIds)
+                .then(({ data }: any) => {
+                    ;(data || []).forEach((p: any) => {
+                        if (!targetNames.has(`partner:${p.id}`)) {
+                            targetNames.set(`partner:${p.id}`, p.name)
+                        }
+                    })
                 })
         )
     }
     if (reviewIds.length > 0) {
         fetches.push(
-            supabase
+            adminClient
                 .from("reviews")
                 .select("id, comment, partner_id")
                 .in("id", reviewIds)
                 .then(({ data }: any) => {
-                    ; (data || []).forEach((rv: any) => {
-                        const snippet = (rv.comment || "Avaliação").slice(0, 60)
+                    ;(data || []).forEach((rv: any) => {
+                        const snippet = rv.comment ? `Avaliação: "${rv.comment.slice(0, 50)}"` : `Avaliação #${rv.id.slice(0, 8)}`
                         targetNames.set(`review:${rv.id}`, snippet)
+                    })
+                })
+        )
+    }
+    if (returnRequestIds.length > 0) {
+        fetches.push(
+            adminClient
+                .from("return_requests")
+                .select("id, order_id, reason")
+                .in("id", returnRequestIds)
+                .then(({ data }: any) => {
+                    ;(data || []).forEach((rr: any) => {
+                        targetNames.set(`return_request:${rr.id}`, `Devolução #${rr.id.slice(0, 8)}${rr.reason ? ` - ${rr.reason}` : ""}`)
                     })
                 })
         )
@@ -462,29 +513,36 @@ export async function getReports(
     await Promise.all(fetches)
 
     // Batch-fetch reporter names from user_profiles (no FK between reports ↔ user_profiles).
-    const reporterIds = [...new Set(items.map((r: any) => r.reporter_user_id as string))]
+    const reporterIds = [...new Set(items.map((r: any) => r.reporter_user_id as string).filter(Boolean))]
     const reporterNames = new Map<string, string>()
     if (reporterIds.length > 0) {
-        const { data: reporters } = await supabase
+        const { data: reporters } = await adminClient
             .from("user_profiles")
             .select("user_id, full_name")
             .in("user_id", reporterIds)
-            ; (reporters || []).forEach((p: any) => {
-                if (p.full_name) reporterNames.set(p.user_id, p.full_name)
-            })
+        ;(reporters || []).forEach((p: any) => {
+            if (p.full_name) reporterNames.set(p.user_id, p.full_name)
+        })
     }
 
     const mapped: Report[] = items.map((r: any) => {
         const reporterName = reporterNames.get(r.reporter_user_id)
-        const tname = targetNames.get(`${r.target_type}:${r.target_id}`)
+        const tname = targetNames.get(`${r.target_type}:${r.target_id}`) || targetNames.get(`partner:${r.target_id}`) || targetNames.get(`store:${r.target_id}`)
         return attachReasonInfo({
             id: r.id,
             reporter_user_id: r.reporter_user_id,
-            reporter_name: reporterName || "Desconhecido",
+            reporter_name: reporterName || "Usuário",
             reporter_email: "N/A",
             target_type: r.target_type,
             target_id: r.target_id,
-            target_name: tname || r.target_id,
+            target_name: tname || (
+                r.target_type === "product" ? `Produto #${r.target_id.slice(0, 8)}` :
+                r.target_type === "service" ? `Serviço #${r.target_id.slice(0, 8)}` :
+                r.target_type === "partner" || r.target_type === "store" ? `Loja #${r.target_id.slice(0, 8)}` :
+                r.target_type === "review" ? `Avaliação #${r.target_id.slice(0, 8)}` :
+                r.target_type === "return_request" ? `Devolução #${r.target_id.slice(0, 8)}` :
+                r.target_id
+            ),
             reason: r.reason,
             reason_code: r.reason_code,
             description: r.description,
@@ -820,21 +878,57 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
     const adminClient = getAdminClient()
 
     if (targetType === "product") {
-        const { data } = await adminClient
+        const { data: product } = await adminClient
             .from("products")
-            .select("*, store:stores(id, name, logo_url, risk_score)")
+            .select("*")
             .eq("id", targetId)
             .maybeSingle()
-        return data
+
+        if (!product) return null
+
+        let store = null
+        if (product.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score")
+                .eq("partner_id", product.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        return {
+            ...product,
+            store,
+        }
     }
 
     if (targetType === "service") {
-        const { data } = await adminClient
+        const { data: service } = await adminClient
             .from("services")
-            .select("*, store:stores(id, name, logo_url, risk_score)")
+            .select("*")
             .eq("id", targetId)
             .maybeSingle()
-        return data
+
+        if (!service) return null
+
+        let store = null
+        if (service.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score")
+                .eq("partner_id", service.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        return {
+            ...service,
+            store,
+        }
     }
 
     if (targetType === "partner" || targetType === "store") {
@@ -844,6 +938,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
             .select("*, partners(*)")
             .eq("id", targetId)
             .maybeSingle()
+
         if (storeDirect) {
             store = storeDirect
         } else {
@@ -856,16 +951,114 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
                 .maybeSingle()
             store = storeByPartner
         }
-        return store
+
+        if (!store) {
+            const { data: partnerData } = await adminClient
+                .from("partners")
+                .select("*")
+                .eq("id", targetId)
+                .maybeSingle()
+            if (partnerData) {
+                return {
+                    id: partnerData.id,
+                    name: partnerData.name || "Parceiro",
+                    partner_id: partnerData.id,
+                    partners: partnerData,
+                    store: { name: partnerData.name, id: partnerData.id }
+                }
+            }
+        }
+
+        return store ? { ...store, store: { name: store.name, id: store.id } } : null
     }
 
     if (targetType === "review") {
-        const { data } = await adminClient
+        const { data: review } = await adminClient
             .from("reviews")
-            .select("*, user_profiles(full_name), products(name), stores(name)")
+            .select("*")
             .eq("id", targetId)
             .maybeSingle()
-        return data
+
+        if (!review) return null
+
+        let reviewerProfile = null
+        if (review.user_id) {
+            const { data: p } = await adminClient
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", review.user_id)
+                .maybeSingle()
+            reviewerProfile = p
+        }
+
+        let store = null
+        if (review.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score")
+                .eq("partner_id", review.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        let product = null
+        if (review.product_id) {
+            const { data: prodData } = await adminClient
+                .from("products")
+                .select("id, name")
+                .eq("id", review.product_id)
+                .maybeSingle()
+            product = prodData
+        }
+
+        let service = null
+        if (review.service_id) {
+            const { data: servData } = await adminClient
+                .from("services")
+                .select("id, name")
+                .eq("id", review.service_id)
+                .maybeSingle()
+            service = servData
+        }
+
+        return {
+            ...review,
+            name: review.comment ? `Avaliação: "${review.comment.slice(0, 50)}"` : `Avaliação #${review.id.slice(0, 8)}`,
+            user_profiles: reviewerProfile,
+            store,
+            product,
+            service,
+        }
+    }
+
+    if (targetType === "return_request") {
+        const { data: returnReq } = await adminClient
+            .from("return_requests")
+            .select("*")
+            .eq("id", targetId)
+            .maybeSingle()
+
+        if (!returnReq) return null
+
+        let store = null
+        if (returnReq.partner_id) {
+            const { data: storeData } = await adminClient
+                .from("stores")
+                .select("id, name, logo_url, risk_score")
+                .eq("partner_id", returnReq.partner_id)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            store = storeData
+        }
+
+        return {
+            ...returnReq,
+            name: `Devolução #${returnReq.id.slice(0, 8)}${returnReq.reason ? ` - ${returnReq.reason}` : ""}`,
+            store,
+        }
     }
 
     if (targetType === "user") {
@@ -874,7 +1067,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
             .select("*")
             .eq("user_id", targetId)
             .maybeSingle()
-        return data
+        return data ? { ...data, name: data.full_name || "Usuário" } : null
     }
 
     return null
@@ -884,10 +1077,9 @@ export async function getAdminReportDetailAction(reportId: string) {
     await requireAdmin("moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
-    const supabase = await getSupabaseServerClient()
     const admin = getAdminClient()
 
-    const { data: report, error } = await supabase
+    const { data: report, error } = await admin
         .from("reports")
         .select("*")
         .eq("id", reportId)

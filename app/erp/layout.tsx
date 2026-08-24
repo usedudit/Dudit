@@ -38,6 +38,7 @@ import type { RoleId } from "@/lib/permissions/rbac-types"
 
 import { listStoresAction } from "@/app/actions/erp/stores"
 import { createAdminClient } from "@/lib/supabase/server"
+import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedbackModal"
 
 export default async function ERPLayout({
   children,
@@ -170,6 +171,11 @@ export default async function ERPLayout({
                     </div>
                   </div>
                   <LimitStatusWidget />
+                  <ERPOnboardingFeedbackModal
+                    partnerId={context.partnerId}
+                    partnerPlan={partnerPlan.slug}
+                    userRole={role}
+                  />
                 </SidebarProvider>
               </StoreProvider>
             </PlanUpgradeProvider>

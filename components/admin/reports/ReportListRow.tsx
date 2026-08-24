@@ -45,8 +45,23 @@ const ReportListRow = React.memo(({
     const targetTypeLabels: Record<string, string> = {
         product: "Produto",
         service: "Serviço",
-        partner: "Parceiro",
+        partner: "Loja",
+        store: "Loja",
         review: "Avaliação",
+        return_request: "Devolução",
+        order: "Pedido",
+        user: "Usuário",
+    }
+
+    const targetTypeBadgeVariant: Record<string, "blue" | "orange" | "green" | "purple" | "cyan" | "gray" | "red"> = {
+        product: "blue",
+        service: "green",
+        partner: "orange",
+        store: "orange",
+        review: "purple",
+        return_request: "orange",
+        order: "blue",
+        user: "gray",
     }
 
     return (
@@ -60,9 +75,19 @@ const ReportListRow = React.memo(({
             <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
                 <div className="flex flex-col text-left min-w-0">
                     <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                        {report.target_type === "review"
-                            ? `Avaliação #${report.target_id.slice(0, 8)}`
-                            : report.target_name || report.target_id}
+                        {report.target_name || (
+                            report.target_type === "review"
+                                ? `Avaliação #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "product"
+                                ? `Produto #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "service"
+                                ? `Serviço #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "partner" || (report.target_type as string) === "store"
+                                ? `Loja #${report.target_id.slice(0, 8)}`
+                                : report.target_type === "return_request"
+                                ? `Devolução #${report.target_id.slice(0, 8)}`
+                                : report.target_id
+                        )}
                     </span>
                     <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
                         {report.target_id}
@@ -104,7 +129,7 @@ const ReportListRow = React.memo(({
             {/* Tipo */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex justify-center">
-                    <Badge variant={report.target_type === "product" ? "blue" : report.target_type === "partner" ? "orange" : "green"}>
+                    <Badge variant={targetTypeBadgeVariant[report.target_type] || "gray"}>
                         {targetTypeLabels[report.target_type] || report.target_type}
                     </Badge>
                 </div>

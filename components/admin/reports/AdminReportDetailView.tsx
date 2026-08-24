@@ -1,29 +1,29 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useTransition } from "react"
+import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
 import {
     ChevronLeftIcon,
-    AlertTriangleIcon,
-    CheckCircleIcon,
-    CancelCircleIcon,
-    ShieldIcon,
+    ShareIcon,
     PackageIcon,
     StoreIcon,
     ClockIcon,
     UserIcon,
-    MailIcon,
-    ArrowRightIcon,
 } from "@/lib/icons"
 import {
     Button,
     Badge,
-    FormSection,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
     ThreeDotsLoader,
+    FormSection,
+    IconPlaceholder,
+    ListItem,
     DefaultModal,
-    Input,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { formatDate, formatDateTime } from "@/lib/utils"
+import { formatDateTime } from "@/lib/utils"
 import {
     getAdminReportDetailAction,
     resolveReport,
@@ -51,6 +51,9 @@ export function AdminReportDetailView({
 }: AdminReportDetailViewProps) {
     const [detail, setDetail] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState("general")
+    const [isScrolled, setIsScrolled] = useState(false)
+    const scrollRef = useRef<HTMLDivElement>(null)
     const [isPending, startTransition] = useTransition()
 
     // Modals
@@ -86,6 +89,15 @@ export function AdminReportDetailView({
     useEffect(() => {
         loadDetail()
     }, [loadDetail])
+
+    const handleScroll = useCallback(() => {
+        setIsScrolled((scrollRef.current?.scrollTop || 0) > 20)
+    }, [])
+
+    const handleShare = useCallback(() => {
+        navigator.clipboard.writeText(window.location.href)
+        toast.success("Link da denúncia copiado!")
+    }, [])
 
     const report: Report | null = detail?.report || initialReport || null
 
@@ -189,9 +201,19 @@ export function AdminReportDetailView({
 
     if (!report) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                <p className="text-sm text-brand-inactive-text">Denúncia não encontrada.</p>
-                <Button variant="outline" size="sm" onClick={onBack}>Voltar</Button>
+            <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+                <IconPlaceholder
+                    icon={ClockIcon}
+                    containerSize="w-16 h-16 mb-2"
+                    iconSize="w-6 h-6"
+                    title="Denúncia não encontrada"
+                    subtitle="A denúncia pode ter sido removida ou o link está incorreto."
+                    itemButton={{
+                        text: "Voltar para lista",
+                        action: onBack,
+                        variant: "outline",
+                    }}
+                />
             </div>
         )
     }
@@ -200,8 +222,10 @@ export function AdminReportDetailView({
         product: "Produto",
         service: "Serviço",
         partner: "Loja / Parceiro",
-        store: "Loja",
+        store: "Loja / Parceiro",
         review: "Avaliação",
+        return_request: "Devolução",
+        order: "Pedido",
         user: "Usuário",
     }
 
@@ -218,231 +242,412 @@ export function AdminReportDetailView({
     const targetSummary = detail?.targetSummary
     const auditEvents = detail?.auditEvents || []
 
-    return (
-        <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background">
-            {/* Header Desktop */}
-            <div className="hidden md:flex items-center justify-between px-8 py-5 border-b border-brand-border dark:border-dark-border">
-                <div className="flex items-center gap-4">
+    const DesktopActions = () => (
+        <>
+            {report.status === "pending" && (
+                <>
                     <Button
-                        variant="filled"
-                        onClick={onBack}
-                        className="w-10 h-10 p-0 flex items-center justify-center rounded-xl"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDismissModalOpen(true)}
+                        disabled={isPending}
                     >
-                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                        Descartar
                     </Button>
-                    <div className="flex flex-col">
-                        <div className="flex items-center gap-2.5">
-                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading font-mono">
-                                Denúncia #{report.id.slice(0, 8)}
-                            </h1>
-                            <Badge variant={statusInfo.variant} className="px-2.5 py-0.5 text-xs">
-                                {statusInfo.label}
-                            </Badge>
-                        </div>
-                        <span className="text-xs text-brand-inactive-text mt-0.5">
-                            Registrada em {formatDateTime(report.created_at)}
-                        </span>
-                    </div>
-                </div>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                        onClick={() => setSpamModalOpen(true)}
+                        disabled={isPending}
+                    >
+                        Marcar Spam
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setResolveModalOpen(true)}
+                        disabled={isPending}
+                    >
+                        Validar Denúncia
+                    </Button>
+                </>
+            )}
+            {report.status === "validated" && (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-orange-600 border-orange-200 hover:bg-orange-50 dark:hover:bg-orange-950/20"
+                    onClick={() => setRevertModalOpen(true)}
+                    disabled={isPending}
+                >
+                    Reverter Validação (-5 pts)
+                </Button>
+            )}
+        </>
+    )
 
-                <div className="flex items-center gap-2.5">
-                    {report.status === "pending" && (
-                        <>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDismissModalOpen(true)}
-                                disabled={isPending}
-                            >
-                                Descartar
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                                onClick={() => setSpamModalOpen(true)}
-                                disabled={isPending}
-                            >
-                                Marcar Spam
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setResolveModalOpen(true)}
-                                disabled={isPending}
-                            >
-                                Validar Denúncia
-                            </Button>
-                        </>
-                    )}
-                    {report.status === "validated" && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-orange-600 border-orange-200 hover:bg-orange-50 dark:hover:bg-orange-950/20"
-                            onClick={() => setRevertModalOpen(true)}
-                            disabled={isPending}
-                        >
-                            Reverter Validação (-5 pts)
-                        </Button>
-                    )}
-                </div>
-            </div>
+    return (
+        <>
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-            {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-[1200px] mx-auto w-full">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Coluna 1: Alvo Denunciado & Denunciante */}
-                    <div className="space-y-6">
-                        <FormSection
-                            title="Item Denunciado"
-                            description={`Tipo: ${targetTypeLabels[report.target_type] || report.target_type}`}
-                        >
-                            <div className="p-4 bg-brand-gray/40 dark:bg-dark-border/10 rounded-xl space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="flex flex-col min-w-0">
-                                        <span className="text-xs text-brand-inactive-text uppercase tracking-wider font-semibold">
-                                            {targetTypeLabels[report.target_type] || report.target_type}
-                                        </span>
-                                        <span className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                            {report.target_type === "review"
-                                                ? `Avaliação #${report.target_id.slice(0, 8)}`
-                                                : target?.name || report.target_name || report.target_id}
-                                        </span>
-                                        <span className="text-xs text-brand-inactive-text opacity-70 font-mono">
-                                            ID: {report.target_id}
-                                        </span>
-                                    </div>
-                                    {target?.risk_score !== undefined && (
-                                        <Badge variant={target.risk_score >= 50 ? "red" : target.risk_score >= 25 ? "orange" : "gray"}>
-                                            Score: {target.risk_score} pts
-                                        </Badge>
-                                    )}
-                                </div>
+                            {/* Sticky Header */}
+                            <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
+                                <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
-                                {target?.store?.name && (
-                                    <div className="pt-2 border-t border-brand-border dark:border-dark-border text-xs text-brand-inactive-text flex justify-between items-center">
-                                        <span>Loja vinculada: <strong>{target.store.name}</strong></span>
-                                        {target.store.id && (
-                                            <Link
-                                                href={`/ddt-admin/partners?view=${target.store.id}`}
-                                                className="text-brand-dark dark:text-dark-heading font-semibold hover:underline flex items-center gap-1"
-                                            >
-                                                Ver Loja <ArrowRightIcon size={12} />
-                                            </Link>
-                                        )}
+                                    {/* Back button - desktop only */}
+                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                        <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
+                                            <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                        </Button>
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Sumário de denúncias deste alvo */}
-                            {targetSummary && (
-                                <div className="grid grid-cols-3 gap-3 pt-2">
-                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-center">
-                                        <span className="text-[11px] text-brand-inactive-text">Total Denúncias</span>
-                                        <p className="text-base font-bold text-brand-dark dark:text-dark-heading">{targetSummary.total}</p>
-                                    </div>
-                                    <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl text-center">
-                                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400">Validadas</span>
-                                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{targetSummary.validated}</p>
-                                    </div>
-                                    <div className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-center">
-                                        <span className="text-[11px] text-brand-inactive-text">Descartadas</span>
-                                        <p className="text-base font-bold text-brand-inactive-text">{targetSummary.dismissed}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </FormSection>
+                                    {/* Title row - desktop */}
+                                    <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
+                                        <div className="flex flex-col gap-1 overflow-hidden min-w-0">
+                                            <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                                <span className="hidden md:inline truncate">Denúncia #{report.id.slice(0, 8)}</span>
+                                                <Badge variant={statusInfo.variant}>
+                                                    {statusInfo.label}
+                                                </Badge>
+                                            </h1>
 
-                        <FormSection
-                            title="Denunciante"
-                            description="Identificação do usuário autor da denúncia"
-                        >
-                            <div className="p-4 bg-brand-gray/40 dark:bg-dark-border/10 rounded-xl space-y-2">
-                                <div className="flex flex-col min-w-0">
-                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-                                        {reporter?.profile?.full_name || report.reporter_name || "Usuário Anônimo"}
-                                    </span>
-                                    <span className="text-xs text-brand-inactive-text font-mono">
-                                        ID: {report.reporter_user_id}
-                                    </span>
-                                </div>
-                                {reporter?.email && (
-                                    <div className="text-xs text-brand-inactive-text pt-1">
-                                        Email: <span className="font-medium text-brand-dark dark:text-dark-heading">{reporter.email}</span>
-                                    </div>
-                                )}
-                                {reporter?.profile?.phone && (
-                                    <div className="text-xs text-brand-inactive-text">
-                                        Telefone: <span className="font-medium text-brand-dark dark:text-dark-heading">{reporter.profile.phone}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </FormSection>
-                    </div>
-
-                    {/* Coluna 2: Detalhes do Motivo & Resolução */}
-                    <div className="space-y-6">
-                        <FormSection
-                            title="Motivo da Denúncia"
-                            description={`Gravidade: ${report.severity?.toUpperCase() || "NORMAL"}`}
-                        >
-                            <div className="space-y-4">
-                                <div>
-                                    <span className="text-xs text-brand-inactive-text">Motivo / Categoria</span>
-                                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mt-0.5">
-                                        {report.reason_label || report.reason}
-                                    </p>
-                                </div>
-
-                                {report.description && (
-                                    <div>
-                                        <span className="text-xs text-brand-inactive-text">Descrição Informada pelo Usuário</span>
-                                        <div className="mt-1 p-3.5 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed">
-                                            {report.description}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {report.resolution_reason && (
-                                    <div className="p-3.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                                        <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Justificativa da Moderação</span>
-                                        <p className="text-sm text-brand-dark dark:text-dark-body mt-0.5 leading-relaxed">
-                                            {report.resolution_reason}
-                                        </p>
-                                        {report.resolved_at && (
-                                             <span className="text-[11px] text-brand-inactive-text block mt-1">
-                                                Resolvido em {formatDateTime(report.resolved_at)}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </FormSection>
-
-                        {/* Histórico / Timeline */}
-                        {auditEvents.length > 0 && (
-                            <FormSection
-                                title="Histórico de Auditoria"
-                                description="Eventos registrados para este alvo"
-                            >
-                                <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                                    {auditEvents.map((evt: any) => (
-                                        <div key={evt.id} className="p-3 bg-brand-gray/30 dark:bg-dark-border/10 rounded-xl text-xs space-y-1">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">{evt.action_type}</span>
-                                                <span className="text-[10px] text-brand-inactive-text">{formatDateTime(evt.created_at)}</span>
+                                            <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                                                Registrada em {formatDateTime(report.created_at)} • Alvo: {targetTypeLabels[report.target_type] || report.target_type} • UUID: {report.id}
                                             </div>
-                                            {evt.metadata?.reason && (
-                                                <p className="text-brand-inactive-text">{String(evt.metadata.reason)}</p>
-                                            )}
                                         </div>
-                                    ))}
+
+                                        {/* Desktop action buttons */}
+                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                            <DesktopActions />
+                                        </div>
+                                    </div>
+
+                                    {/* Title row - mobile */}
+                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
+                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </Button>
+                                            <div className="flex flex-col gap-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                        Denúncia #{report.id.slice(0, 8)}
+                                                    </h1>
+                                                    <Badge variant={statusInfo.variant}>
+                                                        {statusInfo.label}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-brand-inactive-text truncate">
+                                                    {formatDateTime(report.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleShare}
+                                            className="shrink-0"
+                                        >
+                                            Compartilhar
+                                        </Button>
+                                    </div>
+
+                                    {/* Tabs */}
+                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">Denúncia</TabsTrigger>
+                                            <TabsTrigger value="parties">Envolvidos</TabsTrigger>
+                                            <TabsTrigger value="timeline">Auditoria ({auditEvents.length})</TabsTrigger>
+                                        </TabsList>
+                                    </div>
                                 </div>
-                            </FormSection>
-                        )}
-                    </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
+                                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                                    {/* Aba 1: Denúncia */}
+                                    <TabsContent value="general" className="mt-0">
+                                        <FadeIn key="general">
+                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                {/* Coluna principal */}
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                    <FormSection title="Motivo da Denúncia" hasSeparator description={`Gravidade: ${report.severity?.toUpperCase() || "NORMAL"}`}>
+                                                        <div className="space-y-4">
+                                                            <div>
+                                                                <span className="text-xs text-brand-inactive-text">Motivo / Categoria</span>
+                                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mt-0.5">
+                                                                    {report.reason_label || report.reason}
+                                                                </p>
+                                                            </div>
+
+                                                            {report.description && (
+                                                                <div>
+                                                                    <span className="text-xs text-brand-inactive-text">Descrição Informada pelo Usuário</span>
+                                                                    <div className="mt-1 p-3.5 bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed">
+                                                                        {report.description}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {report.resolution_reason && (
+                                                                <div className="p-3.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+                                                                    <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Justificativa da Moderação</span>
+                                                                    <p className="text-sm text-brand-dark dark:text-dark-body mt-0.5 leading-relaxed">
+                                                                        {report.resolution_reason}
+                                                                    </p>
+                                                                    {report.resolved_at && (
+                                                                        <span className="text-[11px] text-brand-inactive-text block mt-1">
+                                                                            Resolvido em {formatDateTime(report.resolved_at)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </FormSection>
+                                                </div>
+
+                                                {/* Sidebar */}
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                    {/* Card do Item Denunciado */}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Item Denunciado
+                                                        </h3>
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="text-xs text-brand-inactive-text uppercase tracking-wider font-semibold">
+                                                                        {targetTypeLabels[report.target_type] || report.target_type}
+                                                                    </span>
+                                                                    <span className="font-bold text-base text-brand-dark dark:text-dark-heading break-all">
+                                                                        {target?.name || report.target_name || `${targetTypeLabels[report.target_type] || report.target_type} #${report.target_id.slice(0, 8)}`}
+                                                                    </span>
+                                                                    <span className="text-xs text-brand-inactive-text opacity-70 font-mono break-all mt-0.5">
+                                                                        ID: {report.target_id}
+                                                                    </span>
+                                                                </div>
+                                                                {target?.risk_score !== undefined && (
+                                                                    <Badge variant={target.risk_score >= 50 ? "red" : target.risk_score >= 25 ? "orange" : "gray"}>
+                                                                        Score: {target.risk_score} pts
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+
+                                                            {(target?.store?.id || report.target_type === "partner") && (
+                                                                <div className="pt-3 border-t border-brand-border dark:border-dark-border">
+                                                                    <Link
+                                                                        href={`/ddt-admin/partners?view=${target?.store?.id || report.target_id}`}
+                                                                        className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
+                                                                    >
+                                                                        Ver ficha da loja →
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Card de Histórico do Alvo */}
+                                                    {targetSummary && (
+                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                                Histórico de Denúncias do Alvo
+                                                            </h3>
+                                                            <div className="space-y-2.5 text-sm">
+                                                                <div className="flex justify-between text-brand-inactive-text">
+                                                                    <span>Total de denúncias</span>
+                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">{targetSummary.total}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-brand-inactive-text">
+                                                                    <span>Validadas</span>
+                                                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{targetSummary.validated}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-brand-inactive-text">
+                                                                    <span>Descartadas</span>
+                                                                    <span className="font-semibold text-brand-inactive-text">{targetSummary.dismissed}</span>
+                                                                </div>
+                                                                {typeof targetSummary.spam === "number" && targetSummary.spam > 0 && (
+                                                                    <div className="flex justify-between text-brand-inactive-text pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                        <span>Spam</span>
+                                                                        <span className="font-semibold text-purple-600 dark:text-purple-400">{targetSummary.spam}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Card de Identificadores */}
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Identificadores
+                                                        </h3>
+                                                        <div className="space-y-2 text-xs">
+                                                            <div>
+                                                                <span className="text-brand-inactive-text block">UUID da Denúncia</span>
+                                                                <span className="font-mono text-brand-dark dark:text-dark-heading select-all break-all">{report.id}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-brand-inactive-text block">ID do Alvo</span>
+                                                                <span className="font-mono text-brand-dark dark:text-dark-heading select-all break-all">{report.target_id}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    {/* Aba 2: Envolvidos */}
+                                    <TabsContent value="parties" className="mt-0">
+                                        <FadeIn key="parties">
+                                            <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
+                                                {/* Coluna principal */}
+                                                <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
+                                                    <FormSection title="Denunciante" hasSeparator description="Identificação do usuário autor da denúncia">
+                                                        <ListItem
+                                                            left={
+                                                                <UserProfileAvatar reporter={reporter} name={report.reporter_name} />
+                                                            }
+                                                            title={reporter?.profile?.full_name || report.reporter_name || "Usuário Anônimo"}
+                                                            description={reporter?.email || "Sem e-mail revelado"}
+                                                            right={
+                                                                report.reporter_user_id ? (
+                                                                    <Link
+                                                                        href={`/ddt-admin/users?view=${report.reporter_user_id}`}
+                                                                        className="text-xs font-bold text-brand-green hover:underline shrink-0"
+                                                                    >
+                                                                        Ver Usuário →
+                                                                    </Link>
+                                                                ) : undefined
+                                                            }
+                                                        />
+
+                                                        <div className="space-y-2 text-sm">
+                                                            <div className="flex justify-between">
+                                                                <span className="text-brand-inactive-text text-xs">ID do Denunciante</span>
+                                                                <span className="font-mono text-xs text-brand-dark dark:text-dark-heading">{report.reporter_user_id}</span>
+                                                            </div>
+                                                            {reporter?.profile?.phone && (
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-brand-inactive-text text-xs">Telefone</span>
+                                                                    <span className="font-bold text-xs text-brand-dark dark:text-dark-heading">{reporter.profile.phone}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </FormSection>
+                                                </div>
+
+                                                {/* Sidebar */}
+                                                <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
+                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                            Loja Vinculada ao Alvo
+                                                        </h3>
+                                                        {target?.store?.name ? (
+                                                            <div className="space-y-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
+                                                                        <StoreIcon className="w-6 h-6 text-brand-inactive-text" />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                            {target.store.name}
+                                                                        </h3>
+                                                                        {typeof target.risk_score === "number" && (
+                                                                            <span className="text-xs text-brand-inactive-text">
+                                                                                Pontuação de Risco: <strong>{target.risk_score} pts</strong>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {target.store.id && (
+                                                                    <Link
+                                                                        href={`/ddt-admin/partners?view=${target.store.id}`}
+                                                                        className="inline-block text-xs font-bold text-brand-green hover:underline"
+                                                                    >
+                                                                        Ver ficha completa da loja →
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-brand-inactive-text">
+                                                                Este tipo de alvo não possui uma loja vinculada ou os dados não estão disponíveis.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    {/* Aba 3: Auditoria */}
+                                    <TabsContent value="timeline" className="mt-0">
+                                        <FadeIn key="timeline">
+                                            <FormSection title="Histórico de Auditoria" hasSeparator description="Eventos registrados para este alvo">
+                                                {auditEvents.length === 0 ? (
+                                                    <div className="py-6">
+                                                        <IconPlaceholder
+                                                            icon={PackageIcon}
+                                                            containerSize="w-14 h-14 mb-2"
+                                                            iconSize="w-6 h-6"
+                                                            title="Nenhum evento registrado"
+                                                            subtitle="Este alvo ainda não possui eventos de auditoria."
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        {auditEvents.map((evt: any) => (
+                                                            <div key={evt.id} className="flex items-start gap-3 border-l-2 border-brand-border dark:border-dark-border pl-4 py-1">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {evt.action_type || "Ação Administrativa"}
+                                                                    </p>
+                                                                    <p className="text-xs text-brand-inactive-text">{formatDateTime(evt.created_at)}</p>
+                                                                    {evt.metadata?.reason && (
+                                                                        <p className="text-xs text-brand-inactive-text mt-1 line-clamp-2">
+                                                                            {String(evt.metadata.reason)}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </FormSection>
+                                        </FadeIn>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </div>
+                    </Tabs>
                 </div>
+            </FadeIn>
+
+            {/* Mobile bottom bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
+                {report.status === "pending" ? (
+                    <>
+                        <Button variant="outline" className="flex-1" onClick={() => setDismissModalOpen(true)} disabled={isPending}>
+                            Descartar
+                        </Button>
+                        <Button variant="destructive" className="flex-1" onClick={() => setResolveModalOpen(true)} disabled={isPending}>
+                            Validar
+                        </Button>
+                    </>
+                ) : report.status === "validated" ? (
+                    <Button variant="outline" className="flex-1" onClick={() => setRevertModalOpen(true)} disabled={isPending}>
+                        Reverter Validação (-5 pts)
+                    </Button>
+                ) : (
+                    <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
+                        Compartilhar
+                    </Button>
+                )}
             </div>
 
             {/* Modal: Validar Denúncia */}
@@ -548,6 +753,24 @@ export function AdminReportDetailView({
                     />
                 </div>
             </DefaultModal>
-        </FadeIn>
+        </>
     )
 }
+
+const UserProfileAvatar = ({ reporter, name }: { reporter: any; name?: string }) => {
+    const initials = (reporter?.profile?.full_name || name || "U")
+        .split(" ")
+        .map((n: string) => n.charAt(0))
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+
+    return (
+        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+            <UserIcon className="w-5 h-5 text-brand-inactive-text" />
+            <span className="sr-only">{initials}</span>
+        </div>
+    )
+}
+
+export default AdminReportDetailView

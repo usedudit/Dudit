@@ -1449,7 +1449,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? `${window.location.origin}${getStoreUrl(partner)}` : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
-            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.partner_id || partner.partnerId || partner.id} targetName={partner.storeName} />
+            <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.partner_id || partner.partnerId || partner.id} targetName={partner.storeName || partner.store_name || partner.name || "Vendedor"} />
 
 
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">

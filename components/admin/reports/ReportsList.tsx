@@ -9,6 +9,7 @@ import {
     Pagination,
     IconPlaceholder,
     DefaultModal,
+    Badge,
 } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -25,7 +26,7 @@ import ReportListRow from "./ReportListRow"
 import ReportsPageControls, { type ReportFilterState, INITIAL_REPORT_FILTERS } from "./ReportsPageControls"
 import { AdminReportDetailView } from "./AdminReportDetailView"
 import { useEntityState } from "@/hooks/use-entity-state"
-import { ShieldIcon, ArrowUpDownIcon } from "@/lib/icons"
+import { ShieldIcon } from "@/lib/icons"
 
 interface ReportsListProps {
     initialData: Report[]
@@ -47,7 +48,8 @@ export default function ReportsList({
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
 
     // Filters
-    const [statusTab, setStatusTab] = useState<string>("pending")
+    const [statusTab, setStatusTab] = useState<string>("all")
+    const [viewMode, setViewMode] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const [filters, setFilters] = useState<ReportFilterState>(INITIAL_REPORT_FILTERS)
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
     const [search, setSearch] = useState("")
@@ -183,15 +185,18 @@ export default function ReportsList({
 
             // Target Type filter
             if (filters.targetType.length > 0) {
-                const typeMap: Record<string, string> = {
-                    "Produto": "product",
-                    "Serviço": "service",
-                    "Parceiro": "partner",
-                    "Avaliação": "review",
+                const typeMap: Record<string, string[]> = {
+                    "Produto": ["product"],
+                    "Serviço": ["service"],
+                    "Loja / Parceiro": ["partner", "store"],
+                    "Parceiro": ["partner", "store"],
+                    "Loja": ["partner", "store"],
+                    "Avaliação": ["review"],
+                    "Devolução": ["return_request"],
                 }
                 const match = filters.targetType.some((t) => {
-                    const mapped = typeMap[t] || t.toLowerCase()
-                    return r.target_type === mapped
+                    const mappedList = typeMap[t] || [t.toLowerCase()]
+                    return mappedList.includes(r.target_type)
                 })
                 if (!match) return false
             }
@@ -279,7 +284,7 @@ export default function ReportsList({
             id: "targetType",
             title: "Tipo de Alvo",
             type: "checkbox-list",
-            options: ["Produto", "Serviço", "Parceiro", "Avaliação"],
+            options: ["Produto", "Serviço", "Loja / Parceiro", "Avaliação", "Devolução"],
         },
     ]
 
@@ -320,6 +325,8 @@ export default function ReportsList({
                     filters={filters}
                     setFilters={setFilters}
                     hasActiveFilters={hasActiveFilters}
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
                     stats={stats}
                 />
 
@@ -327,18 +334,18 @@ export default function ReportsList({
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-6 px-4 md:px-8">
                     <AnimatePresence mode="wait">
                         {filteredReports.length === 0 ? (
-                            <FadeIn key="empty" className="w-full">
+                            <FadeIn key="empty" className="w-full h-full flex items-center justify-center min-h-[400px]">
                                 <IconPlaceholder
                                     icon={ShieldIcon}
                                     title="Nenhuma denúncia encontrada"
                                     subtitle={hasActiveFilters ? "Tente ajustar seus filtros de busca." : "Nenhuma denúncia nesta categoria no momento."}
                                     itemButton={hasActiveFilters ? {
                                         text: "Limpar Filtros",
-                                        action: () => {
-                                            setSearch("")
-                                            setFilters(INITIAL_REPORT_FILTERS)
-                                            setStatusTab("pending")
-                                        },
+                                    action: () => {
+                                        setSearch("")
+                                        setFilters(INITIAL_REPORT_FILTERS)
+                                        setStatusTab("all")
+                                    },
                                         variant: "outline",
                                     } : undefined}
                                 />
@@ -361,88 +368,130 @@ export default function ReportsList({
                                     ))}
                                 </div>
 
-                                {/* Desktop View (Table) */}
-                                <div className="hidden md:block w-full overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border relative bg-white dark:bg-dark-surface shadow-xs">
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left border-collapse min-w-[900px]">
-                                            <thead>
-                                                <tr className="bg-brand-gray/80 dark:bg-dark-border/40 border-b border-brand-border dark:border-dark-border select-none">
-                                                    <th
-                                                        onClick={() => handleSort("target")}
-                                                        className="py-3 px-3 pl-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Alvo</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "target" ? "text-brand-green" : "opacity-40"} />
+                                {/* Desktop View */}
+                                {viewMode === "grid" ? (
+                                    <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {paginatedItems.map((report) => {
+                                            const statusMap: Record<string, { variant: "orange" | "red" | "gray" | "purple"; label: string }> = {
+                                                pending: { variant: "orange", label: "Pendente" },
+                                                validated: { variant: "red", label: "Validada" },
+                                                dismissed: { variant: "gray", label: "Descartada" },
+                                                spam: { variant: "purple", label: "Spam" },
+                                            }
+                                            const statusInfo = statusMap[report.status] || { variant: "gray" as const, label: report.status }
+                                            const targetTypeLabels: Record<string, string> = {
+                                                product: "Produto",
+                                                service: "Serviço",
+                                                partner: "Loja",
+                                                store: "Loja",
+                                                review: "Avaliação",
+                                                return_request: "Devolução",
+                                                order: "Pedido",
+                                                user: "Usuário",
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={report.id}
+                                                    onClick={() => openEntity("view", report.id)}
+                                                    className="bg-white dark:bg-dark-surface p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all cursor-pointer flex flex-col justify-between gap-4"
+                                                >
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
+                                                                {report.target_name || `${targetTypeLabels[report.target_type] || report.target_type} #${report.target_id.slice(0, 8)}`}
+                                                            </h3>
+                                                            <p className="text-xs text-brand-inactive-text mt-0.5 truncate">
+                                                                {report.reason_label || report.reason}
+                                                            </p>
                                                         </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("type")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
+                                                        <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                                                    </div>
+
+                                                    <div className="text-xs space-y-1.5 text-brand-inactive-text border-t border-b border-brand-border/50 dark:border-dark-border/50 py-3">
+                                                        <div className="flex justify-between items-center">
                                                             <span>Tipo</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "type" ? "text-brand-green" : "opacity-40"} />
+                                                            <span>{targetTypeLabels[report.target_type] || report.target_type}</span>
                                                         </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("reason")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span>Motivo</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "reason" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("reporter")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                    >
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex justify-between">
                                                             <span>Denunciante</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "reporter" ? "text-brand-green" : "opacity-40"} />
+                                                            <span className="truncate max-w-[120px]">{report.reporter_name || "Usuário"}</span>
                                                         </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("date")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <span>Data</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "date" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th
-                                                        onClick={() => handleSort("status")}
-                                                        className="py-3 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors text-center"
-                                                    >
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            <span>Status</span>
-                                                            <ArrowUpDownIcon size={13} className={sortConfig?.key === "status" ? "text-brand-green" : "opacity-40"} />
-                                                        </div>
-                                                    </th>
-                                                    <th className="py-3 px-3 pr-6 text-xs font-semibold text-brand-inactive-text dark:text-dark-body text-center">
-                                                        Ações
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {paginatedItems.map((report) => (
-                                                    <ReportListRow
-                                                        key={report.id}
-                                                        report={report}
-                                                        isPending={isPending}
-                                                        onDetail={() => openEntity("view", report.id)}
-                                                        onResolve={() => setResolveTarget(report)}
-                                                        onDismiss={() => setDismissTarget(report)}
-                                                        onSpam={() => setSpamTarget(report)}
-                                                        onRevert={() => setRevertTarget(report)}
-                                                    />
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                    </div>
+
+                                                    <div className="flex justify-between items-center text-xs text-brand-inactive-text">
+                                                        <span>{new Date(report.created_at).toLocaleDateString("pt-BR")}</span>
+                                                        <span>{new Date(report.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="hidden md:block w-full overflow-hidden rounded-xl relative">
+                                        <div className="overflow-x-auto pb-4 custom-scrollbar">
+                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[1000px]">
+                                                <thead>
+                                                    <tr className="bg-brand-gray dark:bg-dark-border/50 select-none">
+                                                        <th
+                                                            onClick={() => handleSort("target")}
+                                                            className="py-3 px-2 pl-6 rounded-l-lg text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Alvo {sortConfig?.key === "target" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("reason")}
+                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Motivo {sortConfig?.key === "reason" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("reporter")}
+                                                            className="py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Denunciante {sortConfig?.key === "reporter" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("date")}
+                                                            className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Data {sortConfig?.key === "date" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("type")}
+                                                            className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Tipo {sortConfig?.key === "type" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th
+                                                            onClick={() => handleSort("status")}
+                                                            className="py-3 px-2 w-32 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center cursor-pointer hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            Status {sortConfig?.key === "status" ? (sortConfig.direction === "asc" ? "↑" : "↓") : ""}
+                                                        </th>
+                                                        <th className="py-3 px-2 pr-6 rounded-r-lg w-24 text-[13px] font-medium text-gray-500 dark:text-dark-body tracking-tight text-center">
+                                                            Ações
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedItems.map((report) => (
+                                                        <ReportListRow
+                                                            key={report.id}
+                                                            report={report}
+                                                            isPending={isPending}
+                                                            onDetail={() => openEntity("view", report.id)}
+                                                            onResolve={() => setResolveTarget(report)}
+                                                            onDismiss={() => setDismissTarget(report)}
+                                                            onSpam={() => setSpamTarget(report)}
+                                                            onRevert={() => setRevertTarget(report)}
+                                                        />
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Pagination */}
                                 {totalPages > 1 && (
@@ -451,7 +500,6 @@ export default function ReportsList({
                                             currentPage={page}
                                             totalPages={totalPages}
                                             onPageChange={setPage}
-                                            inline
                                         />
                                     </div>
                                 )}
