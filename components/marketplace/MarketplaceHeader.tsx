@@ -12,7 +12,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import { Input } from "@/components/reusable/Input"
 import { Switch } from "@/components/reusable/Switch"
 import BottomSheet from "@/components/BottomSheet"
-import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
+import { getUserInitials, getAvatarColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
 import { useTransitionDirection } from "@/providers/transition-provider"
@@ -96,7 +96,7 @@ interface HeaderProps {
             | "vendor",
     ) => void
     currentView?: string
-    userProfile?: { full_name: string | null; address: string | null } | null
+    userProfile?: { full_name: string | null; address: string | null; avatar_url?: string | null } | null
     cartCount?: number
     productName?: string
     onShare?: () => void
@@ -141,7 +141,11 @@ const Header: React.FC<HeaderProps> = ({
     const serverSessionData = useMemo(() => {
         if (serverUserProfile !== undefined || serverCartCount !== undefined) {
             return {
-                profile: serverUserProfile || null,
+                profile: serverUserProfile ? {
+                    full_name: serverUserProfile.full_name,
+                    address: serverUserProfile.address,
+                    avatar_url: serverUserProfile.avatar_url || null,
+                } : null,
                 cartCount: serverCartCount || 0,
             }
         }
@@ -166,6 +170,7 @@ const Header: React.FC<HeaderProps> = ({
     const { theme, setTheme } = useTheme()
     const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false)
     const [isMobileCategoryMenuOpen, setIsMobileCategoryMenuOpen] = useState(false)
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const [isPending, startTransition] = useTransition()
     const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
@@ -372,15 +377,16 @@ const Header: React.FC<HeaderProps> = ({
     }
 
     // DERIVED VALUES - useMemo instead of useState+useEffect to avoid extra re-render
-    const { userName, fullName } = useMemo(() => {
+    const { userName, fullName, avatarUrl } = useMemo(() => {
         if (user) {
             if (profile?.full_name) {
-                return { userName: profile.full_name.split(" ")[0], fullName: profile.full_name }
+                const p = profile as any
+                return { userName: profile.full_name.split(" ")[0], fullName: profile.full_name, avatarUrl: p?.avatar_url || null }
             }
             const fallback = user.email?.split("@")[0] || "Usuário"
-            return { userName: fallback, fullName: fallback }
+            return { userName: fallback, fullName: fallback, avatarUrl: null }
         }
-        return { userName: "Visitante", fullName: "" }
+        return { userName: "Visitante", fullName: "", avatarUrl: null }
     }, [user, profile?.full_name])
 
     const userLocation = useMemo(() => {
@@ -532,6 +538,7 @@ const Header: React.FC<HeaderProps> = ({
         const trimmed = query.trim()
         if (!trimmed) return
         setIsSearchInputFocused(false)
+        setIsMobileSearchOpen(false)
         setDirection("forward")
         startTransition(() => {
             // O servidor resolve o escopo (cidade do usuário/cookie/Brasil) e mantém o ?q=.
@@ -606,39 +613,49 @@ const Header: React.FC<HeaderProps> = ({
             <header className={`lg:hidden w-full fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isTransparentHeader ? "bg-transparent" : "bg-brand-dark dark:bg-dark-surface border-b border-white/10"}`}>
                 <div className="px-4 pt-2 pb-2">
                     <div className="flex items-center gap-3 relative min-h-[36px]">
-                        {/* Back Button / User Icon */}
-                        <Button
-                            variant="filled"
-                            className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (vendorCategoryTitle && onVendorCategoryBack) {
-                                    onVendorCategoryBack()
-                                } else if (!isHome || isProductDetail) {
-                                    handleGoBack()
-                                } else {
-                                    user ? setIsMobileUserMenuOpen(true) : router.push("/auth/login")
-                                }
-                            }}
-                        >
-                            {(!isHome || isProductDetail) ? (
+                        {/* Back Button */}
+                        {(!isHome || isProductDetail) ? (
+                            <Button
+                                variant="filled"
+                                className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (vendorCategoryTitle && onVendorCategoryBack) {
+                                        onVendorCategoryBack()
+                                    } else {
+                                        handleGoBack()
+                                    }
+                                }}
+                            >
                                 <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
-                            ) : user ? (
-                                <div className="relative shrink-0 w-9 h-9">
-                                    <img
-                                        src="https://img.dudit.com.br/static/Placeholder.png"
-                                        alt="User"
-                                        width={36}
-                                        height={36}
-                                        className="w-9 h-9 rounded-full border border-gray-200 object-cover"
-                                    />
+                            </Button>
+                        ) : user ? (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMobileUserMenuOpen(true)
+                                }}
+                                className="shrink-0 focus:outline-none"
+                            >
+                                <UserProfileImage
+                                    fullName={fullName}
+                                    imageUrl={avatarUrl}
+                                    className="w-9 h-9 border-2 border-white/20"
+                                />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push("/auth/login")
+                                }}
+                                className="shrink-0 focus:outline-none"
+                            >
+                                <div className="w-9 h-9 rounded-full border-2 border-white/20 bg-white/10 flex items-center justify-center">
+                                    <span className="text-xs text-white/60">?</span>
                                 </div>
-                            ) : (
-                                <div className="w-9 h-9 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center">
-                                    <span className="text-xs text-gray-500">?</span>
-                                </div>
-                            )}
-                        </Button>
+                            </button>
+                        )}
 
                         {/* Middle Section: Search or Product Name */}
                         <div className="flex-1 flex items-center justify-start min-w-0 transition-all duration-300">
@@ -676,17 +693,13 @@ const Header: React.FC<HeaderProps> = ({
                                     </h1>
                                 </div>
                             ) : (
-                                <div className="bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200">
-                                    <SearchIcon size={18} className="text-brand-green mr-2" />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar na Dudit"
-                                        className="bg-transparent border-none outline-none text-brand-dark text-[14px] w-full placeholder-gray-400 font-normal py-0"
-                                        value={searchValue}
-                                        onChange={(e) => setSearchValue(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                                    />
-                                </div>
+                                <button
+                                    onClick={() => setIsMobileSearchOpen(true)}
+                                    className="bg-white h-[36px] rounded-full flex items-center px-4 w-full border border-gray-200 cursor-text"
+                                >
+                                    <SearchIcon size={18} className="text-brand-green mr-2 shrink-0" />
+                                    <span className="text-brand-dark text-[14px] placeholder-gray-400 font-normal">Buscar na Dudit</span>
+                                </button>
                             )}
                         </div>
 
@@ -707,9 +720,9 @@ const Header: React.FC<HeaderProps> = ({
                                     <Button
                                         variant="filled"
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
+                                        className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                                     >
-                                        <ShareIcon size={20} />
+                                        <ShareIcon size={20} className="" />
                                     </Button>
                                 ) : <div className="w-1" />
                             ) : isProductDetail ? (
@@ -720,25 +733,23 @@ const Header: React.FC<HeaderProps> = ({
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                                             className={`${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                                         >
-                                            <ShareIcon size={20} />
+                                            <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                         </Button>
                                     )}
                                     {favoriteButton ? (
                                         favoriteButton
                                     ) : onFavorite ? (
-                                        <button
+                                        <Button
+                                            variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className={`transition-all duration-300 flex items-center justify-center w-9 h-9 ${isScrolled ? "bg-transparent shadow-none text-white" : "bg-white rounded-full shadow-md text-brand-dark dark:text-dark-heading"}`}
+                                            className={`h-8 w-8 ${isScrolled ? "bg-transparent shadow-none text-white" : ""}`}
                                         >
                                             <HeartIcon size={20} className={isFavorite ? "fill-current" : ""} />
-                                        </button>
+                                        </Button>
                                     ) : null}
                                 </>
                             ) : (
                                 <>
-                                    {user && (
-                                        <NotificationBell variant="marketplace" className="shrink-0" />
-                                    )}
                                     <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={24} strokeWidth={2} />
                                         {cartCount > 0 && (
@@ -784,6 +795,109 @@ const Header: React.FC<HeaderProps> = ({
             />
 
             {renderMobileHeader()}
+
+            {/* Mobile Full-Screen Search Overlay */}
+            {isMobileSearchOpen && (
+                <div className="lg:hidden fixed inset-0 z-[200] bg-white dark:bg-dark-surface flex flex-col">
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-dark-border">
+                        <button
+                            onClick={() => {
+                                setIsMobileSearchOpen(false)
+                                setSearchValue("")
+                                setRpcSuggestions([])
+                            }}
+                            className="shrink-0 p-1 text-brand-dark dark:text-dark-heading"
+                        >
+                            <ChevronLeftIcon size={24} strokeWidth={2.5} />
+                        </button>
+                        <div className="flex-1 flex items-center h-[40px] bg-brand-gray dark:bg-dark-border/30 rounded-full px-4">
+                            <SearchIcon size={18} className="text-brand-green dark:text-brand-green shrink-0 mr-2" />
+                            <input
+                                type="text"
+                                autoFocus
+                                placeholder="Buscar na Dudit"
+                                className="bg-transparent border-none outline-none text-brand-dark dark:text-dark-heading text-[15px] w-full placeholder-gray-400 dark:placeholder-gray-500 font-normal"
+                                value={searchValue}
+                                onChange={(e) => setSearchValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSearch()
+                                        setIsMobileSearchOpen(false)
+                                    }
+                                }}
+                            />
+                            {searchValue.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setSearchValue("")
+                                        setRpcSuggestions([])
+                                    }}
+                                    className="shrink-0 p-1 text-gray-400"
+                                >
+                                    <XIcon size={18} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                        {filteredSuggestions.length > 0 ? (
+                            <div className="divide-y divide-gray-50 dark:divide-dark-border">
+                                {filteredSuggestions.map((suggestion, index) => (
+                                    <button
+                                        key={index}
+                                        className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 transition-colors text-left"
+                                        onClick={() => {
+                                            setSearchValue(suggestion.label)
+                                            setIsMobileSearchOpen(false)
+                                            handleSearch(suggestion.label)
+                                        }}
+                                    >
+                                        <SearchIcon size={18} className="text-gray-300 dark:text-gray-500 shrink-0" />
+                                        <span className="text-[15px] text-brand-dark dark:text-dark-heading flex-1 min-w-0 truncate">{suggestion.label}</span>
+                                        <ChevronRightIcon size={16} className="text-gray-300 dark:text-gray-500 shrink-0 rotate-180" />
+                                    </button>
+                                ))}
+                            </div>
+                        ) : searchValue.trim().length >= 2 ? (
+                            <div className="flex flex-col items-center justify-center py-16 px-6">
+                                <SearchIcon size={40} className="text-gray-200 dark:text-gray-600 mb-4" />
+                                <p className="text-[14px] text-gray-400 dark:text-gray-500 text-center">
+                                    Nenhuma sugestão para &quot;{searchValue}&quot;
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setIsMobileSearchOpen(false)
+                                        handleSearch()
+                                    }}
+                                    className="mt-4 text-brand-green font-bold text-[14px]"
+                                >
+                                    Buscar mesmo assim
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="px-5 py-6">
+                                <p className="text-[12px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Buscas populares</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {["Ofertas", "Eletrônicos", "Roupas", "Casa", "Esportes", "Beleza"].map((term) => (
+                                        <button
+                                            key={term}
+                                            onClick={() => {
+                                                setSearchValue(term)
+                                                setIsMobileSearchOpen(false)
+                                                handleSearch(term)
+                                            }}
+                                            className="px-4 py-2 rounded-full bg-brand-gray dark:bg-dark-border/30 text-brand-dark dark:text-dark-heading text-[13px] font-medium hover:bg-gray-200 dark:hover:bg-dark-border/50 transition-colors"
+                                        >
+                                            {term}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {isMobileUserMenuOpen && (
                 <BottomSheet isOpen={isMobileUserMenuOpen} onClose={() => setIsMobileUserMenuOpen(false)}>

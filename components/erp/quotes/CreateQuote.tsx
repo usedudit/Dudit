@@ -831,7 +831,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             quoteId: existingQuote.id,
                             partnerId,
                             productId: isManualOrBlank ? null : cur.id,
-                            customName: isManualOrBlank ? cur.name : undefined,
+                            customName: cur.name ? cur.name.trim() : undefined,
                             description: undefined,
                             quantity: cur.qty,
                             unitPrice: cur.price,
@@ -853,7 +853,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                         const upd = await updateQuoteItemAction({
                             itemId: cur.quoteItemId,
                             partnerId,
-                            customName: isManualOrBlank ? cur.name : undefined,
+                            customName: cur.name ? cur.name.trim() : undefined,
                             quantity: cur.qty,
                             unitPrice: cur.price,
                             sortOrder: idx,
@@ -977,7 +977,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 additionalCosts: Number(otherCosts) || 0,
                 items: quoteItems.map((item, idx) => ({
                     productId: (item.isBlank || item.isService) ? null : item.id,
-                    customName: (item.isBlank || item.isService) ? item.name : undefined,
+                    customName: item.name ? item.name.trim() : undefined,
                     quantity: item.qty,
                     unitPrice: item.price,
                     sortOrder: idx,

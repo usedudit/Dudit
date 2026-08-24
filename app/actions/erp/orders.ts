@@ -131,7 +131,12 @@ function buildOrderSource(salesChannel: string | undefined, deliveryMethod: 'del
 }
 
 function normalizeOrderNotes(value?: string | null) {
-    return (value || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+    if (!value) return ""
+    return String(value)
+        .replace(/\n*Pedido cancelado por:[\s\S]*$/i, "")
+        .replace(/service_order:[0-9a-f-]+:order/gi, "")
+        .replace(/^Pedido criado a partir do orçamento\s+[^\n.]*(\.|\n|$)/gim, "")
+        .trim()
 }
 
 function buildCancelledOrderNotes(params: {
@@ -2404,10 +2409,74 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             }
         }
 
-        const [customers, sellerName, { platformDriverId, platformDriver }] = await Promise.all([
+        const resolveSourceServiceOrder = async () => {
+            if ((data as any).source_service_order_id) {
+                const { data: so } = await supabase
+                    .from("service_orders")
+                    .select("id, order_number, title, status")
+                    .eq("id", (data as any).source_service_order_id)
+                    .maybeSingle()
+                if (so) return so
+            }
+            const { data: soByOrder } = await supabase
+                .from("service_orders")
+                .select("id, order_number, title, status")
+                .eq("order_id", data.id)
+                .limit(1)
+                .maybeSingle()
+            if (soByOrder) return soByOrder
+
+            if (data.notes && data.notes.includes("service_order:")) {
+                const match = data.notes.match(/service_order:([0-9a-f-]{36}):order/i)
+                if (match?.[1]) {
+                    const { data: soByNote } = await supabase
+                        .from("service_orders")
+                        .select("id, order_number, title, status")
+                        .eq("id", match[1])
+                        .maybeSingle()
+                    if (soByNote) return soByNote
+                }
+            }
+            return null
+        }
+
+        const resolveSourceQuote = async () => {
+            if ((data as any).source_quote_id) {
+                const { data: quote } = await supabase
+                    .from("quotes")
+                    .select("id, quote_number, status")
+                    .eq("id", (data as any).source_quote_id)
+                    .maybeSingle()
+                if (quote) return quote
+            }
+            const { data: quoteByOrder } = await supabase
+                .from("quotes")
+                .select("id, quote_number, status")
+                .eq("converted_order_id", data.id)
+                .limit(1)
+                .maybeSingle()
+            if (quoteByOrder) return quoteByOrder
+
+            if (data.notes && data.notes.includes("orçamento")) {
+                const match = data.notes.match(/orçamento\s+(ORC-[\w-]+)/i)
+                if (match?.[1]) {
+                    const { data: quoteByNum } = await supabase
+                        .from("quotes")
+                        .select("id, quote_number, status")
+                        .eq("quote_number", match[1])
+                        .maybeSingle()
+                    if (quoteByNum) return quoteByNum
+                }
+            }
+            return null
+        }
+
+        const [customers, sellerName, { platformDriverId, platformDriver }, sourceServiceOrder, sourceQuote] = await Promise.all([
             resolveCustomer(),
             resolveSellerName(),
             resolvePlatformDriver(),
+            resolveSourceServiceOrder(),
+            resolveSourceQuote(),
         ])
 
         const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
@@ -2448,6 +2517,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             success: true,
             data: {
                 ...data,
+                order_source: data.order_source === "admin_service_order" ? "Ordem de Serviço" : data.order_source,
                 customers,
                 seller_name: sellerName,
                 subtotal_value: subtotalValue,
@@ -2458,6 +2528,8 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                 refunded_amount: refundedAmount,
                 platform_driver_id: platformDriverId,
                 platform_driver: platformDriver,
+                source_service_order: sourceServiceOrder,
+                source_quote: sourceQuote,
             },
         }
     }
@@ -2478,7 +2550,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     if (saleError || !sale) return { error: "Pedido não encontrado" }
 
     // P3: cliente, vendedor e pre_sale são independentes - resolve em paralelo.
-    const [customers, saleSellerName, saleDraft] = await Promise.all([
+    const [customers, saleSellerName, saleDraft, saleSourceServiceOrder] = await Promise.all([
         sale.customer_id
             ? supabase
                 .from("customers")
@@ -2504,6 +2576,14 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             .limit(1)
             .maybeSingle()
             .then((res: any) => res.data),
+        (sale.origin_type === "service_order" && sale.origin_id)
+            ? supabase
+                .from("service_orders")
+                .select("id, order_number, title, status")
+                .eq("id", sale.origin_id)
+                .maybeSingle()
+                .then((res: any) => res.data)
+            : Promise.resolve(null),
     ])
 
     const shippingCost = Number(saleDraft?.shipping_fee || 0)
@@ -2534,7 +2614,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     const orderLike = {
         id: sale.id,
         order_number: ref,
-        order_source: "Presencial",
+        order_source: sale.origin_type === "service_order" ? "Ordem de Serviço" : "Presencial",
         situation,
         delivery_status: (sale as any).delivery_status || (shippingCost > 0 ? "preparing" : "delivered"),
         delivery_type: shippingCost > 0 ? "delivery" : "pickup",
@@ -2569,6 +2649,8 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
         payment_method: null,
         payment_breakdown: [],
         mp_payment_id: null,
+        source_service_order: saleSourceServiceOrder,
+        source_quote: null,
     }
 
     return { success: true, data: orderLike }

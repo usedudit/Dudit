@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, Button, DefaultModal, FormSection, InfoCard, Pagination } from "@/components/reusable"
+import { Badge, Button, DefaultModal, FormSection, InfoCard, ActionsDropdown, DropdownItem, Pagination } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -22,10 +22,21 @@ import {
     PhoneIcon,
     WhatsappIcon,
     MapPinIcon,
-    Package,
 } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
+
+const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactNode; children: React.ReactNode; className?: string }) => (
+    <>
+        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 ${className}`}>
+            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
+            {children}
+        </div>
+        <FormSection title={title} hasSeparator className="lg:hidden">
+            {children}
+        </FormSection>
+    </>
+)
 
 const STEPS = [
     { key: "assigned", label: "Atribuída" },
@@ -86,14 +97,10 @@ export default function DeliveryAssignmentDetail({
         ? `#${assignment.order_number}`
         : `#${String(assignment.order_id).slice(0, 8)}`
 
-    const cleanCustomerPhone = (assignment.customer_phone || "").replace(/\D/g, "")
     const cleanStorePhone = (assignment.store_phone || "").replace(/\D/g, "")
 
-    const customerMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        assignment.delivery_address || ""
-    )}`
+    const customerMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.delivery_address || "")}`
     const customerWazeUrl = `https://waze.com/ul?q=${encodeURIComponent(assignment.delivery_address || "")}`
-    const customerWhatsappUrl = cleanCustomerPhone ? `https://wa.me/55${cleanCustomerPhone}` : null
 
     const storeMapsUrl = assignment.store_address
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.store_address)}`
@@ -197,59 +204,31 @@ export default function DeliveryAssignmentDetail({
     const isTerminalFailed = ["failed", "cancelled"].includes(assignment.status)
     const totalActiveSteps = isTerminalFailed ? currentStepIndex + 1 : currentStepIndex + 1
 
-    // Build history entries for HistoryTimeline
-    const historyEntries: HistoryEntry[] = [
-        assignment.assigned_at && {
-            id: "assigned",
-            actor_name: "Sistema",
-            change_lines: ["Entrega atribuída ao entregador"],
-            created_at: assignment.assigned_at,
-            entry_type: "status",
-        },
-        assignment.accepted_at && {
-            id: "accepted",
-            actor_name: "Você",
-            change_lines: ["Aceitou a entrega"],
-            created_at: assignment.accepted_at,
-            entry_type: "status",
-        },
-        assignment.picked_up_at && {
-            id: "picked_up",
-            actor_name: "Você",
-            change_lines: ["Retirou o pedido no estabelecimento"],
-            created_at: assignment.picked_up_at,
-            entry_type: "status",
-        },
-        assignment.out_for_delivery_at && {
-            id: "out_for_delivery",
-            actor_name: "Você",
-            change_lines: ["Iniciou rota de entrega"],
-            created_at: assignment.out_for_delivery_at,
-            entry_type: "status",
-        },
-        assignment.delivered_at && {
-            id: "delivered",
-            actor_name: "Você",
-            change_lines: ["Entrega confirmada com sucesso"],
-            created_at: assignment.delivered_at,
-            entry_type: "status",
-        },
-        assignment.failed_at && {
-            id: "failed",
-            actor_name: "Você",
-            change_lines: [`Falha registrada: ${assignment.failure_reason || "Não informado"}`],
-            created_at: assignment.failed_at,
-            entry_type: "cancel",
-        },
-    ].filter(Boolean) as HistoryEntry[]
+    // Build history entries explicitly to avoid && operator issues
+    const historyEntries: HistoryEntry[] = []
+    if (assignment.assigned_at) {
+        historyEntries.push({ id: "assigned", actor_name: "Sistema", change_lines: ["Entrega atribuída ao entregador"], created_at: assignment.assigned_at, entry_type: "status" })
+    }
+    if (assignment.accepted_at) {
+        historyEntries.push({ id: "accepted", actor_name: "Você", change_lines: ["Aceitou a entrega"], created_at: assignment.accepted_at, entry_type: "status" })
+    }
+    if (assignment.picked_up_at) {
+        historyEntries.push({ id: "picked_up", actor_name: "Você", change_lines: ["Retirou o pedido no estabelecimento"], created_at: assignment.picked_up_at, entry_type: "status" })
+    }
+    if (assignment.out_for_delivery_at) {
+        historyEntries.push({ id: "out_for_delivery", actor_name: "Você", change_lines: ["Iniciou rota de entrega"], created_at: assignment.out_for_delivery_at, entry_type: "status" })
+    }
+    if (assignment.delivered_at) {
+        historyEntries.push({ id: "delivered", actor_name: "Você", change_lines: ["Entrega confirmada com sucesso"], created_at: assignment.delivered_at, entry_type: "status" })
+    }
+    if (assignment.failed_at) {
+        historyEntries.push({ id: "failed", actor_name: "Você", change_lines: [`Falha registrada: ${assignment.failure_reason || "Não informado"}`], created_at: assignment.failed_at, entry_type: "cancel" })
+    }
 
     // Items pagination
     const items = assignment.items || []
     const totalItemPages = Math.ceil(items.length / ITEMS_PER_PAGE) || 1
-    const paginatedItems = items.slice(
-        (itemsPage - 1) * ITEMS_PER_PAGE,
-        itemsPage * ITEMS_PER_PAGE
-    )
+    const paginatedItems = items.slice((itemsPage - 1) * ITEMS_PER_PAGE, itemsPage * ITEMS_PER_PAGE)
 
     return (
         <FadeIn>
@@ -260,58 +239,37 @@ export default function DeliveryAssignmentDetail({
                         {/* Sticky Header */}
                         <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b transition-all duration-500 ease-in-out">
                             <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
-
-                                {/* Back button - desktop only */}
                                 <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                     <Button variant="filled" onClick={handleBackClick} className="w-10 h-10 p-0 flex items-center justify-center">
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
 
-                                {/* Title row */}
                                 <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="hidden md:inline truncate">{pageTitle}</span>
-                                            <Badge variant={statusMeta.variant} className="shrink-0">
-                                                {statusMeta.label}
-                                            </Badge>
+                                            <Badge variant={statusMeta.variant} className="shrink-0">{statusMeta.label}</Badge>
                                         </h1>
-
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             {assignment.store_name || assignment.partner_name || "Loja"} • {assignment.assigned_at ? formatDate(assignment.assigned_at) : "Hoje"}
                                         </div>
                                     </div>
 
-                                    {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) && (
-                                            <Button
-                                                variant="outlinered"
-                                                size="sm"
-                                                onClick={() => setFailureOpen(true)}
-                                                disabled={loading}
-                                            >
+                                            <Button variant="outlinered" size="sm" onClick={() => setFailureOpen(true)} disabled={loading}>
                                                 Informar Falha
                                             </Button>
                                         )}
-
                                         {NEXT_STATUS[assignment.status] && (
-                                            <Button
-                                                variant="default"
-                                                size="sm"
-                                                onClick={advance}
-                                                disabled={loading}
-                                                isLoading={loading}
-                                                className="font-bold"
-                                            >
+                                            <Button variant="default" size="sm" onClick={advance} disabled={loading} isLoading={loading} className="font-bold">
                                                 {NEXT_STATUS[assignment.status].label}
                                             </Button>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Tabs */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="resumo">Resumo</TabsTrigger>
@@ -327,18 +285,16 @@ export default function DeliveryAssignmentDetail({
                             <AnimatePresence mode="wait">
                                 {activeTab === "resumo" && (
                                     <FadeIn key="resumo" className="block">
-                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                             {/* LEFT MAIN COLUMN */}
-                                            <div className="lg:col-span-8 space-y-6">
-                                                {/* STEPPER PROGRESS - matching OrderDetailView pattern */}
+                                            <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
+                                                {/* STEPPER PROGRESS - matching OrderDetailView exactly */}
                                                 {!isTerminalFailed ? (
                                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                                         <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
                                                             <div className="flex justify-between items-center">
                                                                 <div className="flex items-center gap-1">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                        Responsável pela entrega:
-                                                                    </span>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
                                                                     <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
                                                                         {assignment.store_name || assignment.partner_name || "Loja"}
                                                                     </div>
@@ -348,21 +304,17 @@ export default function DeliveryAssignmentDetail({
                                                                 </div>
                                                             </div>
                                                         </div>
-
                                                         <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
                                                             <div className="relative px-4">
                                                                 <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
                                                                     <div
                                                                         className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
                                                                         style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
-                                                                    ></div>
-
+                                                                    />
                                                                     {STEPS.map((step, idx) => {
                                                                         const isPassed = currentStepIndex >= idx
-                                                                        const isCurrent = currentStepIndex === idx
                                                                         const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
                                                                         const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
-
                                                                         return (
                                                                             <div key={step.key} className="relative flex flex-col items-center">
                                                                                 <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
@@ -371,7 +323,7 @@ export default function DeliveryAssignmentDetail({
                                                                                     </span>
                                                                                 </div>
                                                                                 <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                    {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                                                                    {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
                                                                                 </div>
                                                                                 <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
                                                                                     {isPassed && !isFailed ? (
@@ -397,14 +349,10 @@ export default function DeliveryAssignmentDetail({
 
                                                 {/* Order Instructions */}
                                                 {assignment.notes && (
-                                                    <InfoCard
-                                                        title="Instruções do Pedido"
-                                                        message={assignment.notes}
-                                                        color="orange"
-                                                    />
+                                                    <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
                                                 )}
 
-                                                {/* Store Section - Local de Coleta */}
+                                                {/* Store Section */}
                                                 <FormSection title="Local de Coleta (Estabelecimento)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
@@ -418,41 +366,33 @@ export default function DeliveryAssignmentDetail({
                                                                 </p>
                                                             )}
                                                         </div>
-
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            {storeMapsUrl && (
-                                                                <a
-                                                                    href={storeMapsUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
-                                                                >
-                                                                    Maps
-                                                                </a>
-                                                            )}
-                                                            {cleanStorePhone && (
-                                                                <a
-                                                                    href={`tel:${cleanStorePhone}`}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
-                                                                >
-                                                                    Ligar
-                                                                </a>
-                                                            )}
-                                                            {storeWhatsappUrl && (
-                                                                <a
-                                                                    href={storeWhatsappUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-100 transition"
-                                                                >
-                                                                    WhatsApp
-                                                                </a>
-                                                            )}
+                                                        <div className="shrink-0">
+                                                            <ActionsDropdown
+                                                                trigger={
+                                                                    <Button variant="outline" size="sm">Contato</Button>
+                                                                }
+                                                            >
+                                                                {storeMapsUrl && (
+                                                                    <DropdownItem onClick={() => window.open(storeMapsUrl, "_blank")}>
+                                                                        <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                    </DropdownItem>
+                                                                )}
+                                                                {cleanStorePhone && (
+                                                                    <DropdownItem onClick={() => window.open(`tel:${cleanStorePhone}`, "_self")}>
+                                                                        <PhoneIcon size={16} /> Ligar para o Estabelecimento
+                                                                    </DropdownItem>
+                                                                )}
+                                                                {storeWhatsappUrl && (
+                                                                    <DropdownItem onClick={() => window.open(storeWhatsappUrl, "_blank")}>
+                                                                        <WhatsappIcon size={16} /> WhatsApp
+                                                                    </DropdownItem>
+                                                                )}
+                                                            </ActionsDropdown>
                                                         </div>
                                                     </div>
                                                 </FormSection>
 
-                                                {/* Customer Section - Local de Entrega */}
+                                                {/* Customer Section */}
                                                 <FormSection title="Local de Entrega (Cliente)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
@@ -464,148 +404,60 @@ export default function DeliveryAssignmentDetail({
                                                                 <span>{assignment.delivery_address || "Endereço não informado"}</span>
                                                             </p>
                                                         </div>
-
-                                                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                                                            <a
-                                                                href={customerMapsUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
+                                                        <div className="shrink-0">
+                                                            <ActionsDropdown
+                                                                trigger={
+                                                                    <Button variant="outline" size="sm">Contato</Button>
+                                                                }
                                                             >
-                                                                Maps
-                                                            </a>
-                                                            <a
-                                                                href={customerWazeUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
-                                                            >
-                                                                Waze
-                                                            </a>
-                                                            {cleanCustomerPhone && (
-                                                                <a
-                                                                    href={`tel:${cleanCustomerPhone}`}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-border dark:border-dark-border text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-brand-gray dark:hover:bg-dark-border transition"
-                                                                >
-                                                                    Ligar
-                                                                </a>
-                                                            )}
-                                                            {customerWhatsappUrl && (
-                                                                <a
-                                                                    href={customerWhatsappUrl}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-100 transition"
-                                                                >
-                                                                    WhatsApp
-                                                                </a>
-                                                            )}
+                                                                <DropdownItem onClick={() => window.open(customerMapsUrl, "_blank")}>
+                                                                    <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                </DropdownItem>
+                                                                <DropdownItem onClick={() => window.open(customerWazeUrl, "_blank")}>
+                                                                    <TruckIcon size={16} /> Abrir no Waze
+                                                                </DropdownItem>
+                                                            </ActionsDropdown>
                                                         </div>
                                                     </div>
                                                 </FormSection>
                                             </div>
 
-                                            {/* RIGHT SIDEBAR COLUMN */}
-                                            <div className="lg:col-span-4 space-y-6">
-                                                {/* Remuneração & Valores */}
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 px-3 py-3">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Remuneração & Valores</h3>
-                                                    </div>
-                                                    <div className="p-5 space-y-4">
-                                                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                                                            <span className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
-                                                                Sua Taxa de Entrega
-                                                            </span>
-                                                            <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
-                                                                {formatCurrency(assignment.delivery_fee || 0)}
-                                                            </p>
+                                            {/* RIGHT SIDEBAR COLUMN with divider */}
+                                            <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                                <SidebarCard title="Remuneração & Valores">
+                                                    <InfoCard
+                                                        title="Sua Taxa de Entrega"
+                                                        message={formatCurrency(assignment.delivery_fee || 0)}
+                                                        color="green"
+                                                    />
+                                                    <div className="space-y-3 text-xs mt-4">
+                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
+                                                            <span className="font-bold text-sm">{formatCurrency(assignment.total_amount || 0)}</span>
                                                         </div>
-
-                                                        <div className="space-y-3 text-xs">
-                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
-                                                                <span className="font-bold text-sm">{formatCurrency(assignment.total_amount || 0)}</span>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                                <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
-                                                            </div>
-                                                            <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">Status do Pagamento:</span>
-                                                                <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
-                                                            </div>
+                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
+                                                            <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
                                                         </div>
-
-                                                        {isCashPayment && (
-                                                            <div className="pt-3 border-t border-brand-border dark:border-dark-border">
-                                                                {assignment.payment_confirmed_at ? (
-                                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                                        Recebimento em dinheiro confirmado
-                                                                    </div>
-                                                                ) : (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        onClick={confirmPayment}
-                                                                        disabled={loading}
-                                                                        className="w-full text-xs font-bold"
-                                                                    >
-                                                                        Confirmar Recebimento em Dinheiro
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        )}
+                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Situação do Pagamento:</span>
+                                                            <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-
-                                                {/* Histórico da Corrida */}
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 px-3 py-3">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Histórico da Corrida</h3>
-                                                    </div>
-                                                    <div className="p-5 space-y-2.5 text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        {assignment.assigned_at && (
-                                                            <div className="flex justify-between">
-                                                                <span>Atribuída:</span>
-                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatDateTime(assignment.assigned_at)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {assignment.accepted_at && (
-                                                            <div className="flex justify-between">
-                                                                <span>Aceita:</span>
-                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatDateTime(assignment.accepted_at)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {assignment.picked_up_at && (
-                                                            <div className="flex justify-between">
-                                                                <span>Retirada:</span>
-                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatDateTime(assignment.picked_up_at)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {assignment.out_for_delivery_at && (
-                                                            <div className="flex justify-between">
-                                                                <span>Em rota:</span>
-                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                                    {formatDateTime(assignment.out_for_delivery_at)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {assignment.delivered_at && (
-                                                            <div className="flex justify-between">
-                                                                <span>Entregue:</span>
-                                                                <span className="font-semibold text-brand-green">
-                                                                    {formatDateTime(assignment.delivered_at)}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                    {isCashPayment && (
+                                                        <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">
+                                                            {assignment.payment_confirmed_at ? (
+                                                                <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                                    Recebimento em dinheiro confirmado
+                                                                </div>
+                                                            ) : (
+                                                                <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full text-xs font-bold">
+                                                                    Confirmar Recebimento em Dinheiro
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </SidebarCard>
                                             </div>
                                         </div>
                                     </FadeIn>
@@ -613,71 +465,64 @@ export default function DeliveryAssignmentDetail({
 
                                 {activeTab === "itens" && (
                                     <FadeIn key="itens" className="block">
-                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                            <div className="lg:col-span-8 space-y-6">
-                                                <FormSection title={`Itens do Pedido (${items.length})`}>
-                                                    {items.length > 0 ? (
-                                                        <div className="space-y-4">
-                                                            <div className="divide-y divide-brand-border/60 dark:divide-dark-border/40">
-                                                                {paginatedItems.map((it: any, idx: number) => (
-                                                                    <div key={idx} className="py-2.5 flex items-center justify-between text-sm">
-                                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">
-                                                                            {it.quantity || 1}x {it.name || "Item"}
-                                                                        </span>
-                                                                        {it.price ? (
-                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                                {formatCurrency(it.price)}
-                                                                            </span>
-                                                                        ) : null}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-
-                                                            {totalItemPages > 1 && (
-                                                                <div className="pt-2">
-                                                                    <Pagination
-                                                                        currentPage={itemsPage}
-                                                                        totalPages={totalItemPages}
-                                                                        onPageChange={setItemsPage}
-                                                                    />
-                                                                </div>
-                                                            )}
-
-                                                            <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-3">
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
-                                                                <span className="text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(assignment.total_amount || 0)}
-                                                                </span>
-                                                            </div>
+                                        <FormSection title={`Itens do Pedido (${items.length})`}>
+                                            {items.length > 0 ? (
+                                                <>
+                                                    <div className="w-full overflow-hidden rounded-xl">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[600px]">
+                                                                <thead>
+                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                        <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Item</th>
+                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24">Qtd.</th>
+                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-36">Preço Unit.</th>
+                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36 rounded-r-lg">Total</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {paginatedItems.map((it: any, idx: number) => {
+                                                                        const qty = it.quantity || 1
+                                                                        const unitPrice = it.price || 0
+                                                                        const total = unitPrice * qty
+                                                                        return (
+                                                                            <tr key={idx} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{it.name || "Item"}</span>
+                                                                                </td>
+                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                    {qty}
+                                                                                </td>
+                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border font-medium text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                    {unitPrice > 0 ? formatCurrency(unitPrice) : "-"}
+                                                                                </td>
+                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                    {total > 0 ? formatCurrency(total) : "-"}
+                                                                                </td>
+                                                                            </tr>
+                                                                        )
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
                                                         </div>
-                                                    ) : (
-                                                        <p className="text-xs text-brand-inactive-text">Nenhum item listado.</p>
+                                                    </div>
+
+                                                    {totalItemPages > 1 && (
+                                                        <div className="pt-4">
+                                                            <Pagination currentPage={itemsPage} totalPages={totalItemPages} onPageChange={setItemsPage} />
+                                                        </div>
                                                     )}
-                                                </FormSection>
-                                            </div>
 
-                                            <div className="lg:col-span-4 space-y-6">
-                                                <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                    <div className="px-5 px-3 py-3">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">Pagamento</h3>
+                                                    <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-4 mt-4">
+                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
+                                                        <span className="text-lg font-extrabold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(assignment.total_amount || 0)}
+                                                        </span>
                                                     </div>
-                                                    <div className="p-5 space-y-3 text-xs">
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Forma:</span>
-                                                            <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Status:</span>
-                                                            <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
-                                                        </div>
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Sua Taxa:</span>
-                                                            <span className="font-bold text-brand-green">{formatCurrency(assignment.delivery_fee || 0)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                </>
+                                            ) : (
+                                                <p className="text-xs text-brand-inactive-text">Nenhum item listado.</p>
+                                            )}
+                                        </FormSection>
                                     </FadeIn>
                                 )}
 
@@ -687,15 +532,12 @@ export default function DeliveryAssignmentDetail({
                                             entries={historyEntries}
                                             emptyMessage="Nenhum registro de histórico encontrado para esta entrega."
                                         />
-
                                         {isTerminalFailed && (
                                             <div className="mt-4 rounded-xl bg-red-50/70 p-4 border border-red-200/60 dark:bg-red-950/20 dark:border-red-900/40 text-xs">
                                                 <span className="font-bold text-red-800 dark:text-red-300">
                                                     {assignment.status === "failed" ? "Falha registrada" : "Entrega cancelada"}:
                                                 </span>
-                                                <p className="mt-1 text-red-700/80 dark:text-red-400">
-                                                    {assignment.failure_reason || "Não informado."}
-                                                </p>
+                                                <p className="mt-1 text-red-700/80 dark:text-red-400">{assignment.failure_reason || "Não informado."}</p>
                                             </div>
                                         )}
                                     </FadeIn>
@@ -708,29 +550,15 @@ export default function DeliveryAssignmentDetail({
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                         {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) ? (
                             <>
-                                <Button
-                                    variant="outlinered"
-                                    onClick={() => setFailureOpen(true)}
-                                    disabled={loading}
-                                    className="flex-1 h-12"
-                                >
+                                <Button variant="outlinered" onClick={() => setFailureOpen(true)} disabled={loading} className="flex-1 h-12">
                                     Informar Falha
                                 </Button>
-                                <Button
-                                    onClick={advance}
-                                    disabled={loading}
-                                    isLoading={loading}
-                                    className="flex-1 h-12"
-                                >
+                                <Button onClick={advance} disabled={loading} isLoading={loading} className="flex-1 h-12">
                                     {NEXT_STATUS[assignment.status]?.shortLabel || "Avançar"}
                                 </Button>
                             </>
                         ) : (
-                            <Button
-                                variant="outline"
-                                onClick={handleBackClick}
-                                className="flex-1 h-12"
-                            >
+                            <Button variant="outline" onClick={handleBackClick} className="flex-1 h-12">
                                 Voltar para entregas
                             </Button>
                         )}
@@ -745,15 +573,8 @@ export default function DeliveryAssignmentDetail({
                     maxWidth="md"
                     footer={
                         <div className="flex items-center justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setFailureOpen(false)} disabled={loading}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                variant="destructive"
-                                onClick={reportFailure}
-                                disabled={loading || !failureReason.trim()}
-                                isLoading={loading}
-                            >
+                            <Button variant="outline" onClick={() => setFailureOpen(false)} disabled={loading}>Cancelar</Button>
+                            <Button variant="destructive" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
                                 Confirmar Falha
                             </Button>
                         </div>

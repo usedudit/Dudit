@@ -160,6 +160,23 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
       return
     }
 
+    const cleanPhone = whatsappPhone.replace(/\D/g, "")
+    if (!cleanPhone) {
+      setError("WhatsApp é obrigatório")
+      setActiveTab("gerais")
+      return
+    }
+
+    let phoneToValidate = cleanPhone
+    if (phoneToValidate.startsWith("55") && (phoneToValidate.length === 12 || phoneToValidate.length === 13)) {
+      phoneToValidate = phoneToValidate.slice(2)
+    }
+    if (phoneToValidate.length !== 11 || phoneToValidate[2] !== "9") {
+      setError("Informe um número de WhatsApp válido com DDD (celular)")
+      setActiveTab("gerais")
+      return
+    }
+
     setIsLoading(true)
     setError("")
 
@@ -192,7 +209,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
       const storePayload = {
         name: name.trim(),
         description: description.trim() || undefined,
-        phone: whatsappPhone.trim() || undefined,
+        phone: whatsappPhone.trim(),
         logo_url: finalLogoUrl || undefined,
         zip_code: addresses.zipCode.trim() || undefined,
         street: addresses.street.trim() || undefined,
@@ -245,7 +262,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
             </Button>
             <Button
               onClick={() => handleSubmit()}
-              disabled={isLoading || !name.trim()}
+              disabled={isLoading || !name.trim() || !whatsappPhone.trim()}
             >
               {isLoading ? "Salvando..." : isEdit ? "Salvar Alterações" : "Criar Loja"}
             </Button>
@@ -309,6 +326,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
                     value={whatsappPhone}
                     onChange={(e) => setWhatsappPhone(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>

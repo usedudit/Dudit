@@ -47,6 +47,7 @@ import BottomSheet from "@/components/BottomSheet"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
+import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
     return formatQuantityWithUnit(qty, unit);
@@ -557,12 +558,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     })()
     const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(order.total_amount || 0) : 0
 
-    const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+    const cleanNotes = cleanOrderNotes(order.notes)
     const cancelNote = (String(order.notes || "").match(/Pedido cancelado por:[\s\S]*$/)?.[0] || "").trim()
     const canEdit = order.situation !== "cancelled"
     const isPickupOrder = order.delivery_type === "pickup"
 
     const isMarketplaceOrder = order.order_source === "Marketplace" || order.order_source === "Online Store" || order.order_source === "Vitrine Online"
+
+    const sourceServiceOrder = order.source_service_order || null
+    const sourceQuote = order.source_quote || null
+
+    const getSourceSubtitle = () => {
+        if (sourceServiceOrder) {
+            return `Ordem de Serviço • OS #${sourceServiceOrder.order_number}`
+        }
+        if (sourceQuote) {
+            return `Orçamento • ${sourceQuote.quote_number}`
+        }
+        return normalizeOrderSource(order.order_source)
+    }
 
     const itemsBaseSubtotal = (sortedOrderItems || []).reduce(
         (sum: number, item: any) => sum + Number(item.subtotal || item.product_price * item.quantity || 0), 0
@@ -580,7 +594,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     // Detect if order has services vs products for dynamic timeline labels
     const orderItems = order.order_items || []
-    const hasOnlyServices = order.order_source === "admin_service_order" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
+    const hasOnlyServices = order.order_source === "admin_service_order" || order.order_source === "Ordem de Serviço" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
     const hasAnyService = orderItems.some((item: any) => item.service_id || item.line_type === "service_booking")
     const hasMixedItems = hasAnyService && !hasOnlyServices
 
@@ -769,7 +783,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                Criado em {formatDateTime(order.created_at)} • {order.order_source || "Manual"}
+                                                Criado em {formatDateTime(order.created_at)} • {getSourceSubtitle()}
                                             </div>
                                         </div>
 
@@ -807,7 +821,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                         <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-between items-center">
+                                                            <div className="flex justify-between items-center flex-wrap gap-2">
                                                                 <div className="flex items-center gap-1">
                                                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                                                         {order.order_source === "Marketplace" ? "Origem da venda:" : "Responsável pela venda:"}
@@ -819,8 +833,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     </div>
                                                                 </div>
                                                                 {order.order_source !== "Marketplace" && (
-                                                                    <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                        Origem da venda: <strong className="text-brand-dark dark:text-dark-heading">{order.order_source || "Manual"}</strong>
+                                                                    <div className="hidden md:flex items-center gap-1.5 text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                        Origem da venda:
+                                                                        {sourceServiceOrder ? (
+                                                                            <a
+                                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
+                                                                                className="font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
+                                                                            >
+                                                                                Ordem de Serviço #{sourceServiceOrder.order_number}
+                                                                            </a>
+                                                                        ) : sourceQuote ? (
+                                                                            <a
+                                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
+                                                                                className="font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
+                                                                            >
+                                                                                Orçamento {sourceQuote.quote_number}
+                                                                            </a>
+                                                                        ) : (
+                                                                            <strong className="text-brand-dark dark:text-dark-heading">{normalizeOrderSource(order.order_source)}</strong>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -867,7 +898,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <FormSection title="Itens do Pedido" hasSeparator>
                                                         <div className="space-y-4">
                                                             {paginatedItems.map((item: any) => {
-                                                                const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
+                                                                const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service";
                                                                 const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                                 return (
                                                                     <div key={item.id} className="flex items-start gap-4">
@@ -1198,6 +1229,45 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 </div>
 
                                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                                    {sourceServiceOrder && (
+                                                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
+                                                                    Ordem de Serviço #{sourceServiceOrder.order_number}
+                                                                </span>
+                                                                {sourceServiceOrder.title && (
+                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate mt-0.5">
+                                                                        {sourceServiceOrder.title}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <a
+                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
+                                                                className="text-xs font-bold text-brand-primary hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
+                                                            >
+                                                                Ver OS
+                                                            </a>
+                                                        </div>
+                                                    )}
+
+                                                    {sourceQuote && (
+                                                        <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
+                                                                    Orçamento {sourceQuote.quote_number}
+                                                                </span>
+                                                            </div>
+                                                            <a
+                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
+                                                                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
+                                                            >
+                                                                Ver Orçamento
+                                                            </a>
+                                                        </div>
+                                                    )}
+
                                                     {hasPendingPayment && (
                                                         <InfoCard
                                                             title="Valor ainda em aberto"
@@ -1341,6 +1411,50 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     })()}
                                                 </FormSection>
 
+                                                {/* 1b. Origem da OS/Orçamento */}
+                                                {sourceServiceOrder && (
+                                                    <FormSection title="" className="mt-0">
+                                                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
+                                                                    Ordem de Serviço #{sourceServiceOrder.order_number}
+                                                                </span>
+                                                                {sourceServiceOrder.title && (
+                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate mt-0.5">
+                                                                        {sourceServiceOrder.title}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <a
+                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
+                                                                className="text-xs font-bold text-brand-primary hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
+                                                            >
+                                                                Ver OS
+                                                            </a>
+                                                        </div>
+                                                    </FormSection>
+                                                )}
+
+                                                {sourceQuote && (
+                                                    <FormSection title="" className="mt-0">
+                                                        <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
+                                                                    Orçamento {sourceQuote.quote_number}
+                                                                </span>
+                                                            </div>
+                                                            <a
+                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
+                                                                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
+                                                            >
+                                                                Ver Orçamento
+                                                            </a>
+                                                        </div>
+                                                    </FormSection>
+                                                )}
+
                                                 {/* 2. Observação */}
                                                 {(cleanNotes || cancelNote) && (
                                                     <FormSection title="" className="mt-0">
@@ -1367,7 +1481,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <FormSection title="Itens do Pedido" className="mb-8">
                                                     <div className="space-y-4">
                                                         {paginatedItems.map((item: any) => {
-                                                            const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service" || (!item.product_id && !item.variant_id);
+                                                            const isService = !!item.service_id || item.line_type === "service_booking" || item.line_type === "service" || Boolean(item.services) || item.products?.type === "service";
                                                             const scheduleInfo = isService ? getServiceScheduleInfo(item, order) : null;
                                                             return (
                                                                 <div key={item.id} className="flex items-start gap-4">
@@ -1721,8 +1835,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                             i.item_type === "service" ||
                             Boolean(i.services) ||
                             i.products?.type === "service" ||
-                            (selectedOrderItemForAppointment && i.id === selectedOrderItemForAppointment.id) ||
-                            (!i.product_id && !i.variant_id)
+                            (selectedOrderItemForAppointment && i.id === selectedOrderItemForAppointment.id)
                         );
                         if (selectedOrderItemForAppointment && !filtered.some((i: any) => i.id === selectedOrderItemForAppointment.id)) {
                             filtered.unshift(selectedOrderItemForAppointment);

@@ -6,11 +6,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { InfoCard } from "@/components/reusable"
+import { PhoneInput, InfoCard } from "@/components/reusable"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { ImageCropperModal } from "./ImageCropperModal"
 import { uploadImageToR2Action } from "@/app/actions/shared/r2"
 import { isGifFile } from "@/lib/security/file-validator"
+import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
+import { validateBrazilMobile } from "@/lib/input-validator"
 
 interface NewStoreModalProps {
   isOpen: boolean
@@ -21,6 +23,7 @@ interface NewStoreModalProps {
 
 export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: NewStoreModalProps) {
   const [storeName, setStoreName] = useState("")
+  const [phone, setPhone] = useState("")
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [croppedImage, setCroppedImage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -62,6 +65,21 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
       return
     }
 
+    const cleanPhone = phone.replace(/\D/g, "")
+    if (!cleanPhone) {
+      setError("WhatsApp é obrigatório")
+      return
+    }
+
+    let phoneToValidate = cleanPhone
+    if (phoneToValidate.startsWith("55") && (phoneToValidate.length === 12 || phoneToValidate.length === 13)) {
+      phoneToValidate = phoneToValidate.slice(2)
+    }
+    if (!validateBrazilMobile(phoneToValidate)) {
+      setError("Número de WhatsApp inválido")
+      return
+    }
+
     setIsLoading(true)
     setError("")
 
@@ -81,7 +99,8 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
       // Create store in Supabase
       const { data, error: supabaseError } = await supabase.from("stores").insert({
         partner_id: partnerId,
-        name: storeName,
+        name: storeName.trim(),
+        phone: normalizePhoneToE164(phone),
         logo_url: imageUrl,
       })
 
@@ -90,6 +109,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
       }
 
       setStoreName("")
+      setPhone("")
       setImageFile(null)
       setCroppedImage(null)
       onStoreCreated()
@@ -113,7 +133,7 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
             {/* Store Name Input */}
             <div className="flex flex-col gap-2">
               <label htmlFor="store-name" className="text-sm font-medium">
-                Nome da Loja
+                Nome da Loja <span className="text-red-500">*</span>
               </label>
               <Input
                 id="store-name"
@@ -121,6 +141,18 @@ export function NewStoreModal({ isOpen, onClose, partnerId, onStoreCreated }: Ne
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
                 disabled={isLoading}
+              />
+            </div>
+
+            {/* WhatsApp Input */}
+            <div className="flex flex-col gap-2">
+              <PhoneInput
+                label="WhatsApp"
+                placeholder="(00) 00000-0000"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isLoading}
+                required
               />
             </div>
 

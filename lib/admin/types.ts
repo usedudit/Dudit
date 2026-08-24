@@ -285,6 +285,7 @@ export interface EnforcementUser {
     banned_at: string | null
     banned_until: string | null
     banned_reason: string | null
+    banned_case_id?: string | null
     created_at: string
     stores_count?: number
     partner?: {
@@ -292,6 +293,7 @@ export interface EnforcementUser {
         store_name: string
         is_active: boolean
         suspended_at: string | null
+        suspended_case_id?: string | null
         erp_disabled: boolean
         stores?: { name: string }[]
         stores_count?: number
@@ -307,6 +309,8 @@ export interface EnforcementPartner {
     erp_disabled: boolean
     suspended_at: string | null
     suspended_until: string | null
+    suspended_reason?: string | null
+    suspended_case_id?: string | null
     risk_score: number
     created_at: string
     partner_id?: string
@@ -320,6 +324,7 @@ export interface AdminStoreEntry {
     is_active: boolean
     suspended_at: string | null
     suspended_reason: string | null
+    suspended_case_id?: string | null
     risk_score: number
     created_at: string
     partner_id: string

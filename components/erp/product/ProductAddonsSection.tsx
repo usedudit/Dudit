@@ -174,9 +174,6 @@ export const ProductAddonsSection: React.FC<ProductAddonsSectionProps> = ({
                             variant: "outline",
                         }}
                     />
-                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center mb-2 text-brand-inactive-text">
-                        <PlusIcon className="w-5 h-5" />
-                    </div>
                 </div>
             ) : (
                 <div className="space-y-4">

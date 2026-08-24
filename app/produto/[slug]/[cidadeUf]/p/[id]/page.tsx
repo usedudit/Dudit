@@ -88,7 +88,8 @@ export default async function ProductDetailsPage({
 
   const userProfile = sessionData?.profile ? {
     full_name: sessionData.profile.full_name,
-    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null
+    address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null,
+    avatar_url: sessionData.profile.avatar_url || null,
   } : null
   const cartCount = sessionData?.cartCount || 0
 

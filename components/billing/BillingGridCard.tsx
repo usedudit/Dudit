@@ -87,8 +87,8 @@ const BillingGridCard = React.memo(
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Gateway</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{gatewayLabel}</span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
                         </div>
                         <div className="flex flex-col gap-0.5 items-end">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
@@ -97,11 +97,7 @@ const BillingGridCard = React.memo(
                     </div>
 
                     <div className="flex items-end justify-between mt-1">
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
-                        </div>
-
+                        <div />
                         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                             <ActionsDropdown
                                 onView={onDetails}

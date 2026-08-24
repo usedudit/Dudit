@@ -127,7 +127,7 @@ const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/lojas": "escalar",
     "/erp/logistica": "crescer",
     "/erp/transacoes": "crescer",
-    "/erp/transacoes/dre": "crescer",
+    "/erp/transacoes/dre": "escalar",
     "/erp/contas-a-pagar": "crescer",
     "/erp/contas-a-receber": "crescer",
     "/erp/caixa": "crescer",
@@ -221,7 +221,7 @@ export function ERPSidebar() {
     const pathname = usePathname()
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen, sidebarCard } = useSidebar()
     const isCollapsed = !isExpanded
-    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug } = usePermissions()
+    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug, role } = usePermissions()
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
 
@@ -327,7 +327,11 @@ export function ERPSidebar() {
                         }
                         if (item.label === "Financeiro") {
                             if (sub.href === "/erp/transacoes") return financialResourceActive
-                            if (sub.href === "/erp/transacoes/dre") return financialResourceActive
+                            if (sub.href === "/erp/transacoes/dre") {
+                                const roleId = String(role || "").toLowerCase()
+                                const isAllowedRole = !role || ["owner", "admin", "manager"].includes(roleId)
+                                return financialResourceActive && isAllowedRole
+                            }
                             if (sub.href === "/erp/contas-a-pagar") return financialResourceActive
                             if (sub.href === "/erp/contas-a-receber") return financialResourceActive
                             if (sub.href === "/erp/caixa") return financialResourceActive

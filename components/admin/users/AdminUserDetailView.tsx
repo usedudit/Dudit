@@ -190,7 +190,7 @@ export function AdminUserDetailView({
             try {
                 const res = await banUser(userId, "Banimento manual via detalhes de usuário")
                 if (res.success) {
-                    toast.success("Usuário banido com sucesso")
+                    toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                     setBanModalOpen(false)
                     loadDetail()
                     onUserUpdated?.()
@@ -337,11 +337,27 @@ export function AdminUserDetailView({
                                                 <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
                                                     <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                            Usuário Bloqueado / Banido
-                                                        </h3>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
+                                                                Usuário Bloqueado / Banido
+                                                            </h3>
+                                                            {profile.banned_case_id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(profile.banned_case_id)
+                                                                        toast.success("Protocolo do caso copiado!")
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
+                                                                    title="Clique para copiar o protocolo"
+                                                                >
+                                                                    <span>Caso: {profile.banned_case_id}</span>
+                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                         <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
                                                             Motivo: {profile.banned_reason || "Sem motivo informado."} • Banido em: {formatDate(profile.banned_at)}
+                                                            {profile.banned_until ? ` • Vigência até: ${formatDate(profile.banned_until)}` : " • Permanente"}
                                                         </p>
                                                     </div>
                                                 </div>

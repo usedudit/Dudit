@@ -6,6 +6,7 @@ import { Button, Checkbox, IconPlaceholder, Badge, FormDropdown, MoneyInput, Thr
 import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import DefaultModal from "@/components/reusable/DefaultModal"
+import AlertModal from "@/components/reusable/AlertModal"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import { SkeletonLoader } from "@/components/reusable/SkeletonLoader"
@@ -207,6 +208,13 @@ export default function TransactionsPage({
     const [financeAccounts, setFinanceAccounts] = useState<any[]>([])
     const [fallbackPaymentMethods, setFallbackPaymentMethods] = useState<any[]>([])
     const [confirmRecurringPayment, setConfirmRecurringPayment] = useState<ERPTransaction | null>(null)
+    const [paymentBalanceWarningOpen, setPaymentBalanceWarningOpen] = useState(false)
+    const [paymentBalanceWarningMeta, setPaymentBalanceWarningMeta] = useState<{
+        accountName: string
+        currentBalance: number
+        amount: number
+    }>({ accountName: "", currentBalance: 0, amount: 0 })
+    const skipPaymentBalanceWarningRef = useRef(false)
     const [confirmSettleGroup, setConfirmSettleGroup] = useState<ERPTransaction | null>(null)
     const [confirmCancelTransaction, setConfirmCancelTransaction] = useState<ERPTransaction | null>(null)
     const [cancelReason, setCancelReason] = useState("")
@@ -1289,6 +1297,22 @@ export default function TransactionsPage({
             notifyError("Selecione uma conta bancária para registrar o pagamento.")
             return
         }
+
+        if (!skipPaymentBalanceWarningRef.current) {
+            const acc = financeAccounts.find((a: any) => a.id === financeAccountId)
+            const accBal = acc ? Number(acc.current_balance ?? 0) : 0
+            if (accBal + 0.005 < finalPaid) {
+                setPaymentBalanceWarningMeta({
+                    accountName: acc?.name || "Conta selecionada",
+                    currentBalance: accBal,
+                    amount: finalPaid,
+                })
+                setPaymentBalanceWarningOpen(true)
+                return
+            }
+        }
+        skipPaymentBalanceWarningRef.current = false
+
         setPayingInstallment(true)
         try {
             if (selectedInstallmentForPayment.isRecurringOccurrence) {
@@ -1644,6 +1668,24 @@ export default function TransactionsPage({
                                     ? "Cancelando transação..."
                                     : "Salvando..."
                     }
+                />
+
+                <AlertModal
+                    isOpen={paymentBalanceWarningOpen}
+                    onClose={() => {
+                        setPaymentBalanceWarningOpen(false)
+                        skipPaymentBalanceWarningRef.current = false
+                    }}
+                    onConfirm={() => {
+                        skipPaymentBalanceWarningRef.current = true
+                        setPaymentBalanceWarningOpen(false)
+                        void handleConfirmInstallmentPayment()
+                    }}
+                    title="Saldo insuficiente na conta"
+                    description={`O valor do pagamento (${formatCurrency(paymentBalanceWarningMeta.amount)}) é maior que o saldo atual da conta ${paymentBalanceWarningMeta.accountName} (${formatCurrency(paymentBalanceWarningMeta.currentBalance)}). Deseja continuar mesmo assim?`}
+                    confirmText="Continuar mesmo assim"
+                    cancelText="Cancelar"
+                    variant="warning"
                 />
             </>
         )
@@ -2209,7 +2251,7 @@ export default function TransactionsPage({
                     partnerId={partnerId}
                     storeId={storeId}
                     categories={categories}
-                    accounts={accounts}
+                    accounts={financeAccounts && financeAccounts.length > 0 ? financeAccounts : accounts}
                     paymentMethods={paymentMethods}
                     editTransaction={editingTx || undefined}
                     editRecurringTemplateId={entityState.entityType === "recurring" ? (entityState.entityId || undefined) : undefined}

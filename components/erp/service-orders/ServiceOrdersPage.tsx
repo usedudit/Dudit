@@ -7,7 +7,7 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { Button, Checkbox, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -41,6 +41,38 @@ import {
   updateServiceOrderStatusAction,
 } from "@/app/actions/erp/service-orders"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+
+const SERVICE_STATUS_ORDER: string[] = [
+  "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
+  "aguardando_peca", "concluida", "entregue"
+]
+
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  aberta: ["aguardando_aprovacao", "cancelada"],
+  aguardando_aprovacao: ["aprovada", "cancelada"],
+  aprovada: ["em_andamento", "cancelada"],
+  em_andamento: ["aguardando_peca", "concluida", "cancelada"],
+  aguardando_peca: ["em_andamento", "cancelada"],
+  concluida: ["entregue"],
+  entregue: [],
+  cancelada: [],
+}
+
+function doesServiceTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
+  if (currentStatus === "cancelada" || nextStatus === "cancelada") return false
+  const currentIdx = SERVICE_STATUS_ORDER.indexOf(currentStatus)
+  const nextIdx = SERVICE_STATUS_ORDER.indexOf(nextStatus)
+  if (currentIdx === -1 || nextIdx === -1) return false
+  return nextIdx < currentIdx
+}
+
+const CHANGE_STATUS_REASONS = [
+  { value: "operational_error", label: "Erro operacional / Clique acidental" },
+  { value: "client_request", label: "Solicitação do cliente" },
+  { value: "rework", label: "Retrabalho necessário" },
+  { value: "logistics_issue", label: "Problema logístico" },
+  { value: "other", label: "Outro" }
+]
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
   { id: "order_number", label: "Nº OS", align: "left", width: "150px" },
@@ -91,6 +123,9 @@ export default function ServiceOrdersPage({
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null)
   const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [statusModal, setStatusModal] = useState<{ orderId: string; currentStatus: string; nextStatus: string } | null>(null)
+  const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
+  const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
   const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
   const itemsPerPage = 50
 
@@ -286,7 +321,7 @@ export default function ServiceOrdersPage({
     }, { selectedIds: selection, totalCount: sortedOrders.length })
   }, [exportData, partnerId, storeId, debouncedSearch, activeTab, filters.status, selection, sortedOrders.length])
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  const handleStatusChange = async (id: string, newStatus: string, reason?: string) => {
     setIsUpdatingStatus(true)
     try {
       const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
@@ -300,6 +335,49 @@ export default function ServiceOrdersPage({
     } finally {
       setIsUpdatingStatus(false)
     }
+  }
+
+  const handleStatusTransition = (orderId: string, currentStatus: string, nextStatus: string) => {
+    setStatusModal(null)
+    if (currentStatus === nextStatus) return
+
+    if (doesServiceTransitionRequireReason(currentStatus, nextStatus)) {
+      setStatusWarningModal({
+        isOpen: true,
+        orderId,
+        currentStatus,
+        nextStatus,
+        reasonValue: "",
+        customReason: "",
+      })
+    } else {
+      setSimpleConfirmModal({
+        isOpen: true,
+        orderId,
+        nextStatus,
+      })
+    }
+  }
+
+  const confirmStatusWarning = async () => {
+    if (!statusWarningModal) return
+    const { orderId, nextStatus, reasonValue, customReason } = statusWarningModal
+    let finalReason = reasonValue
+    if (reasonValue === "other" && customReason.trim()) {
+      finalReason = `Outro: ${customReason.trim()}`
+    } else {
+      const foundLabel = CHANGE_STATUS_REASONS.find(r => r.value === reasonValue)?.label
+      if (foundLabel) finalReason = foundLabel
+    }
+    setStatusWarningModal(null)
+    await handleStatusChange(orderId, nextStatus, finalReason)
+  }
+
+  const handleOpenStatusModal = (orderId: string) => {
+    const order = effectiveOrders?.find((o: any) => o.id === orderId)
+    if (!order) return
+    const currentStatus = order.status || "aberta"
+    setStatusModal({ orderId, currentStatus, nextStatus: currentStatus })
   }
 
   const handleDelete = async (id: string) => {
@@ -712,7 +790,7 @@ export default function ServiceOrdersPage({
                                 }}
                                 onDetails={() => openEntity("view", o.id)}
                                 onEdit={() => openEntity("edit", o.id)}
-                                onStatus={() => handleStatusChange(o.id, "aguardando_aprovacao")}
+                                onStatus={() => handleOpenStatusModal(o.id)}
                                 onShare={async () => {
                                   const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                   const token = await ensurePublicTokenAction(partnerId, o.id)
@@ -791,7 +869,7 @@ export default function ServiceOrdersPage({
                                       }}
                                       onDetails={() => openEntity("view", o.id)}
                                       onEdit={() => openEntity("edit", o.id)}
-                                      onStatus={() => handleStatusChange(o.id, "aguardando_aprovacao")}
+                                      onStatus={() => handleOpenStatusModal(o.id)}
                                       onShare={async () => {
                                         const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
                                         const token = await ensurePublicTokenAction(partnerId, o.id)
@@ -912,6 +990,118 @@ export default function ServiceOrdersPage({
         confirmText="Excluir"
         cancelText="Cancelar"
         variant="danger"
+      />
+
+      <DefaultModal
+        isOpen={!!statusModal}
+        onClose={() => setStatusModal(null)}
+        title="Alterar Status"
+        maxWidth="sm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <Button variant="outline" onClick={() => setStatusModal(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (statusModal && statusModal.nextStatus && statusModal.nextStatus !== statusModal.currentStatus) {
+                  handleStatusTransition(statusModal.orderId, statusModal.currentStatus, statusModal.nextStatus)
+                }
+              }}
+              disabled={!statusModal?.nextStatus || statusModal?.nextStatus === statusModal?.currentStatus}
+            >
+              Confirmar
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+            Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[statusModal?.currentStatus as ServiceOrderStatus]?.label || statusModal?.currentStatus}</strong>
+          </p>
+          {(() => {
+            const currentStatus = statusModal?.currentStatus || "aberta"
+            const transitions = STATUS_TRANSITIONS[currentStatus] || []
+            if (transitions.length === 0) {
+              return <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
+            }
+            return (
+              <FormDropdown
+                label="Novo Status"
+                value={statusModal?.nextStatus || ""}
+                setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
+                options={transitions.map((s) => ({
+                  value: s,
+                  label: SERVICE_ORDER_STATUS_META[s as ServiceOrderStatus]?.label || s
+                }))}
+                placeholder="Selecione o novo status"
+              />
+            )
+          })()}
+        </div>
+      </DefaultModal>
+
+      <AlertModal
+        isOpen={statusWarningModal?.isOpen ?? false}
+        onClose={() => setStatusWarningModal(null)}
+        onConfirm={confirmStatusWarning}
+        title="Atenção: Alteração de Status"
+        message={
+          <div className="flex flex-col gap-4 text-left">
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+              Esta OS já estava como{" "}
+              <strong className="text-brand-dark dark:text-dark-heading">
+                {SERVICE_ORDER_STATUS_META[statusWarningModal?.currentStatus as ServiceOrderStatus]?.label || statusWarningModal?.currentStatus}
+              </strong>{" "}
+              e você está alterando para{" "}
+              <strong className="text-brand-dark dark:text-dark-heading">
+                {SERVICE_ORDER_STATUS_META[statusWarningModal?.nextStatus as ServiceOrderStatus]?.label || statusWarningModal?.nextStatus}
+              </strong>.
+              Esta ação requer uma justificativa.
+            </p>
+            <div className="flex flex-col gap-4 mt-2">
+              <FormDropdown
+                label="Motivo da alteração"
+                options={CHANGE_STATUS_REASONS}
+                value={statusWarningModal?.reasonValue || ""}
+                setValue={(val) => setStatusWarningModal(prev => prev ? { ...prev, reasonValue: val } : null)}
+                placeholder="Selecione o motivo"
+              />
+              {statusWarningModal?.reasonValue === "other" && (
+                <Input
+                  label="Descreva o motivo"
+                  placeholder="Digite o motivo aqui..."
+                  value={statusWarningModal?.customReason || ""}
+                  onChange={(e) => setStatusWarningModal(prev => prev ? { ...prev, customReason: e.target.value } : null)}
+                />
+              )}
+            </div>
+          </div>
+        }
+        confirmText="Confirmar Alteração"
+        cancelText="Cancelar"
+        variant="warning"
+        disabled={
+          !statusWarningModal?.reasonValue ||
+          (statusWarningModal.reasonValue === "other" && !statusWarningModal.customReason.trim())
+        }
+      />
+
+      <AlertModal
+        isOpen={simpleConfirmModal?.isOpen ?? false}
+        title="Confirmar Alteração de Status"
+        description={`Tem certeza que deseja alterar o status desta OS para ${SERVICE_ORDER_STATUS_META[simpleConfirmModal?.nextStatus as ServiceOrderStatus]?.label || simpleConfirmModal?.nextStatus}?`}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        onClose={() => setSimpleConfirmModal(null)}
+        onConfirm={async () => {
+          if (simpleConfirmModal) {
+            const { orderId, nextStatus } = simpleConfirmModal
+            setSimpleConfirmModal(null)
+            await handleStatusChange(orderId, nextStatus)
+          }
+        }}
+        variant="info"
       />
     </>
   )

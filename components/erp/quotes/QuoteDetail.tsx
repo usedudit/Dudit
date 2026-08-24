@@ -273,7 +273,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             notifySuccess(
                 d.alreadyConverted ? "Pedido já existente" : "Pedido criado",
                 d.alreadyConverted
-                    ? "Este orçamento já havia sido convertido. Abrindo o pedido."
+                    ? "Este orçamento já havia sido convertido."
                     : `Venda ${d.orderNumber || d.orderId} criada com sucesso.`
             );
             setQuote((prev: any) =>
@@ -281,7 +281,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
             );
             lastLoadedHistoryQuoteId.current = null;
             debouncedRefresh();
-            router.push(`/erp/pedidos/${d.orderId}`);
+            onBack();
         } catch {
             notifyError("Erro", "Falha de conexão ao converter o orçamento.");
         } finally {
@@ -589,7 +589,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                             <Button
                                                                 variant="outline"
                                                                 className="mt-3 h-12"
-                                                                onClick={() => router.push(`/erp/pedidos/${quote.converted_order_id}`)}
+                                                                onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
                                                             >
                                                                 Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
                                                             </Button>

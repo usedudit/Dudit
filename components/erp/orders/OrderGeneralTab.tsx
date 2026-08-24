@@ -664,9 +664,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 {!hasOnlyServices && (
                                     <PaymentRow label="Método de Entrega" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{deliveryMethod === "pickup" ? "Retirada pessoalmente" : "Entrega / Delivery"}</span>} />
                                 )}
-                                {!isQuickMode && (
-                                    <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
-                                )}
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -755,14 +752,9 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
 
-                                <PaymentRow
-                                    label="Tipo de Entrega"
-                                    value={
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                            {deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                        </span>
-                                    }
-                                />
+                                {!isQuickMode && (
+                                    <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                                )}
 
                                 {(Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
                                     <PaymentRow
@@ -883,10 +875,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                     )}
 
                     {/* --- 2. PAYMENT CARD --- */}
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
-                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
+                    {!isPaidOrder && (
+                        <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 flex flex-col gap-6 mt-6">
+                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
 
-                        {!isPaidOrder && (
                             <div className="space-y-4">
                                 <div className="flex flex-col gap-3">
                                     {!isQuickMode && (
@@ -980,19 +972,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             </span>
                                         </div>
                                     </div>
-
-                                    <Button
-                                        size="lg"
-                                        className="w-full mt-4"
-                                        onClick={handleSaveOrder}
-                                        disabled={isSaving}
-                                    >
-                                        Ir para Pagamento
-                                    </Button>
                                 </div>
+
+                                <Button
+                                    size="lg"
+                                    className="w-full mt-4"
+                                    onClick={handleSaveOrder}
+                                    disabled={isSaving}
+                                >
+                                    Ir para Pagamento
+                                </Button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1300,7 +1292,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 </FormSection>
 
                 {/* 3. Configurações do Pedido (Mobile) */}
-                <FormSection title="Configurações do Pedido">
+                <FormSection title="Configurações do Pedido" hasSeparator>
                     {isPaidOrder ? (
                         <div className="space-y-4 text-left">
                             <PaymentRow label="Data do Pedido" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatDateString(orderDate)}</span>} />
@@ -1367,6 +1359,109 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                         </div>
                     )}
                 </FormSection>
+
+                {/* 4. Dados do Pagamento (Mobile) */}
+                {isPaidOrder && (
+                    <FormSection title="Pagamento" hasSeparator>
+                        <div className="space-y-4 text-left">
+                            <PaymentRow
+                                label="Método de Pagamento"
+                                value={
+                                    <div className="flex items-center gap-2">
+                                        <PaymentMethodIndicator label={paymentMethodLabel} />
+                                    </div>
+                                }
+                            />
+
+                            {paymentBreakdown.length > 1 && (
+                                <div className="md:col-span-2">
+                                    <PaymentRow
+                                        label="Valores por meio"
+                                        value={
+                                            <div className="flex flex-col gap-1">
+                                                {paymentBreakdown.map((entry: any, index: number) => (
+                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                        {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        }
+                                    />
+                                </div>
+                            )}
+
+                            <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
+
+                            {!isQuickMode && (
+                                <PaymentRow label="Conta de recebimento" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{accountOptions.find(opt => opt.value === financeAccountId)?.label || "Não informado"}</span>} />
+                            )}
+
+                            {(Number(shippingFee || 0) > 0 || originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) && (
+                                <PaymentRow
+                                    label="Valor da Entrega"
+                                    value={
+                                        (originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
+                                            <div className="text-right">
+                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                    {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
+                                                </span>
+                                                <span className="ml-2 inline-block rounded bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                    Subsidiado pela loja
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>
+                                        )
+                                    }
+                                />
+                            )}
+
+                            {Number(otherCosts || 0) > 0 && (
+                                <PaymentRow
+                                    label="Outros Custos"
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(otherCosts)}</span>}
+                                />
+                            )}
+
+                            {Number(discountAmount || 0) > 0 && (
+                                <PaymentRow
+                                    label="Desconto do Pedido"
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>}
+                                />
+                            )}
+
+                            {couponDiscountAmount > 0 && (
+                                <PaymentRow
+                                    label="Desconto por Cupom"
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>}
+                                />
+                            )}
+
+                            {paymentMethodDiscountAmount > 0 && (
+                                <PaymentRow
+                                    label={
+                                        originalPaymentMethod === "exchange" ? "Crédito de troca" :
+                                            originalPaymentMethod === "store_credit" ? "Vale-compra" :
+                                                "Desconto do Método"
+                                    }
+                                    value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>}
+                                />
+                            )}
+
+                            {paymentMethodExtraAmount > 0 && (
+                                <PaymentRow
+                                    label="Taxa do Método"
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
+                                />
+                            )}
+
+                            <div className="md:col-span-2 flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
+                            </div>
+                        </div>
+                    </FormSection>
+                )}
             </div>
         </FadeIn>
     )

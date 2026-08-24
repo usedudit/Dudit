@@ -223,6 +223,7 @@ export function ExplorarPageClient({
     const [activeTab, setActiveTab] = useState<"filtros" | "ordenar">("filtros")
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
+    const [isMobileScrolled, setIsMobileScrolled] = useState(false)
 
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
@@ -390,6 +391,21 @@ export function ExplorarPageClient({
                 console.error("Error querying geolocation permission:", err)
             })
         }
+    }, [])
+
+    useEffect(() => {
+        let ticking = false
+        const onScroll = () => {
+            if (ticking) return
+            window.requestAnimationFrame(() => {
+                setIsMobileScrolled(window.scrollY > 10)
+                ticking = false
+            })
+            ticking = true
+        }
+        onScroll()
+        window.addEventListener("scroll", onScroll, { passive: true })
+        return () => window.removeEventListener("scroll", onScroll)
     }, [])
 
     const limitConfig = useMemo(() => {
@@ -1380,14 +1396,15 @@ export function ExplorarPageClient({
                         activeFiltersCount={activeFiltersCount}
                         onOpenFilters={() => setIsFiltersBottomSheetOpen(true)}
                         onOpenSort={() => setIsSortBottomSheetOpen(true)}
+                        isVisible={isMobileScrolled}
                     />
                 )}
 
-                {/* Add padding to account for sticky mobile controls */}
+                {/* Always reserve space for sticky mobile controls */}
                 {!isLandingPage && rawItems.length > 0 && <div className="lg:hidden h-[46px]" />}
 
                 {/* MAIN CONTENT */}
-                <div className="container mx-auto max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4">
+                <div className="container mx-auto max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
                     {!query && activeCategoriesList.length > 0 && !isLandingPage && (
                         <div className="mb-6 lg:mb-8">

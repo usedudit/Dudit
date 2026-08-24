@@ -1,9 +1,11 @@
 import { getCurrentUser } from "@/lib/auth/server-user"
-import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getDreReport, type DreRegime } from "@/lib/services/dre.service"
 import { DreA4Preview } from "@/components/erp/financial/dre/receipt/DreA4Preview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { redirect, notFound } from "next/navigation"
+import { createAdminClient } from "@/lib/supabase/server"
 
 interface PrintDrePageProps {
   searchParams: Promise<{
@@ -36,19 +38,74 @@ export default async function PrintDrePage({ searchParams }: PrintDrePageProps) 
     redirect("/auth/login")
   }
 
-  try {
-    await requirePartnerAccessWithPermission(partnerId, "financial", "view", user)
-  } catch {
+  const admin = createAdminClient()
+  const [plan, partnerRes, puRes] = await Promise.all([
+    getPartnerPlan(partnerId),
+    admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
+    admin.from("partner_users").select("id, role_id").eq("partner_id", partnerId).eq("user_id", user.id).maybeSingle(),
+  ])
+
+  // 1. Validação do Plano Escalar
+  if (!hasMinimumPlan(plan.slug, "escalar")) {
     return (
       <div className="p-8 text-center text-red-600 font-bold font-sans">
-        Acesso negado. Você não possui permissão para visualizar este relatório.
+        O DRE é um recurso exclusivo do Plano Escalar.
       </div>
     )
+  }
+
+  const isPartnerOwner = partnerRes.data?.user_id === user.id
+  const roleId = String(puRes.data?.role_id || "").toLowerCase()
+
+  // 2. Validação de Role: Apenas owner, admin e gerente (manager)
+  if (!isPartnerOwner && !["owner", "admin", "manager"].includes(roleId)) {
+    return (
+      <div className="p-8 text-center text-red-600 font-bold font-sans">
+        Apenas proprietários, administradores e gerentes podem visualizar o DRE.
+      </div>
+    )
+  }
+
+  // 3. Validação de Lojas Acessíveis
+  let allowedStoreIds: string[] | null = null
+  if (!isPartnerOwner && roleId !== "owner") {
+    if (!puRes.data) {
+      return (
+        <div className="p-8 text-center text-red-600 font-bold font-sans">
+          Acesso negado às lojas desta empresa.
+        </div>
+      )
+    }
+    const { data: members } = await admin
+      .from("store_members")
+      .select("store_id")
+      .eq("partner_user_id", puRes.data.id)
+
+    const memberStoreIds = (members || []).map((m: any) => m.store_id)
+    if (memberStoreIds.length === 0) {
+      return (
+        <div className="p-8 text-center text-red-600 font-bold font-sans">
+          Acesso negado às lojas desta empresa.
+        </div>
+      )
+    }
+    allowedStoreIds = memberStoreIds
+  }
+
+  if (storeId && storeId !== "all") {
+    if (allowedStoreIds !== null && !allowedStoreIds.includes(storeId)) {
+      return (
+        <div className="p-8 text-center text-red-600 font-bold font-sans">
+          Você não possui permissão para visualizar os dados desta loja.
+        </div>
+      )
+    }
   }
 
   const report = await getDreReport({
     partnerId,
     storeId: storeId === "all" ? null : storeId,
+    allowedStoreIds: storeId && storeId !== "all" ? null : allowedStoreIds,
     startDate,
     endDate,
     regime,

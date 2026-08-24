@@ -48,6 +48,7 @@ import {
     isDatePeriodFilterActive,
     type DatePeriodFilterValue,
 } from "@/lib/utils/filter-date-period"
+import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
 
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import AlertModal from "../../reusable/AlertModal"
@@ -310,7 +311,7 @@ export default function OrdersPage({
                 title: "Origem",
                 type: "checkbox-list",
                 options: Array.from(
-                    new Set(effectiveOrders?.map((o: any) => o.order_source || "Manual") || []),
+                    new Set(effectiveOrders?.map((o: any) => normalizeOrderSource(o.order_source)) || []),
                 ) as string[],
             },
         ],
@@ -355,7 +356,7 @@ export default function OrdersPage({
                 }
 
                 const orderItems = o.order_items || []
-                const hasOnlyServices = o.order_source === "admin_service_order" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
+                const hasOnlyServices = o.order_source === "admin_service_order" || o.order_source === "Ordem de Serviço" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
                 const deliveryType = o.delivery_type || "delivery"
 
                 return {
@@ -374,7 +375,7 @@ export default function OrdersPage({
                     formattedDate: formatDate(o.order_date || o.created_at),
                     formattedTime: formatTime(o.order_date || o.created_at),
                     store_name: o.stores?.name || "-",
-                    order_source: o.order_source || "Manual",
+                    order_source: normalizeOrderSource(o.order_source),
                     items_count: o.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || o.quantity || 0,
                     created_at_time: new Date(o.order_date || o.created_at).getTime(),
                     situation: o.situation,
@@ -653,7 +654,7 @@ export default function OrdersPage({
     const openNotesSheet = (order: { originalId?: string; id?: string; notes?: string | null }) => {
         const orderId = order.originalId || order.id || null
         if (!orderId) return
-        const cleanNotes = String(order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
+        const cleanNotes = cleanOrderNotes(order.notes)
         setNotesSheet({ open: true, orderId, notes: cleanNotes })
     }
 

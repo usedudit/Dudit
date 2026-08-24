@@ -88,7 +88,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
   ])
   const sessionData = user ? await getUserSessionData(user.id) : null
 
-  const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null } : null
+  const userProfile = sessionData?.profile ? { full_name: sessionData.profile.full_name, address: sessionData.profile.city ? `${sessionData.profile.city} - ${sessionData.profile.state}` : null, avatar_url: sessionData.profile.avatar_url || null } : null
   const cartCount = sessionData?.cartCount || 0
 
   const filteredProducts = (products || []).filter((p: any) => p.store_is_active !== false)

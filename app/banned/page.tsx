@@ -20,9 +20,9 @@ export default async function BannedPage() {
 
     const { data: profile } = await supabase
         .from("user_profiles")
-        .select("banned_at, banned_until, banned_reason")
+        .select("banned_at, banned_until, banned_reason, banned_case_id, full_name")
         .eq("user_id", user.id)
         .single()
 
-    return <BannedView profile={profile} />
+    return <BannedView profile={profile} user={user} />
 }

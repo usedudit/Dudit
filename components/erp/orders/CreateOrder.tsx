@@ -52,6 +52,7 @@ import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
+import { cleanOrderNotes } from "@/lib/orders/order-utils"
 
 interface CreateOrderProps {
     onBack: () => void
@@ -579,7 +580,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 setDeliveryDate(order.created_at.split('T')[0])
                 setDeliveryTime(formatCurrentLocalTime(new Date(order.created_at)))
                 setFinanceAccountId(order.finance_account_id || "")
-                setNotes(order.notes || "")
+                setNotes(cleanOrderNotes(order.notes))
                 setShippingFee((order.delivery_fee || 0).toString())
                 setOtherCosts((order.additional_costs || 0).toString())
                 setDiscountValue(order.discount_value || 0)

@@ -95,7 +95,25 @@ export async function createSubscriptionPreapprovalAction(input: CreatePreapprov
       return { success: false, error: "Este plano não suporta pagamento automático via Mercado Pago." }
     }
 
-    const nextExecutionAt = new Date().toISOString()
+    const now = new Date()
+    const freqType = plan.frequency_type
+    const freqInterval = Number(plan.frequency_interval || 1)
+    let nextExecutionAt: string
+    if (freqType === "day") {
+      nextExecutionAt = new Date(now.getTime() + freqInterval * 24 * 60 * 60 * 1000).toISOString()
+    } else if (freqType === "week") {
+      nextExecutionAt = new Date(now.getTime() + freqInterval * 7 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (freqType === "month") {
+      const d = new Date(now)
+      d.setMonth(d.getMonth() + freqInterval)
+      nextExecutionAt = d.toISOString()
+    } else if (freqType === "year") {
+      const d = new Date(now)
+      d.setFullYear(d.getFullYear() + freqInterval)
+      nextExecutionAt = d.toISOString()
+    } else {
+      nextExecutionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
 
     // 3. Insert local subscription record as 'pending' (Awaiting approval from webhook/server)
     const { data: sub, error: subErr } = await admin

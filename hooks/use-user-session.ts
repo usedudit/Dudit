@@ -7,6 +7,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 interface UserProfileData {
   full_name: string | null
   address: string | null
+  avatar_url: string | null
 }
 
 interface UserSessionData {
@@ -28,7 +29,7 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     if (!user) return null
 
     const [profileRes, cartRes, addressRes] = await Promise.all([
-      supabase.from("user_profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
       supabase.from("cart_items").select("quantity").eq("user_id", user.id),
       supabase.from("addresses").select("city, state")
         .eq("user_id", user.id)
@@ -47,7 +48,7 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     const cartCount = cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0)
 
     return {
-      profile: profileData ? { full_name: profileData.full_name, address: addressStr } : null,
+      profile: profileData ? { full_name: profileData.full_name, address: addressStr, avatar_url: profileData.avatar_url || null } : null,
       cartCount
     }
   }, [user, supabase])

@@ -23,6 +23,17 @@ function sanitizeIlike(input: string): string {
 }
 import type { EnforcementUser, EnforcementPartner, CursorPaginatedResult } from "@/lib/admin/types"
 
+// ─── Helper: Generate Clean Human-Readable Case Protocol ID (CAS-XXXXXXXX) ───
+
+export function generateCaseId(prefix: string = "CAS"): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // 32 chars, no 0/O, 1/I to avoid user confusion
+    let result = ""
+    for (let i = 0; i < 8; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return `${prefix}-${result}`
+}
+
 // ─── Helper: increment partner risk_score (capped at 100) ──────────────────
 
 async function incrementRiskScore(partnerId: string, points: number): Promise<void> {
@@ -108,7 +119,7 @@ export async function getUsers(
 
     let query = supabase
         .from("user_profiles")
-        .select("user_id, full_name, avatar_url, phone, cpf, banned_at, banned_until, banned_reason, created_at")
+        .select("user_id, full_name, avatar_url, phone, cpf, banned_at, banned_until, banned_reason, banned_case_id, created_at")
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
@@ -149,11 +160,11 @@ export async function getUsers(
         const [partnersRes, partnerUsersRes, authUsers] = await Promise.all([
             supabase
                 .from("partners")
-                .select("id, user_id, is_active, suspended_at, erp_disabled, stores(id, name)")
+                .select("id, user_id, is_active, suspended_at, suspended_case_id, erp_disabled, stores(id, name)")
                 .in("user_id", userIds),
             supabase
                 .from("partner_users")
-                .select("partner_id, user_id, partners(id, is_active, suspended_at, erp_disabled, stores(id, name))")
+                .select("partner_id, user_id, partners(id, is_active, suspended_at, suspended_case_id, erp_disabled, stores(id, name))")
                 .in("user_id", userIds),
             Promise.allSettled(
                 userIds.map(async (uid: string) => {
@@ -197,6 +208,7 @@ export async function getUsers(
             banned_at: p.banned_at,
             banned_until: p.banned_until,
             banned_reason: p.banned_reason,
+            banned_case_id: p.banned_case_id,
             created_at: p.created_at,
             stores_count: storesCount,
             partner: partnerInfo
@@ -205,6 +217,7 @@ export async function getUsers(
                     store_name: partnerInfo.stores?.[0]?.name || "Loja",
                     is_active: partnerInfo.is_active,
                     suspended_at: partnerInfo.suspended_at,
+                    suspended_case_id: partnerInfo.suspended_case_id,
                     erp_disabled: partnerInfo.erp_disabled,
                     stores_count: storesCount,
                 }
@@ -648,7 +661,7 @@ export async function getPartners(
     // Main query: fetch stores with partner info
     let storeQuery = supabase
         .from("stores")
-        .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
+        .select("id, name, is_active, suspended_at, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
 
     if (search && search.trim().length > 0) {
         const sanitized = sanitizeIlike(search.trim())
@@ -686,7 +699,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: partners } = await supabase
             .from("partners")
-            .select("id, user_id, is_active, erp_disabled, suspended_at, suspended_until, created_at, stores(name, risk_score)")
+            .select("id, user_id, is_active, erp_disabled, suspended_at, suspended_until, suspended_reason, suspended_case_id, created_at, stores(name, risk_score)")
             .in("id", partnerIds)
         if (partners) {
             partnerMap = new Map(partners.map((p: any) => [p.id, p]))
@@ -707,7 +720,7 @@ export async function getPartners(
     if (partnerIds.length > 0) {
         const { data: allStores } = await supabase
             .from("stores")
-            .select("id, name, is_active, suspended_at, suspended_reason, risk_score, created_at, partner_id")
+            .select("id, name, is_active, suspended_at, suspended_reason, suspended_case_id, risk_score, created_at, partner_id")
             .in("partner_id", partnerIds)
         if (allStores) {
             for (const s of allStores) {
@@ -726,9 +739,11 @@ export async function getPartners(
             owner_name: ownerMap.get(partner?.user_id) || "Desconhecido",
             owner_user_id: partner?.user_id || "",
             is_active: s.is_active,
-            erp_disabled: !s.is_active,
-            suspended_at: s.suspended_at,
-            suspended_until: null,
+            erp_disabled: partner ? !!partner.erp_disabled : false,
+            suspended_at: s.suspended_at || partner?.suspended_at || null,
+            suspended_until: partner?.suspended_until || null,
+            suspended_reason: s.suspended_reason || partner?.suspended_reason || null,
+            suspended_case_id: s.suspended_case_id || partner?.suspended_case_id || null,
             risk_score: s.risk_score || 0,
             created_at: s.created_at,
             partner_id: s.partner_id,
@@ -739,6 +754,7 @@ export async function getPartners(
                 is_active: st.is_active,
                 suspended_at: st.suspended_at,
                 suspended_reason: st.suspended_reason,
+                suspended_case_id: st.suspended_case_id,
                 risk_score: st.risk_score || 0,
                 created_at: st.created_at,
                 partner_id: st.partner_id,
@@ -758,14 +774,12 @@ export async function getPartners(
 
 export async function enableTenantAccess(
     partnerId: string,
-    reason: string
+    reason: string = "Reativação administrativa de acesso ao ERP"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
-    if (!reason || reason.trim().length < 5) {
-        return { success: false, error: "O motivo deve ter pelo menos 5 caracteres" }
-    }
+    const finalReason = reason && reason.trim().length >= 5 ? reason.trim() : "Reativação administrativa de acesso ao ERP"
 
     const supabase = getAdminClient()
 
@@ -801,6 +815,8 @@ export async function enableTenantAccess(
             erp_disabled_at: null,
             erp_disabled_by: null,
             suspended_until: null,
+            suspended_reason: null,
+            suspended_case_id: null,
         } as any)
         .eq("id", partnerId)
 
@@ -826,7 +842,7 @@ export async function banUser(
     reason: string,
     durationDays: number | null = null,
     stepUpToken: string = "admin-confirmed"
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
@@ -861,6 +877,8 @@ export async function banUser(
         ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
         : null  // null = permanent ban
 
+    const caseId = generateCaseId("CAS")
+
     const { error: updateError } = await supabase
         .from("user_profiles")
         .update({
@@ -868,6 +886,7 @@ export async function banUser(
             banned_until: bannedUntil,
             banned_reason: reason.trim(),
             banned_by: admin.userId,
+            banned_case_id: caseId,
         } as any)
         .eq("user_id", targetUserId)
 
@@ -880,7 +899,7 @@ export async function banUser(
         actionType: AdminActionType.USER_BAN,
         targetType: "user",
         targetId: targetUserId,
-        metadata: { reason: reason.trim(), targetName: user.full_name, durationDays: durationDays || "permanent", bannedUntil },
+        metadata: { case_id: caseId, reason: reason.trim(), targetName: user.full_name, durationDays: durationDays || "permanent", bannedUntil },
     })
 
     // If user has partner, deactivate their products + increment risk_score
@@ -895,7 +914,7 @@ export async function banUser(
         await incrementRiskScore(partner.id, 10)
     }
 
-    return { success: true }
+    return { success: true, caseId }
 }
 
 // ─── Unban User ─────────────────────────────────────────────────────────────
@@ -935,6 +954,7 @@ export async function unbanUser(
             banned_until: null,
             banned_reason: null,
             banned_by: null,
+            banned_case_id: null,
         } as any)
         .eq("user_id", targetUserId)
 
@@ -953,13 +973,13 @@ export async function unbanUser(
     return { success: true }
 }
 
-// ─── Suspend Partner ⚠️ (step-up required) ──────────────────────────────────
+// ─── Suspend Partner (Tenant ERP + All Stores) ⚠️ (step-up required) ────────
 
 export async function suspendPartner(
     partnerId: string,
     reason: string,
     stepUpToken: string = "admin-confirmed"
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
@@ -998,6 +1018,8 @@ export async function suspendPartner(
         return { success: false, error: "Parceiro já está suspenso" }
     }
 
+    const caseId = generateCaseId("CAS")
+
     // Mass-assignment: whitelisted
     const { error: updateError } = await supabase
         .from("partners")
@@ -1006,6 +1028,7 @@ export async function suspendPartner(
             suspended_at: new Date().toISOString(),
             suspended_reason: reason.trim(),
             suspended_by: admin.userId,
+            suspended_case_id: caseId,
         } as any)
         .eq("id", partnerId)
 
@@ -1021,6 +1044,7 @@ export async function suspendPartner(
             suspended_at: new Date().toISOString(),
             suspended_reason: `Parceiro suspenso: ${reason.trim()}`,
             suspended_by: admin.userId,
+            suspended_case_id: caseId,
         } as any)
         .eq("partner_id", partnerId)
 
@@ -1029,13 +1053,13 @@ export async function suspendPartner(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName },
     })
 
-    return { success: true }
+    return { success: true, caseId }
 }
 
-// ─── Unsuspend Partner ──────────────────────────────────────────────────────
+// ─── Unsuspend Partner (Tenant ERP + All Stores) ────────────────────────────
 
 export async function unsuspendPartner(
     partnerId: string,
@@ -1082,6 +1106,7 @@ export async function unsuspendPartner(
             suspended_at: null,
             suspended_reason: null,
             suspended_by: null,
+            suspended_case_id: null,
         } as any)
         .eq("id", partnerId)
 
@@ -1097,6 +1122,7 @@ export async function unsuspendPartner(
             suspended_at: null,
             suspended_reason: null,
             suspended_by: null,
+            suspended_case_id: null,
         } as any)
         .eq("partner_id", partnerId)
 
@@ -1111,13 +1137,13 @@ export async function unsuspendPartner(
     return { success: true }
 }
 
-// ─── Suspend Store (store-level, not partner) ⚠️ (step-up required) ─────────
+// ─── Suspend Single Store (Specific store, not partner) ⚠️ (step-up required) 
 
 export async function suspendStore(
     storeId: string,
     reason: string,
     stepUpToken: string = "admin-confirmed"
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
@@ -1142,6 +1168,8 @@ export async function suspendStore(
         return { success: false, error: "Loja já está suspensa" }
     }
 
+    const caseId = generateCaseId("CAS")
+
     const { error: updateError } = await supabase
         .from("stores")
         .update({
@@ -1149,6 +1177,7 @@ export async function suspendStore(
             suspended_at: new Date().toISOString(),
             suspended_reason: reason.trim(),
             suspended_by: admin.userId,
+            suspended_case_id: caseId,
         } as any)
         .eq("id", storeId)
 
@@ -1161,13 +1190,13 @@ export async function suspendStore(
         actionType: AdminActionType.PARTNER_SUSPEND,
         targetType: "partner",
         targetId: storeId,
-        metadata: { reason: reason.trim(), storeName: store.name, storeId },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName: store.name, storeId },
     })
 
-    return { success: true }
+    return { success: true, caseId }
 }
 
-// ─── Unsuspend Store ────────────────────────────────────────────────────────
+// ─── Unsuspend Single Store ─────────────────────────────────────────────────
 
 export async function unsuspendStore(
     storeId: string,
@@ -1203,6 +1232,7 @@ export async function unsuspendStore(
             suspended_at: null,
             suspended_reason: null,
             suspended_by: null,
+            suspended_case_id: null,
         } as any)
         .eq("id", storeId)
 
@@ -1228,7 +1258,7 @@ export async function disableTenantAccess(
     reason: string,
     durationDays: number | null = null,
     stepUpToken: string = "admin-confirmed"
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; caseId?: string; error?: string }> {
     const admin = await requireAdmin("admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
@@ -1261,6 +1291,8 @@ export async function disableTenantAccess(
         ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
         : null  // null = permanent disable
 
+    const caseId = generateCaseId("CAS")
+
     const { error: updateError } = await supabase
         .from("partners")
         .update({
@@ -1268,6 +1300,8 @@ export async function disableTenantAccess(
             erp_disabled_at: new Date().toISOString(),
             erp_disabled_by: admin.userId,
             suspended_until: suspendedUntil,
+            suspended_reason: reason.trim(),
+            suspended_case_id: caseId,
         } as any)
         .eq("id", partnerId)
 
@@ -1280,10 +1314,10 @@ export async function disableTenantAccess(
         actionType: AdminActionType.PARTNER_DISABLE_ERP,
         targetType: "partner",
         targetId: partnerId,
-        metadata: { reason: reason.trim(), storeName: partner.store_name },
+        metadata: { case_id: caseId, reason: reason.trim(), storeName: partner.store_name },
     })
 
-    return { success: true }
+    return { success: true, caseId }
 }
 
 // ─── Soft-Delete Product ⚠️ (step-up required) ──────────────────────────────

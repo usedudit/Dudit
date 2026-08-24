@@ -15,27 +15,25 @@ import type { EnforcementPartner } from "@/lib/admin/types"
 interface PartnerListRowProps {
     partner: EnforcementPartner
     isPending: boolean
-    onUnsuspend: (partner: EnforcementPartner) => void
-    onSuspend: (partner: EnforcementPartner) => void
-    onEnableERP: (partner: EnforcementPartner) => void
-    onDisableERP: (partner: EnforcementPartner) => void
-    onUnsuspendStore: (partner: EnforcementPartner) => void
-    onSuspendStore: (partner: EnforcementPartner) => void
-    onSuspendPartnerFromStore: (store: EnforcementPartner) => void
     onView: (partner: EnforcementPartner) => void
+    onSuspendStore: (partner: EnforcementPartner) => void
+    onUnsuspendStore: (partner: EnforcementPartner) => void
+    onDisableERP: (partner: EnforcementPartner) => void
+    onEnableERP: (partner: EnforcementPartner) => void
+    onSuspendPartner: (partner: EnforcementPartner) => void
+    onUnsuspendPartner: (partner: EnforcementPartner) => void
 }
 
 const PartnerListRow = React.memo(({
     partner,
     isPending,
-    onUnsuspend,
-    onSuspend,
-    onEnableERP,
-    onDisableERP,
-    onUnsuspendStore,
+    onView,
     onSuspendStore,
-    onSuspendPartnerFromStore,
-    onView
+    onUnsuspendStore,
+    onDisableERP,
+    onEnableERP,
+    onSuspendPartner,
+    onUnsuspendPartner,
 }: PartnerListRowProps) => {
     const isStore = partner.type === "store"
 
@@ -91,13 +89,21 @@ const PartnerListRow = React.memo(({
 
             {/* Status */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-1 justify-center">
                     {partner.suspended_at ? (
-                        <Badge variant="red">Suspensa</Badge>
+                        <Badge variant="red">Loja Suspensa</Badge>
                     ) : partner.is_active ? (
-                        <Badge variant="green">Ativa</Badge>
+                        <Badge variant="green">Loja Ativa</Badge>
                     ) : (
                         <Badge variant="gray">Inativa</Badge>
+                    )}
+                    {partner.erp_disabled && (
+                        <Badge variant="red">ERP Desativado</Badge>
+                    )}
+                    {partner.suspended_case_id && (
+                        <span className="font-mono text-[10px] text-red-600 dark:text-red-400 font-bold">
+                            {partner.suspended_case_id}
+                        </span>
                     )}
                 </div>
             </td>
@@ -111,14 +117,29 @@ const PartnerListRow = React.memo(({
                                 <CheckCircleIcon size={16} /> Reativar Loja
                             </DropdownItem>
                         ) : (
-                            <>
-                                <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-red">
-                                    <BlockedIcon size={16} /> Desabilitar ERP
-                                </DropdownItem>
-                                <DropdownItem onClick={() => onSuspendPartnerFromStore(partner)} className="text-brand-orange">
-                                    <AlertTriangleIcon size={16} /> Suspender Parceiro
-                                </DropdownItem>
-                            </>
+                            <DropdownItem onClick={() => onSuspendStore(partner)} className="text-brand-red">
+                                <BlockedIcon size={16} /> Suspender Esta Loja
+                            </DropdownItem>
+                        )}
+
+                        {partner.erp_disabled ? (
+                            <DropdownItem onClick={() => onEnableERP(partner)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Reativar Acesso ERP
+                            </DropdownItem>
+                        ) : (
+                            <DropdownItem onClick={() => onDisableERP(partner)} className="text-brand-red">
+                                <BlockedIcon size={16} /> Desativar Acesso ERP
+                            </DropdownItem>
+                        )}
+
+                        {!partner.is_active ? (
+                            <DropdownItem onClick={() => onUnsuspendPartner(partner)} className="text-brand-green">
+                                <CheckCircleIcon size={16} /> Reativar Parceiro Inteiro
+                            </DropdownItem>
+                        ) : (
+                            <DropdownItem onClick={() => onSuspendPartner(partner)} className="text-brand-orange">
+                                <AlertTriangleIcon size={16} /> Suspender Parceiro Inteiro
+                            </DropdownItem>
                         )}
                     </ActionsDropdown>
                 </div>

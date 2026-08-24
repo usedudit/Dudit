@@ -12,6 +12,8 @@ import {
     EditIcon,
     UserIcon,
     CalendarIcon,
+    BlockedIcon,
+    CheckCircleIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -27,6 +29,8 @@ import {
     AlertModal,
     DefaultModal,
     Input,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
@@ -37,6 +41,10 @@ import {
     getAdminPartnerDetail,
     suspendPartner,
     unsuspendPartner,
+    suspendStore,
+    unsuspendStore,
+    disableTenantAccess,
+    enableTenantAccess,
     updateStoreRiskScore,
 } from "@/app/actions/admin/enforcement"
 import Link from "next/link"
@@ -114,8 +122,12 @@ export function AdminPartnerDetailView({
     const [returnPage, setReturnPage] = useState(1)
 
     // Modals
-    const [suspendModalOpen, setSuspendModalOpen] = useState(false)
-    const [unsuspendModalOpen, setUnsuspendModalOpen] = useState(false)
+    const [suspendStoreModalOpen, setSuspendStoreModalOpen] = useState(false)
+    const [unsuspendStoreModalOpen, setUnsuspendStoreModalOpen] = useState(false)
+    const [disableErpModalOpen, setDisableErpModalOpen] = useState(false)
+    const [enableErpModalOpen, setEnableErpModalOpen] = useState(false)
+    const [suspendPartnerModalOpen, setSuspendPartnerModalOpen] = useState(false)
+    const [unsuspendPartnerModalOpen, setUnsuspendPartnerModalOpen] = useState(false)
     const [riskModalOpen, setRiskModalOpen] = useState(false)
     const [newRiskScore, setNewRiskScore] = useState<string>("")
     const [riskTitle, setRiskTitle] = useState("")
@@ -208,7 +220,9 @@ export function AdminPartnerDetailView({
         auditEvents = [],
     } = detail
 
-    const isSuspended = !!store.suspended_at || !store.is_active
+    const isStoreSuspended = !!store.suspended_at || !store.is_active
+    const isErpDisabled = !!partner?.erp_disabled
+    const isPartnerSuspended = partner ? (!!partner.suspended_at || !partner.is_active) : false
 
     // Pagination calculations
     const paginatedProducts = recentProducts.slice((productPage - 1) * ITEMS_PER_PAGE, productPage * ITEMS_PER_PAGE)
@@ -236,14 +250,15 @@ export function AdminPartnerDetailView({
         toast.success("ID do parceiro copiado com sucesso!")
     }, [store?.partner_id, detail?.partner?.id])
 
-    const handleConfirmSuspend = () => {
-        if (!store.partner_id) return
+    // ── Handlers: Loja Específica ──
+    const handleConfirmSuspendStore = () => {
+        if (!store?.id) return
         startTransition(async () => {
             try {
-                const res = await suspendPartner(store.partner_id, "Suspensão pelo painel de detalhes")
+                const res = await suspendStore(store.id, "Suspensão de loja via painel administrativo")
                 if (res.success) {
-                    toast.success("Loja suspensa com sucesso")
-                    setSuspendModalOpen(false)
+                    toast.success(`Loja suspensa com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                    setSuspendStoreModalOpen(false)
                     loadDetail()
                     onPartnerUpdated?.()
                 } else {
@@ -255,18 +270,100 @@ export function AdminPartnerDetailView({
         })
     }
 
-    const handleConfirmUnsuspend = () => {
-        if (!store.partner_id) return
+    const handleConfirmUnsuspendStore = () => {
+        if (!store?.id) return
         startTransition(async () => {
             try {
-                const res = await unsuspendPartner(store.partner_id, "Reativação pelo painel de detalhes")
+                const res = await unsuspendStore(store.id, "Reativação de loja via painel administrativo")
                 if (res.success) {
-                    toast.success("Suspensão revogada com sucesso")
-                    setUnsuspendModalOpen(false)
+                    toast.success("Loja reativada com sucesso!")
+                    setUnsuspendStoreModalOpen(false)
                     loadDetail()
                     onPartnerUpdated?.()
                 } else {
                     toast.error(res.error || "Erro ao reativar loja")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    // ── Handlers: Acesso ao ERP (Tenant) ──
+    const handleConfirmDisableERP = () => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        startTransition(async () => {
+            try {
+                const res = await disableTenantAccess(partnerId, "Desativação de acesso ao ERP via painel administrativo")
+                if (res.success) {
+                    toast.success(`Acesso ao ERP desativado! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                    setDisableErpModalOpen(false)
+                    loadDetail()
+                    onPartnerUpdated?.()
+                } else {
+                    toast.error(res.error || "Erro ao desativar ERP")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    const handleConfirmEnableERP = () => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        startTransition(async () => {
+            try {
+                const res = await enableTenantAccess(partnerId)
+                if (res.success) {
+                    toast.success("Acesso ao ERP restabelecido com sucesso!")
+                    setEnableErpModalOpen(false)
+                    loadDetail()
+                    onPartnerUpdated?.()
+                } else {
+                    toast.error(res.error || "Erro ao reativar ERP")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    // ── Handlers: Parceiro Completo ──
+    const handleConfirmSuspendPartner = () => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        startTransition(async () => {
+            try {
+                const res = await suspendPartner(partnerId, "Suspensão completa de parceiro via painel administrativo")
+                if (res.success) {
+                    toast.success(`Parceiro e todas as lojas suspensos! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
+                    setSuspendPartnerModalOpen(false)
+                    loadDetail()
+                    onPartnerUpdated?.()
+                } else {
+                    toast.error(res.error || "Erro ao suspender parceiro")
+                }
+            } catch (err: any) {
+                toast.error(err.message || "Erro inesperado")
+            }
+        })
+    }
+
+    const handleConfirmUnsuspendPartner = () => {
+        const partnerId = store?.partner_id || partner?.id
+        if (!partnerId) return
+        startTransition(async () => {
+            try {
+                const res = await unsuspendPartner(partnerId, "Reativação de parceiro via painel administrativo")
+                if (res.success) {
+                    toast.success("Parceiro e lojas reativados com sucesso!")
+                    setUnsuspendPartnerModalOpen(false)
+                    loadDetail()
+                    onPartnerUpdated?.()
+                } else {
+                    toast.error(res.error || "Erro ao reativar parceiro")
                 }
             } catch (err: any) {
                 toast.error(err.message || "Erro inesperado")
@@ -323,9 +420,19 @@ export function AdminPartnerDetailView({
                                         <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                             <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                                 <span className="hidden md:inline truncate">{store.name}</span>
-                                                <Badge variant={isSuspended ? "red" : "green"}>
-                                                    {isSuspended ? "Suspensa" : "Ativa"}
+                                                <Badge variant={isStoreSuspended ? "red" : "green"}>
+                                                    {isStoreSuspended ? "Loja Suspensa" : "Loja Ativa"}
                                                 </Badge>
+                                                {isErpDisabled && (
+                                                    <Badge variant="red">
+                                                        ERP Desativado
+                                                    </Badge>
+                                                )}
+                                                {isPartnerSuspended && (
+                                                    <Badge variant="red">
+                                                        Parceiro Suspenso
+                                                    </Badge>
+                                                )}
                                                 <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
                                                     Risco: {store.risk_score || 0} pts
                                                 </Badge>
@@ -345,7 +452,7 @@ export function AdminPartnerDetailView({
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
                                             <Button
                                                 variant="outline"
                                                 onClick={() => {
@@ -357,10 +464,11 @@ export function AdminPartnerDetailView({
                                                 Score de Risco
                                             </Button>
 
-                                            {isSuspended ? (
+                                            {/* Ação direta: Suspender / Reativar Esta Loja */}
+                                            {isStoreSuspended ? (
                                                 <Button
                                                     variant="outline"
-                                                    onClick={() => setUnsuspendModalOpen(true)}
+                                                    onClick={() => setUnsuspendStoreModalOpen(true)}
                                                     className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
                                                 >
                                                     Reativar Loja
@@ -368,11 +476,44 @@ export function AdminPartnerDetailView({
                                             ) : (
                                                 <Button
                                                     variant="destructive"
-                                                    onClick={() => setSuspendModalOpen(true)}
+                                                    onClick={() => setSuspendStoreModalOpen(true)}
                                                 >
                                                     Suspender Loja
                                                 </Button>
                                             )}
+
+                                            {/* Dropdown de Ações Administrativas (ERP / Parceiro) */}
+                                            <ActionsDropdown>
+                                                {isErpDisabled ? (
+                                                    <DropdownItem
+                                                        onClick={() => setEnableErpModalOpen(true)}
+                                                    >
+                                                        <CheckCircleIcon size={16} className="text-brand-green" /> Reativar Acesso ao ERP
+                                                    </DropdownItem>
+                                                ) : (
+                                                    <DropdownItem
+                                                        onClick={() => setDisableErpModalOpen(true)}
+                                                        className="text-brand-red"
+                                                    >
+                                                        <BlockedIcon size={16} className="text-brand-red" /> Desativar Acesso ao ERP
+                                                    </DropdownItem>
+                                                )}
+
+                                                {isPartnerSuspended ? (
+                                                    <DropdownItem
+                                                        onClick={() => setUnsuspendPartnerModalOpen(true)}
+                                                    >
+                                                        <CheckCircleIcon size={16} className="text-brand-green" /> Reativar Parceiro Inteiro
+                                                    </DropdownItem>
+                                                ) : (
+                                                    <DropdownItem
+                                                        onClick={() => setSuspendPartnerModalOpen(true)}
+                                                        className="text-brand-red"
+                                                    >
+                                                        <AlertTriangleIcon size={16} className="text-brand-red" /> Suspender Parceiro (Todas as Lojas)
+                                                    </DropdownItem>
+                                                )}
+                                            </ActionsDropdown>
                                         </div>
                                     </div>
 
@@ -396,15 +537,60 @@ export function AdminPartnerDetailView({
                                     {/* Aba 1: Dados da Loja */}
                                     <TabsContent value="general" className="mt-0">
                                         <FadeIn key="general">
-                                            {isSuspended && (
+                                            {/* Banner: ERP Desativado */}
+                                            {isErpDisabled && (
+                                                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 mb-6">
+                                                    <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h3 className="text-sm font-bold text-amber-950 dark:text-amber-300">
+                                                                Acesso ao ERP Desativado (Conta do Parceiro)
+                                                            </h3>
+                                                            {partner?.suspended_case_id && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(partner.suspended_case_id)
+                                                                        toast.success("Protocolo do caso copiado!")
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 font-mono text-xs font-bold border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-200"
+                                                                >
+                                                                    <span>Caso: {partner.suspended_case_id}</span>
+                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-amber-900/80 dark:text-amber-400/80 mt-0.5">
+                                                            Motivo: {partner?.suspended_reason || "Sem motivo informado."}
+                                                            {partner?.suspended_until ? ` • Vigência até: ${formatDate(partner.suspended_until)}` : " • Permanente"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Banner: Loja Suspensa */}
+                                            {isStoreSuspended && (
                                                 <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 mb-8">
                                                     <AlertTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
-                                                            Loja Suspensa Administrativamente
-                                                        </h3>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h3 className="text-sm font-bold text-red-950 dark:text-red-300">
+                                                                Loja Suspensa Administrativamente
+                                                            </h3>
+                                                            {(store.suspended_case_id || partner?.suspended_case_id) && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
+                                                                        toast.success("Protocolo do caso copiado!")
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-mono text-xs font-bold border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-200"
+                                                                >
+                                                                    <span>Caso: {store.suspended_case_id || partner?.suspended_case_id}</span>
+                                                                    <span className="text-[10px] uppercase font-sans font-semibold">Copiar</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                         <p className="text-xs text-red-900/80 dark:text-red-400/80 mt-0.5">
-                                                            Motivo: {store.suspended_reason || "Sem motivo especificado."}
+                                                            Motivo: {store.suspended_reason || partner?.suspended_reason || "Sem motivo especificado."}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -537,6 +723,23 @@ export function AdminPartnerDetailView({
                                                                     <div className="flex items-center justify-between mt-0.5">
                                                                         <span className="font-mono text-brand-dark dark:text-dark-heading">{store.partner_id.slice(0, 14)}...</span>
                                                                         <button onClick={handleCopyPartnerId} className="text-brand-green font-bold hover:underline">Copiar</button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {(store.suspended_case_id || partner?.suspended_case_id) && (
+                                                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                                                                    <span className="text-brand-inactive-text block">Protocolo do Caso</span>
+                                                                    <div className="flex items-center justify-between mt-0.5">
+                                                                        <span className="font-mono font-bold text-red-600 dark:text-red-400">{store.suspended_case_id || partner?.suspended_case_id}</span>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                navigator.clipboard.writeText(store.suspended_case_id || partner?.suspended_case_id)
+                                                                                toast.success("Protocolo copiado!")
+                                                                            }}
+                                                                            className="text-brand-green font-bold hover:underline"
+                                                                        >
+                                                                            Copiar
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -930,33 +1133,59 @@ export function AdminPartnerDetailView({
             </FadeIn>
 
             {/* Mobile bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                {isSuspended ? (
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
+                {isStoreSuspended ? (
                     <Button
                         variant="outline"
-                        onClick={() => setUnsuspendModalOpen(true)}
-                        className="flex-1 text-brand-green border-brand-green/30"
+                        onClick={() => setUnsuspendStoreModalOpen(true)}
+                        className="flex-1 text-brand-green border-brand-green/30 text-xs"
                     >
                         Reativar Loja
                     </Button>
                 ) : (
                     <Button
                         variant="destructive"
-                        onClick={() => setSuspendModalOpen(true)}
-                        className="flex-1"
+                        onClick={() => setSuspendStoreModalOpen(true)}
+                        className="flex-1 text-xs"
                     >
                         Suspender Loja
                     </Button>
                 )}
+
+                <ActionsDropdown trigger={
+                    <Button variant="outline" size="sm" className="px-2.5">
+                        Mais Ações
+                    </Button>
+                }>
+                    {isErpDisabled ? (
+                        <DropdownItem onClick={() => setEnableErpModalOpen(true)}>
+                            <CheckCircleIcon size={16} className="text-brand-green" /> Reativar ERP
+                        </DropdownItem>
+                    ) : (
+                        <DropdownItem onClick={() => setDisableErpModalOpen(true)} className="text-brand-red">
+                            <BlockedIcon size={16} className="text-brand-red" /> Desativar ERP
+                        </DropdownItem>
+                    )}
+                    {isPartnerSuspended ? (
+                        <DropdownItem onClick={() => setUnsuspendPartnerModalOpen(true)}>
+                            <CheckCircleIcon size={16} className="text-brand-green" /> Reativar Parceiro
+                        </DropdownItem>
+                    ) : (
+                        <DropdownItem onClick={() => setSuspendPartnerModalOpen(true)} className="text-brand-red">
+                            <AlertTriangleIcon size={16} className="text-brand-red" /> Suspender Parceiro
+                        </DropdownItem>
+                    )}
+                </ActionsDropdown>
+
                 <Button
                     variant="outline"
                     onClick={() => {
                         setNewRiskScore(String(store.risk_score || 0))
                         setRiskModalOpen(true)
                     }}
-                    className="flex-1"
+                    className="flex-1 text-xs"
                 >
-                    Score de Risco
+                    Score Risco
                 </Button>
             </div>
 
@@ -1029,25 +1258,69 @@ export function AdminPartnerDetailView({
                 </div>
             </DefaultModal>
 
-            {/* Modal: Suspender Loja */}
+            {/* 1. Modal: Suspender Loja (Apenas esta filial) */}
             <AlertModal
-                isOpen={suspendModalOpen}
-                onClose={() => setSuspendModalOpen(false)}
-                onConfirm={handleConfirmSuspend}
-                title="Suspender Loja"
-                description={`Tem certeza que deseja suspender a loja ${store.name}? A loja deixará de receber pedidos e seus produtos ficarão indisponíveis no marketplace.`}
-                confirmText="Suspender Loja"
+                isOpen={suspendStoreModalOpen}
+                onClose={() => setSuspendStoreModalOpen(false)}
+                onConfirm={handleConfirmSuspendStore}
+                title="Suspender Esta Loja"
+                description={`Tem certeza que deseja suspender apenas a loja "${store.name}"? A loja deixará de receber pedidos e seus produtos ficarão ocultos na vitrine. Outras lojas do mesmo parceiro continuarão ativas.`}
+                confirmText="Suspender Esta Loja"
                 variant="danger"
             />
 
-            {/* Modal: Reativar Loja */}
+            {/* 2. Modal: Reativar Loja (Apenas esta filial) */}
             <AlertModal
-                isOpen={unsuspendModalOpen}
-                onClose={() => setUnsuspendModalOpen(false)}
-                onConfirm={handleConfirmUnsuspend}
+                isOpen={unsuspendStoreModalOpen}
+                onClose={() => setUnsuspendStoreModalOpen(false)}
+                onConfirm={handleConfirmUnsuspendStore}
                 title="Reativar Loja"
-                description={`Deseja restabelecer o funcionamento da loja ${store.name}? A loja voltará a operar no marketplace.`}
+                description={`Deseja restabelecer o funcionamento da loja "${store.name}"? A loja voltará a operar normalmente na vitrine.`}
                 confirmText="Reativar Loja"
+                variant="success"
+            />
+
+            {/* 3. Modal: Desativar Acesso ao ERP (Conta do Parceiro) */}
+            <AlertModal
+                isOpen={disableErpModalOpen}
+                onClose={() => setDisableErpModalOpen(false)}
+                onConfirm={handleConfirmDisableERP}
+                title="Desativar Acesso ao ERP"
+                description={`Atenção: Ao desativar o acesso ao ERP, todos os administradores e colaboradores da organização perderão acesso ao painel de gestão /erp.`}
+                confirmText="Desativar Acesso ao ERP"
+                variant="danger"
+            />
+
+            {/* 4. Modal: Reativar Acesso ao ERP (Conta do Parceiro) */}
+            <AlertModal
+                isOpen={enableErpModalOpen}
+                onClose={() => setEnableErpModalOpen(false)}
+                onConfirm={handleConfirmEnableERP}
+                title="Reativar Acesso ao ERP"
+                description={`Deseja restabelecer o acesso ao ERP para todos os operadores e administradores deste parceiro?`}
+                confirmText="Reativar Acesso ao ERP"
+                variant="success"
+            />
+
+            {/* 5. Modal: Suspender Parceiro Inteiro */}
+            <AlertModal
+                isOpen={suspendPartnerModalOpen}
+                onClose={() => setSuspendPartnerModalOpen(false)}
+                onConfirm={handleConfirmSuspendPartner}
+                title="Suspender Parceiro Completo"
+                description={`ATENÇÃO: Esta ação suspenderá a organização inteira, bloqueando o acesso ao ERP e desativando TODAS as suas lojas e filiais cadastradas.`}
+                confirmText="Suspender Parceiro Inteiro"
+                variant="danger"
+            />
+
+            {/* 6. Modal: Reativar Parceiro Inteiro */}
+            <AlertModal
+                isOpen={unsuspendPartnerModalOpen}
+                onClose={() => setUnsuspendPartnerModalOpen(false)}
+                onConfirm={handleConfirmUnsuspendPartner}
+                title="Reativar Parceiro Completo"
+                description={`Deseja reativar a organização do parceiro e restabelecer o funcionamento de todas as suas lojas?`}
+                confirmText="Reativar Parceiro Completo"
                 variant="success"
             />
         </>

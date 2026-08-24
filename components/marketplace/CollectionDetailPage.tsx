@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Button, DefaultModal, Input, FormTextarea, FormSection, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, DefaultModal, Input, FormTextarea, FormSection, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
 import { ChevronLeftIcon, EditIcon, TrashIcon, ChevronDownIcon, CollectionsIcon } from "@/lib/icons"
 import { ItemCard } from "@/components/marketplace/shared-components"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -306,36 +306,19 @@ export function CollectionDetailPage({ collection }: CollectionDetailProps) {
             </DefaultModal>
 
             {/* Delete Confirmation Modal */}
-            <DefaultModal
+            <AlertModal
                 isOpen={isDeleteModalOpen}
+                isLoading={isDeletePending}
                 onClose={() => {
                     if (!isDeletePending) setIsDeleteModalOpen(false)
                 }}
+                onConfirm={handleDelete}
                 title="Excluir Coleção"
-                maxWidth="sm"
-            >
-                <div className="flex flex-col gap-4 p-4">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Tem certeza que deseja excluir a coleção <strong className="text-brand-dark dark:text-dark-heading">{collection.name}</strong>? Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="flex justify-end gap-2 mt-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsDeleteModalOpen(false)}
-                            disabled={isDeletePending}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={handleDelete}
-                            isLoading={isDeletePending}
-                            className="bg-red-500 hover:bg-red-600 text-white"
-                        >
-                            Excluir
-                        </Button>
-                    </div>
-                </div>
-            </DefaultModal>
+                description={`Tem certeza que deseja excluir a coleção ${collection.name}? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir"
+                cancelText="Cancelar"
+                variant="danger"
+            />
         </>
     )
 }

@@ -208,12 +208,12 @@ function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: 
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
             <div>
                 <div className="flex items-start gap-4">
-                    <div className="bg-brand-gray dark:bg-dark-border/40 p-2 rounded-2xl border border-brand-border/60 dark:border-dark-border/60 shrink-0">
+                    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-md shrink-0 p-1">
                         {qrCodeUrl ? (
                             <img
                                 src={qrCodeUrl}
                                 alt="QR Code do perfil"
-                                className="w-16 h-16 rounded-lg object-contain"
+                                className="w-16 h-16 object-contain rounded-md"
                             />
                         ) : (
                             <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
@@ -322,7 +322,6 @@ function HelpCard() {
     const helpItems = [
         { label: "Central de Ajuda", description: "Artigos, tutoriais e dúvidas", href: "/ajuda", icon: "HelpCircleIcon" },
         { label: "Fale Conosco", description: "Suporte via chat ou WhatsApp", href: "/ajuda/contato", icon: "MailIcon" },
-        { label: "Status do Sistema", description: "Verifique a disponibilidade", href: "https://status.dudit.com.br", icon: "InfoIcon", external: true },
     ];
 
     return (
@@ -332,19 +331,19 @@ function HelpCard() {
                     Ajuda e Suporte
                 </h3>
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                    Conte com a nossa equipe para tirar suas dúvidas.
+                    Conte conosco para tirar suas dúvidas.
                 </p>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 grid grid-cols-1 md:grid-cols-2">
                     {helpItems.map((item) => (
                         <ListItem
                             key={item.label}
                             icon={helpIconMap[item.icon] || HelpCircleIcon}
                             title={item.label}
                             description={item.description}
-                            right={item.external ? <LinkIcon className="w-4 h-4 text-brand-inactive-text" /> : <ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
-                            onClick={() => item.external ? window.open(item.href, "_blank") : router.push(item.href)}
-                            className="border-0 bg-transparent hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 p-2 rounded-xl"
+                            right={<ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
+                            onClick={() => router.push(item.href)}
+                            className="border-0 bg-transparent hover:bg-brand-gray/40 dark:hover:bg-dark-border/50 p-2 rounded-xl"
                         />
                     ))}
                 </div>
@@ -618,12 +617,12 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                 <SparklesIcon className="w-5 h-5 text-brand-green" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                         Teste grátis
                     </span>
                     <p className="text-sm text-brand-dark dark:text-dark-heading">
@@ -670,12 +669,12 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                 <RocketIcon size={20} className="text-brand-green" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                         Modo ERP
                     </span>
                     <p className="text-sm text-brand-dark dark:text-dark-heading">
@@ -736,12 +735,12 @@ function TipsCard() {
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                 <SparklesIcon size={20} className="text-brand-green" />
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/40 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                         Dica {tipIdx + 1}/{PLATFORM_TIPS.length}
                     </span>
                     <p className="text-sm text-brand-dark dark:text-dark-heading">

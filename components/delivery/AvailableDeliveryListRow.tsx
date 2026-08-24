@@ -3,13 +3,8 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/reusable"
-import {
-    MapPinIcon,
-    StoreIcon,
-    Package,
-} from "@/lib/icons"
+import { Package } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 export interface AvailableDeliveryOffer {
     assignment_id: string
@@ -71,35 +66,20 @@ export default function AvailableDeliveryListRow({
 
             {/* ESTABELECIMENTO */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border w-[220px]">
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                        <StoreIcon size={14} className="text-brand-inactive-text shrink-0" />
-                        <span className="truncate max-w-[180px]">{offer.store_name || offer.partner_name || "Estabelecimento"}</span>
-                    </div>
-                    {offer.store_address && (
-                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate max-w-[200px] mt-0.5">
-                            {offer.store_address}
-                        </span>
-                    )}
-                </div>
+                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[200px]">
+                    {offer.store_name || offer.partner_name || "Estabelecimento"}
+                </span>
             </td>
 
             {/* DESTINO DA ENTREGA */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border w-[300px]">
-                <div className="flex items-start gap-2">
-                    <UserProfileImage
-                        fullName={offer.customer_name || "Cliente"}
-                        className="h-6 w-6 text-[10px] shrink-0 mt-0.5"
-                    />
-                    <div className="flex flex-col min-w-0">
-                        <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
-                            {offer.customer_name || "Cliente"}
-                        </span>
-                        <span className="flex items-start gap-1 text-xs text-brand-dark/90 dark:text-dark-body line-clamp-2 max-w-[260px]">
-                            <MapPinIcon size={12} className="text-brand-green shrink-0 mt-0.5" />
-                            {offer.delivery_address || "Endereço não informado"}
-                        </span>
-                    </div>
+                <div className="flex flex-col min-w-0">
+                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[260px]">
+                        {offer.customer_name || "Cliente"}
+                    </span>
+                    <span className="text-xs text-brand-dark/90 dark:text-dark-body line-clamp-1 max-w-[260px]">
+                        {offer.delivery_address || "Endereço não informado"}
+                    </span>
                 </div>
             </td>
 

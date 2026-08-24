@@ -9,6 +9,7 @@ export type DreRegime = "competencia" | "caixa"
 export interface DreFilters {
   partnerId: string
   storeId?: string | null
+  allowedStoreIds?: string[] | null
   startDate: string // YYYY-MM-DD
   endDate: string // YYYY-MM-DD
   regime?: DreRegime
@@ -22,6 +23,7 @@ export interface DreSubItem {
   verticalPercent: number // % em relação à Receita Bruta
   previousAmount?: number
   horizontalVariation?: number // % de variação vs período anterior
+  percentageOfGroup?: number
   transactionCount?: number
   helpText?: string
 }
@@ -142,6 +144,7 @@ async function computeDrePeriod(
   startDate: string,
   endDate: string,
   regime: DreRegime,
+  allowedStoreIds?: string[] | null,
 ) {
   const supabase = createAdminClient()
   const startIso = `${startDate}T00:00:00`
@@ -156,7 +159,11 @@ async function computeDrePeriod(
     .eq("partner_id", partnerId)
     .order("is_headquarters", { ascending: false })
 
-  if (storeId) storeQuery = storeQuery.eq("id", storeId)
+  if (storeId) {
+    storeQuery = storeQuery.eq("id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    storeQuery = storeQuery.in("id", allowedStoreIds)
+  }
 
   // 1. Vendas PDV (`sales` + `sale_items`)
   let salesQuery = supabase
@@ -170,7 +177,11 @@ async function computeDrePeriod(
     .neq("status", "cancelled")
     .limit(10000)
 
-  if (storeId) salesQuery = salesQuery.eq("store_id", storeId)
+  if (storeId) {
+    salesQuery = salesQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    salesQuery = salesQuery.in("store_id", allowedStoreIds)
+  }
   if (regime === "competencia") {
     salesQuery = salesQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
@@ -189,7 +200,11 @@ async function computeDrePeriod(
     .not("situation", "in", '("cancelled","pending_payment")')
     .limit(10000)
 
-  if (storeId) ordersQuery = ordersQuery.eq("store_id", storeId)
+  if (storeId) {
+    ordersQuery = ordersQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    ordersQuery = ordersQuery.in("store_id", allowedStoreIds)
+  }
   if (regime === "competencia") {
     ordersQuery = ordersQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
@@ -204,7 +219,11 @@ async function computeDrePeriod(
     .not("status", "in", '("cancelled","draft")')
     .limit(10000)
 
-  if (storeId) soQuery = soQuery.eq("store_id", storeId)
+  if (storeId) {
+    soQuery = soQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    soQuery = soQuery.in("store_id", allowedStoreIds)
+  }
   if (regime === "competencia") {
     soQuery = soQuery.gte("created_at", startIso).lte("created_at", endIso)
   } else {
@@ -219,7 +238,11 @@ async function computeDrePeriod(
     .not("status", "in", '("cancelled")')
     .limit(10000)
 
-  if (storeId) apptQuery = apptQuery.eq("store_id", storeId)
+  if (storeId) {
+    apptQuery = apptQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    apptQuery = apptQuery.in("store_id", allowedStoreIds)
+  }
   if (regime === "competencia") {
     apptQuery = apptQuery.gte("start_date", startDate).lte("start_date", endDate)
   } else {
@@ -238,7 +261,11 @@ async function computeDrePeriod(
     .neq("status", "cancelled")
     .limit(10000)
 
-  if (storeId) txQuery = txQuery.eq("store_id", storeId)
+  if (storeId) {
+    txQuery = txQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    txQuery = txQuery.in("store_id", allowedStoreIds)
+  }
   if (regime === "competencia") {
     txQuery = txQuery.or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(due_date.is.null,created_at.gte.${startIso},created_at.lte.${endIso})`)
   } else {
@@ -255,7 +282,11 @@ async function computeDrePeriod(
     .lte("created_at", endIso)
     .limit(5000)
 
-  if (storeId) returnsQuery = returnsQuery.eq("store_id", storeId)
+  if (storeId) {
+    returnsQuery = returnsQuery.eq("store_id", storeId)
+  } else if (allowedStoreIds && allowedStoreIds.length > 0) {
+    returnsQuery = returnsQuery.in("store_id", allowedStoreIds)
+  }
 
   // ── Execução Paralela Simultânea de Todas as Queries em 1 Roundtrip ─────────
   const [
@@ -619,7 +650,11 @@ async function computeDrePeriod(
       tradeName: hqStore?.name,
       documentNumber: selectedStore?.cnpj || selectedStore?.cpf || hqStore?.cnpj || hqStore?.cpf || "",
       partnerAvatar: (selectedStore?.logo_url || hqStore?.logo_url) ? getR2ImageUrl(selectedStore?.logo_url || hqStore?.logo_url) : undefined,
-      storeName: storeId ? (selectedStore?.name || "Loja Selecionada") : "Todas as Lojas (Consolidado)",
+      storeName: storeId
+        ? (selectedStore?.name || "Loja Selecionada")
+        : (allowedStoreIds && allowedStoreIds.length === 1
+            ? (stores.find((s: any) => s.id === allowedStoreIds[0])?.name || "Loja Selecionada")
+            : "Todas as Lojas (Consolidado)"),
       taxRegimeLabel: (selectedStore?.person_type || hqStore?.person_type) === "juridica" ? "Pessoa Jurídica (Simples Nacional / MEI)" : "Pessoa Física",
       generatedAt: new Date().toLocaleString("pt-BR"),
     },
@@ -654,6 +689,9 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
   const regime = filters.regime || "competencia"
   const partnerId = sanitizeUUID(filters.partnerId) || filters.partnerId
   const storeId = filters.storeId ? sanitizeUUID(filters.storeId) : null
+  const allowedStoreIds = filters.allowedStoreIds && filters.allowedStoreIds.length > 0
+    ? filters.allowedStoreIds.map(id => sanitizeUUID(id) || id)
+    : null
 
   let prevDates: { previousStartDate: string; previousEndDate: string } | undefined
   if (filters.compareWithPrevious) {
@@ -662,9 +700,9 @@ export async function getDreReport(filters: DreFilters): Promise<DreReportData> 
 
   // Executa o período atual e o comparativo simultaneamente em paralelo
   const [currentData, prevData] = await Promise.all([
-    computeDrePeriod(partnerId, storeId, filters.startDate, filters.endDate, regime),
+    computeDrePeriod(partnerId, storeId, filters.startDate, filters.endDate, regime, allowedStoreIds),
     prevDates
-      ? computeDrePeriod(partnerId, storeId, prevDates.previousStartDate, prevDates.previousEndDate, regime)
+      ? computeDrePeriod(partnerId, storeId, prevDates.previousStartDate, prevDates.previousEndDate, regime, allowedStoreIds)
       : Promise.resolve(null),
   ])
 

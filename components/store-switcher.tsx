@@ -131,7 +131,7 @@ export function StoreSwitcher({
                                 <img
                                     src={storeImage || "https://img.dudit.com.br/static/Placeholder.png"}
                                     alt={store.name}
-                                    className="w-6 h-6 rounded-md object-cover shrink-0"
+                                    className="w-6 h-6 rounded-full object-cover shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{store.name}</p>

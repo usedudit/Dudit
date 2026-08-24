@@ -1,6 +1,7 @@
 import { formatDateTime } from "@/lib/utils"
 import { formatPaymentMethodLabel, toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { formatAddressParts, stripCep } from "@/lib/utils/format-address"
+import { cleanOrderNotes } from "@/lib/orders/order-utils"
 
 export type SaleReceiptFormat = "thermal" | "a4"
 
@@ -334,7 +335,7 @@ export function buildSaleReceiptFromOrder(
         order.is_online_payment === true
     )
 
-    const notes = (order.notes || order.observation || order.customer_notes || "").trim() || null
+    const notes = cleanOrderNotes(order.notes || order.observation || order.customer_notes) || null
 
     const returnPolicyBlock =
         policySnap && policySnap.receipt_show_policy_block !== false

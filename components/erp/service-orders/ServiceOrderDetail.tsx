@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -37,6 +37,27 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
     entregue: [],
     cancelada: [],
 }
+
+const SERVICE_STATUS_ORDER: string[] = [
+    "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
+    "aguardando_peca", "concluida", "entregue"
+]
+
+function doesServiceTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
+    if (currentStatus === "cancelada" || nextStatus === "cancelada") return false
+    const currentIdx = SERVICE_STATUS_ORDER.indexOf(currentStatus)
+    const nextIdx = SERVICE_STATUS_ORDER.indexOf(nextStatus)
+    if (currentIdx === -1 || nextIdx === -1) return false
+    return nextIdx < currentIdx
+}
+
+const CHANGE_STATUS_REASONS = [
+    { value: "operational_error", label: "Erro operacional / Clique acidental" },
+    { value: "client_request", label: "Solicitação do cliente" },
+    { value: "rework", label: "Retrabalho necessário" },
+    { value: "logistics_issue", label: "Problema logístico" },
+    { value: "other", label: "Outro" }
+]
 
 const PRIORITY_META: Record<string, { label: string; variant: "gray" | "green" | "orange" | "red" }> = {
     baixa: { label: "Baixa", variant: "gray" },
@@ -86,6 +107,8 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const [isRegeneratingCode, setIsRegeneratingCode] = useState(false)
     const [showStatusModal, setShowStatusModal] = useState(false)
     const [selectedStatus, setSelectedStatus] = useState("")
+    const [statusWarningModal, setStatusWarningModal] = useState<{ isOpen: boolean; currentStatus: string; nextStatus: string; reasonValue: string; customReason: string } | null>(null)
+    const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; nextStatus: string } | null>(null)
 
     useEffect(() => { setOrder(data) }, [data])
 
@@ -159,7 +182,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         loadTeam()
     }, [])
 
-    const handleStatusChange = async (newStatus: string) => {
+    const handleStatusChange = async (newStatus: string, reason?: string) => {
         setLoading(true)
         const res = await updateServiceOrderStatusAction(partnerId, order.id, newStatus)
         if (res.success) {
@@ -176,6 +199,41 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             toast({ description: res.error || "Erro ao atualizar status" })
         }
         setLoading(false)
+    }
+
+    const handleStatusTransition = (currentStatus: string, nextStatus: string) => {
+        setShowStatusModal(false)
+        setSelectedStatus("")
+        if (currentStatus === nextStatus) return
+
+        if (doesServiceTransitionRequireReason(currentStatus, nextStatus)) {
+            setStatusWarningModal({
+                isOpen: true,
+                currentStatus,
+                nextStatus,
+                reasonValue: "",
+                customReason: "",
+            })
+        } else {
+            setSimpleConfirmModal({
+                isOpen: true,
+                nextStatus,
+            })
+        }
+    }
+
+    const confirmStatusWarning = async () => {
+        if (!statusWarningModal) return
+        const { nextStatus, reasonValue, customReason } = statusWarningModal
+        let finalReason = reasonValue
+        if (reasonValue === "other" && customReason.trim()) {
+            finalReason = `Outro: ${customReason.trim()}`
+        } else {
+            const foundLabel = CHANGE_STATUS_REASONS.find(r => r.value === reasonValue)?.label
+            if (foundLabel) finalReason = foundLabel
+        }
+        setStatusWarningModal(null)
+        await handleStatusChange(nextStatus, finalReason)
     }
 
     const handleSignatureSaved = async (key: string) => {
@@ -983,47 +1041,112 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             }
 
             {/* Status Change Modal */}
-            {showStatusModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowStatusModal(false); setSelectedStatus("") }}>
-                    <div className="bg-white dark:bg-dark-surface rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Alterar Status</h3>
-                        <p className="text-sm text-brand-inactive-text mb-4">Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]?.label || order.status}</strong></p>
-                        {availableTransitions.length === 0 ? (
-                            <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
-                        ) : (
-                            <FormDropdown
-                              label="Novo status"
-                              options={availableTransitions.map((status) => ({
+            <DefaultModal
+                isOpen={showStatusModal}
+                onClose={() => { setShowStatusModal(false); setSelectedStatus("") }}
+                title="Alterar Status"
+                maxWidth="sm"
+                footer={
+                    <div className="flex gap-3 justify-end w-full">
+                        <Button variant="outline" onClick={() => { setShowStatusModal(false); setSelectedStatus("") }}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (selectedStatus) {
+                                    handleStatusTransition(order.status, selectedStatus)
+                                }
+                            }}
+                            disabled={!selectedStatus || selectedStatus === order.status}
+                        >
+                            Confirmar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4 py-2">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]?.label || order.status}</strong>
+                    </p>
+                    {availableTransitions.length === 0 ? (
+                        <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
+                    ) : (
+                        <FormDropdown
+                            label="Novo Status"
+                            options={availableTransitions.map((status) => ({
                                 value: status,
                                 label: SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
-                              }))}
-                              value={selectedStatus}
-                              setValue={setSelectedStatus}
-                              placeholder="Selecione o novo status"
-                              actionItem={{
-                                label: "Confirmar",
-                                icon: <CheckCircleIcon size={18} />,
-                                onClick: async () => {
-                                  if (selectedStatus) {
-                                    await handleStatusChange(selectedStatus)
-                                    setShowStatusModal(false)
-                                    setSelectedStatus("")
-                                  }
-                                }
-                              }}
+                            }))}
+                            value={selectedStatus}
+                            setValue={setSelectedStatus}
+                            placeholder="Selecione o novo status"
+                        />
+                    )}
+                </div>
+            </DefaultModal>
+
+            <AlertModal
+                isOpen={statusWarningModal?.isOpen ?? false}
+                onClose={() => setStatusWarningModal(null)}
+                onConfirm={confirmStatusWarning}
+                title="Atenção: Alteração de Status"
+                message={
+                    <div className="flex flex-col gap-4 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Esta OS já estava como{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {SERVICE_ORDER_STATUS_META[statusWarningModal?.currentStatus as ServiceOrderStatus]?.label || statusWarningModal?.currentStatus}
+                            </strong>{" "}
+                            e você está alterando para{" "}
+                            <strong className="text-brand-dark dark:text-dark-heading">
+                                {SERVICE_ORDER_STATUS_META[statusWarningModal?.nextStatus as ServiceOrderStatus]?.label || statusWarningModal?.nextStatus}
+                            </strong>.
+                            Esta ação requer uma justificativa.
+                        </p>
+                        <div className="flex flex-col gap-4 mt-2">
+                            <FormDropdown
+                                label="Motivo da alteração"
+                                options={CHANGE_STATUS_REASONS}
+                                value={statusWarningModal?.reasonValue || ""}
+                                setValue={(val) => setStatusWarningModal(prev => prev ? { ...prev, reasonValue: val } : null)}
+                                placeholder="Selecione o motivo"
                             />
-                        )}
-                        <div className="flex justify-end mt-4">
-                            <button
-                                onClick={() => { setShowStatusModal(false); setSelectedStatus("") }}
-                                className="text-sm font-medium text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors px-4 py-2"
-                            >
-                                Cancelar
-                            </button>
+                            {statusWarningModal?.reasonValue === "other" && (
+                                <Input
+                                    label="Descreva o motivo"
+                                    placeholder="Digite o motivo aqui..."
+                                    value={statusWarningModal?.customReason || ""}
+                                    onChange={(e) => setStatusWarningModal(prev => prev ? { ...prev, customReason: e.target.value } : null)}
+                                />
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                }
+                confirmText="Confirmar Alteração"
+                cancelText="Cancelar"
+                variant="warning"
+                disabled={
+                    !statusWarningModal?.reasonValue ||
+                    (statusWarningModal.reasonValue === "other" && !statusWarningModal.customReason.trim())
+                }
+            />
+
+            <AlertModal
+                isOpen={simpleConfirmModal?.isOpen ?? false}
+                title="Confirmar Alteração de Status"
+                description={`Tem certeza que deseja alterar o status desta OS para ${SERVICE_ORDER_STATUS_META[simpleConfirmModal?.nextStatus as ServiceOrderStatus]?.label || simpleConfirmModal?.nextStatus}?`}
+                confirmText="Confirmar"
+                cancelText="Cancelar"
+                onClose={() => setSimpleConfirmModal(null)}
+                onConfirm={async () => {
+                    if (simpleConfirmModal) {
+                        const { nextStatus } = simpleConfirmModal
+                        setSimpleConfirmModal(null)
+                        await handleStatusChange(nextStatus)
+                    }
+                }}
+                variant="info"
+            />
 
             <AlertModal
                 isOpen={confirmDelete}

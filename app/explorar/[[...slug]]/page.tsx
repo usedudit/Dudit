@@ -269,6 +269,7 @@ export default async function ExplorarPage({
                 : null,
             city: sessionData.profile.city || null,
             state: sessionData.profile.state || null,
+            avatar_url: sessionData.profile.avatar_url || null,
         }
         : null
 

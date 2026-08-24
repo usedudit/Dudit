@@ -60,10 +60,44 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Componente Principal ────────────────────────────────────────────────────
-export default function BannedView({ profile }: { profile: any }) {
+export default function BannedView({ profile, user }: { profile: any; user?: any }) {
+    const [copied, setCopied] = React.useState(false)
+    const [copiedAll, setCopiedAll] = React.useState(false)
+
+    // Determina o ID do caso (se não existir, gera um determinístico baseado no ID do usuário)
+    const rawCaseId = profile?.banned_case_id
+    const fallbackCaseId = profile?.user_id || user?.id
+        ? `CAS-${(profile?.user_id || user?.id).replace(/-/g, "").slice(0, 8).toUpperCase()}`
+        : "CAS-PENDENTE"
+    const caseId = rawCaseId || fallbackCaseId
+
     const isPermanent = !profile?.banned_until
-    const banDate = profile?.banned_at ? new Date(profile.banned_at).toLocaleDateString('pt-BR') : "Desconhecida"
-    const unbanDate = profile?.banned_until ? new Date(profile.banned_until).toLocaleDateString('pt-BR') : "Permanente"
+    const banDate = profile?.banned_at ? new Date(profile.banned_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Desconhecida"
+    const unbanDate = profile?.banned_until ? new Date(profile.banned_until).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Permanente"
+    const reasonText = profile?.banned_reason || "Violação das diretrizes e Termos de Uso da plataforma."
+
+    const handleCopyCaseId = () => {
+        navigator.clipboard.writeText(caseId)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2500)
+    }
+
+    const handleCopyFullCase = () => {
+        const text = [
+            `--- DADOS DO CASO DE SUSPENSÃO DUDIT ---`,
+            `Protocolo: ${caseId}`,
+            `Usuário ID: ${profile?.user_id || user?.id || "N/A"}`,
+            `Nome: ${profile?.full_name || "N/A"}`,
+            `Status: ${isPermanent ? "Banimento Permanente" : `Suspensão Temporária (Até ${unbanDate})`}`,
+            `Data da Aplicação: ${banDate}`,
+            `Motivo Informado: ${reasonText}`,
+            `----------------------------------------`,
+        ].join("\n")
+
+        navigator.clipboard.writeText(text)
+        setCopiedAll(true)
+        setTimeout(() => setCopiedAll(false), 2500)
+    }
 
     const handleSignOut = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -77,6 +111,21 @@ export default function BannedView({ profile }: { profile: any }) {
         }
     }
 
+    // Monta o e-mail pré-formatado para contestação
+    const mailSubject = encodeURIComponent(`[Recurso Dudit] Solicitação de Revisão - Protocolo #${caseId}`)
+    const mailBody = encodeURIComponent(
+        `Olá equipe de suporte da Dudit,\n\n` +
+        `Gostaria de solicitar a revisão e recurso do bloqueio da minha conta sob o protocolo #${caseId}.\n\n` +
+        `--- Informações do Caso ---\n` +
+        `• Protocolo do Caso: ${caseId}\n` +
+        `• ID do Usuário: ${profile?.user_id || user?.id || "N/A"}\n` +
+        `• E-mail cadastrado: ${user?.email || "N/A"}\n` +
+        `• Motivo registrado: ${reasonText}\n\n` +
+        `--- Justificativa do Recurso ---\n` +
+        `[Por favor, descreva aqui seus argumentos ou esclarecimentos sobre o ocorrido]:\n\n`
+    )
+    const appealMailUrl = `mailto:contato@dudit.com.br?subject=${mailSubject}&body=${mailBody}`
+
     return (
         <Shell>
             <div className="mx-auto h-20 w-20 bg-brand-red/10 text-brand-red rounded-full flex items-center justify-center">
@@ -84,22 +133,46 @@ export default function BannedView({ profile }: { profile: any }) {
             </div>
 
             <div>
-                <h2 className="text-2xl font-bold text-brand-dark mb-2">Conta Banida</h2>
+                <h2 className="text-2xl font-bold text-brand-dark mb-2">Conta Suspensa</h2>
                 <p className="text-brand-inactive-text text-sm">
-                    Sua conta foi {isPermanent ? "banida permanentemente" : "suspensa temporariamente"} por violar nossos Termos de Serviço.
+                    O acesso a esta conta foi restrito por inconformidade com os Termos de Serviço da Dudit.
                 </p>
             </div>
 
+            {/* Protocolo / Case ID Card */}
+            <div className="w-full bg-brand-gray/80 rounded-2xl p-4 border border-brand-border text-left space-y-3">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-brand-inactive-text uppercase tracking-wider">
+                        Protocolo do Caso
+                    </span>
+                    <button
+                        onClick={handleCopyCaseId}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-brand-green hover:underline cursor-pointer"
+                    >
+                        {copied ? "✓ Copiado!" : "Copiar Protocolo"}
+                    </button>
+                </div>
+                <div className="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-brand-border">
+                    <code className="font-mono text-sm font-bold text-brand-dark tracking-wide">
+                        {caseId}
+                    </code>
+                    <span className="text-[11px] font-semibold text-brand-inactive-text">
+                        {isPermanent ? "Permanente" : `Até ${unbanDate}`}
+                    </span>
+                </div>
+            </div>
+
+            {/* Detalhes do Caso */}
             <div className="w-full text-left">
                 <InfoCard
-                    title="Motivo da Punição"
+                    title="Motivo Registrado"
                     message={
-                        <div className="space-y-1">
-                            <p className="font-semibold">{profile?.banned_reason || "Violação dos Termos de Uso."}</p>
+                        <div className="space-y-1.5">
+                            <p className="font-semibold text-sm">{reasonText}</p>
                             <p className="text-xs opacity-75">
                                 {isPermanent
-                                    ? `Suspenso em: ${banDate}`
-                                    : `Período: ${banDate} até ${unbanDate}`
+                                    ? `Decisão aplicada em: ${banDate}`
+                                    : `Vigência: de ${banDate} até ${unbanDate}`
                                 }
                             </p>
                         </div>
@@ -108,14 +181,33 @@ export default function BannedView({ profile }: { profile: any }) {
                 />
             </div>
 
-            <Button asChild className="w-full h-[44px] text-[15px] font-bold">
-                <a href="mailto:contato@dudit.com.br?subject=Contestação%20de%20Banimento">
-                    Contestar esta decisão
-                </a>
-            </Button>
+            {/* Instruções de Recurso */}
+            <div className="w-full text-left bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 text-xs text-blue-900 dark:text-blue-200 leading-relaxed">
+                <p className="font-bold mb-1">Deseja recorrer ou tirar dúvidas?</p>
+                <p className="text-blue-800/80 dark:text-blue-300/80">
+                    Se você acredita que esta ação foi aplicada incorretamente, você pode submeter uma solicitação de recurso informando seu protocolo acima para que nossa equipe reavalie a decisão.
+                </p>
+            </div>
 
-            <form onSubmit={handleSignOut} className="w-full flex justify-center">
-                <button type="submit" className="text-sm text-brand-inactive-text hover:text-brand-red mt-4 font-medium">
+            {/* Ações de Recurso */}
+            <div className="w-full space-y-2.5">
+                <Button asChild className="w-full h-[46px] text-[15px] font-bold">
+                    <a href={appealMailUrl}>
+                        Solicitar Recurso por E-mail
+                    </a>
+                </Button>
+
+                <Button
+                    variant="outline"
+                    onClick={handleCopyFullCase}
+                    className="w-full h-[40px] text-xs font-semibold"
+                >
+                    {copiedAll ? "✓ Dados do caso copiados!" : "Copiar resumo completo do caso"}
+                </Button>
+            </div>
+
+            <form onSubmit={handleSignOut} className="w-full flex justify-center pt-2">
+                <button type="submit" className="text-sm text-brand-inactive-text hover:text-brand-red font-medium transition-colors">
                     ← Sair da conta
                 </button>
             </form>

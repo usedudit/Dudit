@@ -105,7 +105,11 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
   const [customStartDate, setCustomStartDate] = useState<string>(() => getPresetDates("current_month").startDate)
   const [customEndDate, setCustomEndDate] = useState<string>(() => getPresetDates("current_month").endDate)
 
-  const [selectedStoreId, setSelectedStoreId] = useState<string>(activeStoreId || "all")
+  const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
+    if (stores.length === 1) return stores[0].id
+    if (activeStoreId && stores.some((s) => s.id === activeStoreId)) return activeStoreId
+    return "all"
+  })
   const [regime, setRegime] = useState<DreRegime>("competencia")
   const [comparePrevious, setComparePrevious] = useState<boolean>(true)
 

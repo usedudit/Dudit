@@ -655,3 +655,147 @@ export const getCurrentPartnerContext = cache(async (resolvedUser?: any): Promis
     return null
 })
 
+// ─── Suspended Stores & ERP Access Resolver ─────────────────────────────────
+
+export interface SuspendedStoreRecord {
+    partnerId: string
+    storeId: string
+    storeName: string
+    partnerName: string
+    isOwn: boolean
+    status: "erp_disabled" | "partner_suspended" | "store_suspended"
+    statusLabel: string
+    caseId: string | null
+    reason: string | null
+    suspendedAt: string | null
+    suspendedUntil: string | null
+    ownerName: string
+}
+
+export const getUserSuspendedAccess = cache(async (userId?: string): Promise<SuspendedStoreRecord[]> => {
+    const user = userId ? { id: userId } : await getCurrentUser()
+    if (!user) return []
+
+    const admin = createAdminClient()
+
+    // 1. Get all partner ids the user owns or belongs to
+    const [ownedPartnersRes, invitedRowsRes] = await Promise.all([
+        admin.from("partners")
+            .select("id, user_id, business_info, is_active, erp_disabled, suspended_at, suspended_until, suspended_reason, suspended_case_id")
+            .eq("user_id", user.id),
+        admin.from("partner_users")
+            .select("id, partner_id")
+            .eq("user_id", user.id)
+    ])
+
+    const ownedPartners = ownedPartnersRes.data || []
+    const invitedRows = invitedRowsRes.data || []
+    const ownedPartnerIds = ownedPartners.map((p: any) => p.id)
+    const invitedPartnerIds = ([...new Set(invitedRows.map((r: any) => r.partner_id))] as string[])
+        .filter((id: string) => !ownedPartnerIds.includes(id))
+
+    let invitedPartners: any[] = []
+    if (invitedPartnerIds.length > 0) {
+        const { data: inv } = await admin.from("partners")
+            .select("id, user_id, business_info, is_active, erp_disabled, suspended_at, suspended_until, suspended_reason, suspended_case_id")
+            .in("id", invitedPartnerIds)
+        invitedPartners = inv || []
+    }
+
+    const allPartners = [...ownedPartners, ...invitedPartners]
+    if (allPartners.length === 0) return []
+
+    const allPartnerIds = allPartners.map((p: any) => p.id)
+
+    // 2. Get stores for these partners
+    const { data: stores } = await admin.from("stores")
+        .select("id, name, partner_id, is_active, suspended_at, suspended_reason, suspended_case_id, is_headquarters")
+        .in("partner_id", allPartnerIds)
+
+    const storesList = stores || []
+
+    const ownerUserIds = new Set<string>()
+    for (const p of allPartners) if (p.user_id) ownerUserIds.add(p.user_id)
+    let ownerNames = new Map<string, string>()
+    if (ownerUserIds.size > 0) {
+        const { data: profiles } = await admin.from("user_profiles")
+            .select("user_id, full_name")
+            .in("user_id", Array.from(ownerUserIds))
+        if (profiles) {
+            ownerNames = new Map(profiles.map((pr: any) => [pr.user_id, pr.full_name]))
+        }
+    }
+
+    const suspendedRecords: SuspendedStoreRecord[] = []
+
+    for (const partner of allPartners) {
+        const isOwn = partner.user_id === user.id
+        const biz = partner.business_info as any
+        const partnerName = biz?.nome_fantasia || biz?.razao_social || "Parceiro"
+        const ownerName = isOwn ? "Você" : (ownerNames.get(partner.user_id) || "Proprietário")
+        const partnerStores = storesList.filter((s: any) => s.partner_id === partner.id)
+
+        // Case A: Partner has ERP disabled
+        if (partner.erp_disabled === true) {
+            const hq = partnerStores.find((s: any) => s.is_headquarters) || partnerStores[0]
+            suspendedRecords.push({
+                partnerId: partner.id,
+                storeId: hq?.id || partner.id,
+                storeName: hq?.name || partnerName,
+                partnerName,
+                isOwn,
+                status: "erp_disabled",
+                statusLabel: "Acesso ERP Desativado",
+                caseId: partner.suspended_case_id || null,
+                reason: partner.suspended_reason || "Acesso ao painel ERP suspenso administrativamente.",
+                suspendedAt: partner.suspended_at || null,
+                suspendedUntil: partner.suspended_until || null,
+                ownerName,
+            })
+            continue // Entire ERP is disabled for this partner
+        }
+
+        // Case B: Entire partner is suspended
+        if (partner.is_active === false) {
+            const hq = partnerStores.find((s: any) => s.is_headquarters) || partnerStores[0]
+            suspendedRecords.push({
+                partnerId: partner.id,
+                storeId: hq?.id || partner.id,
+                storeName: hq?.name || partnerName,
+                partnerName,
+                isOwn,
+                status: "partner_suspended",
+                statusLabel: "Parceiro Suspenso",
+                caseId: partner.suspended_case_id || null,
+                reason: partner.suspended_reason || "Conta de parceiro suspensa administrativamente.",
+                suspendedAt: partner.suspended_at || null,
+                suspendedUntil: partner.suspended_until || null,
+                ownerName,
+            })
+            continue
+        }
+
+        // Case C: Specific store(s) are suspended
+        for (const st of partnerStores) {
+            if (st.is_active === false || st.suspended_at) {
+                suspendedRecords.push({
+                    partnerId: partner.id,
+                    storeId: st.id,
+                    storeName: st.name,
+                    partnerName,
+                    isOwn,
+                    status: "store_suspended",
+                    statusLabel: "Loja Suspensa",
+                    caseId: st.suspended_case_id || partner.suspended_case_id || null,
+                    reason: st.suspended_reason || "Loja temporariamente desativada pela administração.",
+                    suspendedAt: st.suspended_at || null,
+                    suspendedUntil: null,
+                    ownerName,
+                })
+            }
+        }
+    }
+
+    return suspendedRecords
+})
+

@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, Badge, Spinner, ThreeDotsLoader } from "@/components/reusable"
+import Pagination from "@/components/reusable/Pagination"
 import { useToast } from "@/hooks/use-toast"
 import {
   cancelMyRecurringSubscriptionAction,
@@ -30,6 +31,7 @@ import {
   CheckCircleIcon,
   CancelCircleIcon
 } from "@/lib/icons"
+import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
 
 export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] }) {
   const { toast } = useToast()
@@ -40,6 +42,8 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [executions, setExecutions] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const HISTORY_PAGE_SIZE = 10
 
   // Edit details state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -54,6 +58,10 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
   // Credits state
   const [credits, setCredits] = useState<any[]>([])
   const [loadingCredits, setLoadingCredits] = useState(false)
+
+  // Refund state
+  const [refundOpen, setRefundOpen] = useState(false)
+  const [refundSub, setRefundSub] = useState<any>(null)
 
   useEffect(() => {
     if (activeTab === "credits") {
@@ -166,12 +174,19 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
       return
     }
     setSelectedId(subscriptionId)
+    setHistoryPage(1)
     setLoadingHistory(true)
     const res = await getMyRecurringSubscriptionExecutionsAction(subscriptionId)
     setLoadingHistory(false)
     if (res.success) setExecutions(res.data || [])
     else toast({ title: "Erro", description: res.error, variant: "destructive" })
   }
+
+  const historyTotalPages = Math.ceil(executions.length / HISTORY_PAGE_SIZE)
+  const paginatedExecutions = useMemo(() => {
+    const start = (historyPage - 1) * HISTORY_PAGE_SIZE
+    return executions.slice(start, start + HISTORY_PAGE_SIZE)
+  }, [executions, historyPage])
 
   const statusVariant = (status: string) => {
     if (status === "active") return "green" as const
@@ -274,9 +289,7 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                             Plano
                           </h3>
                         )}
-                        <Badge variant={statusVariant(sub.status)}>
-                          {getStatusLabel(sub.status)}
-                        </Badge>
+                        <Badge variant={statusVariant(sub.status)} />
                       </div>
                       {sub.partner ? (
                         <Link
@@ -376,6 +389,17 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         >
                           Cancelar Assinatura
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-brand-purple"
+                          onClick={() => {
+                            setRefundSub(sub)
+                            setRefundOpen(true)
+                          }}
+                        >
+                          Solicitar Reembolso
+                        </Button>
                       </>
                     )}
 
@@ -457,38 +481,46 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
                         ) : executions.length === 0 ? (
                           <p className="text-xs text-brand-inactive-text dark:text-dark-body">Nenhuma execução registrada.</p>
                         ) : (
-                          <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                            {executions.map((exec) => (
-                              <div
-                                key={exec.id}
-                                className="text-xs flex items-center justify-between border border-brand-border dark:border-dark-border rounded-xl p-3 bg-brand-gray/30 dark:bg-dark-surface"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <span className="font-semibold">{formatFullDate(exec.scheduled_for)}</span>
-                                  {exec.orders?.order_number && (
-                                    <span className="text-brand-primary font-medium">
-                                      Pedido #{exec.orders.order_number}
-                                    </span>
-                                  )}
+                          <div className="space-y-2">
+                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                              {paginatedExecutions.map((exec) => (
+                                <div
+                                  key={exec.id}
+                                  className="text-xs flex items-center justify-between border border-brand-border dark:border-dark-border rounded-xl p-3 bg-brand-gray/30 dark:bg-dark-surface"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <span className="font-semibold">{formatFullDate(exec.scheduled_for)}</span>
+                                    {exec.orders?.order_number && (
+                                      <span className="text-brand-primary font-medium">
+                                        Pedido #{exec.orders.order_number}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <Badge
+                                      variant={
+                                        exec.status === "completed"
+                                          ? "green"
+                                          : exec.status === "failed"
+                                            ? "red"
+                                            : "gray"
+                                      }
+                                    />
+                                    {exec.error_message && (
+                                      <span className="text-brand-red font-medium">{exec.error_message}</span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <Badge
-                                    variant={
-                                      exec.status === "completed"
-                                        ? "green"
-                                        : exec.status === "failed"
-                                          ? "red"
-                                          : "gray"
-                                    }
-                                  >
-                                    {exec.status}
-                                  </Badge>
-                                  {exec.error_message && (
-                                    <span className="text-brand-red font-medium">{exec.error_message}</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
+                            {historyTotalPages > 1 && (
+                              <Pagination
+                                currentPage={historyPage}
+                                totalPages={historyTotalPages}
+                                onPageChange={setHistoryPage}
+                                inline
+                              />
+                            )}
                           </div>
                         )}
                       </motion.div>
@@ -566,6 +598,16 @@ export function MySubscriptionsClient({ subscriptions }: { subscriptions: any[] 
           </motion.div>
         )}
       </AnimatePresence>
+
+      <BillingRefundModal
+        isOpen={refundOpen}
+        onClose={() => {
+          setRefundOpen(false)
+          setRefundSub(null)
+        }}
+        purchase={refundSub?.lastPurchase || null}
+        partnerId={refundSub?.partnerId || ""}
+      />
     </div>
   )
 }

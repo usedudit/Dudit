@@ -83,7 +83,7 @@ export default function UserEnforcementList({ initialData, initialStats }: UserE
             try {
                 const res = await banUser(banTarget.user_id, actionReason || "Violação dos termos de uso")
                 if (res.success) {
-                    toast.success("Usuário banido com sucesso!")
+                    toast.success(`Usuário banido com sucesso! ${res.caseId ? `Protocolo: ${res.caseId}` : ""}`)
                     setBanTarget(null)
                     setActionReason("")
                     refreshUsers()

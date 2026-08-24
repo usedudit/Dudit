@@ -561,9 +561,31 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         let success = false
         let savedData = null
 
+        const servicesPayload = services.map((s: any) => ({
+            service_id: s.isManual ? null : (s.service_id || null),
+            service_name: s.service_name || s.name || "Serviço avulso",
+            service_price: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
+            quantity: Number(s.quantity || 1)
+        }))
+
+        const productsPayload = products.map((p: any) => ({
+            product_id: p.isManual ? null : (p.product_id || null),
+            product_name: p.product_name || p.name || "Produto avulso",
+            unit_price: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
+            quantity: Number(p.quantity || 1),
+            variant_id: p.variant_id || null
+        }))
+
+        const specsPayload = pendingSpecsRef.current || editData?.specifications || undefined
+
         if (editData) {
-            // 1. Update OS details
-            const res = await updateServiceOrderAction(partnerId, editData.id, payload)
+            // Update OS details + services + products in a single atomic action
+            const res = await updateServiceOrderAction(partnerId, editData.id, {
+                ...payload,
+                services: isLocked ? undefined : servicesPayload,
+                products: isLocked ? undefined : productsPayload,
+                specifications: specsPayload,
+            })
 
             if (!res.success) {
                 toast({ description: res.error || "Erro ao atualizar OS" })
@@ -571,48 +593,19 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                 return
             }
 
-            // 2. Sync services (only if not locked)
-            if (!isLocked) {
-                const svcRes = await syncServiceOrderServicesAction(
-                    partnerId,
-                    editData.id,
-                    services.map((s: any) => ({
-                        service_id: s.isManual ? null : (s.service_id || null),
-                        service_name: s.service_name || s.name || "Serviço avulso",
-                        service_price: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
-                        quantity: Number(s.quantity || 1)
-                    }))
-                )
-                if (!svcRes.success) {
-                    toast({ description: svcRes.error || "Erro ao atualizar serviços" })
-                }
-
-                // 3. Sync products
-                const prodRes = await syncServiceOrderProductsAction(
-                    partnerId,
-                    editData.id,
-                    products.map((p: any) => ({
-                        product_id: p.isManual ? null : (p.product_id || null),
-                        product_name: p.product_name || p.name || "Produto avulso",
-                        unit_price: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
-                        quantity: Number(p.quantity || 1),
-                        variant_id: p.variant_id || null
-                    }))
-                )
-                if (!prodRes.success) {
-                    toast({ description: prodRes.error || "Erro ao atualizar produtos" })
-                }
-            }
-
             success = true
             savedData = res.data
+            pendingSpecsRef.current = null
         } else {
-            // Create OS
+            // Create OS + services + products + specifications in a single atomic action
             const res = await createServiceOrderAction(partnerId, {
                 ...payload,
                 store_id: storeId || undefined,
                 payment_status: "unpaid",
                 paid_amount: 0,
+                services: servicesPayload,
+                products: productsPayload,
+                specifications: specsPayload,
             } as any)
 
             if (!res.success) {
@@ -622,50 +615,9 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
             }
 
             orderId = res.data.id
-
-            // Add services after creation
-            if (services.length > 0) {
-                const svcRes = await addServicesToOrderAction(
-                    partnerId,
-                    orderId,
-                    services.map((s: any) => ({
-                        service_id: s.isManual ? null : (s.service_id || null),
-                        service_name: s.service_name || s.name || "Serviço avulso",
-                        service_price: Number(s.service_price !== undefined ? s.service_price : (s.price || 0)),
-                        quantity: Number(s.quantity || 1)
-                    }))
-                )
-                if (!svcRes.success) {
-                    toast({ description: "OS criada, mas erro ao adicionar serviços" })
-                }
-            }
-
-            // Add products after creation
-            if (products.length > 0) {
-                const prodRes = await addProductsToOrderAction(
-                    partnerId,
-                    orderId,
-                    products.map((p: any) => ({
-                        product_id: p.isManual ? null : (p.product_id || null),
-                        product_name: p.product_name || p.name || "Produto avulso",
-                        unit_price: Number(p.unit_price !== undefined ? p.unit_price : (p.price || 0)),
-                        quantity: Number(p.quantity || 1),
-                        variant_id: p.variant_id || null
-                    }))
-                )
-                if (!prodRes.success) {
-                    toast({ description: "OS criada, mas erro ao adicionar produtos" })
-                }
-            }
-
-            // Save specifications after creation
-            if (pendingSpecsRef.current) {
-                await saveServiceOrderSpecificationsAction(partnerId, orderId, pendingSpecsRef.current)
-                pendingSpecsRef.current = null
-            }
-
             success = true
             savedData = res.data
+            pendingSpecsRef.current = null
         }
 
         if (success && orderId) {

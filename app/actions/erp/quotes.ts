@@ -1658,7 +1658,30 @@ export async function convertQuoteToOrderAction(data: {
 
             const { data: rawItems, error: itemsError } = await supabase
                 .from("quote_items")
-                .select("product_id, custom_name, quantity, unit_price, sort_order, product_name_snapshot, products(name, sku, is_active, stock_available, allow_sell_without_stock)")
+                .select(`
+                    product_id,
+                    custom_name,
+                    quantity,
+                    unit_price,
+                    sort_order,
+                    product_name_snapshot,
+                    product_sku_snapshot,
+                    products (
+                        id,
+                        name,
+                        sku,
+                        is_active,
+                        stock_available,
+                        allow_sell_without_stock,
+                        product_variants (
+                            id,
+                            variant_name,
+                            sku,
+                            price,
+                            stock_available
+                        )
+                    )
+                `)
                 .eq("quote_id", data.quoteId)
                 .eq("partner_id", data.partnerId)
                 .order("sort_order", { ascending: true })
@@ -1671,6 +1694,24 @@ export async function convertQuoteToOrderAction(data: {
             const quoteItems = rawItems || []
             if (quoteItems.length === 0) {
                 return errorResponse("Este orçamento não possui itens para gerar um pedido.")
+            }
+
+            const findMatchedVariant = (row: any, prod: any) => {
+                const variants: any[] = prod?.product_variants || []
+                if (!variants || variants.length === 0) return null
+
+                const customNameRaw = (row.custom_name && String(row.custom_name).trim()) || ""
+                const prodNameRaw = (prod?.name && String(prod.name).trim()) || ""
+                const suffix = (prodNameRaw && customNameRaw.startsWith(prodNameRaw))
+                    ? customNameRaw.slice(prodNameRaw.length).replace(/^[\s-–-]+/, "").trim()
+                    : customNameRaw
+
+                return variants.find(
+                    (v: any) =>
+                        (v.variant_name && suffix && v.variant_name.toLowerCase().trim() === suffix.toLowerCase()) ||
+                        (v.variant_name && customNameRaw && v.variant_name.toLowerCase().trim() === customNameRaw.toLowerCase()) ||
+                        (row.product_sku_snapshot && v.sku && v.sku.toLowerCase().trim() === row.product_sku_snapshot.toLowerCase().trim())
+                ) || null
             }
 
             // Perform stock, variant availability, active status, and deleted products checks
@@ -1686,8 +1727,14 @@ export async function convertQuoteToOrderAction(data: {
                     if (prod.is_active === false) {
                         return errorResponse(`O produto "${prod.name}" está inativo. Não é possível converter o orçamento.`)
                     }
-                    if (prod.allow_sell_without_stock === false && Number(row.quantity || 0) > Number(prod.stock_available || 0)) {
-                        return errorResponse(`A quantidade do item "${prod.name}" (${row.quantity}) é maior do que o estoque disponível (${prod.stock_available || 0}).`)
+                    if (prod.allow_sell_without_stock === false) {
+                        const matchedVariant = findMatchedVariant(row, prod)
+                        const availableStock = matchedVariant ? Number(matchedVariant.stock_available ?? 0) : Number(prod.stock_available ?? 0)
+                        const displayName = matchedVariant ? `${prod.name} - ${matchedVariant.variant_name}` : prod.name
+
+                        if (Number(row.quantity || 0) > availableStock) {
+                            return errorResponse(`A quantidade do item "${displayName}" (${row.quantity}) é maior do que o estoque disponível (${availableStock}).`)
+                        }
                     }
                 }
             }
@@ -1710,14 +1757,21 @@ export async function convertQuoteToOrderAction(data: {
 
             const erpItems = quoteItems.map((row: any, idx: number) => {
                 const prod = Array.isArray(row.products) ? row.products[0] : row.products
+                const matchedVariant = findMatchedVariant(row, prod)
+
+                const customNameRaw = (row.custom_name && String(row.custom_name).trim()) || ""
+                const snapshotNameRaw = (row.product_name_snapshot && String(row.product_name_snapshot).trim()) || ""
+                const prodNameRaw = (prod?.name && String(prod.name).trim()) || ""
+
+                let resolvedDisplayName = customNameRaw || snapshotNameRaw || prodNameRaw || "Item"
+                if (matchedVariant && prodNameRaw && !resolvedDisplayName.toLowerCase().includes(matchedVariant.variant_name.toLowerCase())) {
+                    resolvedDisplayName = `${prodNameRaw} - ${matchedVariant.variant_name}`
+                }
+
                 return {
                     productId: row.product_id || null,
-                    variantId: null as string | null,
-                    customName:
-                        (row.custom_name && String(row.custom_name).trim())
-                        || (row.product_name_snapshot && String(row.product_name_snapshot).trim())
-                        || (prod?.name && String(prod.name).trim())
-                        || "Item",
+                    variantId: matchedVariant?.id || null,
+                    customName: resolvedDisplayName,
                     quantity: Number(row.quantity || 0),
                     unitPrice: Number(row.unit_price || 0),
                     sortOrder: Number(row.sort_order ?? idx),
@@ -1776,7 +1830,7 @@ export async function convertQuoteToOrderAction(data: {
                 shippingCost: Number(quote.shipping_cost || 0),
                 additionalCosts: Number(quote.additional_costs || 0),
                 totalAmount: Number(quote.total || 0),
-                notes: buildConversionOrderNotes(String(quote.quote_number || ""), quote.notes),
+                notes: (quote.notes || "").trim() || undefined,
                 csrf_token: data.csrf_token,
             }
 

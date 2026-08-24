@@ -27,7 +27,7 @@ import DeliveryAssignmentListRow, { type DeliveryAssignmentItem } from "./Delive
 import DeliveryAssignmentGridCard from "./DeliveryAssignmentGridCard"
 import DeliveryAssignmentDetail from "./DeliveryAssignmentDetail"
 
-type SortKey = "date" | "total" | "fee" | "order"
+type SortKey = "order" | "partner" | "customer" | "values" | "status"
 type SortDirection = "asc" | "desc"
 
 const ITEMS_PER_PAGE = 8
@@ -65,7 +65,7 @@ export default function DeliveryAssignmentsList() {
     const [isAvailabilityLoading, setIsAvailabilityLoading] = useState(false)
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
-        key: "date",
+        key: "status",
         direction: "desc",
     })
 
@@ -274,18 +274,20 @@ export default function DeliveryAssignmentsList() {
 
         list.sort((a, b) => {
             let res = 0
-            if (key === "date") {
+            if (key === "status") {
                 const dateA = new Date(a.assigned_at || 0).getTime()
                 const dateB = new Date(b.assigned_at || 0).getTime()
                 res = dateA - dateB
-            } else if (key === "total") {
+            } else if (key === "values") {
                 res = (a.total_amount || 0) - (b.total_amount || 0)
-            } else if (key === "fee") {
-                res = (a.delivery_fee || 0) - (b.delivery_fee || 0)
             } else if (key === "order") {
                 const numA = Number(a.order_number) || 0
                 const numB = Number(b.order_number) || 0
                 res = numA - numB
+            } else if (key === "partner") {
+                res = String(a.partner_name || "").localeCompare(String(b.partner_name || ""))
+            } else if (key === "customer") {
+                res = String(a.customer_name || "").localeCompare(String(b.customer_name || ""))
             }
             return direction === "asc" ? res : -res
         })
@@ -535,17 +537,13 @@ export default function DeliveryAssignmentsList() {
                                                             <th
                                                                 key={col.id}
                                                                 className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                                                    } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                    } ${col.id !== "actions" ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading" : ""} group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
                                                                     }`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => {
                                                                     if (col.id === "actions") return
-                                                                    const keyMap: Record<string, SortKey> = {
-                                                                        order: "order",
-                                                                        values: "fee",
-                                                                        status: "date",
-                                                                    }
-                                                                    handleSort(keyMap[col.id] || "date")
+                                                                    const sortKey = col.id as SortKey
+                                                                    handleSort(sortKey)
                                                                 }}
                                                             >
                                                                 <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>

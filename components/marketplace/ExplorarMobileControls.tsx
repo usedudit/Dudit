@@ -8,15 +8,23 @@ interface ExplorarMobileControlsProps {
     activeFiltersCount: number
     onOpenFilters: () => void
     onOpenSort: () => void
+    isVisible?: boolean
 }
 
 export function ExplorarMobileControls({
     activeFiltersCount,
     onOpenFilters,
     onOpenSort,
+    isVisible = true,
 }: ExplorarMobileControlsProps) {
     return (
-        <div className="lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2">
+        <div
+            className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-40 bg-white dark:bg-dark-surface border-b border-gray-100 dark:border-dark-border shadow-sm flex items-center px-4 gap-2 transition-all duration-200 ${
+                isVisible
+                    ? "opacity-100 translate-y-0 pointer-events-auto"
+                    : "opacity-0 -translate-y-2 pointer-events-none"
+            }`}
+        >
             {/* Filtros Button */}
             <Button
                 variant="outline"

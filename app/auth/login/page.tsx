@@ -8,6 +8,7 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useSupabase } from "@/providers/supabase-provider"
 import { getUserHasAnyPartnerAccess } from "@/app/actions/auth/partner-access"
+import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 
 // Importação estática (Leve, carregamento imediato)
 import AuthView from "@/components/auth/AuthView"
@@ -158,7 +159,11 @@ function AuthContent() {
   }
 
   if (user && isPartnerMode && canShowPartnerWizardWhenLoggedIn === null) {
-    return <div className="min-h-screen bg-[#022C2B]" />
+    return (
+      <div className="min-h-screen bg-[#022C2B] flex items-center justify-center">
+        <ThreeDotsLoader />
+      </div>
+    )
   }
 
 

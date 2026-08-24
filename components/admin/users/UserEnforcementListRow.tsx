@@ -83,7 +83,7 @@ const UserEnforcementListRow = React.memo(({
 
             {/* Status */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-1 justify-center">
                     {user.banned_at ? (
                         user.banned_until && new Date(user.banned_until) < new Date() ? (
                             <Badge variant="orange">Ban expirado</Badge>
@@ -92,6 +92,11 @@ const UserEnforcementListRow = React.memo(({
                         )
                     ) : (
                         <Badge variant="green">Ativo</Badge>
+                    )}
+                    {user.banned_case_id && (
+                        <span className="font-mono text-[10px] text-red-600 dark:text-red-400 font-bold">
+                            {user.banned_case_id}
+                        </span>
                     )}
                 </div>
             </td>

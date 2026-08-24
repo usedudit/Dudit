@@ -326,9 +326,17 @@ export default function CreateTransactionPage({
     const pendingSelectContactIdRef = useRef<string | null>(null)
     const pendingCloseRef = useRef<(() => void) | null>(null)
     const skipTransferBalanceCheckRef = useRef(false)
+    const skipBalanceWarningRef = useRef(false)
 
     const [transferInsufficientOpen, setTransferInsufficientOpen] = useState(false)
     const [transferInsufficientMeta, setTransferInsufficientMeta] = useState({ fromBal: 0, amount: 0 })
+    const [balanceWarningOpen, setBalanceWarningOpen] = useState(false)
+    const [balanceWarningMeta, setBalanceWarningMeta] = useState<{
+        accountName: string
+        currentBalance: number
+        amount: number
+        txKind: TxKind
+    }>({ accountName: "", currentBalance: 0, amount: 0, txKind: "expense" })
     const [adjustFromTransferOpen, setAdjustFromTransferOpen] = useState(false)
     const [adjustFromTransferNewBalance, setAdjustFromTransferNewBalance] = useState(0)
     const [adjustFromTransferSaving, setAdjustFromTransferSaving] = useState(false)
@@ -838,6 +846,25 @@ export default function CreateTransactionPage({
             return
         }
         setFieldErrors(new Set())
+
+        /* ── Insufficient balance check for transactions with positive amount and selected account ── */
+        if (txKind !== "transfer" && txKind !== "adjustment") {
+            if (!skipBalanceWarningRef.current && amount > 0 && accountId) {
+                const curBal = getAccountBalance(accountId)
+                if (curBal + 0.005 < amount) {
+                    const acc = activeAccounts.find((a) => a.id === accountId)
+                    setBalanceWarningMeta({
+                        accountName: acc?.name || "Conta selecionada",
+                        currentBalance: curBal,
+                        amount,
+                        txKind,
+                    })
+                    setBalanceWarningOpen(true)
+                    return
+                }
+            }
+            skipBalanceWarningRef.current = false
+        }
 
         /* ── EDIT MODE: update existing recurring template ── */
         if (isRecurringTemplateEdit && editRecurringTemplateId) {
@@ -2270,6 +2297,24 @@ export default function CreateTransactionPage({
                     title="Cancelar recorrência?"
                     description="Nenhum pagamento já registrado será apagado. Novas ocorrências deixarão de ser geradas."
                     confirmText="Cancelar recorrência"
+                    variant="warning"
+                />
+
+                <AlertModal
+                    isOpen={balanceWarningOpen}
+                    onClose={() => {
+                        setBalanceWarningOpen(false)
+                        skipBalanceWarningRef.current = false
+                    }}
+                    onConfirm={() => {
+                        skipBalanceWarningRef.current = true
+                        setBalanceWarningOpen(false)
+                        void handleSave()
+                    }}
+                    title="Saldo insuficiente na conta"
+                    description={`O valor informado (${formatCurrency(balanceWarningMeta.amount)}) é maior que o saldo atual da conta ${balanceWarningMeta.accountName} (${formatCurrency(balanceWarningMeta.currentBalance)}). Deseja continuar mesmo assim?`}
+                    confirmText="Continuar mesmo assim"
+                    cancelText="Cancelar"
                     variant="warning"
                 />
             </div>

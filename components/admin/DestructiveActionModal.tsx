@@ -113,9 +113,14 @@ const DestructiveActionModal = ({
                             className="mt-0.5 w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500 shrink-0"
                             onClick={(e) => e.stopPropagation()}
                         />
-                        <span className="text-xs text-red-900 dark:text-red-300 font-medium leading-relaxed">
-                            Estou ciente das consequências desta ação administrativa e confirmo que desejo prosseguir.
-                        </span>
+                        <div className="space-y-1">
+                            <span className="text-xs text-red-900 dark:text-red-300 font-medium leading-relaxed block">
+                                Estou ciente das consequências desta ação administrativa e confirmo que desejo prosseguir.
+                            </span>
+                            <span className="text-[11px] text-red-700/80 dark:text-red-400/80 block">
+                                ℹ️ Um identificador de caso (ex: <code className="font-mono font-bold">CAS-XXXXXXXX</code>) será gerado automaticamente para auditoria e recurso.
+                            </span>
+                        </div>
                     </div>
                 </div>
 

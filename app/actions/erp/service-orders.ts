@@ -213,42 +213,96 @@ export async function createServiceOrderAction(
     payment_breakdown?: any
     created_at?: string | null
     specifications?: { name: string; value: string }[]
+    services?: Array<{ service_id: string | null; service_name?: string; service_price?: number; quantity?: number }>
+    products?: Array<{ product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity?: number }>
   },
 ): Promise<{ success: true; data: any; orderNumber: string } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requirePermission(partnerId, "service_orders", "create")
-    const user = await requireUser()
+    const [user] = await Promise.all([
+      requireUser(),
+      requirePermission(partnerId, "service_orders", "create"),
+    ])
     const admin = getAdminClient()
-
-    let customerId = input.customer_id || null
-    if (customerId) {
-      const { data: customer } = await admin
-        .from("customers")
-        .select("id")
-        .eq("id", customerId)
-        .eq("partner_id", partnerId)
-        .maybeSingle()
-      if (!customer?.id) return { success: false, error: "Cliente inválido para este parceiro." }
-      customerId = customer.id
-    }
 
     const storeId = input.store_id
     if (!storeId) {
       return { success: false, error: "store_id é obrigatório. Selecione uma loja antes de criar a OS." }
     }
-    await requireStoreAccess(storeId, partnerId)
 
-    const status = input.status || "aberta"
+    // Run store access, plan limit, and customer snapshot validation in parallel
+    const [_, limitCheck, customerSnapshot] = await Promise.all([
+      requireStoreAccess(storeId, partnerId),
+      checkLimit(partnerId, "monthly_service_orders"),
+      input.customer_id ? getCustomerSnapshot(admin, input.customer_id, partnerId) : Promise.resolve(null),
+    ])
 
-    // -- Plan limit check --
-    const limitCheck = await checkLimit(partnerId, "monthly_service_orders")
+    if (input.customer_id && !customerSnapshot) {
+      return { success: false, error: "Cliente inválido para este parceiro." }
+    }
+
     if (!limitCheck.allowed) {
       return { success: false, error: limitCheck.message || "Limite mensal de ordens de serviço atingido." }
     }
 
+    const status = input.status || "aberta"
+
+    // Compute item totals in-memory
+    const servicesList = input.services || []
+    const productsList = input.products || []
+
+    let totalServiceAmount = 0
+    const serviceRows = servicesList.map((s, idx) => {
+      const price = Number(s.service_price !== undefined ? s.service_price : 0)
+      const qty = Number(s.quantity || 1)
+      const total = price * qty
+      totalServiceAmount += total
+      return {
+        service_id: s.service_id || null,
+        service_name: s.service_name || "Serviço avulso",
+        service_price: price,
+        quantity: qty,
+        total_price: total,
+        sort_order: idx,
+      }
+    })
+
+    let totalProductAmount = 0
+    const productRows = productsList.map((p, idx) => {
+      const price = Number(p.unit_price !== undefined ? p.unit_price : 0)
+      const qty = Number(p.quantity || 1)
+      const total = price * qty
+      totalProductAmount += total
+      return {
+        product_id: p.product_id || null,
+        variant_id: p.variant_id || null,
+        product_name: p.product_name || "Produto avulso",
+        unit_price: price,
+        quantity: qty,
+        total_price: total,
+        sort_order: idx,
+      }
+    })
+
+    const subtotal = totalServiceAmount + totalProductAmount
+    const discVal = Number(input.discount_value || 0)
+    const discType = input.discount_type || 'fixed'
+    const couponDisc = Number(input.coupon_discount_amount || 0)
+    const otherCosts = Number(input.other_costs || 0)
+
+    let discountAmount = 0
+    if (discType === 'percentage') {
+      discountAmount = (subtotal * discVal) / 100
+    } else if (discType === 'fixed') {
+      discountAmount = discVal
+    } else if (discType === 'coupon') {
+      discountAmount = couponDisc
+    }
+
+    const finalTotal = Math.max(0, subtotal - discountAmount + otherCosts)
     const publicToken = generateShortId(6)
 
+    // 1. Insert service order with final totals
     const { data, error } = await admin
       .from("service_orders")
       .insert({
@@ -260,8 +314,8 @@ export async function createServiceOrderAction(
         description: sanitizeNotes(input.description),
         diagnosis: sanitizeNotes(input.diagnosis),
         internal_notes: sanitizeNotes(input.internal_notes),
-        customer_id: customerId,
-        customer_snapshot: customerId ? await getCustomerSnapshot(admin, customerId) : null,
+        customer_id: input.customer_id || null,
+        customer_snapshot: customerSnapshot,
         expected_completion_date: input.expected_completion_date || null,
         assigned_user_id: input.assigned_user_id || null,
         status,
@@ -269,91 +323,67 @@ export async function createServiceOrderAction(
         priority: input.priority || 'baixa',
         estimated_hours: input.estimated_hours || null,
         expected_completion_time: input.expected_completion_time || null,
-        discount_value: input.discount_value || 0,
-        discount_type: input.discount_type || 'fixed',
+        discount_value: discVal,
+        discount_type: discType,
         coupon_id: input.coupon_id || null,
         coupon_code: input.coupon_code || null,
-        coupon_discount_amount: input.coupon_discount_amount || 0,
-        other_costs: input.other_costs || 0,
+        coupon_discount_amount: couponDisc,
+        other_costs: otherCosts,
+        total_service_amount: totalServiceAmount,
+        total_product_amount: totalProductAmount,
+        total_amount: finalTotal,
         payment_status: input.payment_status || 'unpaid',
         paid_amount: input.paid_amount || 0,
         payment_method: input.payment_method || null,
         payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
         created_at: input.created_at || undefined,
-        specifications: input.specifications ? input.specifications : undefined,
+        specifications: input.specifications && input.specifications.length > 0 ? input.specifications : undefined,
       })
       .select("*")
       .single()
 
     if (error) throw error
 
-    const orderNumber = data.order_number
-
-    await logAuditEvent({
-      partnerId,
-      actorUserId: user.id,
-      entityType: "service_order",
-      entityId: data.id,
-      actionType: "created",
-      source: "manual",
-      changeLines: [`OS #${orderNumber} criada por ${user.email || "usuário"}`],
-      metadata: { storeId, partnerId, userId: user.id, serviceOrderId: data.id },
-    })
-
-    try {
-      await increment_usage_counter(partnerId, "service_orders_month_count")
-    } catch { }
-
-    if (input.assigned_user_id && input.assigned_user_id !== user.id) {
-      try {
-        await createNotification({
-          userId: input.assigned_user_id,
-          type: "service_order_assigned" as any,
-          title: "Nova OS atribuída",
-          message: `OS #${orderNumber}: ${input.title}`,
-          entityType: "service_order" as any,
-          entityId: data.id,
-          data: { partnerId, orderNumber },
-          idempotencyKey: `os-assigned-${data.id}-${input.assigned_user_id}`,
-        })
-      } catch { }
+    // 2. Insert linked order in orders table
+    const userNotes = sanitizeNotes(input.internal_notes || input.description) || null
+    const buildLinkedOrderPayload = (includeSourceId: boolean = true) => {
+      const payload: any = {
+        partner_id: partnerId,
+        store_id: storeId,
+        buyer_id: input.customer_id || null,
+        customer_id: input.customer_id || null,
+        customer_name: (customerSnapshot as any)?.name || null,
+        total_amount: finalTotal,
+        discount_value: discVal,
+        discount_type: discType,
+        discount_amount: discountAmount,
+        additional_costs: otherCosts,
+        paid_amount: input.paid_amount || 0,
+        situation: "pending",
+        delivery_status: "not_sent",
+        delivery_type: "pickup",
+        order_source: "Ordem de Serviço",
+        payment_method: input.payment_method || "Método não definido",
+        notes: userNotes,
+        created_at: new Date().toISOString(),
+        created_by: user.id,
+      }
+      if (includeSourceId) {
+        payload.source_service_order_id = data.id
+      }
+      return payload
     }
-
-    // Create linked order in orders table (mirror appointments flow)
-    const orderRefNote = `service_order:${data.id}:order`
-    const buildLinkedOrderPayload = (total: number) => ({
-      partner_id: partnerId,
-      store_id: storeId,
-      buyer_id: customerId,
-      customer_id: customerId,
-      customer_name: (data.customer_snapshot as any)?.name || null,
-      total_amount: total,
-      discount_value: input.discount_value || 0,
-      discount_type: input.discount_type || "fixed",
-      discount_amount: 0,
-      additional_costs: input.other_costs || 0,
-      paid_amount: 0,
-      situation: "pending",
-      delivery_status: "not_sent",
-      delivery_type: "pickup",
-      order_source: "admin_service_order",
-      payment_method: "Método não definido",
-      notes: orderRefNote,
-      created_at: new Date().toISOString(),
-      created_by: user.id,
-    })
 
     let linkedOrderResult: any = await admin
       .from("orders")
-      .insert(buildLinkedOrderPayload(0))
+      .insert(buildLinkedOrderPayload(true))
       .select("id")
       .single()
 
-    // Retry with a minimum positive total if the DB still enforces total_amount > 0
-    if (linkedOrderResult?.error && /positive|total_amount|check constraint/i.test(String(linkedOrderResult.error.message || ""))) {
+    if (linkedOrderResult?.error && /source_service_order_id|column/i.test(String(linkedOrderResult.error.message || ""))) {
       linkedOrderResult = await admin
         .from("orders")
-        .insert(buildLinkedOrderPayload(0.01))
+        .insert(buildLinkedOrderPayload(false))
         .select("id")
         .single()
     }
@@ -366,23 +396,120 @@ export async function createServiceOrderAction(
       throw new Error(`Falha ao criar pedido vinculado à OS: ${linkedOrderErr?.message || "erro desconhecido"}`)
     }
 
-    await admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id)
+    // 3. Prepare parallel inserts for order items, service rows, product rows and update order_id on OS
+    const orderItems = [
+      ...serviceRows.map((s: any) => ({
+        order_id: linkedOrder.id,
+        product_id: s.service_id || null,
+        variant_id: null,
+        product_name: s.service_name || "Mão de Obra",
+        product_price: s.service_price,
+        quantity: s.quantity,
+        subtotal: s.total_price,
+        line_type: "service_booking" as const,
+        fulfillment_mode: "on_site",
+        service_id: s.service_id || null,
+        is_gift: false,
+        original_price: null,
+        is_promotional: false,
+        promotion_id: null,
+      })),
+      ...productRows.map((p: any) => ({
+        order_id: linkedOrder.id,
+        product_id: p.product_id || null,
+        variant_id: p.variant_id || null,
+        product_name: p.product_name || "Produto",
+        product_price: p.unit_price,
+        quantity: p.quantity,
+        subtotal: p.total_price,
+        line_type: "product" as const,
+        fulfillment_mode: "delivery",
+        service_id: null,
+        is_gift: false,
+        original_price: null,
+        is_promotional: false,
+        promotion_id: null,
+      })),
+    ]
 
-    await recalcTotals(admin, data.id)
+    const insertPromises: Promise<any>[] = [
+      admin.from("service_orders").update({ order_id: linkedOrder.id }).eq("id", data.id),
+    ]
+
+    if (serviceRows.length > 0) {
+      const formattedServices = serviceRows.map(s => ({ ...s, service_order_id: data.id }))
+      insertPromises.push(admin.from("service_order_services").insert(formattedServices))
+    }
+
+    if (productRows.length > 0) {
+      const formattedProducts = productRows.map(p => ({ ...p, service_order_id: data.id }))
+      insertPromises.push(admin.from("service_order_products").insert(formattedProducts))
+    }
+
+    if (orderItems.length > 0) {
+      insertPromises.push(admin.from("order_items").insert(orderItems))
+    }
+
+    await Promise.all(insertPromises)
+
+    const orderNumber = data.order_number
+
+    // 4. Background tasks (audits, notifications, usage counter)
+    void (async () => {
+      try {
+        await logAuditEvent({
+          partnerId,
+          actorUserId: user.id,
+          entityType: "service_order",
+          entityId: data.id,
+          actionType: "created",
+          source: "manual",
+          changeLines: [`OS #${orderNumber} criada por ${user.email || "usuário"}`],
+          metadata: { storeId, partnerId, userId: user.id, serviceOrderId: data.id },
+        })
+      } catch (e) {
+        console.error("[createServiceOrderAction] Audit log error:", e)
+      }
+
+      try {
+        await increment_usage_counter(partnerId, "service_orders_month_count")
+      } catch { }
+
+      if (input.assigned_user_id && input.assigned_user_id !== user.id) {
+        try {
+          await createNotification({
+            userId: input.assigned_user_id,
+            type: "service_order_assigned" as any,
+            title: "Nova OS atribuída",
+            message: `OS #${orderNumber}: ${input.title}`,
+            entityType: "service_order" as any,
+            entityId: data.id,
+            data: { partnerId, orderNumber },
+            idempotencyKey: `os-assigned-${data.id}-${input.assigned_user_id}`,
+          })
+        } catch { }
+      }
+    })()
+
     revalidatePath("/erp/ordens-de-servico")
-    return { success: true, data, orderNumber }
+    return { success: true, data: { ...data, order_id: linkedOrder.id }, orderNumber }
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao criar ordem de serviço" }
   }
 }
 
-async function getCustomerSnapshot(admin: any, customerId: string) {
+async function getCustomerSnapshot(admin: any, customerId: string, partnerId?: string) {
+  let customerQuery = admin
+    .from("customers")
+    .select("id, name, email, phone, image_url")
+    .eq("id", customerId)
+
+  if (partnerId) {
+    customerQuery = customerQuery.eq("partner_id", partnerId)
+  }
+
   const [{ data: customer }, { data: addresses }] = await Promise.all([
-    admin
-      .from("customers")
-      .select("id, name, email, phone, image_url")
-      .eq("id", customerId)
-      .single(),
+    customerQuery.maybeSingle(),
     admin
       .from("addresses")
       .select("zip_code, street, number, complement, neighborhood, city, state, address_type, is_default")
@@ -1016,16 +1143,25 @@ async function recalcTotals(admin: any, serviceOrderId: string) {
       await admin.from("order_items").insert(orderItems)
     }
 
-    await admin
+    const orderUpdateData: any = {
+      total_amount: finalTotal,
+      discount_value: discVal,
+      discount_type: discType,
+      discount_amount: discountAmount,
+      additional_costs: otherCosts,
+      order_source: "Ordem de Serviço",
+      source_service_order_id: serviceOrderId,
+    }
+
+    const { error: orderUpdErr } = await admin
       .from("orders")
-      .update({
-        total_amount: finalTotal,
-        discount_value: discVal,
-        discount_type: discType,
-        discount_amount: discountAmount,
-        additional_costs: otherCosts,
-      })
+      .update(orderUpdateData)
       .eq("id", linkedOrderId)
+
+    if (orderUpdErr && /source_service_order_id|column/i.test(String(orderUpdErr.message || ""))) {
+      delete orderUpdateData.source_service_order_id
+      await admin.from("orders").update(orderUpdateData).eq("id", linkedOrderId)
+    }
   }
 }
 
@@ -1243,12 +1379,16 @@ export async function updateServiceOrderAction(
     payment_breakdown?: any
     created_at?: string | null
     specifications?: { name: string; value: string }[]
+    services?: Array<{ service_id: string | null; service_name?: string; service_price?: number; quantity?: number }>
+    products?: Array<{ product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity?: number }>
   },
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requirePermission(partnerId, "service_orders", "edit")
-    const user = await requireUser()
+    const [user] = await Promise.all([
+      requireUser(),
+      requirePermission(partnerId, "service_orders", "edit"),
+    ])
     const admin = getAdminClient()
 
     const { data: current, error: getErr } = await admin
@@ -1261,7 +1401,6 @@ export async function updateServiceOrderAction(
     if (getErr || !current) throw new Error("Ordem de serviço não encontrada")
 
     const isPaid = current.payment_status === "paid" || current.payment_status === "partially_paid"
-    const allowedWhenPaid = ["internal_notes", "status", "priority", "expected_completion_date", "expected_completion_time", "estimated_hours", "specifications"]
 
     const updateData: any = {}
     if (input.store_id !== undefined && !isPaid) {
@@ -1276,21 +1415,17 @@ export async function updateServiceOrderAction(
     if (input.internal_notes !== undefined) updateData.internal_notes = sanitizeNotes(input.internal_notes)
     if (input.customer_id !== undefined && !isPaid) {
       const customerId = input.customer_id || null
-      if (customerId) {
-        const { data: customer } = await admin
-          .from("customers")
-          .select("id")
-          .eq("id", customerId)
-          .eq("partner_id", partnerId)
-          .maybeSingle()
-        if (!customer?.id) return { success: false, error: "Cliente invÃ¡lido para este parceiro." }
-      }
       updateData.customer_id = customerId
-      updateData.customer_snapshot = customerId ? await getCustomerSnapshot(admin, customerId) : null
+      updateData.customer_snapshot = customerId ? await getCustomerSnapshot(admin, customerId, partnerId) : null
     }
     if (input.expected_completion_date !== undefined) updateData.expected_completion_date = input.expected_completion_date
     if (input.assigned_user_id !== undefined && !isPaid) updateData.assigned_user_id = input.assigned_user_id
-    if (input.status !== undefined) updateData.status = input.status
+    if (input.status !== undefined) {
+      updateData.status = input.status
+      if (input.status === "concluida" && !current.completed_at) {
+        updateData.completed_at = new Date().toISOString()
+      }
+    }
     if (input.priority !== undefined) updateData.priority = input.priority
     if (input.estimated_hours !== undefined) updateData.estimated_hours = input.estimated_hours
     if (input.expected_completion_time !== undefined) updateData.expected_completion_time = input.expected_completion_time
@@ -1307,8 +1442,50 @@ export async function updateServiceOrderAction(
       updateData.payment_breakdown = input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null
     }
     if (input.created_at !== undefined && !isPaid) updateData.created_at = input.created_at
-    if (input.specifications !== undefined) updateData.specifications = input.specifications.length > 0 ? input.specifications : null
-    if (input.status !== undefined) updateData.status = input.status
+    if (input.specifications !== undefined) updateData.specifications = input.specifications && input.specifications.length > 0 ? input.specifications : null
+
+    // Sync services if provided and not locked
+    if (input.services !== undefined && !isPaid) {
+      await admin.from("service_order_services").delete().eq("service_order_id", serviceOrderId)
+      if (input.services.length > 0) {
+        const serviceItems = input.services.map((s, idx) => {
+          const price = Number(s.service_price !== undefined ? s.service_price : 0)
+          const qty = Number(s.quantity || 1)
+          return {
+            service_order_id: serviceOrderId,
+            service_id: s.service_id || null,
+            service_name: s.service_name || "Serviço avulso",
+            service_price: price,
+            quantity: qty,
+            total_price: price * qty,
+            sort_order: idx,
+          }
+        })
+        await admin.from("service_order_services").insert(serviceItems)
+      }
+    }
+
+    // Sync products if provided and not locked
+    if (input.products !== undefined && !isPaid) {
+      await admin.from("service_order_products").delete().eq("service_order_id", serviceOrderId)
+      if (input.products.length > 0) {
+        const productItems = input.products.map((p, idx) => {
+          const price = Number(p.unit_price !== undefined ? p.unit_price : 0)
+          const qty = Number(p.quantity || 1)
+          return {
+            service_order_id: serviceOrderId,
+            product_id: p.product_id || null,
+            variant_id: p.variant_id || null,
+            product_name: p.product_name || "Produto avulso",
+            unit_price: price,
+            quantity: qty,
+            total_price: price * qty,
+            sort_order: idx,
+          }
+        })
+        await admin.from("service_order_products").insert(productItems)
+      }
+    }
 
     const { data, error } = await admin
       .from("service_orders")
@@ -1320,20 +1497,20 @@ export async function updateServiceOrderAction(
 
     if (error) throw error
 
-    // Log audit event
+    // Log audit event asynchronously
     const changes = []
     if (input.title && input.title !== current.title) changes.push(`Título: "${current.title}" -> "${input.title}"`)
     if (input.status && input.status !== current.status) changes.push(`Status: "${current.status}" -> "${input.status}"`)
     if (input.store_id && input.store_id !== current.store_id) changes.push(`Loja alterada`)
 
     const updatedStoreId = data.store_id || current.store_id
-    await logAuditEvent({
+    void logAuditEvent({
       partnerId, actorUserId: user.id,
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "updated", source: "manual",
       changeLines: changes.length > 0 ? changes : ["Dados da OS atualizados"],
       metadata: { storeId: updatedStoreId, partnerId, userId: user.id, serviceOrderId },
-    })
+    }).catch(e => console.error("[updateServiceOrderAction] audit log error:", e))
 
     await recalcTotals(admin, serviceOrderId)
     revalidatePath("/erp/ordens-de-servico")
@@ -1721,6 +1898,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
         additional_costs: otherCosts,
         paid_amount: payload.paidAmount,
         situation: saleStatus,
+        order_source: "Ordem de Serviço",
         payment_method: payload.paymentMethod || null,
         payment_breakdown: JSON.stringify(paymentMethodSummary),
       })

@@ -367,15 +367,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                     <Button variant="ghost" leftIcon={<XIcon />} onClick={() => setDetailOpen(false)}>
                         Fechar
                     </Button>
-                    {selectedPurchase.status === "pending" && (
-                        <Button
-                            variant="destructive"
-                            leftIcon={<XIcon />}
-                            onClick={() => { setCancelTarget(selectedPurchase); setCancelOpen(true); setDetailOpen(false) }}
-                        >
-                            Cancelar compra
-                        </Button>
-                    )}
                 </div>
             </footer>
         </div>
@@ -431,7 +422,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                     gatewayLabel={getGatewayLabel(p.gateway)}
                                     createdAt={p.created_at}
                                     onDetails={() => handleViewDetails(p)}
-                                    onCancel={p.status === "pending" ? () => { setCancelTarget(p); setCancelOpen(true) } : undefined}
                                     onInvoice={p.invoice_id ? () => handleInvoice() : undefined}
                                 />
                             ))}
@@ -483,7 +473,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             createdAt={p.created_at}
                                             columns={filteredColumns}
                                             onDetails={() => handleViewDetails(p)}
-                                            onCancel={p.status === "pending" ? () => { setCancelTarget(p); setCancelOpen(true) } : undefined}
                                             onInvoice={p.invoice_id ? () => handleInvoice() : undefined}
                                         />
                                     ))}

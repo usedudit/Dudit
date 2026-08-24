@@ -103,7 +103,7 @@ export async function subscribeToRecurringPlanAction(input: {
 
     const { data: plan } = await admin
       .from("recurring_plans")
-      .select("id, name, status, start_date, show_in_marketplace")
+      .select("id, name, status, start_date, show_in_marketplace, frequency_type, frequency_interval")
       .eq("id", input.planId)
       .eq("partner_id", input.partnerId)
       .maybeSingle()
@@ -125,7 +125,25 @@ export async function subscribeToRecurringPlanAction(input: {
       return { success: false, error: "Você já possui uma assinatura ativa deste plano." }
     }
 
-    const nextExecutionAt = new Date(Math.max(Date.now(), new Date(plan.start_date).getTime())).toISOString()
+    const now = new Date()
+    const freqType = plan.frequency_type || "month"
+    const freqInterval = Number(plan.frequency_interval || 1)
+    let nextExecutionAt: string
+    if (freqType === "day") {
+      nextExecutionAt = new Date(now.getTime() + freqInterval * 24 * 60 * 60 * 1000).toISOString()
+    } else if (freqType === "week") {
+      nextExecutionAt = new Date(now.getTime() + freqInterval * 7 * 24 * 60 * 60 * 1000).toISOString()
+    } else if (freqType === "month") {
+      const d = new Date(now)
+      d.setMonth(d.getMonth() + freqInterval)
+      nextExecutionAt = d.toISOString()
+    } else if (freqType === "year") {
+      const d = new Date(now)
+      d.setFullYear(d.getFullYear() + freqInterval)
+      nextExecutionAt = d.toISOString()
+    } else {
+      nextExecutionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
 
     const { data, error } = await admin
       .from("recurring_subscriptions")

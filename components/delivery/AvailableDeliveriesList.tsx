@@ -23,7 +23,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import AvailableDeliveryGridCard from "./AvailableDeliveryGridCard"
 import AvailableDeliveryListRow, { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 
-type SortKey = "date" | "fee" | "order"
+type SortKey = "order" | "partner" | "dest" | "fee"
 type SortDirection = "asc" | "desc"
 
 const ITEMS_PER_PAGE = 8
@@ -88,7 +88,7 @@ export default function AvailableDeliveriesList() {
     const knownOfferIdsRef = useRef<Set<string>>(new Set())
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
-        key: "date",
+        key: "dest",
         direction: "desc",
     })
 
@@ -196,7 +196,7 @@ export default function AvailableDeliveriesList() {
 
         list.sort((a, b) => {
             let res = 0
-            if (key === "date") {
+            if (key === "dest") {
                 const dateA = new Date(a.assigned_at || 0).getTime()
                 const dateB = new Date(b.assigned_at || 0).getTime()
                 res = dateA - dateB
@@ -206,6 +206,8 @@ export default function AvailableDeliveriesList() {
                 const numA = Number(a.order_number) || 0
                 const numB = Number(b.order_number) || 0
                 res = numA - numB
+            } else if (key === "partner") {
+                res = String(a.store_name || a.partner_name || "").localeCompare(String(b.store_name || b.partner_name || ""))
             }
             return direction === "asc" ? res : -res
         })
@@ -450,27 +452,22 @@ export default function AvailableDeliveriesList() {
                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                     {FIXED_COLUMNS.map((col) => {
                                                         const isSorted = sortConfig.key === col.id
-                                                        const keyMap: Record<string, SortKey> = {
-                                                            order: "order",
-                                                            dest: "date",
-                                                            fee: "fee",
-                                                        }
                                                         return (
                                                             <th
                                                                 key={col.id}
                                                                 className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                                                                    } cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
+                                                                    } ${col.id !== "actions" ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading" : ""} group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
                                                                     }`}
                                                                 style={{ width: col.width }}
                                                                 onClick={() => {
                                                                     if (col.id === "actions") return
-                                                                    const sortKey = keyMap[col.id]
-                                                                    if (sortKey) handleSort(sortKey)
+                                                                    const sortKey = col.id as SortKey
+                                                                    handleSort(sortKey)
                                                                 }}
                                                             >
                                                                 <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
                                                                     <span>{col.label}</span>
-                                                                    {col.id !== "actions" && keyMap[col.id] && (
+                                                                    {col.id !== "actions" && (
                                                                         <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>
                                                                             <ArrowUpDownIcon
                                                                                 size={14}

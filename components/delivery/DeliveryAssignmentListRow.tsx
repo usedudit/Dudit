@@ -1,19 +1,15 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Badge, BadgeVariant, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
     TruckIcon,
-    PhoneIcon,
-    MapPinIcon,
     CheckCircleIcon,
     ClockIcon,
     AlertTriangleIcon,
-    WhatsappIcon,
-    StoreIcon,
+    MapPinIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
@@ -102,11 +98,9 @@ export default function DeliveryAssignmentListRow({
         ? `#${assignment.order_number}`
         : `#${String(assignment.order_id).slice(0, 8)}`
 
-    const cleanPhone = (assignment.customer_phone || "").replace(/\D/g, "")
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
         assignment.delivery_address || ""
     )}`
-    const whatsappUrl = cleanPhone ? `https://wa.me/55${cleanPhone}` : null
 
     const handleView = () => {
         if (onView) {
@@ -140,58 +134,23 @@ export default function DeliveryAssignmentListRow({
 
             {/* ESTABELECIMENTO */}
             <td className="p-2 border-b border-brand-border dark:border-dark-border w-[180px]">
-                <div className="flex items-center gap-1.5 text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                    <StoreIcon size={14} className="text-brand-inactive-text shrink-0" />
-                    <span className="truncate max-w-[160px]">{assignment.partner_name || "Loja Parceira"}</span>
-                </div>
+                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[160px]">
+                    {assignment.partner_name || "Loja Parceira"}
+                </span>
             </td>
 
             {/* CLIENTE */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[200px]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col">
-                    <span className="font-semibold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
-                        {assignment.customer_name}
-                    </span>
-                    {assignment.customer_phone ? (
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <a
-                                href={`tel:${assignment.customer_phone}`}
-                                className="text-xs text-brand-green hover:underline flex items-center gap-1"
-                                title="Ligar para cliente"
-                            >
-                                <PhoneIcon size={11} />
-                                <span>{assignment.customer_phone}</span>
-                            </a>
-                            {whatsappUrl && (
-                                <a
-                                    href={whatsappUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-emerald-600 hover:text-emerald-700"
-                                    title="Chamar no WhatsApp"
-                                >
-                                    <WhatsappIcon size={13} />
-                                </a>
-                            )}
-                        </div>
-                    ) : (
-                        <span className="text-xs text-brand-inactive-text">Sem telefone</span>
-                    )}
-                </div>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[200px]">
+                <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate block max-w-[180px]">
+                    {assignment.customer_name}
+                </span>
             </td>
 
             {/* ENDEREÇO */}
-            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[240px]" onClick={(e) => e.stopPropagation()}>
-                <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-1.5 text-xs text-brand-dark/90 dark:text-dark-body hover:text-brand-green transition-colors max-w-[220px]"
-                    title="Abrir no Google Maps"
-                >
-                    <MapPinIcon size={14} className="text-brand-inactive-text shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">{assignment.delivery_address || "Endereço não informado"}</span>
-                </a>
+            <td className="p-2 border-b border-brand-border dark:border-dark-border w-[240px]">
+                <span className="text-xs text-brand-dark/90 dark:text-dark-body truncate block max-w-[220px]">
+                    {assignment.delivery_address || "Endereço não informado"}
+                </span>
             </td>
 
             {/* VALORES */}
@@ -216,30 +175,13 @@ export default function DeliveryAssignmentListRow({
             {/* AÇÕES */}
             <td className="py-2.5 pr-6 pl-2 border-b border-brand-border dark:border-dark-border text-center w-[70px] rounded-r-lg" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-center action-btn">
-                    <ActionsDropdown
-                        trigger={
-                            <button
-                                type="button"
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark dark:hover:bg-dark-border dark:hover:text-dark-heading transition-colors cursor-pointer"
-                                aria-label="Ações da entrega"
-                            >
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                            </button>
-                        }
-                    >
+                    <ActionsDropdown>
+                        <DropdownItem onClick={() => handleView()}>
+                            <TruckIcon size={16} /> Ver Detalhes
+                        </DropdownItem>
                         <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
                             <MapPinIcon size={16} /> Abrir Rota no Maps
                         </DropdownItem>
-                        {cleanPhone && (
-                            <DropdownItem onClick={() => window.open(`tel:${cleanPhone}`, "_self")}>
-                                <PhoneIcon size={16} /> Ligar para Cliente
-                            </DropdownItem>
-                        )}
-                        {whatsappUrl && (
-                            <DropdownItem onClick={() => window.open(whatsappUrl, "_blank")}>
-                                <WhatsappIcon size={16} /> Chamar no WhatsApp
-                            </DropdownItem>
-                        )}
                     </ActionsDropdown>
                 </div>
             </td>

@@ -116,9 +116,9 @@ export async function getStoreAction(storeId: string) {
 interface CreateStoreInput {
     partnerId: string
     name: string
+    phone: string
     slug?: string
     description?: string
-    phone?: string
     opening_hours?: Record<string, unknown>
     logo_url?: string
     // Address fields
@@ -140,24 +140,29 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
         await requirePartnerAccessWithPermission(input.partnerId, "stores" as any, "create")
         await requireMinimumPlan(input.partnerId, "escalar")
 
+        if (!input.name || !input.name.trim()) {
+            return { success: false, error: "Nome da loja é obrigatório" }
+        }
+
+        if (!input.phone || !input.phone.trim()) {
+            return { success: false, error: "WhatsApp é obrigatório" }
+        }
+
         const supabase = await getSupabaseServerClient()
         const admin = createAdminClient()
 
         const slug = input.slug || generateSlug(input.name)
 
-        let normalizedPhone: string | null = null
-        if (input.phone) {
-            const sanitizedPhone = typeof input.phone === "string" ? sanitizeInput(input.phone, 20) : ""
-            let phoneToValidate = sanitizedPhone
-            const digits = sanitizedPhone.replace(/\D/g, "")
-            if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
-                phoneToValidate = digits.slice(2)
-            }
-            if (!validateBrazilMobile(phoneToValidate)) {
-                return { success: false, error: "Número de telefone inválido" }
-            }
-            normalizedPhone = normalizePhoneToE164(sanitizedPhone)
+        const sanitizedPhone = typeof input.phone === "string" ? sanitizeInput(input.phone, 20) : ""
+        let phoneToValidate = sanitizedPhone
+        const digits = sanitizedPhone.replace(/\D/g, "")
+        if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+            phoneToValidate = digits.slice(2)
         }
+        if (!validateBrazilMobile(phoneToValidate)) {
+            return { success: false, error: "Número de WhatsApp inválido" }
+        }
+        const normalizedPhone = normalizePhoneToE164(sanitizedPhone)
 
         const { data, error } = await supabase
             .from("stores")

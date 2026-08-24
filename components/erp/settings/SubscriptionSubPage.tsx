@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input } from "@/components/reusable"
+import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input, FormSection } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import {
     CheckCircleIcon,
@@ -745,8 +745,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             <>
                                                 {subData?.subscription?.status === "past_due" && (
                                                     <Button
-                                                        variant="default"
-                                                        className="bg-red-500 text-white hover:bg-red-600 text-xs md:text-sm h-11 px-4 font-semibold"
+                                                        variant="destructive"
+                                                        className="h-11"
                                                         onClick={handleGenerateManualPayment}
                                                         disabled={manualPaymentModal.loading}
                                                         isLoading={manualPaymentModal.loading}
@@ -756,8 +756,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 )}
                                                 {subData?.subscription?.status !== "past_due" && (
                                                     <Button
-                                                        variant="outline"
-                                                        className="text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20 text-xs md:text-sm h-11 px-4 font-semibold"
+                                                        variant="outlinered"
+                                                        className="h-11"
                                                         onClick={() => setCancelModal(true)}
                                                     >
                                                         Cancelar Plano
@@ -895,12 +895,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         </div>
 
                         {/* Billing History Section */}
-                        <div className="mb-10">
-                            <h3 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 px-1">
-                                Histórico de Faturas
-                            </h3>
+                        <FormSection title="Histórico de Faturas" hasSeparator>
                             <BillingPage initialPartnerId={effectivePartnerId} showTitle={false} />
-                        </div>
+                        </FormSection>
                     </div>
                 </div>
 

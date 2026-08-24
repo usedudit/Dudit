@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation"
 import { requireUser } from "@/lib/auth/authorization"
-import { getAllUserStoreAccess, type StoreAccessRecord } from "@/lib/auth/partner-context"
+import { getAllUserStoreAccess, getUserSuspendedAccess, type StoreAccessRecord } from "@/lib/auth/partner-context"
 import type { PartnerRole } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 import { selectErpAction } from "./actions"
 import Link from "next/link"
 import { Button, ListItem, Badge } from "@/components/reusable"
 import { PlusIcon, StoreIcon } from "@/lib/icons"
+import { SelectErpSuspendedSection } from "@/components/erp/SelectErpSuspendedSection"
 
 const ROLE_LABELS: Record<PartnerRole, string> = {
     OWNER: "Proprietário",
@@ -26,10 +27,13 @@ function roleIdToPartnerRole(roleId: RoleId | string | null | undefined): Partne
 export default async function SelectErpPage() {
     const user = await requireUser()
 
-    const storeAccess = await getAllUserStoreAccess()
+    const [storeAccess, suspendedAccess] = await Promise.all([
+        getAllUserStoreAccess(),
+        getUserSuspendedAccess(user.id),
+    ])
 
-    // If no access at all, redirect to partner registration
-    if (storeAccess.length === 0) {
+    // If no access at all (neither active nor suspended), redirect to partner registration
+    if (storeAccess.length === 0 && suspendedAccess.length === 0) {
         redirect("/auth/login?mode=partner")
     }
 
@@ -39,8 +43,8 @@ export default async function SelectErpPage() {
     // Check if user has access to any store that isn't theirs
     const hasNonOwnAccess = storeAccess.some(a => !a.isOwn)
 
-    // Only auto-redirect if the user has a single store that belongs to them
-    if (storeAccess.length === 1 && !hasNonOwnAccess) {
+    // Only auto-redirect if the user has a single store that belongs to them AND no suspended stores
+    if (storeAccess.length === 1 && !hasNonOwnAccess && suspendedAccess.length === 0) {
         redirect("/erp/inicio")
     }
 
@@ -50,7 +54,8 @@ export default async function SelectErpPage() {
         ...storeAccess.filter(a => !a.isOwn),
     ]
 
-    // Multiple stores - show selection screen
+    const onlySuspended = storeAccess.length === 0 && suspendedAccess.length > 0
+
     return (
         <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-dark-background transition-colors duration-300">
             <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
@@ -69,62 +74,75 @@ export default async function SelectErpPage() {
 
             <main className="flex-1 flex flex-col justify-center items-center px-4 py-12 md:py-16">
                 <div className="w-full max-w-lg flex flex-col gap-6">
-                    <div className="text-center mb-4">
-                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                            Que bom te ver por aqui!
-                        </h1>
-                        <p className="text-brand-dark dark:text-dark-heading text-sm">
-                            Você tem acesso a uma ou mais lojas. Escolha qual deseja acessar.
-                        </p>
-                    </div>
+                    {!onlySuspended && (
+                        <div className="text-center mb-4">
+                            <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                                Que bom te ver por aqui!
+                            </h1>
+                            <p className="text-brand-dark dark:text-dark-heading text-sm">
+                                Você tem acesso a uma ou mais lojas. Escolha qual deseja acessar.
+                            </p>
+                        </div>
+                    )}
 
-                    {/* Store Cards */}
-                    <div className="flex flex-col gap-3">
-                        {sortedAccess.map((access, index) => {
-                            const isOwn = access.isOwn
-                            const roleLabel = ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId
+                    {/* Active Store Cards */}
+                    {sortedAccess.length > 0 && (
+                        <div className="flex flex-col gap-3">
+                            {sortedAccess.map((access, index) => {
+                                const isOwn = access.isOwn
+                                const roleLabel = ROLE_LABELS[roleIdToPartnerRole(access.roleId)] || access.roleId
 
-                            return (
-                                <form key={access.storeId} action={selectErpAction}>
-                                    <input type="hidden" name="partnerId" value={access.partnerId} />
-                                    <input type="hidden" name="storeId" value={access.storeId} />
-                                    <button
-                                        type="submit"
-                                        className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
-                                    >
-                                        <ListItem
-                                            className={`px-6 py-5 gap-4 ${isOwn ? "ring-2 ring-brand-primary/20 bg-brand-primary/5" : ""}`}
-                                            icon={StoreIcon}
-                                            title={
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="truncate">{access.storeName}</span>
-                                                    {isOwn ? (
-                                                        <p className="text-xs font-bold text-brand-green">Sua loja · Matriz</p>
-                                                    ) : (
-                                                        <p className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</p>
-                                                    )}
-                                                </div>
-                                            }
-                                            description={
-                                                isOwn
-                                                    ? `${access.partnerName} - você pode alternar entre matriz e filiais depois de entrar`
-                                                    : access.ownerName
-                                                        ? `${access.partnerName} · Proprietário: ${access.ownerName}`
-                                                        : access.partnerName
-                                            }
-                                            showChevron={true}
-                                        />
-                                    </button>
-                                    {isOwn && index < sortedAccess.length - 1 && (
-                                        <div className="my-2 border-b border-gray-200 dark:border-dark-border" />
-                                    )}
-                                </form>
-                            )
-                        })}
-                    </div>
+                                return (
+                                    <form key={access.storeId} action={selectErpAction}>
+                                        <input type="hidden" name="partnerId" value={access.partnerId} />
+                                        <input type="hidden" name="storeId" value={access.storeId} />
+                                        <button
+                                            type="submit"
+                                            className="w-full text-left block bg-transparent p-0 border-0 cursor-pointer focus:outline-none"
+                                        >
+                                            <ListItem
+                                                className={`px-6 py-5 gap-4 ${isOwn ? "ring-2 ring-brand-primary/20 bg-brand-primary/5" : ""}`}
+                                                icon={StoreIcon}
+                                                title={
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="truncate">{access.storeName}</span>
+                                                        {isOwn ? (
+                                                            <p className="text-xs font-bold text-brand-green">Sua loja · Matriz</p>
+                                                        ) : (
+                                                            <p className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</p>
+                                                        )}
+                                                    </div>
+                                                }
+                                                description={
+                                                    isOwn
+                                                        ? `${access.partnerName} - você pode alternar entre matriz e filiais depois de entrar`
+                                                        : access.ownerName
+                                                            ? `${access.partnerName} · Proprietário: ${access.ownerName}`
+                                                            : access.partnerName
+                                                }
+                                                showChevron={true}
+                                            />
+                                        </button>
+                                        {isOwn && index < sortedAccess.length - 1 && (
+                                            <div className="my-2 border-b border-gray-200 dark:border-dark-border" />
+                                        )}
+                                    </form>
+                                )
+                            })}
+                        </div>
+                    )}
 
-                    {/* Create Partner Account Button - only show if user doesn't have their own store */}
-                    {!hasOwnStore && (
+                    {/* Suspended Stores / ERP Access Section */}
+                    {suspendedAccess.length > 0 && (
+                        <SelectErpSuspendedSection
+                            suspendedStores={suspendedAccess}
+                            userEmail={user.email}
+                            onlySuspended={onlySuspended}
+                        />
+                    )}
+
+                    {/* Create Partner Account Button - only show if user doesn't have their own active store */}
+                    {!hasOwnStore && !onlySuspended && (
                         <div className="mt-6 text-center">
                             <Button
                                 asChild

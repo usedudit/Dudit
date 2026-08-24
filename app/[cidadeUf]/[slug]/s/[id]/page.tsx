@@ -88,6 +88,7 @@ export default async function ServiceDetailsPage({
         longitude: sessionData.profile.longitude,
         city: sessionData.profile.city,
         state: sessionData.profile.state,
+        avatar_url: sessionData.profile.avatar_url || null,
     } : null
     const cartCount = sessionData?.cartCount || 0
 

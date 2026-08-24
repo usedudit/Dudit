@@ -9,6 +9,7 @@ type MarketplaceSessionData = {
         state: string | null
         latitude: number | null
         longitude: number | null
+        avatar_url: string | null
     } | null
     cartCount: number
 }
@@ -18,7 +19,7 @@ async function getMarketplaceSessionCore(userId: string, logLabel: string): Prom
     const supabase = await getSupabaseServerClient()
 
     const [profileRes, addressRes, cartRes] = await Promise.all([
-        supabase.from("user_profiles").select("id, full_name").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_profiles").select("id, full_name, avatar_url").eq("user_id", userId).maybeSingle(),
         supabase.from("addresses").select("city, state, latitude, longitude")
             .eq("user_id", userId)
             .eq("is_default", true)
@@ -42,6 +43,7 @@ async function getMarketplaceSessionCore(userId: string, logLabel: string): Prom
                 state: addressData?.state || null,
                 latitude: addressData?.latitude || null,
                 longitude: addressData?.longitude || null,
+                avatar_url: profileData.avatar_url || null,
             }
             : null,
         cartCount: cartItems.reduce((acc: number, item: any) => acc + (item.quantity || 1), 0),
