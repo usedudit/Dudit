@@ -14,7 +14,7 @@ import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
@@ -1768,7 +1768,7 @@ export function ProductDetailsPageClient({
                 {(() => {
                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
                     const sellerBannerFallback = sellerAvatarImage
-                        ? getRandomDefaultBanner()
+                        ? getDefaultBannerSeeded(partner.id || partner.store_name || "Vendedor")
                         : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"));
                     const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
                         ? getR2ImageUrl(partner.banner_url, "large")

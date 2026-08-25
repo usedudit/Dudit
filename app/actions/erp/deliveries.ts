@@ -656,7 +656,19 @@ export async function getSmartDeliverySuggestionsAction(input: {
       created_at,
       distance_km,
       delivery_type,
-      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
+      order_items(
+        id,
+        product_name,
+        product_price,
+        quantity,
+        subtotal,
+        product_id,
+        variant_id,
+        service_id,
+        products(id, name, sku, images, unit, product_type),
+        product_variants(id, variant_name, sku, images),
+        services(id, name, images)
+      )
     `)
     .eq("partner_id", input.partnerId)
     .order("created_at", { ascending: false })
@@ -903,6 +915,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       id,
       order_number,
       total_amount,
+      paid_amount,
       delivery_fee,
       distance_km,
       delivery_breakdown,
@@ -910,11 +923,25 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       buyer_id,
       delivery_address,
       situation,
+      payment_method,
+      payment_breakdown,
       delivery_status,
       created_at,
       order_source,
       delivery_type,
-      order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
+      order_items(
+        id,
+        product_name,
+        product_price,
+        quantity,
+        subtotal,
+        product_id,
+        variant_id,
+        service_id,
+        products(id, name, sku, images, unit, product_type),
+        product_variants(id, variant_name, sku, images),
+        services(id, name, images)
+      )
     `)
     .eq("partner_id", partnerId)
     .order("created_at", { ascending: false })
@@ -990,6 +1017,10 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       displayId: order.order_number || `#${String(order.id).slice(0, 8).toUpperCase()}`,
       orderNumber: order.order_number || null,
       status: order.situation || "pending",
+      paymentStatus: order.situation || "pending",
+      paymentMethod: order.payment_method || null,
+      payment_method: order.payment_method || null,
+      paymentBreakdown: order.payment_breakdown || null,
       deliveryStatus: order.delivery_status || "not_sent",
       totalAmount: Number(order.total_amount || 0),
       shippingFee: Number(order.delivery_fee || 0),
@@ -1023,7 +1054,29 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       })(),
       address: formatAddress(order) || "",
       orderSource: order.order_source || "Manual",
-      items: order.order_items || [],
+      items: (order.order_items || []).map((item: any) => {
+        const sku = item.product_variants?.sku || item.products?.sku || "N/A"
+        const images = item.product_variants?.images || item.products?.images || item.services?.images || null
+        const unit = item.products?.unit || "un"
+        const price = Number(item.product_price || 0)
+        const qty = Number(item.quantity || 1)
+        const subtotal = Number(item.subtotal || price * qty)
+        return {
+          ...item,
+          sku,
+          images,
+          unit,
+          product_price: price,
+          price,
+          subtotal,
+          products: {
+            sku,
+            images,
+            unit,
+            product_type: item.products?.product_type || (item.service_id ? "servico" : "produto"),
+          },
+        }
+      }),
       alreadyInActiveDelivery: activeOrderIds.has(order.id),
     }))
 }
@@ -1272,11 +1325,44 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       finalDeliveryId = created.id
     }
 
-    await getAdminClient()
-      .from("delivery_assignments")
-      .update({ status: "cancelled" })
-      .eq("delivery_id", finalDeliveryId)
-      .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+    const isPlatformRequest = payload.deliveryPersonId === "platform:dudit_network" || payload.deliveryPersonId === "dudit_network"
+
+    if (isPlatformRequest) {
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .in("order_id", orderIds)
+        .in("status", ["available", "requested", "assigned"])
+
+      const { data: orderRows } = await getAdminClient()
+        .from("orders")
+        .select("id, delivery_fee")
+        .in("id", orderIds)
+        .eq("partner_id", payload.partnerId)
+
+      const assignmentRows = (orderRows || []).map((ord: any) => ({
+        order_id: ord.id,
+        delivery_id: finalDeliveryId,
+        partner_id: payload.partnerId,
+        driver_id: null,
+        assigned_by: user?.id || null,
+        status: "available",
+        delivery_fee: Number(ord.delivery_fee || 0),
+        notes: sanitizeNotes(payload.notes),
+        assigned_at: new Date().toISOString(),
+      }))
+
+      if (assignmentRows.length > 0) {
+        await getAdminClient().from("delivery_assignments").insert(assignmentRows)
+      }
+    } else {
+      // Se for entrega própria / equipe / outro entregador, CANCELA qualquer solicitação de plataforma pendente
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+        .or(`delivery_id.eq.${finalDeliveryId},order_id.in.(${orderIds.join(",")})`)
+        .in("status", ["available", "requested", "assigned"])
+    }
 
     // Insert ordered delivery links
     const linkRows = orderIds.map((orderId, idx) => ({
@@ -1516,7 +1602,19 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
               additional_costs,
               discount_value,
               notes,
-              order_items(id, product_name, product_price, quantity, subtotal, product_id, products(sku, images, product_type))
+              order_items(
+                id,
+                product_name,
+                product_price,
+                quantity,
+                subtotal,
+                product_id,
+                variant_id,
+                service_id,
+                products(id, name, sku, images, unit, product_type),
+                product_variants(id, variant_name, sku, images),
+                services(id, name, images)
+              )
             )
       )
     `)
@@ -1739,6 +1837,14 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       childPatch.delivered_at = nowIso
     }
     await supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId)
+
+    if (nextStatus === "cancelled" || nextStatus === "delivered" || nextStatus === "sent") {
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "cancelled", cancelled_at: nowIso })
+        .eq("delivery_id", params.deliveryId)
+        .in("status", ["available", "requested", "assigned"])
+    }
 
     // Keep order delivery_status and timestamps in sync (best-effort)
     try {

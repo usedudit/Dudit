@@ -124,6 +124,11 @@ const fetchReturnsDataStatic = unstable_cache(
       regret: "Arrependimento",
       size_fit: "Tamanho / Caimento",
       other: "Outro",
+      quality_issue: "Problema de qualidade",
+      missing_item: "Item faltando",
+      damaged_in_transit: "Danificado no transporte",
+      not_as_described: "Não corresponde à descrição",
+      late_delivery: "Entrega atrasada",
     }
 
     const statusLabels: Record<string, string> = {
@@ -132,6 +137,12 @@ const fetchReturnsDataStatic = unstable_cache(
       rejected: "Recusado",
       completed: "Concluído",
       cancelled: "Cancelado",
+      awaiting_return: "Aguardando devolução",
+      in_transit: "Em trânsito",
+      partially_refunded: "Reembolso parcial",
+      fully_refunded: "Reembolso total",
+      pending_review: "Análise pendente",
+      processing: "Processando",
     }
 
     return {

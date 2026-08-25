@@ -33,6 +33,7 @@ export interface AvailableDeliveryOffer {
 interface AvailableDeliveryListRowProps {
     offer: AvailableDeliveryOffer
     onAccept: (assignmentId: string) => void
+    onView?: (offer: AvailableDeliveryOffer) => void
     isAccepting?: boolean
 }
 
@@ -41,6 +42,7 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 export default function AvailableDeliveryListRow({
     offer,
     onAccept,
+    onView,
     isAccepting = false,
 }: AvailableDeliveryListRowProps) {
     const router = useRouter()
@@ -72,8 +74,10 @@ export default function AvailableDeliveryListRow({
     const handleRowClick = (e: React.MouseEvent) => {
         // Ignora se clicou em um botão
         if ((e.target as HTMLElement).closest("button")) return
-        if (assignmentId) {
-            router.push(`/entregadores/entregas-disponiveis/${assignmentId}`)
+        if (onView) {
+            onView(offer)
+        } else if (assignmentId) {
+            router.push(`/entregadores/entregas-disponiveis?view=${assignmentId}`)
         }
     }
 

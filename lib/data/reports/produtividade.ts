@@ -86,8 +86,12 @@ const getCachedProductivityData = cache(async (partnerId: string, period: Period
       }
 
       const totalAppointments = rows.length
+      const noShowCount = rows.filter((a: any) => {
+        const s = String(a.status || "").toLowerCase()
+        return s.includes("no_show") || s.includes("missed") || s.includes("faltou")
+      }).length
       const attendanceRate = totalAppointments > 0
-        ? Math.round(((totalAppointments - cancelledCount) / totalAppointments) * 100)
+        ? Math.round(((totalAppointments - cancelledCount - noShowCount) / totalAppointments) * 100)
         : 0
       const avgDuration = durationCount > 0 ? Math.round(durationSum / durationCount) : 0
 

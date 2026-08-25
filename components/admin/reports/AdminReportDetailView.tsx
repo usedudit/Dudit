@@ -33,6 +33,7 @@ import {
     type Report,
 } from "@/app/actions/admin/reports"
 import Link from "next/link"
+import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 
@@ -439,16 +440,31 @@ export function AdminReportDetailView({
                                                                 )}
                                                             </div>
 
-                                                            {(target?.store?.id || report.target_type === "partner") && (
-                                                                <div className="pt-3 border-t border-brand-border dark:border-dark-border">
-                                                                    <Link
-                                                                        href={`/ddt-admin/partners?view=${target?.store?.id || report.target_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
-                                                                    >
-                                                                        Ver ficha da loja →
-                                                                    </Link>
-                                                                </div>
-                                                            )}
+                                                            {(() => {
+                                                                const targetType = report.target_type as string
+                                                                const marketplaceUrl = targetType === "product" && target
+                                                                    ? getProductUrl(target, target.store)
+                                                                    : targetType === "service" && target
+                                                                    ? getServiceUrl(target, target.store)
+                                                                    : (targetType === "partner" || targetType === "store") && target
+                                                                    ? getStoreUrl(target)
+                                                                    : null
+
+                                                                if (!marketplaceUrl) return null
+
+                                                                return (
+                                                                    <div className="pt-3 border-t border-brand-border dark:border-dark-border">
+                                                                        <Link
+                                                                            href={marketplaceUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="text-xs font-bold text-brand-green hover:underline flex items-center gap-1"
+                                                                        >
+                                                                            Ver no marketplace →
+                                                                        </Link>
+                                                                    </div>
+                                                                )
+                                                            })()}
                                                         </div>
                                                     </div>
 
@@ -567,10 +583,12 @@ export function AdminReportDetailView({
                                                                 </div>
                                                                 {target.store.id && (
                                                                     <Link
-                                                                        href={`/ddt-admin/partners?view=${target.store.id}`}
+                                                                        href={getStoreUrl(target)}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
                                                                         className="inline-block text-xs font-bold text-brand-green hover:underline"
                                                                     >
-                                                                        Ver ficha completa da loja →
+                                                                        Ver loja no marketplace →
                                                                     </Link>
                                                                 )}
                                                             </div>

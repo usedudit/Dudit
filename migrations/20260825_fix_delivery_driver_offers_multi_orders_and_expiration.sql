@@ -72,91 +72,128 @@ AS $$
     SELECT partner_id
     FROM public.delivery_driver_partners
     WHERE driver_id = auth.uid() AND is_active = true
+  ),
+  distinct_offers AS (
+    SELECT DISTINCT ON (COALESCE(da.delivery_id, da.id))
+      da.id,
+      da.id AS assignment_id,
+      da.order_id,
+      da.delivery_id,
+      da.partner_id,
+      da.status,
+      da.assigned_at,
+      da.delivery_fee AS raw_fee,
+      da.notes,
+      o.order_number,
+      o.delivery_address,
+      o.total_amount AS raw_amount,
+      o.payment_method,
+      o.store_id,
+      o.buyer_id,
+      o.customer_name AS raw_customer_name
+    FROM public.delivery_assignments da
+    JOIN public.orders o ON o.id = da.order_id AND o.partner_id = da.partner_id
+    CROSS JOIN current_driver cd
+    WHERE (da.status IN ('available', 'requested') OR (da.status = 'assigned' AND da.driver_id IS NULL))
+      AND da.assigned_at >= (now() - interval '15 minutes')
+      -- Pedido não pode já ter sido enviado, entregue ou cancelado no ERP
+      AND o.delivery_status NOT IN ('sent', 'delivered', 'cancelled')
+      -- Se houver registro em deliveries, não pode ter sido cancelado, entregue ou atribuído a outro entregador da equipe
+      AND NOT EXISTS (
+        SELECT 1 FROM public.deliveries d
+        WHERE d.id = da.delivery_id
+          AND (
+            d.status IN ('sent', 'delivered', 'cancelled')
+            OR (d.delivery_person_id IS NOT NULL AND d.delivery_person_id <> auth.uid())
+          )
+      )
+      AND (
+        cd.city IS NULL
+        OR cd.city = ''
+        OR EXISTS (
+          SELECT 1 FROM public.addresses sa
+          WHERE (sa.store_id = o.store_id OR (o.store_id IS NULL AND sa.partner_id = da.partner_id))
+            AND LOWER(TRIM(sa.city)) = LOWER(TRIM(cd.city))
+        )
+        OR (o.delivery_address ILIKE '%' || cd.city || '%')
+      )
+      AND (
+        da.assigned_at < (now() - interval '3 minutes')
+        OR EXISTS (SELECT 1 FROM partner_links pl WHERE pl.partner_id = da.partner_id)
+        OR NOT EXISTS (
+          SELECT 1 FROM public.delivery_driver_partners ddp
+          WHERE ddp.partner_id = da.partner_id AND ddp.is_active = true
+        )
+      )
+    ORDER BY COALESCE(da.delivery_id, da.id), da.assigned_at DESC, da.id DESC
   )
   SELECT
-    da.id,
-    da.id AS assignment_id,
-    da.order_id,
-    da.delivery_id,
-    da.partner_id,
-    da.status,
-    da.assigned_at,
-    -- Se houver múltiplos pedidos agrupados no mesmo delivery_id, soma as taxas
+    dto.id,
+    dto.assignment_id,
+    dto.order_id,
+    dto.delivery_id,
+    dto.partner_id,
+    dto.status,
+    dto.assigned_at,
     COALESCE((
       SELECT SUM(da2.delivery_fee)
       FROM public.delivery_assignments da2
-      WHERE da2.delivery_id = da.delivery_id AND da.delivery_id IS NOT NULL
-    ), da.delivery_fee) AS delivery_fee,
-    o.order_number,
+      WHERE da2.delivery_id = dto.delivery_id AND dto.delivery_id IS NOT NULL
+    ), dto.raw_fee) AS delivery_fee,
+    dto.order_number,
     COALESCE((
       SELECT count(*)
       FROM public.delivery_orders do_cnt
-      WHERE do_cnt.delivery_id = da.delivery_id AND da.delivery_id IS NOT NULL
+      WHERE do_cnt.delivery_id = dto.delivery_id AND dto.delivery_id IS NOT NULL
     ), 1::bigint) AS order_count,
     COALESCE(s.name, p.business_info->>'nome_fantasia', p.business_info->>'razao_social', 'Loja') AS partner_name,
     COALESCE(s.name, p.business_info->>'nome_fantasia', p.business_info->>'razao_social', 'Loja') AS store_name,
     COALESCE(s.phone, s.business_info->>'whatsapp', p.business_info->>'telefone', p.business_info->>'whatsapp', '') AS store_phone,
     COALESCE(s.logo_url, s.banner_url, '') AS store_logo_url,
     COALESCE(
-      (SELECT a.street || ', ' || COALESCE(a.number, 'S/N') || ' - ' || COALESCE(a.neighborhood, '') || ', ' || a.city FROM public.addresses a WHERE a.store_id = s.id OR (s.id IS NULL AND a.partner_id = da.partner_id) ORDER BY a.is_default DESC NULLS LAST, a.created_at ASC LIMIT 1),
+      (SELECT a.street || ', ' || COALESCE(a.number, 'S/N') || ' - ' || COALESCE(a.neighborhood, '') || ', ' || a.city FROM public.addresses a WHERE a.store_id = s.id OR (s.id IS NULL AND a.partner_id = dto.partner_id) ORDER BY a.is_default DESC NULLS LAST, a.created_at ASC LIMIT 1),
       ''
     ) AS store_address,
-    COALESCE(NULLIF(o.customer_name, ''), c.name, 'Cliente') AS customer_name,
+    COALESCE(NULLIF(dto.raw_customer_name, ''), c.name, 'Cliente') AS customer_name,
     COALESCE(c.phone, '') AS customer_phone,
-    o.delivery_address,
+    dto.delivery_address,
     COALESCE((
       SELECT SUM(o2.total_amount)
       FROM public.delivery_orders do_sum
       JOIN public.orders o2 ON o2.id = do_sum.order_id
-      WHERE do_sum.delivery_id = da.delivery_id AND da.delivery_id IS NOT NULL
-    ), o.total_amount) AS total_amount,
-    o.payment_method,
-    da.notes,
+      WHERE do_sum.delivery_id = dto.delivery_id AND dto.delivery_id IS NOT NULL
+    ), dto.raw_amount) AS total_amount,
+    dto.payment_method,
+    dto.notes,
     COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
+        'id', oi.id,
         'name', oi.product_name,
-        'quantity', oi.quantity
+        'product_name', oi.product_name,
+        'quantity', oi.quantity,
+        'price', oi.product_price,
+        'product_price', oi.product_price,
+        'unit_price', oi.product_price,
+        'subtotal', COALESCE(oi.subtotal, oi.product_price * oi.quantity),
+        'sku', COALESCE(pv.sku, pr.sku, 'N/A'),
+        'images', pr.images,
+        'image_url', pr.images,
+        'unit', COALESCE(pr.unit, 'un')
       ) ORDER BY oi.id)
       FROM public.order_items oi
-      WHERE oi.order_id = o.id
+      LEFT JOIN public.products pr ON pr.id = oi.product_id
+      LEFT JOIN public.product_variants pv ON pv.id = oi.variant_id
+      WHERE (dto.delivery_id IS NOT NULL AND oi.order_id IN (SELECT do_i.order_id FROM public.delivery_orders do_i WHERE do_i.delivery_id = dto.delivery_id))
+         OR (dto.delivery_id IS NULL AND oi.order_id = dto.order_id)
     ), '[]'::jsonb) AS items
-  FROM public.delivery_assignments da
-  JOIN public.orders o ON o.id = da.order_id AND o.partner_id = da.partner_id
-  JOIN public.partners p ON p.id = da.partner_id
-  LEFT JOIN public.stores s ON s.id = o.store_id
-  LEFT JOIN public.customers c ON c.id = o.buyer_id AND c.partner_id = o.partner_id
-  CROSS JOIN current_driver cd
-  WHERE (da.status IN ('available', 'requested') OR (da.status = 'assigned' AND da.driver_id IS NULL))
-    -- Limite de expiração: 15 minutos
-    AND da.assigned_at >= (now() - interval '15 minutes')
-    -- 1. Filtro regional: Loja na mesma cidade do entregador (ou endereço de entrega na mesma cidade)
-    AND (
-      cd.city IS NULL
-      OR cd.city = ''
-      OR EXISTS (
-        SELECT 1 FROM public.addresses sa
-        WHERE (sa.store_id = s.id OR (s.id IS NULL AND sa.partner_id = da.partner_id))
-          AND LOWER(TRIM(sa.city)) = LOWER(TRIM(cd.city))
-      )
-      OR (o.delivery_address ILIKE '%' || cd.city || '%')
-    )
-    -- 2. Janela de prioridade: Se a loja tem parceiros vinculados, os primeiros 3 minutos são exclusivos deles
-    AND (
-      -- Se a oferta tem mais de 3 minutos, já abre para todos da cidade
-      da.assigned_at < (now() - interval '3 minutes')
-      -- Se o motorista logado é vinculado a esta loja, ele vê imediatamente
-      OR EXISTS (SELECT 1 FROM partner_links pl WHERE pl.partner_id = da.partner_id)
-      -- Se esta loja NÃO possui nenhum parceiro exclusivo vinculado, abre imediatamente
-      OR NOT EXISTS (
-        SELECT 1 FROM public.delivery_driver_partners ddp
-        WHERE ddp.partner_id = da.partner_id AND ddp.is_active = true
-      )
-    )
+  FROM distinct_offers dto
+  JOIN public.partners p ON p.id = dto.partner_id
+  LEFT JOIN public.stores s ON s.id = dto.store_id
+  LEFT JOIN public.customers c ON c.id = dto.buyer_id AND c.partner_id = dto.partner_id
   ORDER BY
-    -- Prioridade visual para entregas de lojas vinculadas ao motorista
-    CASE WHEN EXISTS (SELECT 1 FROM partner_links pl WHERE pl.partner_id = da.partner_id) THEN 0 ELSE 1 END ASC,
-    da.assigned_at DESC,
-    da.id DESC
+    CASE WHEN EXISTS (SELECT 1 FROM partner_links pl WHERE pl.partner_id = dto.partner_id) THEN 0 ELSE 1 END ASC,
+    dto.assigned_at DESC,
+    dto.id DESC
   LIMIT LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100);
 $$;
 
@@ -164,6 +201,7 @@ $$;
 --    - Aceita todos os pedidos vinculados ao mesmo delivery_id de forma atômica
 --    - Bloqueia ofertas expiradas (> 15 minutos)
 --    - Trava de capacidade de no máximo 2 entregas simultâneas
+--    - Validação de entrega própria / equipe / cancelada no ERP
 DROP FUNCTION IF EXISTS public.accept_delivery_offer(uuid);
 DROP FUNCTION IF EXISTS public.accept_delivery_offer;
 
@@ -176,6 +214,7 @@ AS $$
 DECLARE
   v_user uuid := auth.uid();
   v_assignment public.delivery_assignments%ROWTYPE;
+  v_delivery public.deliveries%ROWTYPE;
   v_now timestamptz := now();
   v_active_count integer;
   v_driver_city text;
@@ -210,6 +249,10 @@ BEGIN
     RAISE EXCEPTION 'delivery_assignment_not_found';
   END IF;
 
+  IF v_assignment.status = 'cancelled' THEN
+    RAISE EXCEPTION 'delivery_assignment_cancelled';
+  END IF;
+
   IF v_assignment.driver_id IS NOT NULL AND v_assignment.driver_id <> v_user THEN
     RAISE EXCEPTION 'delivery_assignment_already_accepted';
   END IF;
@@ -223,6 +266,52 @@ BEGIN
     RAISE EXCEPTION 'delivery_offer_expired';
   END IF;
 
+  -- VALIDAÇÃO CRÍTICA DE ENTREGA PRÓPRIA / EQUIPE OU JÁ DESPACHADA:
+  -- Se houver entrega no ERP (tabela deliveries), verificar se já foi atribuída a entregador próprio ou finalizada
+  IF v_assignment.delivery_id IS NOT NULL THEN
+    SELECT * INTO v_delivery
+    FROM public.deliveries
+    WHERE id = v_assignment.delivery_id
+    FOR UPDATE;
+
+    IF FOUND THEN
+      -- Se a entrega já foi finalizada ou cancelada pelo lojista
+      IF v_delivery.status IN ('delivered', 'cancelled') THEN
+        UPDATE public.delivery_assignments
+        SET status = 'cancelled', cancelled_at = v_now, updated_at = v_now
+        WHERE delivery_id = v_assignment.delivery_id;
+
+        RAISE EXCEPTION 'delivery_already_finished_or_cancelled';
+      END IF;
+
+      -- Se o lojista atribuiu um entregador próprio/da equipe (delivery_person_id preenchido diferente deste motorista)
+      IF v_delivery.delivery_person_id IS NOT NULL AND v_delivery.delivery_person_id <> v_user THEN
+        UPDATE public.delivery_assignments
+        SET status = 'cancelled', cancelled_at = v_now, updated_at = v_now
+        WHERE delivery_id = v_assignment.delivery_id;
+
+        RAISE EXCEPTION 'delivery_already_assigned_to_team_driver';
+      END IF;
+    END IF;
+  END IF;
+
+  -- Verificar se algum pedido desta entrega já foi despachado/entregue/cancelado no ERP
+  IF EXISTS (
+    SELECT 1 FROM public.orders o
+    WHERE (
+      (v_assignment.delivery_id IS NOT NULL AND o.id IN (SELECT do_inner.order_id FROM public.delivery_orders do_inner WHERE do_inner.delivery_id = v_assignment.delivery_id))
+      OR (v_assignment.delivery_id IS NULL AND o.id = v_assignment.order_id)
+    )
+    AND o.partner_id = v_assignment.partner_id
+    AND o.delivery_status IN ('sent', 'delivered', 'cancelled')
+  ) THEN
+    UPDATE public.delivery_assignments
+    SET status = 'cancelled', cancelled_at = v_now, updated_at = v_now
+    WHERE id = v_assignment.id OR (v_assignment.delivery_id IS NOT NULL AND delivery_id = v_assignment.delivery_id);
+
+    RAISE EXCEPTION 'order_already_dispatched_or_cancelled';
+  END IF;
+
   -- Se pertencer a uma entrega agrupada com múltiplos pedidos, atualiza todos os pedidos da rota
   IF v_assignment.delivery_id IS NOT NULL THEN
     UPDATE public.delivery_assignments
@@ -233,10 +322,10 @@ BEGIN
     WHERE delivery_id = v_assignment.delivery_id
       AND (driver_id IS NULL OR driver_id = v_user);
 
-    -- Atualiza status da tabela deliveries se existir
+    -- Atualiza status e entregador da tabela deliveries
     UPDATE public.deliveries
     SET status = 'preparing',
-        delivery_person_id = COALESCE(delivery_person_id, v_user)
+        delivery_person_id = v_user
     WHERE id = v_assignment.delivery_id;
 
     -- Atualiza status de todos os pedidos da entrega para preparing se pendentes
@@ -318,8 +407,23 @@ AS $$
       o.delivery_fee,
       COALESCE(do_item.position, 1) AS position,
       COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('name', oi.product_name, 'quantity', oi.quantity) ORDER BY oi.id)
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', oi.id,
+          'name', oi.product_name,
+          'product_name', oi.product_name,
+          'quantity', oi.quantity,
+          'price', oi.product_price,
+          'product_price', oi.product_price,
+          'unit_price', oi.product_price,
+          'subtotal', COALESCE(oi.subtotal, oi.product_price * oi.quantity),
+          'sku', COALESCE(pv.sku, pr.sku, 'N/A'),
+          'images', pr.images,
+          'image_url', pr.images,
+          'unit', COALESCE(pr.unit, 'un')
+        ) ORDER BY oi.id)
         FROM public.order_items oi
+        LEFT JOIN public.products pr ON pr.id = oi.product_id
+        LEFT JOIN public.product_variants pv ON pv.id = oi.variant_id
         WHERE oi.order_id = o.id
       ), '[]'::jsonb) AS items
     FROM target_assignment ta
@@ -371,8 +475,23 @@ AS $$
       o_primary.situation AS payment_status,
       -- Itens do pedido principal (retrocompatibilidade)
       COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('name', oi.product_name, 'quantity', oi.quantity) ORDER BY oi.id)
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', oi.id,
+          'name', oi.product_name,
+          'product_name', oi.product_name,
+          'quantity', oi.quantity,
+          'price', oi.product_price,
+          'product_price', oi.product_price,
+          'unit_price', oi.product_price,
+          'subtotal', COALESCE(oi.subtotal, oi.product_price * oi.quantity),
+          'sku', COALESCE(pv.sku, pr.sku, 'N/A'),
+          'images', pr.images,
+          'image_url', pr.images,
+          'unit', COALESCE(pr.unit, 'un')
+        ) ORDER BY oi.id)
         FROM public.order_items oi
+        LEFT JOIN public.products pr ON pr.id = oi.product_id
+        LEFT JOIN public.product_variants pv ON pv.id = oi.variant_id
         WHERE oi.order_id = o_primary.id
       ), '[]'::jsonb) AS items,
       -- Lista completa de pedidos / paradas na rota
@@ -388,6 +507,7 @@ $$;
 
 -- 5. Atualizar RPC transition_delivery_assignment:
 --    - Sincroniza todos os pedidos vinculados ao delivery_id quando for uma entrega agrupada
+--    - Valida se a entrega não foi cancelada ou reatribuída no ERP
 DROP FUNCTION IF EXISTS public.transition_delivery_assignment(uuid, text, text);
 DROP FUNCTION IF EXISTS public.transition_delivery_assignment;
 
@@ -421,6 +541,26 @@ BEGIN
     WHERE dd.user_id = v_user AND dd.is_active = true
   ) THEN
     RAISE EXCEPTION 'delivery_assignment_not_owned';
+  END IF;
+
+  IF v_assignment.status = 'cancelled' THEN
+    RAISE EXCEPTION 'delivery_assignment_cancelled';
+  END IF;
+
+  -- Se a entrega no ERP foi atribuída a outro entregador (equipe/próprio)
+  IF v_assignment.delivery_id IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM public.deliveries d
+      WHERE d.id = v_assignment.delivery_id
+        AND d.delivery_person_id IS NOT NULL
+        AND d.delivery_person_id <> v_user
+    ) THEN
+      UPDATE public.delivery_assignments
+      SET status = 'cancelled', cancelled_at = v_now, updated_at = v_now
+      WHERE delivery_id = v_assignment.delivery_id;
+
+      RAISE EXCEPTION 'delivery_reassigned_to_team_driver';
+    END IF;
   END IF;
 
   SELECT COALESCE(up.full_name, 'Entregador')
@@ -517,21 +657,6 @@ BEGIN
         delivery_arrived_at = CASE WHEN p_next_status = 'delivered' THEN v_now ELSE delivery_arrived_at END,
         delivery_completed_at = CASE WHEN p_next_status = 'delivered' THEN v_now ELSE delivery_completed_at END
     WHERE id = v_assignment.order_id AND partner_id = v_assignment.partner_id;
-
-    UPDATE public.delivery_orders do_item
-    SET status = v_delivery_status,
-        delivered_at = CASE WHEN p_next_status = 'delivered' THEN v_now ELSE delivered_at END
-    WHERE do_item.order_id = v_assignment.order_id;
-
-    UPDATE public.deliveries d
-    SET status = v_delivery_status,
-        started_at = CASE WHEN p_next_status IN ('out_for_delivery', 'delivered') THEN COALESCE(started_at, v_now) ELSE started_at END,
-        departure_time = CASE WHEN p_next_status IN ('out_for_delivery', 'delivered') THEN COALESCE(departure_time, v_now) ELSE departure_time END,
-        delivered_at = CASE WHEN p_next_status = 'delivered' THEN v_now ELSE delivered_at END,
-        completed_at = CASE WHEN p_next_status = 'delivered' THEN v_now ELSE completed_at END
-    WHERE d.id IN (
-      SELECT do2.delivery_id FROM public.delivery_orders do2 WHERE do2.order_id = v_assignment.order_id
-    );
   END IF;
 
   INSERT INTO public.audit_logs (

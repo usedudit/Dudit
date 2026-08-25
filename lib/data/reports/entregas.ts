@@ -98,6 +98,14 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
         sent: "Saiu p/ entrega",
         delivered: "Entregue",
         completed: "Concluído",
+        cancelled: "Cancelado",
+        returning: "Em devolução",
+        returned: "Devolvido",
+        delivery_failed: "Falha na entrega",
+        failed: "Falhou",
+        rescheduled: "Reagendado",
+        in_transit: "Em trânsito",
+        out_for_delivery: "Saiu para entrega",
       }
 
       const byStatus = new Map<string, number>()

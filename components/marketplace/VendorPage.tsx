@@ -11,7 +11,7 @@ import { ShareModal } from "./ShareModal"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { MarketplaceHeader } from "./MarketplaceHeader"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
@@ -624,7 +624,16 @@ function getPromotionScore(promo: any): number {
     }
 }
 
-function pickBestSection(sections: any[]): any | null {
+function hashSeed(seed: string | number): number {
+    const str = String(seed)
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0
+    }
+    return Math.abs(hash)
+}
+
+function pickBestSection(sections: any[], seed: string | number): any | null {
     if (!sections.length) return null
 
     const discountSections = sections.filter(
@@ -648,7 +657,7 @@ function pickBestSection(sections: any[]): any | null {
         : null
 
     if (bestDiscount && bestBenefit) {
-        return Math.random() < 0.5 ? bestDiscount : bestBenefit
+        return hashSeed(seed) % 2 === 0 ? bestDiscount : bestBenefit
     }
 
     return bestDiscount || bestBenefit
@@ -756,13 +765,16 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }).filter(sec => sec.items.length > 0)
     }, [partnerPromotions, products, services])
 
-    const bestCampaignSection = useMemo(() => pickBestSection(campaignSections), [campaignSections])
+    const bestCampaignSection = useMemo(
+        () => pickBestSection(campaignSections, partner?.id || "dudit"),
+        [campaignSections, partner?.id]
+    )
 
     const partnerRawImage = partner.storeImageUrl || null
     const partnerProfileImageUrl = getImageUrl(partnerRawImage)
     const bannerImage = useMemo(() => {
         if (partner.banner_url) return getImageUrl(partner.banner_url)
-        return partnerRawImage ? getRandomDefaultBanner() : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
+        return partnerRawImage ? getDefaultBannerSeeded(partner?.id || partner.storeName || "Vendedor") : getBannerUrlByColor(getAvatarColor(partner.storeName || "Vendedor"))
     }, [partner.banner_url, partnerRawImage, partner.storeName])
 
     const hasPlans = plans && plans.length > 0

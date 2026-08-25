@@ -638,6 +638,13 @@ export async function resolveReport(
     }
 
     const supabase = await getSupabaseServerClient()
+
+    const { data: reportData } = await supabase
+        .from("reports")
+        .select("reporter_user_id, target_type, target_id, reason")
+        .eq("id", id)
+        .maybeSingle()
+
     const { data, error } = await supabase.rpc("validate_report", {
         p_report_id: id,
         p_reason: cleanReason,
@@ -667,6 +674,68 @@ export async function resolveReport(
         },
     })
 
+    // Send notifications
+    try {
+        const { createNotification, createNotificationsForUsers, getPartnerTeamUserIds } = await import("@/lib/services/notification.service")
+        const partnerId = r.partner_id as string | undefined
+        const targetTypeLabel: Record<string, string> = {
+            product: "produto", service: "serviço", partner: "loja",
+            store: "loja", review: "avaliação", return_request: "devolução",
+        }
+        const itemLabel = targetTypeLabel[reportData?.target_type || (r.target_type as string)] || "item"
+        const reportSnippet = reportData?.reason ? `"${reportData.reason.slice(0, 80)}"` : ""
+
+        // Notify reporter
+        if (reportData?.reporter_user_id) {
+            await createNotification({
+                userId: reportData.reporter_user_id,
+                type: "admin_announcement",
+                title: "Sua denúncia foi validada",
+                message: `Sua denúncia sobre o ${itemLabel} ${reportSnippet} foi analisada e validada pela equipe de moderação.`,
+                entityType: "announcement",
+                entityId: null,
+                data: {
+                    audience: "customer",
+                    report_id: id,
+                    target_type: reportData.target_type,
+                    target_id: reportData.target_id,
+                    url: "/",
+                },
+                idempotencyKey: `report_validated_reporter:${id}:${reportData.reporter_user_id}`,
+                origin: "system",
+            })
+        }
+
+        // Notify owner/partner team
+        if (partnerId) {
+            const teamUserIds = await getPartnerTeamUserIds(partnerId)
+            if (teamUserIds.length > 0) {
+                await createNotificationsForUsers(teamUserIds, (uid) => ({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: "Denúncia validada contra sua loja",
+                    message: `Uma denúncia sobre um ${itemLabel} da sua loja foi validada. Um aumento de ${r.points_applied || 5} pontos foi aplicado ao score de risco.`,
+                    entityType: "announcement",
+                    entityId: null,
+                    data: {
+                        audience: "seller",
+                        report_id: id,
+                        target_type: reportData?.target_type,
+                        target_id: reportData?.target_id,
+                        partner_id: partnerId,
+                        points_applied: r.points_applied,
+                        risk_score: r.risk_score,
+                        url: "/erp/configuracoes",
+                    },
+                    idempotencyKey: `report_validated_owner:${id}:${uid}`,
+                    origin: "system",
+                }))
+            }
+        }
+    } catch (notifErr) {
+        console.error("[ADMIN_REPORTS] Failed to send validate notifications:", notifErr)
+    }
+
     return { success: true }
 }
 
@@ -688,6 +757,13 @@ export async function dismissReport(
     }
 
     const supabase = await getSupabaseServerClient()
+
+    const { data: reportData } = await supabase
+        .from("reports")
+        .select("reporter_user_id, target_type, target_id, reason")
+        .eq("id", id)
+        .maybeSingle()
+
     const { data, error } = await supabase.rpc("dismiss_report", {
         p_report_id: id,
         p_reason: cleanReason,
@@ -709,6 +785,40 @@ export async function dismissReport(
         targetId: (r.target_id as string) || id,
         metadata: { reportId: id, reason: cleanReason },
     })
+
+    // Send notifications
+    try {
+        const { createNotification } = await import("@/lib/services/notification.service")
+        const targetTypeLabel: Record<string, string> = {
+            product: "produto", service: "serviço", partner: "loja",
+            store: "loja", review: "avaliação", return_request: "devolução",
+        }
+        const itemLabel = targetTypeLabel[reportData?.target_type || (r.target_type as string)] || "item"
+        const reportSnippet = reportData?.reason ? `"${reportData.reason.slice(0, 80)}"` : ""
+
+        // Notify reporter
+        if (reportData?.reporter_user_id) {
+            await createNotification({
+                userId: reportData.reporter_user_id,
+                type: "admin_announcement",
+                title: "Sua denúncia foi descartada",
+                message: `Sua denúncia sobre o ${itemLabel} ${reportSnippet} foi analisada e descartada pela equipe de moderação.`,
+                entityType: "announcement",
+                entityId: null,
+                data: {
+                    audience: "customer",
+                    report_id: id,
+                    target_type: reportData.target_type,
+                    target_id: reportData.target_id,
+                    url: "/",
+                },
+                idempotencyKey: `report_dismissed_reporter:${id}:${reportData.reporter_user_id}`,
+                origin: "system",
+            })
+        }
+    } catch (notifErr) {
+        console.error("[ADMIN_REPORTS] Failed to send dismiss notifications:", notifErr)
+    }
 
     return { success: true }
 }
@@ -890,7 +1000,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (product.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score")
+                .select("id, name, logo_url, risk_score, city, state, slug")
                 .eq("partner_id", product.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)
@@ -917,7 +1027,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (service.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score")
+                .select("id, name, logo_url, risk_score, city, state, slug")
                 .eq("partner_id", service.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)

@@ -9,6 +9,7 @@ import { AccountDeletionService } from "@/lib/services/account-deletion.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SMTP2GOService } from "@/lib/services/smtp2go.service"
+import { SMTP2GO_TEMPLATE_IDS } from "@/lib/services/smtp2go-templates"
 import {
   getAccountDeletionEmailHtml,
   getAccountDeletionEmailText,
@@ -173,15 +174,23 @@ export async function requestAccountDeletionCodeAction(
       return { error: "Erro ao gerar código de confirmação." }
     }
 
-    // 8. Dispatch email via SMTP2GO
-    const html = getAccountDeletionEmailHtml(rawCode, 15)
-    const text = getAccountDeletionEmailText(rawCode, 15)
-
+    // 8. Dispatch email via SMTP2GO using Dashboard Template
+    const templateId = SMTP2GO_TEMPLATE_IDS.accountDeletionCode || undefined
     const emailResult = await SMTP2GOService.sendEmail({
       to: [{ email: rawEmail, name: user.user_metadata?.full_name || undefined }],
       subject: "Confirme a exclusão da sua conta Dudit",
-      html,
-      text,
+      template_id: templateId,
+      variables: {
+        code: rawCode,
+        codigo: rawCode,
+        expiration_minutes: "15",
+        validade: "15 minutos",
+        validade_minutos: "15",
+        full_name: user.user_metadata?.full_name || "",
+        nome: user.user_metadata?.full_name || "",
+      },
+      html: templateId ? undefined : getAccountDeletionEmailHtml(rawCode, 15),
+      text: templateId ? undefined : getAccountDeletionEmailText(rawCode, 15),
       userId: user.id,
       partnerId: partner?.id || undefined,
     })

@@ -136,6 +136,11 @@ const fetchMarketingDataStatic = unstable_cache(
       endsAt: c.ends_at,
     }))
 
+    const totalDiscount = topCoupons.reduce((sum: number, c: { usageCount: number; discountValue: number; discountType: string }) => {
+      if (c.discountType === "percentage") return sum + (c.usageCount * (c.discountValue / 100))
+      return sum + (c.usageCount * c.discountValue)
+    }, 0)
+
     return {
       revenueBySource: sortedSources.map(([label, value]) => ({ label, value })),
       totalRevenue,
@@ -146,8 +151,8 @@ const fetchMarketingDataStatic = unstable_cache(
         total: totalCoupons,
         used: usedCoupons,
         usageRate,
-        totalDiscount: 0,
-        totalDiscountFormatted: brl(0),
+        totalDiscount,
+        totalDiscountFormatted: brl(totalDiscount),
       },
       evolution,
       topCoupons,

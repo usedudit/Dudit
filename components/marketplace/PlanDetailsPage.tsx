@@ -14,7 +14,7 @@ import { InfoCard } from "@/components/reusable/InfoCard"
 import { formatCurrency } from "@/lib/utils"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
@@ -880,7 +880,7 @@ export function PlanDetailsPageClient({
                                 {(() => {
                                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null
                                     const sellerBannerFallback = sellerAvatarImage
-                                        ? getRandomDefaultBanner()
+                                        ? getDefaultBannerSeeded(partner.id || partner.store_name || "Vendedor")
                                         : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"))
                                     const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
                                         ? getR2ImageUrl(partner.banner_url, "large")

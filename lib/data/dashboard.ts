@@ -392,7 +392,7 @@ async function getCachedGeneral(partnerId: string, storeId = ""): Promise<Genera
             id: p.id,
             title: p.name,
             subtitle: p.category || "Sem categoria",
-            value: formatQuantityWithUnit(p.stock_quantity || 0, p.unit),
+            value: String(Number(p.stock_quantity || 0)),
             tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange",
           })),
         }
@@ -414,7 +414,7 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
         const [products, orders, items] = await Promise.all([
           scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).limit(300),
           supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).order("created_at", { ascending: false }).limit(400),
-          supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).limit(600),
+          supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).limit(600),
         ])
         if (products.error) throw products.error
         if (orders.error) throw orders.error
@@ -426,11 +426,16 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
         const out = productRows.filter((p: any) => Number(p.stock_quantity || 0) <= 0)
         const low = productRows.filter((p: any) => Number(p.stock_quantity || 0) > 0 && Number(p.stock_quantity || 0) <= 5)
         const sold = new Map<string, number>()
-        for (const item of itemRows) sold.set(item.product_name || "Produto", (sold.get(item.product_name || "Produto") || 0) + money(item.quantity || 0))
-        const category = new Map<string, number>()
-        for (const p of productRows) {
-          const catName = (p.category as any)?.name || "Sem categoria"
-          category.set(catName, (category.get(catName) || 0) + 1)
+        const catRevenue = new Map<string, number>()
+        const nameToProduct = new Map<string, any>()
+        for (const p of productRows) nameToProduct.set(p.name, p)
+        for (const item of itemRows) {
+          const qty = Number(item.quantity || 0)
+          sold.set(item.product_name || "Produto", (sold.get(item.product_name || "Produto") || 0) + qty)
+          const rev = Number(item.net_item_value || 0)
+          const prod = nameToProduct.get(item.product_name)
+          const catName = (prod?.category as any)?.name || "Sem categoria"
+          catRevenue.set(catName, (catRevenue.get(catName) || 0) + rev)
         }
         const hours = new Map<string, number>()
         for (const order of orderRows) {
@@ -448,11 +453,11 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
             { title: "Produtos com estoque baixo", value: String(low.length), detail: "até 5 unidades", tone: low.length ? "orange" : "green" },
             { title: "Produtos ativos", value: String(productRows.filter((p: any) => p.is_active).length), tone: "default" },
           ] as Metric[],
-          topProducts: topFromMap(sold).map((item, index) => ({ id: item.label, title: item.label, subtitle: `${index + 1}º em vendas`, value: formatQuantityWithUnit(item.value, "UN"), tone: "blue" })) as DashboardListItem[],
-          idleProducts: productRows.filter((p: any) => !sold.has(p.name)).slice(0, 6).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: brl(p.price), tone: "default" })),
-          criticalStock: [...out, ...low].slice(0, 8).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: formatQuantityWithUnit(p.stock_quantity || 0, p.unit), tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange" })) as DashboardListItem[],
+          topProducts: topFromMap(sold).map((item, index) => ({ id: item.label, title: item.label, subtitle: `${index + 1}º em vendas`, value: String(item.value), tone: "blue" })) as DashboardListItem[],
+          idleProducts: productRows.filter((p: any) => !sold.has(p.name)).slice(0, 6).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: brl(Number(p.price || 0)), tone: "default" })),
+          criticalStock: [...out, ...low].slice(0, 8).map((p: any) => ({ id: p.id, title: p.name, subtitle: p.category || "Sem categoria", value: String(Number(p.stock_quantity || 0)), tone: Number(p.stock_quantity || 0) <= 0 ? "red" : "orange" })) as DashboardListItem[],
           bestSellers: topFromMap(sold),
-          categorySales: topFromMap(category),
+          categorySales: topFromMap(catRevenue),
           salesEvolution: bucketByDate(orderRows, "created_at", "total_amount"),
           busyHours: topFromMap(hours, 8),
         }
@@ -496,9 +501,14 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
             map.set(key, current)
           }
         }
+        const svcCategoryMap = new Map<string, string>()
+        for (const svc of services.data || []) {
+          const catName = (svc as any).service_categories?.name || "Sem categoria"
+          svcCategoryMap.set((svc as any).name || "", catName)
+        }
         const categories = new Map<string, number>()
-        for (const service of services.data || []) {
-          const catName = (service as any).service_categories?.name || "Sem categoria"
+        for (const row of rows) {
+          const catName = svcCategoryMap.get(row.service_name || "") || "Sem categoria"
           categories.set(catName, (categories.get(catName) || 0) + 1)
         }
         const rowFrom = ([name, value]: [string, { count: number; revenue: number; minutes: number; cancelled: number }]): DashboardListItem => ({
@@ -512,8 +522,8 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
 
         return {
           metrics: [
+            { title: "Total de agendamentos", value: String(rows.length), detail: "últimos 30 dias", tone: "default" },
             { title: "Agendamentos hoje", value: String(todayRows.length), detail: `${todayRows.filter((i: any) => String(i.status).toLowerCase().includes("iniciado")).length} em andamento`, tone: "blue" },
-            { title: "Em andamento", value: String(todayRows.filter((i: any) => String(i.status).toLowerCase().includes("iniciado")).length), tone: "default" },
             { title: "Aguardando confirmação", value: String(rows.filter((i: any) => String(i.status).toLowerCase().includes("aguard")).length), tone: "orange" },
             { title: "Cancelados", value: String(cancelled.length), tone: cancelled.length ? "red" : "green" },
             { title: "Comparecimento", value: `${rows.length ? Math.round((attended.length / rows.length) * 100) : 0}%`, detail: "últimos 30 dias", tone: "green" },

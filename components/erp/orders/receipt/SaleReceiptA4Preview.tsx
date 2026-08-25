@@ -49,12 +49,12 @@ const SaleReceiptA4Preview = ({
     const shouldShowAck = showAcknowledgment && data.showAcknowledgment !== false
 
     const pages = useMemo(() => {
-        const ROW_HEIGHT = 85
+        const ROW_HEIGHT = 40
         const TOTALS_SECTION_HEIGHT = 380
-        const P1_FIXED_CONTENT_HEIGHT = 570
+        const P1_FIXED_CONTENT_HEIGHT = 450
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123
         const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
-        const PN_FIXED_CONTENT_HEIGHT = 300
+        const PN_FIXED_CONTENT_HEIGHT = 220
         const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT
 
         const chunks: { items: typeof quoteItems; hasTotals: boolean; type: string }[] = []
@@ -105,7 +105,7 @@ const SaleReceiptA4Preview = ({
                 {pages.map((page, pageIndex) => (
                     <div
                         key={pageIndex}
-                        className="w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] shadow-md overflow-hidden relative font-sans rounded-sm min-h-[297mm] flex flex-col"
+                        className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
                     >
                         <div
                             className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"

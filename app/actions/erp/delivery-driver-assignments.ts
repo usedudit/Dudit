@@ -129,34 +129,37 @@ export async function assignPlatformDriverToDeliveryAction(input: {
 
 export async function requestDuditDeliveryAction(input: {
   partnerId: string
-  orderId: string
+  orderId?: string
+  orderIds?: string[]
   deliveryId?: string | null
   notes?: string
 }) {
   const user = await requireUser()
   await requirePartnerRouteAccess(input.partnerId, "logistics", { specificPermission: "can_assign_driver" })
+  const orderIds = Array.from(new Set(input.orderIds || (input.orderId ? [input.orderId] : []))).filter(Boolean)
+  if (orderIds.length === 0) return { success: false as const, error: "Nenhum pedido informado." }
+
   const admin = getAdminClient()
 
-  const { data: order } = await admin
+  const { data: orders } = await admin
     .from("orders")
     .select("id, partner_id, delivery_fee, delivery_status, store_id")
-    .eq("id", input.orderId)
+    .in("id", orderIds)
     .eq("partner_id", input.partnerId)
-    .maybeSingle()
 
-  if (!order) {
-    return { success: false as const, error: "Pedido não encontrado." }
+  if (!orders || orders.length === 0) {
+    return { success: false as const, error: "Pedidos não encontrados." }
   }
 
-  // Cancel any existing active assignment for this order before creating the new request
+  // Cancel any existing active assignment for these orders before creating the new request
   await admin
     .from("delivery_assignments")
     .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-    .eq("order_id", input.orderId)
+    .in("order_id", orderIds)
     .in("status", ["available", "requested", "assigned"])
 
-  const payload: Record<string, any> = {
-    order_id: input.orderId,
+  const rows = orders.map((order: any) => ({
+    order_id: order.id,
     delivery_id: input.deliveryId || null,
     partner_id: input.partnerId,
     driver_id: null,
@@ -165,34 +168,33 @@ export async function requestDuditDeliveryAction(input: {
     delivery_fee: Number(order.delivery_fee || 0),
     notes: String(input.notes || "").trim().slice(0, 500) || null,
     assigned_at: new Date().toISOString(),
-  }
+  }))
 
   const { data: inserted, error } = await admin
     .from("delivery_assignments")
-    .insert(payload)
+    .insert(rows)
     .select("id")
-    .single()
 
-  if (error) {
-    return { success: false as const, error: "Não foi possível solicitar a entrega Dudit: " + error.message }
+  if (error || !inserted || inserted.length === 0) {
+    return { success: false as const, error: "Não foi possível solicitar a entrega Dudit: " + (error?.message || "") }
   }
 
   // Set order delivery_status to preparing if not already
-  if (order.delivery_status !== "preparing" && order.delivery_status !== "sent") {
-    await admin
-      .from("orders")
-      .update({ delivery_status: "preparing" })
-      .eq("id", input.orderId)
-  }
+  await admin
+    .from("orders")
+    .update({ delivery_status: "preparing" })
+    .in("id", orderIds)
+    .eq("partner_id", input.partnerId)
+    .not("delivery_status", "in", '("preparing","sent","delivered")')
 
   await logAuditEvent({
     partnerId: input.partnerId,
     actorUserId: user.id,
     entityType: "delivery_assignment",
-    entityId: inserted.id,
+    entityId: inserted[0].id,
     actionType: "dudit_delivery_requested",
     changeLines: ["Entrega solicitada para a rede de entregadores Dudit"],
-    metadata: { orderId: input.orderId, deliveryId: input.deliveryId },
+    metadata: { orderIds, deliveryId: input.deliveryId },
     source: "erp",
   })
 
@@ -201,7 +203,7 @@ export async function requestDuditDeliveryAction(input: {
   revalidatePath("/entregadores")
   revalidatePath("/entregadores/entregas-disponiveis")
 
-  return { success: true as const, assignmentId: inserted.id }
+  return { success: true as const, assignmentId: inserted[0].id, count: inserted.length }
 }
 
 export async function cancelDuditDeliveryRequestAction(input: {

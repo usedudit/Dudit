@@ -29,6 +29,7 @@ export interface DeliveryDriverPickerSheetProps {
     onClose: () => void
     partnerId: string
     orderId?: string
+    orderIds?: string[]
     deliveryId?: string
     orderNumber?: string | null
     destinationAddress?: string | null
@@ -45,6 +46,7 @@ export default function DeliveryDriverPickerSheet({
     onClose,
     partnerId,
     orderId,
+    orderIds,
     deliveryId,
     orderNumber,
     destinationAddress,
@@ -60,11 +62,13 @@ export default function DeliveryDriverPickerSheet({
     const [isCancelling, setIsCancelling] = useState(false)
     const [activeRequest, setActiveRequest] = useState<any | null>(null)
 
+    const primaryOrderId = (orderIds && orderIds.length > 0 ? orderIds[0] : orderId) || undefined
+
     const checkRequestStatus = useCallback(async () => {
-        if (!orderId || !partnerId) return
+        if (!primaryOrderId || !partnerId) return
         setIsLoadingStatus(true)
         try {
-            const res = await getDuditDeliveryRequestStatusAction({ partnerId, orderId })
+            const res = await getDuditDeliveryRequestStatusAction({ partnerId, orderId: primaryOrderId })
             if (res.success) {
                 setActiveRequest(res.activeRequest)
             }
@@ -73,25 +77,26 @@ export default function DeliveryDriverPickerSheet({
         } finally {
             setIsLoadingStatus(false)
         }
-    }, [partnerId, orderId])
+    }, [partnerId, primaryOrderId])
 
     useEffect(() => {
-        if (isOpen && orderId) {
+        if (isOpen && primaryOrderId) {
             void checkRequestStatus()
         }
-    }, [isOpen, orderId, checkRequestStatus])
+    }, [isOpen, primaryOrderId, checkRequestStatus])
 
     // Polling while request is pending acceptance
     useEffect(() => {
-        if (!isOpen || !orderId || !activeRequest || activeRequest.status !== "available") return
+        if (!isOpen || !primaryOrderId || !activeRequest || activeRequest.status !== "available") return
         const interval = setInterval(() => {
             void checkRequestStatus()
         }, 5000)
         return () => clearInterval(interval)
-    }, [isOpen, orderId, activeRequest, checkRequestStatus])
+    }, [isOpen, primaryOrderId, activeRequest, checkRequestStatus])
 
     const handleRequestDelivery = async () => {
-        if (!orderId || !partnerId) {
+        const targetOrderIds = Array.from(new Set(orderIds || (orderId ? [orderId] : []))).filter(Boolean)
+        if (targetOrderIds.length === 0 || !partnerId) {
             toast.error("Salve o pedido primeiro para poder solicitar um entregador Dudit.")
             return
         }
@@ -100,7 +105,7 @@ export default function DeliveryDriverPickerSheet({
         try {
             const res = await requestDuditDeliveryAction({
                 partnerId,
-                orderId,
+                orderIds: targetOrderIds,
                 deliveryId: deliveryId || null,
                 notes,
             })

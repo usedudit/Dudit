@@ -54,6 +54,7 @@ import {
 import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import DeliveryDriverPickerSheet from "@/components/erp/deliveries/DeliveryDriverPickerSheet"
@@ -67,6 +68,8 @@ type OrderPickerItem = {
     totalAmount: number
     orderDate?: string | null
     status: string
+    paymentStatus?: string | null
+    paymentMethod?: string | null
     deliveryStatus: string
     shippingFee: number
     deliveryFee?: number
@@ -959,6 +962,32 @@ export default function CreateDeliveryPage({
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(activeOrder.shippingFee || activeOrder.deliveryFee || 0)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                {(() => {
+                                                    if (Array.isArray((activeOrder as any).paymentBreakdown) && (activeOrder as any).paymentBreakdown.length > 0) {
+                                                        return (activeOrder as any).paymentBreakdown
+                                                            .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
+                                                            .filter(Boolean)
+                                                            .join(", ") || formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
+                                                    }
+                                                    return formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
+                                                })()}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                            <Badge variant={getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).variant}>
+                                                {getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}
+                                            </Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
                                             <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                 {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
@@ -1001,9 +1030,10 @@ export default function CreateDeliveryPage({
                                         return (
                                             <div className="space-y-4">
                                                 {filteredItems.map((item: any) => {
-                                                    const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
-                                                    const itemSku = item.products?.sku || item.sku || "N/A"
-                                                    const itemPrice = Number(item.product_price || item.price || 0)
+                                                    const itemImage = getR2ImageUrl(item.product_variants?.images || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
+                                                    const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
+                                                    const itemUnit = item.products?.unit || item.unit || "un"
+                                                    const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
                                                     const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
 
                                                     return (
@@ -1029,7 +1059,7 @@ export default function CreateDeliveryPage({
                                                                     SKU: {itemSku}
                                                                 </div>
                                                                 <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                    {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
+                                                                    {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1077,8 +1107,9 @@ export default function CreateDeliveryPage({
                 partnerId={partnerId}
                 deliveryId={editDeliveryId || undefined}
                 orderId={selectedOrderIds[0] || undefined}
+                orderIds={selectedOrderIds}
                 destinationAddress={customerAddress ? `${customerAddress.street}, ${customerAddress.number || "S/N"} - ${customerAddress.neighborhood}, ${customerAddress.city}` : undefined}
-                deliveryFee={primaryOrder?.deliveryFee}
+                deliveryFee={selectedOrders.reduce((sum, o) => sum + Number(o.deliveryFee || o.shippingFee || 0), 0)}
                 onDeliveryRequested={() => {
                     setPlatformDriver({ id: "dudit_network", fullName: "Rede de Entregadores Dudit", isPlatformDriver: true })
                     setSelectedDeliveryPersonId("platform:dudit_network")

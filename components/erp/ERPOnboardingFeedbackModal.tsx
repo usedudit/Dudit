@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, FormTextarea } from "@/components/reusable"
+import { DefaultModal, Button, FormTextarea, InfoCard, IconPlaceholder } from "@/components/reusable"
 import {
   checkERPOnboardingFeedbackPromptAction,
   recordFeedbackPromptShownAction,
@@ -10,7 +10,6 @@ import {
   type FeedbackSentiment,
 } from "@/app/actions/feedback"
 import { getClientFeedbackContext } from "@/lib/utils/client-feedback-context"
-import { CheckCircleIcon, Sparkles } from "lucide-react"
 
 interface ERPOnboardingFeedbackModalProps {
   partnerId: string
@@ -105,8 +104,8 @@ export function ERPOnboardingFeedbackModal({
         selectedSentiment === "positive"
           ? "Estou gostando"
           : selectedSentiment === "neutral"
-          ? "Tenho algumas dificuldades"
-          : "Estou tendo problemas"
+            ? "Tenho algumas dificuldades"
+            : "Estou tendo problemas"
 
       const messageContent = comment.trim()
         ? `[Experiência: ${sentimentLabel}]\n${comment.trim()}`
@@ -148,12 +147,37 @@ export function ERPOnboardingFeedbackModal({
       onClose={handleClose}
       title={isSuccess ? "Obrigado!" : "Como está sendo sua experiência na Dudit?"}
       maxWidth="md"
+      footer={
+        <div className="flex justify-end gap-3 w-full">
+          <Button
+            variant="outline"
+            onClick={handleClose}
+            disabled={isSubmitting}
+          >
+            Agora não
+          </Button>
+
+          <Button
+            type="submit"
+            disabled={isSubmitting || !selectedSentiment}
+          >
+            Enviar Resposta
+          </Button>
+        </div>
+      }
     >
       {isSuccess ? (
-        <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-            <CheckCircleIcon className="w-8 h-8" />
-          </div>
+        <div className="flex flex-col items-center justify-center">
+          <IconPlaceholder
+            placeholderType="image"
+            imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
+            title="Obrigado pelo feedback!"
+            subtitle="Sua experiência nos ajuda a aprimorar o dia a dia da gestão do seu negócio."
+            itemButton={{
+              text: "Continuar no ERP",
+              action: handleClose,
+            }}
+          />
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
               Agradecemos seu retorno!
@@ -184,11 +208,10 @@ export function ERPOnboardingFeedbackModal({
                     setSelectedSentiment(item.id)
                     setErrorMessage(null)
                   }}
-                  className={`w-full flex items-center gap-3.5 p-3.5 rounded-xl border text-left transition-all ${
-                    isSelected
-                      ? "border-brand-primary bg-brand-primary/5 text-brand-dark dark:border-brand-primary dark:text-white ring-1 ring-brand-primary"
-                      : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/40 text-gray-800 dark:text-dark-body"
-                  }`}
+                  className={`w-full flex items-center gap-3.5 p-3.5 rounded-xl border text-left transition-all ${isSelected
+                    ? "border-brand-primary bg-brand-primary/5 text-brand-dark dark:border-brand-primary dark:text-white ring-1 ring-brand-primary"
+                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/40 text-gray-800 dark:text-dark-body"
+                    }`}
                 >
                   <span className="text-2xl shrink-0 leading-none">{item.emoji}</span>
                   <div className="flex-1 min-w-0">
@@ -218,31 +241,11 @@ export function ERPOnboardingFeedbackModal({
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300">
-              {errorMessage}
-            </div>
+            <InfoCard
+              color="red"
+              message={errorMessage}
+            />
           )}
-
-          {/* Rodapé de Ações */}
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="text-xs text-brand-inactive-text hover:text-brand-dark dark:hover:text-white transition-colors"
-              disabled={isSubmitting}
-            >
-              Agora não
-            </button>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="filled"
-                type="submit"
-                disabled={isSubmitting || !selectedSentiment}
-              >
-                {isSubmitting ? "Enviando..." : "Enviar Resposta"}
-              </Button>
-            </div>
-          </div>
         </form>
       )}
     </DefaultModal>

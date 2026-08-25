@@ -23,7 +23,9 @@ import {
     WhatsappIcon,
     MapPinIcon,
 } from "@/lib/icons"
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
+import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
 
 const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactNode; children: React.ReactNode; className?: string }) => (
@@ -531,11 +533,15 @@ export default function DeliveryAssignmentDetail({
                                                             <>
                                                                 <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                                     <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                                    <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
+                                                                    <span className="font-semibold text-right">
+                                                                        {formatPaymentMethodLabel(assignment.payment_method, null) || "Não informada"}
+                                                                    </span>
                                                                 </div>
                                                                 <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
                                                                     <span className="text-brand-inactive-text dark:text-dark-body">Situação do Pagamento:</span>
-                                                                    <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
+                                                                    <Badge variant={getPaymentStatusMeta(assignment.payment_status).variant}>
+                                                                        {getPaymentStatusMeta(assignment.payment_status).label}
+                                                                    </Badge>
                                                                 </div>
                                                             </>
                                                         )}
@@ -577,16 +583,26 @@ export default function DeliveryAssignmentDetail({
                                                                 </thead>
                                                                 <tbody>
                                                                     {paginatedItems.map((it: any, idx: number) => {
-                                                                        const qty = it.quantity || 1
-                                                                        const unitPrice = it.price || 0
-                                                                        const total = unitPrice * qty
+                                                                        const qty = Number(it.quantity || 1)
+                                                                        const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
+                                                                        const total = Number(it.subtotal || unitPrice * qty)
+                                                                        const itemSku = it.sku || it.product_variants?.sku || it.products?.sku || null
+                                                                        const unit = it.unit || it.products?.unit || "un"
+
                                                                         return (
                                                                             <tr key={idx} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
                                                                                 <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                                                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">{it.name || "Item"}</span>
+                                                                                    <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
+                                                                                        {it.name || it.product_name || "Item"}
+                                                                                    </div>
+                                                                                    {itemSku && itemSku !== "N/A" && (
+                                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mt-0.5">
+                                                                                            SKU: {itemSku}
+                                                                                        </div>
+                                                                                    )}
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                    {qty}
+                                                                                    {formatQuantityWithUnit(qty, unit)}
                                                                                 </td>
                                                                                 <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border font-medium text-[13px] text-brand-dark dark:text-dark-heading">
                                                                                     {unitPrice > 0 ? formatCurrency(unitPrice) : "-"}

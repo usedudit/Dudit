@@ -11,6 +11,7 @@ import { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 interface AvailableDeliveryGridCardProps {
     offer: AvailableDeliveryOffer
     onAccept: (assignmentId: string) => void
+    onView?: (offer: AvailableDeliveryOffer) => void
     isAccepting?: boolean
 }
 
@@ -19,6 +20,7 @@ const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 export default function AvailableDeliveryGridCard({
     offer,
     onAccept,
+    onView,
     isAccepting = false,
 }: AvailableDeliveryGridCardProps) {
     const router = useRouter()
@@ -53,8 +55,10 @@ export default function AvailableDeliveryGridCard({
 
     const handleCardClick = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("[role='menu']")) return
-        if (assignmentId) {
-            router.push(`/entregadores/entregas-disponiveis/${assignmentId}`)
+        if (onView) {
+            onView(offer)
+        } else if (assignmentId) {
+            router.push(`/entregadores/entregas-disponiveis?view=${assignmentId}`)
         }
     }
 

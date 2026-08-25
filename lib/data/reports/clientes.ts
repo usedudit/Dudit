@@ -21,6 +21,7 @@ export interface CustomerReportData {
   avgDaysBetweenPurchases: number
   topCustomers: { id: string; label: string; value: string; subtitle?: string; orders: number }[]
   vipCustomers: { id: string; label: string; value: string; orders: number }[]
+  inactiveCustomerList: { id: string; label: string; value: string; subtitle: string; orders: number }[]
   customerEvolution: { label: string; ativos: number; novos: number }[]
 }
 
@@ -119,6 +120,16 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
         .filter(([_, date]) => date < cutoffDate.toISOString().slice(0, 10))
         .length
 
+      // ─── Inactive customer list (top 6 by order count) ───
+      const inactiveCustomerList = [...customerLastOrder.entries()]
+        .filter(([_, date]) => date < cutoffDate.toISOString().slice(0, 10))
+        .map(([key, lastOrder]) => {
+          const data = lifetimeMap.get(key) || { name: key, total: 0, count: 0 }
+          return { id: key, label: data.name, value: brl(data.total), subtitle: `Último pedido: ${lastOrder}`, orders: data.count }
+        })
+        .sort((a, b) => b.orders - a.orders)
+        .slice(0, 6)
+
       // ─── Purchase frequency (avg orders per active customer in period) ───
       const totalOrdersInPeriod = periodOrders.length
       const purchaseFrequency = activeCustomers > 0
@@ -216,6 +227,7 @@ const getCachedCustomerData = cache(async (partnerId: string, period: Period = "
         avgDaysBetweenPurchases,
         topCustomers,
         vipCustomers,
+        inactiveCustomerList,
         customerEvolution,
       }
     },

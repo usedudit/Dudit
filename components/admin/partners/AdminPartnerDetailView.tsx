@@ -10,10 +10,10 @@ import {
     AlertTriangleIcon,
     ClockIcon,
     EditIcon,
-    UserIcon,
     CalendarIcon,
     BlockedIcon,
     CheckCircleIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -26,7 +26,6 @@ import {
     FormSection,
     IconPlaceholder,
     Pagination,
-    AlertModal,
     DefaultModal,
     Input,
     ActionsDropdown,
@@ -35,7 +34,6 @@ import {
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
-import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import {
@@ -448,18 +446,10 @@ export function AdminPartnerDetailView({
                                                 <Badge variant={store.risk_score >= 50 ? "red" : store.risk_score >= 25 ? "orange" : "gray"}>
                                                     Risco: {store.risk_score || 0} pts
                                                 </Badge>
-                                                <button
-                                                    onClick={handleCopyStoreId}
-                                                    title="Copiar ID da loja"
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono bg-brand-gray dark:bg-dark-border/40 hover:bg-brand-gray/80 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading rounded-lg border border-brand-border dark:border-dark-border transition-colors cursor-pointer"
-                                                >
-                                                    <span>ID: {store.id.slice(0, 8)}...</span>
-                                                    <span className="text-[10px] uppercase font-bold text-brand-link">Copiar</span>
-                                                </button>
                                             </h1>
 
                                             <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                                Responsável: {ownerProfile?.full_name || "Lojista"} • {ownerProfile?.email || "Sem e-mail"} • ID Loja: {store.id}
+                                                Responsável: {ownerProfile?.full_name || "Lojista"} • {ownerProfile?.email || "Sem e-mail"}
                                             </div>
                                         </div>
 
@@ -610,7 +600,7 @@ export function AdminPartnerDetailView({
                                         <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                             {/* Coluna principal */}
                                             <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                <FormSection title="Informações Cadastrais" hasSeparator>
+                                                <FormSection title="Informações Cadastrais">
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                                         <div>
                                                             <span className="text-xs font-semibold text-brand-inactive-text block">Nome Comercial</span>
@@ -721,22 +711,6 @@ export function AdminPartnerDetailView({
                                                         Identificadores
                                                     </h3>
                                                     <div className="space-y-2 text-xs">
-                                                        <div>
-                                                            <span className="text-brand-inactive-text block">ID da Loja</span>
-                                                            <div className="flex items-center justify-between mt-0.5">
-                                                                <span className="font-mono text-brand-dark dark:text-dark-heading">{store.id ? `${store.id.slice(0, 14)}...` : "-"}</span>
-                                                                {store.id && <button onClick={handleCopyStoreId} className="text-brand-green font-bold hover:underline">Copiar</button>}
-                                                            </div>
-                                                        </div>
-                                                        {store.partner_id && (
-                                                            <div>
-                                                                <span className="text-brand-inactive-text block">ID do Parceiro</span>
-                                                                <div className="flex items-center justify-between mt-0.5">
-                                                                    <span className="font-mono text-brand-dark dark:text-dark-heading">{store.partner_id ? `${store.partner_id.slice(0, 14)}...` : "-"}</span>
-                                                                    <button onClick={handleCopyPartnerId} className="text-brand-green font-bold hover:underline">Copiar</button>
-                                                                </div>
-                                                            </div>
-                                                        )}
                                                         {(store.suspended_case_id || partner?.suspended_case_id) && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
                                                                 <span className="text-brand-inactive-text block">Protocolo do Caso</span>
@@ -764,7 +738,7 @@ export function AdminPartnerDetailView({
                                 {/* Aba 2: Produtos */}
                                 <TabsContent value="products" className="mt-0">
                                     <FadeIn key="products">
-                                        <FormSection title={`Produtos Cadastrados (${recentProducts.length})`} hasSeparator>
+                                        <FormSection title={`Produtos Cadastrados (${recentProducts.length})`}>
                                             {recentProducts.length === 0 ? (
                                                 <IconPlaceholder
                                                     icon={PackageIcon}
@@ -858,7 +832,7 @@ export function AdminPartnerDetailView({
                                 {/* Aba 3: Serviços */}
                                 <TabsContent value="services" className="mt-0">
                                     <FadeIn key="services">
-                                        <FormSection title={`Serviços Cadastrados (${recentServices.length})`} hasSeparator>
+                                        <FormSection title={`Serviços Cadastrados (${recentServices.length})`}>
                                             {recentServices.length === 0 ? (
                                                 <IconPlaceholder
                                                     icon={CalendarIcon}
@@ -928,7 +902,7 @@ export function AdminPartnerDetailView({
                                 {/* Aba 4: Pedidos */}
                                 <TabsContent value="orders" className="mt-0">
                                     <FadeIn key="orders">
-                                        <FormSection title={`Vendas Registradas (${recentOrders.length})`} hasSeparator>
+                                        <FormSection title={`Vendas Registradas (${recentOrders.length})`}>
                                             {recentOrders.length === 0 ? (
                                                 <IconPlaceholder
                                                     icon={ShoppingCartIcon}
@@ -1014,7 +988,7 @@ export function AdminPartnerDetailView({
                                 {/* Aba 5: Devoluções */}
                                 <TabsContent value="returns" className="mt-0">
                                     <FadeIn key="returns">
-                                        <FormSection title={`Solicitações de Troca & Devolução (${recentReturns.length})`} hasSeparator>
+                                        <FormSection title={`Solicitações de Troca & Devolução (${recentReturns.length})`}>
                                             {recentReturns.length === 0 ? (
                                                 <IconPlaceholder
                                                     icon={ReturnIcon}
@@ -1102,7 +1076,7 @@ export function AdminPartnerDetailView({
                                 {/* Aba 6: Auditoria & Risco */}
                                 <TabsContent value="audit" className="mt-0">
                                     <FadeIn key="audit">
-                                        <FormSection title={`Histórico de Auditoria (${auditEvents.length})`} hasSeparator>
+                                        <FormSection title={`Histórico de Auditoria (${auditEvents.length})`}>
                                             {auditEvents.length === 0 ? (
                                                 <IconPlaceholder
                                                     icon={ClockIcon}
@@ -1148,7 +1122,7 @@ export function AdminPartnerDetailView({
                     <Button
                         variant="outline"
                         onClick={() => setUnsuspendStoreModalOpen(true)}
-                        className="flex-1 text-brand-green border-brand-green/30 text-xs"
+                        className="flex-1 h-12"
                     >
                         Reativar Loja
                     </Button>
@@ -1156,15 +1130,26 @@ export function AdminPartnerDetailView({
                     <Button
                         variant="destructive"
                         onClick={() => setSuspendStoreModalOpen(true)}
-                        className="flex-1 text-xs"
+                        className="flex-1 h-12"
                     >
                         Suspender Loja
                     </Button>
                 )}
 
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setNewRiskScore(String(store.risk_score || 0))
+                        setRiskModalOpen(true)
+                    }}
+                    className="flex-1 h-12"
+                >
+                    Score Risco
+                </Button>
+
                 <ActionsDropdown trigger={
-                    <Button variant="outline" size="sm" className="px-2.5">
-                        Mais Ações
+                    <Button variant="outline" className="h-12 w-12">
+                        <ThreeDotsIcon size={20} />
                     </Button>
                 }>
                     {isErpDisabled ? (
@@ -1186,17 +1171,6 @@ export function AdminPartnerDetailView({
                         </DropdownItem>
                     )}
                 </ActionsDropdown>
-
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        setNewRiskScore(String(store.risk_score || 0))
-                        setRiskModalOpen(true)
-                    }}
-                    className="flex-1 text-xs"
-                >
-                    Score Risco
-                </Button>
             </div>
 
             {/* Modal: Ajustar Score de Risco */}

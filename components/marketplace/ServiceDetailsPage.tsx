@@ -44,7 +44,7 @@ import { ReportModal } from "./ReportModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useNotification } from "@/hooks/use-notification"
 import { getPublicAvailableTimeSlots } from "@/app/actions/marketplace/services"
 import {
@@ -1544,7 +1544,7 @@ export function ServiceDetailsPageClient({
                 {(() => {
                     const sellerAvatarImage = partner.store_avatar && !partner.store_avatar.includes("Placeholder.png") ? getR2ImageUrl(partner.store_avatar, "thumb") : null;
                     const sellerBannerFallback = sellerAvatarImage
-                        ? getRandomDefaultBanner()
+                        ? getDefaultBannerSeeded(partner.id || partner.store_name || "Vendedor")
                         : getBannerUrlByColor(getAvatarColor(partner.store_name || "Vendedor"));
                     const sellerBannerImage = partner.banner_url && !partner.banner_url.includes("Placeholder.png")
                         ? getR2ImageUrl(partner.banner_url, "large")

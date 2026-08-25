@@ -10,7 +10,7 @@ import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/uti
 import { getProductUrl, getStoreUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
 import { getBillingUnitSuffix } from "@/lib/utils/formatters"
-import { getRandomDefaultBanner } from "@/lib/utils/banner"
+import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useFavorites } from "@/providers/favorites-provider"
 import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
@@ -71,7 +71,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const rawBanner = vitrine.banner_url || partner.banner_url || null
     const bannerUrl = rawBanner && !rawBanner.includes("Placeholder.png") ? rawBanner : null
     const fallbackBanner = hasPartnerLogo
-        ? getRandomDefaultBanner()
+        ? getDefaultBannerSeeded(partner.id || storeName)
         : getBannerUrlByColor(getAvatarColor(storeName))
     const bannerImage = bannerUrl ? getR2ImageUrl(bannerUrl, "large") : fallbackBanner
     const city = partner.city || vitrine.city || ""

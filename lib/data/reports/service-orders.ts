@@ -25,13 +25,19 @@ export interface ServiceOrderReportData {
 
 const STATUS_LABELS: Record<string, string> = {
   aberta: "Aberta",
-  aguardando_aprovacao: "Aguadando Aprovação",
+  aguardando_aprovacao: "Aguardando Aprovação",
   aprovada: "Aprovada",
   em_andamento: "Em Andamento",
   aguardando_peca: "Aguardando Peça",
   concluida: "Concluída",
   entregue: "Entregue",
   cancelada: "Cancelada",
+  pausada: "Pausada",
+  em_revisao: "Em Revisão",
+  aprovacao_pendente: "Aprovação Pendente",
+  orcamento: "Orçamento",
+  em_execucao: "Em Execução",
+  aguardando_retirada: "Aguardando Retirada",
 }
 
 const getCachedServiceOrdersData = cache(async (partnerId: string, period: Period = "monthly") => {

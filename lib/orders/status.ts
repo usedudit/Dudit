@@ -49,11 +49,23 @@ export function getDeliveryStatusIcon(status?: string | null): React.ReactElemen
 
 const PAYMENT_STATUS_META: Record<string, { label: string; variant: BadgeVariant }> = {
   paid: { label: "Pago", variant: "green" },
+  pago: { label: "Pago", variant: "green" },
+  approved: { label: "Aprovado", variant: "green" },
+  aprovado: { label: "Aprovado", variant: "green" },
   partially_paid: { label: "Parcialmente Pago", variant: "orange" },
+  parcialmente_pago: { label: "Parcialmente Pago", variant: "orange" },
   pending: { label: "Pendente", variant: "gray" },
+  pendente: { label: "Pendente", variant: "gray" },
   unpaid: { label: "Pendente", variant: "gray" },
   cancelled: { label: "Cancelado", variant: "red" },
+  cancelado: { label: "Cancelado", variant: "red" },
   in_process: { label: "Em análise", variant: "orange" },
+  em_analise: { label: "Em análise", variant: "orange" },
+  authorized: { label: "Autorizado", variant: "blue" },
+  refunded: { label: "Reembolsado", variant: "red" },
+  reembolsado: { label: "Reembolsado", variant: "red" },
+  rejected: { label: "Recusado", variant: "red" },
+  chargeback: { label: "Estornado", variant: "red" },
   shipped: { label: "Enviado", variant: "blue" },
   delivered: { label: "Entregue", variant: "green" },
   awaiting_pickup_payment: { label: "Aguardando pagamento na retirada", variant: "orange" },
@@ -75,7 +87,8 @@ const DELIVERY_STATUS_META: Record<string, { label: string; variant: BadgeVarian
 
 export function getPaymentStatusMeta(status?: string | null) {
   if (!status) return { label: "Não informado", variant: "gray" as const }
-  return PAYMENT_STATUS_META[status] || { label: status, variant: "gray" as const }
+  const key = String(status).toLowerCase().trim()
+  return PAYMENT_STATUS_META[key] || { label: status, variant: "gray" as const }
 }
 
 export function getDeliveryStatusMeta(status?: string | null) {

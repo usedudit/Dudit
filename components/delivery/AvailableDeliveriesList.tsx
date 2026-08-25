@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Button, IconPlaceholder, ThreeDotsLoader, Input } from "@/components/reusable"
@@ -9,6 +9,7 @@ import Pagination from "@/components/reusable/Pagination"
 import {
     listAvailableDeliveryOffersAction,
     acceptDeliveryOfferAction,
+    getMyDeliveryAssignmentAction,
 } from "@/app/actions/delivery-drivers"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -22,6 +23,7 @@ import {
 import { useMediaQuery } from "@/components/erp/hooks"
 import AvailableDeliveryGridCard from "./AvailableDeliveryGridCard"
 import AvailableDeliveryListRow, { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
+import AvailableDeliveryDetail from "./AvailableDeliveryDetail"
 
 type SortKey = "order" | "partner" | "dest" | "fee"
 type SortDirection = "asc" | "desc"
@@ -76,6 +78,11 @@ function playNewOfferSound() {
 
 export default function AvailableDeliveriesList() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const viewedId = searchParams?.get("view") || null
+    const [viewedOffer, setViewedOffer] = useState<any | null>(null)
+    const [isLoadingViewed, setIsLoadingViewed] = useState(false)
+
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"list" | "grid">("list")
@@ -86,6 +93,14 @@ export default function AvailableDeliveriesList() {
     const [acceptingId, setAcceptingId] = useState<string | null>(null)
     const [refreshCooldown, setRefreshCooldown] = useState(false)
     const knownOfferIdsRef = useRef<Set<string>>(new Set())
+
+    const openView = (id: string) => {
+        router.push(`/entregadores/entregas-disponiveis?view=${id}`)
+    }
+
+    const closeView = () => {
+        router.push("/entregadores/entregas-disponiveis")
+    }
 
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
         key: "dest",
@@ -142,7 +157,34 @@ export default function AvailableDeliveriesList() {
             setIsLoading(false)
             setIsRefreshing(false)
         }
-    }, [])
+    }, [refreshCooldown])
+
+    useEffect(() => {
+        if (!viewedId) {
+            setViewedOffer(null)
+            return
+        }
+
+        const local = offers.find((it) => (it.assignment_id || it.id) === viewedId)
+        if (local) {
+            setViewedOffer(local)
+        }
+
+        async function fetchDetails() {
+            setIsLoadingViewed(true)
+            try {
+                const res = await getMyDeliveryAssignmentAction(viewedId!)
+                if (res.success && res.data) {
+                    setViewedOffer(res.data)
+                }
+            } catch (err) {
+                console.error("Erro ao buscar detalhes da entrega disponível:", err)
+            } finally {
+                setIsLoadingViewed(false)
+            }
+        }
+        void fetchDetails()
+    }, [viewedId, offers])
 
     useEffect(() => {
         void loadOffers()
@@ -165,7 +207,7 @@ export default function AvailableDeliveriesList() {
             }
 
             toast.success("Entrega aceita com sucesso! Redirecionando...")
-            router.push(`/entregadores/entregas/${assignmentId}`)
+            router.push(`/entregadores/entregas?view=${assignmentId}`)
         } catch (e: any) {
             toast.error(e?.message || "Erro ao aceitar entrega.")
         } finally {
@@ -238,6 +280,28 @@ export default function AvailableDeliveriesList() {
 
     const hasAnyOffers = offers.length > 0
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
+
+    if (viewedId) {
+        if (isLoadingViewed && !viewedOffer) {
+            return (
+                <div className="w-full h-full flex items-center justify-center min-h-[400px]">
+                    <ThreeDotsLoader />
+                </div>
+            )
+        }
+
+        if (viewedOffer) {
+            return (
+                <AvailableDeliveryDetail
+                    offer={viewedOffer}
+                    onBack={closeView}
+                    onAccepted={() => {
+                        router.push(`/entregadores/entregas?view=${viewedId}`)
+                    }}
+                />
+            )
+        }
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -431,6 +495,7 @@ export default function AvailableDeliveriesList() {
                                             key={offer.assignment_id || (offer as any).id}
                                             offer={offer}
                                             onAccept={handleAccept}
+                                            onView={(it) => openView(it.assignment_id || it.id || "")}
                                             isAccepting={acceptingId === (offer.assignment_id || (offer as any).id)}
                                         />
                                     ))}
@@ -494,6 +559,7 @@ export default function AvailableDeliveriesList() {
                                                         key={offer.assignment_id || (offer as any).id}
                                                         offer={offer}
                                                         onAccept={handleAccept}
+                                                        onView={(it) => openView(it.assignment_id || it.id || "")}
                                                         isAccepting={acceptingId === (offer.assignment_id || (offer as any).id)}
                                                     />
                                                 ))}

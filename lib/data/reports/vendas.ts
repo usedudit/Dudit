@@ -117,9 +117,21 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         bySource.set(src, (bySource.get(src) || 0) + money(o.total_amount))
       }
 
+      const normalizePaymentMethod = (raw: string): string => {
+        const lower = raw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        if (lower.includes("pix")) return "Pix"
+        if (lower.includes("credito")) return "Cartão de Crédito"
+        if (lower.includes("debito")) return "Cartão de Débito"
+        if (lower.includes("dinheiro") || lower.includes("cash")) return "Dinheiro"
+        if (lower.includes("boleto")) return "Boleto"
+        if (lower.includes("transfer")) return "Transferência"
+        if (lower.includes("vale")) return "Vale"
+        if (lower.includes("nao definido") || lower.includes("pendente") || lower.includes("outro")) return "Não Definido"
+        return raw || "Não Definido"
+      }
       const byPayment = new Map<string, number>()
       for (const o of periodOrders) {
-        const pm = String(o.payment_method || "Outro")
+        const pm = normalizePaymentMethod(String(o.payment_method || ""))
         byPayment.set(pm, (byPayment.get(pm) || 0) + money(o.total_amount))
       }
 
@@ -153,7 +165,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       const prodMap = new Map<string, number>()
       for (const item of itemRows) {
         const name = item.product_name || "Produto"
-        prodMap.set(name, (prodMap.get(name) || 0) + money(item.quantity))
+        prodMap.set(name, (prodMap.get(name) || 0) + (Number(item.quantity) || 0))
       }
       const topProducts = Array.from(prodMap.entries())
         .sort((a, b) => b[1] - a[1])
@@ -166,7 +178,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         }))
 
       // ─── Items sold ───
-      const totalItemsSold = itemRows.reduce((sum: number, item: any) => sum + money(item.quantity), 0)
+      const totalItemsSold = itemRows.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 0), 0)
 
       // ─── Cancellation rate ───
       const cancelRows = cancelResult.data || []
@@ -176,10 +188,10 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       }).length
       const cancellationRate = cancelRows.length > 0 ? Math.round((cancelledCount / cancelRows.length) * 100) : 0
 
-      // ─── Net revenue (after discounts/shipping) ───
+      // ─── Net revenue ───
       const totalDiscount = periodOrders.reduce((a: number, o: any) => a + money(o.discount_total || 0), 0)
       const totalDeliveryFee = periodOrders.reduce((a: number, o: any) => a + money(o.delivery_fee || 0), 0)
-      const netRevenue = periodOrders.reduce((a: number, o: any) => a + money(o.amount_paid || o.total_amount), 0)
+      const netRevenue = revenue - totalDiscount + totalDeliveryFee
 
       // ─── Gross profit (cost_price lookup) ───
       const prodIds = [...new Set(itemRows.map((i: any) => i.product_id).filter(Boolean))]
@@ -197,7 +209,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       let totalItemsWithCost = 0
       for (const item of itemRows) {
         const pid = item.product_id
-        const qty = money(item.quantity || 0)
+        const qty = Number(item.quantity || 0)
         if (pid && costPriceMap.has(pid)) {
           totalCost += qty * costPriceMap.get(pid)!
           itemsWithCost++
@@ -213,7 +225,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       for (const item of itemRows) {
         const name = item.product_name || "Produto"
         const cur = prodRevenueMap.get(name) || { revenue: 0, cost: 0, qty: 0 }
-        const qty = money(item.quantity || 0)
+        const qty = Number(item.quantity || 0)
         const rev = money(item.net_item_value || 0)
         cur.revenue += rev
         cur.qty += qty
@@ -233,7 +245,7 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
       for (const item of serviceRows) {
         const name = item.product_name || "Serviço"
         const cur = svcMap.get(name) || { count: 0, revenue: 0 }
-        cur.count += money(item.quantity || 1)
+        cur.count += Number(item.quantity || 1)
         cur.revenue += money(item.net_item_value || 0)
         svcMap.set(name, cur)
       }
@@ -265,12 +277,12 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         value: count,
       }))
 
-      // ─── ABC Curve ───
+      // ─── ABC Curve (by revenue, not quantity) ───
       const allItemRows = allItemsResult.data || []
       const abcProdMap = new Map<string, number>()
       for (const item of allItemRows) {
         const name = item.product_name || "Produto"
-        abcProdMap.set(name, (abcProdMap.get(name) || 0) + money(item.total_amount || item.quantity))
+        abcProdMap.set(name, (abcProdMap.get(name) || 0) + (Number(item.net_item_value) || 0))
       }
       const sortedProducts = Array.from(abcProdMap.entries()).sort((a, b) => b[1] - a[1])
       const totalValue = sortedProducts.reduce((a, [_, v]) => a + v, 0)

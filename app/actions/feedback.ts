@@ -6,7 +6,6 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeString, sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { sendDiscordFeedbackNotification } from "@/lib/services/discord-feedback.service"
-import { createNotificationsForUsers } from "@/lib/services/notification.service"
 
 export type FeedbackType = "onboarding" | "help_article" | "general" | "bug"
 export type FeedbackSentiment = "positive" | "neutral" | "negative"
@@ -171,47 +170,6 @@ export async function submitFeedbackAction(
   }).catch((err) => {
     console.error("[submitFeedbackAction] Background Discord webhook error:", err)
   })
-
-  // 7. Trigger in-app notification to platform admins if feedback is critical
-  const isCritical = input.type === "bug" || sentiment === "negative" || input.type === "onboarding"
-  if (isCritical) {
-    try {
-      const { data: adminRoles } = await admin
-        .from("admin_roles")
-        .select("user_id")
-        .in("role", ["super_admin", "admin"])
-
-      if (adminRoles && adminRoles.length > 0) {
-        const adminUserIds = adminRoles.map((r: { user_id: string }) => r.user_id)
-        const typeTitles: Record<FeedbackType, string> = {
-          bug: "🐛 Novo Bug Reportado",
-          onboarding: "🚀 Feedback de Onboarding ERP",
-          help_article: "📖 Feedback da Central de Ajuda",
-          general: "💬 Novo Feedback Geral",
-        }
-
-        const notificationTitle = typeTitles[input.type] || "Novo Feedback"
-        const previewMessage =
-          sanitizedMessage.length > 120 ? `${sanitizedMessage.slice(0, 117)}...` : sanitizedMessage
-
-        await createNotificationsForUsers(adminUserIds, (adminId) => ({
-          userId: adminId,
-          type: "admin_announcement",
-          title: notificationTitle,
-          message: `${userName}: "${previewMessage}"`,
-          data: {
-            feedbackId: inserted.id,
-            type: input.type,
-            partnerId: sanitizedPartnerId,
-            audience: "admin",
-          },
-          idempotencyKey: `feedback:${inserted.id}:${adminId}`,
-        }))
-      }
-    } catch (notifErr) {
-      console.error("[submitFeedbackAction] Failed to create admin notification:", notifErr)
-    }
-  }
 
   return {
     success: true,
