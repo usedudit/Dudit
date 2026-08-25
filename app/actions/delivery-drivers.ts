@@ -14,8 +14,10 @@ function hashInviteToken(token: string) {
 function normalizeError(error: any, fallback: string) {
   const message = String(error?.message || "")
   if (message.includes("delivery_driver_busy")) return "Você já possui 2 entregas em andamento. Conclua uma para aceitar novas."
+  if (message.includes("delivery_offer_expired")) return "Esta oferta de entrega expirou (tempo limite de 15 minutos)."
   if (message.includes("delivery_assignment_already_accepted")) return "Esta entrega acabou de ser aceita por outro entregador."
   if (message.includes("delivery_assignment_not_available")) return "Esta entrega não está mais disponível."
+  if (message.includes("delivery_assignment_not_found")) return "Entrega não encontrada."
   if (message.includes("delivery_assignment_invalid_transition")) return "Essa transição de status não é permitida."
   if (message.includes("delivery_failure_reason_required")) return "Informe o motivo da falha."
   if (message.includes("delivery_assignment_not_owned")) return "Entrega não encontrada ou sem permissão."
@@ -54,6 +56,8 @@ export async function listMyDeliveryAssignmentsAction(params?: {
   const hasMore = rows.length > limit
   const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
     ...row,
+    id: row.id || row.assignment_id,
+    assignment_id: row.assignment_id || row.id,
     delivery_fee: Number(row.delivery_fee || 0),
     total_amount: Number(row.total_amount || 0),
     items: Array.isArray(row.items) ? row.items : [],
@@ -73,13 +77,24 @@ export async function getMyDeliveryAssignmentAction(assignmentId: string) {
   const supabase = await getSupabaseServerClient()
   const { data, error } = await supabase.rpc("get_my_delivery_assignment", { p_assignment_id: assignmentId })
   if (error || !data) return { success: false as const, error: normalizeError(error, "Entrega não encontrada.") }
+  
+  const orders = Array.isArray(data.orders) ? data.orders : []
   return {
     success: true as const,
     data: {
       ...data,
+      id: data.id || data.assignment_id || assignmentId,
+      assignment_id: data.assignment_id || data.id || assignmentId,
       delivery_fee: Number(data.delivery_fee || 0),
       total_amount: Number(data.total_amount || 0),
       items: Array.isArray(data.items) ? data.items : [],
+      orders: orders.map((o: any) => ({
+        ...o,
+        total_amount: Number(o.total_amount || 0),
+        delivery_fee: Number(o.delivery_fee || 0),
+        items: Array.isArray(o.items) ? o.items : [],
+      })),
+      total_orders: Number(data.total_orders || (orders.length > 0 ? orders.length : 1)),
     },
   }
 }
@@ -88,6 +103,8 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
   await requireDeliveryDriver()
   const supabase = await getSupabaseServerClient()
   const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+
   const { data, error } = await supabase.rpc("get_available_delivery_offers", {
     p_limit: limit,
   })
@@ -99,6 +116,7 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
       .select(`
         id,
         order_id,
+        delivery_id,
         partner_id,
         status,
         assigned_at,
@@ -141,6 +159,7 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
         )
       `)
       .or("status.in.(available,requested),and(status.eq.assigned,driver_id.is.null)")
+      .gte("assigned_at", fifteenMinutesAgo)
       .order("assigned_at", { ascending: false })
       .limit(limit)
 
@@ -156,13 +175,16 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
       const storeAddr = s.addresses ? `${s.addresses.street}, ${s.addresses.number} - ${s.addresses.neighborhood}, ${s.addresses.city}` : s.city || ""
       const storeName = s.name || p.business_info?.nome_fantasia || p.business_info?.razao_social || p.name || "Loja"
       return {
+        id: row.id,
         assignment_id: row.id,
         order_id: row.order_id,
+        delivery_id: row.delivery_id,
         partner_id: row.partner_id,
         status: row.status,
         assigned_at: row.assigned_at,
         delivery_fee: Number(row.delivery_fee || 0),
         order_number: o.order_number || String(row.order_id).slice(0, 8),
+        order_count: 1,
         partner_name: storeName,
         store_name: storeName,
         store_phone: s.phone || s.whatsapp_phone || p.phone || "",
@@ -187,6 +209,9 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
   const rows = Array.isArray(data) ? data : []
   const items = rows.map((row: any) => ({
     ...row,
+    id: row.id || row.assignment_id,
+    assignment_id: row.assignment_id || row.id,
+    order_count: Number(row.order_count || 1),
     delivery_fee: Number(row.delivery_fee || 0),
     total_amount: Number(row.total_amount || 0),
     items: Array.isArray(row.items) ? row.items : [],
@@ -207,12 +232,17 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
 
   if (error) {
     const message = String(error.message || "")
-    if (message.includes("delivery_assignment_already_accepted")) {
-      return { success: false as const, error: "Esta entrega já foi aceita por outro entregador." }
+    if (
+      message.includes("delivery_driver_busy") ||
+      message.includes("delivery_offer_expired") ||
+      message.includes("delivery_driver_not_active") ||
+      message.includes("delivery_assignment_already_accepted") ||
+      message.includes("delivery_assignment_not_available") ||
+      message.includes("delivery_assignment_not_found")
+    ) {
+      return { success: false as const, error: normalizeError(error, "Não foi possível aceitar a entrega.") }
     }
-    if (message.includes("delivery_assignment_not_available")) {
-      return { success: false as const, error: "Esta entrega não está mais disponível." }
-    }
+
     // Fallback: direct update if RPC fails
     const { getCurrentUser } = await import("@/lib/auth/authorization")
     const user = await getCurrentUser()
@@ -232,7 +262,7 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
       .maybeSingle()
 
     if (updateError || !updated) {
-      return { success: false as const, error: "Não foi possível aceitar a entrega. Ela pode ter sido aceita por outro entregador." }
+      return { success: false as const, error: "Não foi possível aceitar a entrega. Ela pode ter sido aceita por outro entregador ou expirado." }
     }
 
     if (updated.order_id) {

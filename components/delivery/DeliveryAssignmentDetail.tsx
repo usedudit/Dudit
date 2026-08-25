@@ -88,6 +88,39 @@ export default function DeliveryAssignmentDetail({
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
 
+    const ordersList = React.useMemo(() => {
+        if (assignment.orders && assignment.orders.length > 0) {
+            return assignment.orders
+        }
+        return [
+            {
+                order_id: assignment.order_id,
+                order_number: assignment.order_number,
+                position: 1,
+                customer_name: assignment.customer_name,
+                customer_phone: assignment.customer_phone,
+                delivery_address: assignment.delivery_address,
+                total_amount: assignment.total_amount,
+                delivery_fee: assignment.delivery_fee,
+                payment_method: assignment.payment_method,
+                payment_status: assignment.payment_status,
+                items: assignment.items || [],
+                notes: assignment.notes,
+            },
+        ]
+    }, [assignment])
+
+    const totalRouteDeliveryFee = React.useMemo(() => {
+        if (assignment.orders && assignment.orders.length > 0) {
+            return assignment.orders.reduce((sum: number, o: any) => sum + Number(o.delivery_fee || 0), 0)
+        }
+        return Number(assignment.delivery_fee || 0)
+    }, [assignment])
+
+    const totalRouteAmount = React.useMemo(() => {
+        return ordersList.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
+    }, [ordersList])
+
     const statusMeta = statusConfig[assignment.status] || {
         label: assignment.status,
         variant: "gray" as const,
@@ -107,7 +140,9 @@ export default function DeliveryAssignmentDetail({
         : null
     const storeWhatsappUrl = cleanStorePhone ? `https://wa.me/55${cleanStorePhone}` : null
 
-    const pageTitle = `Pedido ${orderNumberDisplay}`
+    const pageTitle = ordersList.length > 1
+        ? `Rota com ${ordersList.length} pedidos`
+        : `Pedido ${orderNumberDisplay}`
 
     useEffect(() => {
         setHeaderOverride({
@@ -226,7 +261,20 @@ export default function DeliveryAssignmentDetail({
     }
 
     // Items pagination
-    const items = assignment.items || []
+    const items = React.useMemo(() => {
+        if (assignment.items && assignment.items.length > 0) return assignment.items
+        const list: any[] = []
+        for (const order of ordersList) {
+            for (const item of (order.items || [])) {
+                list.push({
+                    ...item,
+                    order_number: order.order_number,
+                    customer_name: order.customer_name,
+                })
+            }
+        }
+        return list
+    }, [assignment, ordersList])
     const totalItemPages = Math.ceil(items.length / ITEMS_PER_PAGE) || 1
     const paginatedItems = items.slice((itemsPage - 1) * ITEMS_PER_PAGE, itemsPage * ITEMS_PER_PAGE)
 
@@ -392,57 +440,105 @@ export default function DeliveryAssignmentDetail({
                                                     </div>
                                                 </FormSection>
 
-                                                {/* Customer Section */}
-                                                <FormSection title="Local de Entrega (Cliente)">
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                        <div className="space-y-1">
-                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                                {assignment.customer_name || "Cliente"}
-                                                            </h3>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
-                                                                <span>{assignment.delivery_address || "Endereço não informado"}</span>
-                                                            </p>
-                                                        </div>
-                                                        <div className="shrink-0">
-                                                            <ActionsDropdown
-                                                                trigger={
-                                                                    <Button variant="outline" size="sm">Contato</Button>
-                                                                }
-                                                            >
-                                                                <DropdownItem onClick={() => window.open(customerMapsUrl, "_blank")}>
-                                                                    <MapPinIcon size={16} /> Abrir Rota no Maps
-                                                                </DropdownItem>
-                                                                <DropdownItem onClick={() => window.open(customerWazeUrl, "_blank")}>
-                                                                    <TruckIcon size={16} /> Abrir no Waze
-                                                                </DropdownItem>
-                                                            </ActionsDropdown>
-                                                        </div>
-                                                    </div>
-                                                </FormSection>
+                                                {/* Customer Section(s) / Paradas */}
+                                                {ordersList.map((order: any, idx: number) => {
+                                                    const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
+                                                    const custMaps = order.delivery_address
+                                                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
+                                                        : null
+                                                    const custWaze = order.delivery_address
+                                                        ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
+                                                        : null
+                                                    const custWa = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
+                                                    const stopTitle = ordersList.length > 1
+                                                        ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
+                                                        : "Local de Entrega (Cliente)"
+
+                                                    return (
+                                                        <FormSection key={order.order_id || idx} title={stopTitle}>
+                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                                <div className="space-y-1">
+                                                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                                        <span>{order.customer_name || "Cliente"}</span>
+                                                                        {order.total_amount && (
+                                                                            <span className="text-xs font-normal text-brand-inactive-text">
+                                                                                ({formatCurrency(order.total_amount)})
+                                                                            </span>
+                                                                        )}
+                                                                    </h3>
+                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
+                                                                        <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
+                                                                        <span>{order.delivery_address || "Endereço não informado"}</span>
+                                                                    </p>
+                                                                    {order.notes && (
+                                                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                                                            <strong>Obs:</strong> {order.notes}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="shrink-0">
+                                                                    <ActionsDropdown
+                                                                        trigger={
+                                                                            <Button variant="outline" size="sm">Contato / Rota</Button>
+                                                                        }
+                                                                    >
+                                                                        {custMaps && (
+                                                                            <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
+                                                                                <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                            </DropdownItem>
+                                                                        )}
+                                                                        {custWaze && (
+                                                                            <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
+                                                                                <TruckIcon size={16} /> Abrir no Waze
+                                                                            </DropdownItem>
+                                                                        )}
+                                                                        {cleanCustPhone && (
+                                                                            <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
+                                                                                <PhoneIcon size={16} /> Ligar para o Cliente
+                                                                            </DropdownItem>
+                                                                        )}
+                                                                        {custWa && (
+                                                                            <DropdownItem onClick={() => window.open(custWa, "_blank")}>
+                                                                                <WhatsappIcon size={16} /> WhatsApp
+                                                                            </DropdownItem>
+                                                                        )}
+                                                                    </ActionsDropdown>
+                                                                </div>
+                                                            </div>
+                                                        </FormSection>
+                                                    )
+                                                })}
                                             </div>
 
                                             {/* RIGHT SIDEBAR COLUMN with divider */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
                                                 <SidebarCard title="Remuneração & Valores">
                                                     <InfoCard
-                                                        title="Sua Taxa de Entrega"
-                                                        message={formatCurrency(assignment.delivery_fee || 0)}
+                                                        title="Sua Taxa de Entrega (Total)"
+                                                        message={formatCurrency(totalRouteDeliveryFee)}
                                                         color="green"
                                                     />
                                                     <div className="space-y-3 text-xs mt-4">
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
-                                                            <span className="font-bold text-sm">{formatCurrency(assignment.total_amount || 0)}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Total de Paradas:</span>
+                                                            <span className="font-bold text-sm">{ordersList.length}</span>
                                                         </div>
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                            <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor Total dos Pedidos:</span>
+                                                            <span className="font-bold text-sm">{formatCurrency(totalRouteAmount)}</span>
                                                         </div>
-                                                        <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Situação do Pagamento:</span>
-                                                            <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
-                                                        </div>
+                                                        {ordersList.length === 1 && (
+                                                            <>
+                                                                <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
+                                                                    <span className="font-semibold">{assignment.payment_method || "Não informada"}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Situação do Pagamento:</span>
+                                                                    <span className="font-semibold">{assignment.payment_status || "Pendente"}</span>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                     {isCashPayment && (
                                                         <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">

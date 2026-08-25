@@ -3,6 +3,7 @@ import {
     Button,
     InfoCard,
     IconPlaceholder,
+    ListItem,
 } from '@/components/reusable';
 import {
     CheckCircleIcon,
@@ -675,9 +676,10 @@ export default function PaymentStatusModal({
                                     )}
 
                                     <div className="grid grid-cols-1 gap-4 mb-8">
-                                        <SuccessActionCard
+                                        <ListItem
                                             icon={FileIcon}
-                                            label="Imprimir recibo"
+                                            title="Imprimir recibo"
+                                            description="Gerar e imprimir recibo da venda"
                                             onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
                                         />
                                     </div>

@@ -33,6 +33,8 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
 import { buildNotificationContent } from "@/lib/notifications/templates"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export type ERPItemPayload = {
     productId?: string | null
@@ -2237,25 +2239,29 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
     const supabase = createAdminClient()
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)
 
-    const orderQuery = supabase
-        .from("orders")
-        .select(`
-            *,
-            order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock, unit), product_variants(id, variant_name, sku, stock_quantity, stock_available), services(id, name, images)),
-            stores(name),
-            coupons(*),
-            appointments(*),
-            return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items!return_items_return_request_id_fkey(*))
-        `)
-        .eq("partner_id", partnerId)
+    const { data, error } = await getCachedErpPage(
+        ["erp-order-detail", partnerId, orderId],
+        [TAGS.orders(partnerId), `order-${orderId}`],
+        async () => {
+            const detailClient = createAdminClient()
+            const orderQuery = detailClient
+                .from("orders")
+                .select(`
+                    *,
+                    order_items(*, products(id, name, sku, images, stock_quantity, stock_available, allow_sell_without_stock, unit), product_variants(id, variant_name, sku, stock_quantity, stock_available), services(id, name, images)),
+                    stores(name),
+                    coupons(*),
+                    appointments(*),
+                    return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items!return_items_return_request_id_fkey(*))
+                `)
+                .eq("partner_id", partnerId)
 
-    if (isUuid) {
-        orderQuery.eq("id", orderId)
-    } else {
-        orderQuery.eq("order_number", orderId)
-    }
+            if (isUuid) orderQuery.eq("id", orderId)
+            else orderQuery.eq("order_number", orderId)
 
-    const { data, error } = await orderQuery.maybeSingle()
+            return orderQuery.maybeSingle()
+        },
+    )
 
     if (error) return { error: error.message }
     if (data) {
@@ -4412,79 +4418,52 @@ export async function getERPOrdersPageAction(
             return { success: false, error: "Sem permissão para acessar a listagem de pedidos." }
         }
 
-        const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_ORDERS_PAGE_SIZE))))
         const fetchLimit = limit + 1
+        const rows = await getCachedErpPage(
+            [
+                "erp-orders-page",
+                partnerId,
+                options?.storeId || "all-stores",
+                cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+                String(limit),
+            ],
+            [TAGS.orders(partnerId)],
+            async () => {
+                const supabase = createAdminClient()
+                const baseSelect = `
+                        id, order_number, mp_payment_id, customer_name, buyer_id,
+                        total_amount, paid_amount, situation, previous_situation_before_cancel,
+                        delivery_status, delivery_type, order_source, created_at, store_id,
+                        stores(name),
+                        return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
+                        order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
+                        payment_method, payment_breakdown, payment_provider
+                    `
+                const selectWithPosSale = `${baseSelect}, is_pos_sale`
+                const buildQuery = (selectClause: string) => {
+                    let query = supabase
+                        .from("orders")
+                        .select(selectClause)
+                        .eq("partner_id", partnerId)
+                    if (options?.storeId) query = query.eq("store_id", options.storeId)
+                    if (cursor) query = query.or(buildOrdersKeysetOrFilter(cursor))
+                    return query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(fetchLimit)
+                }
 
-        const baseSelect = `
-                id,
-                order_number,
-                mp_payment_id,
-                customer_name,
-                buyer_id,
-                total_amount,
-                paid_amount,
-                situation,
-                previous_situation_before_cancel,
-                delivery_status,
-                delivery_type,
-                order_source,
-                created_at,
-                store_id,
-                stores(name),
-                return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
-                order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
-                payment_method,
-                payment_breakdown,
-                payment_provider
-            `
-
-        const selectWithPosSale = `
-                ${baseSelect},
-                is_pos_sale
-            `
-
-        const selectWithoutPosSale = baseSelect
-
-        const buildQuery = (selectClause: string) => {
-            let query = supabase
-                .from("orders")
-                .select(selectClause)
-                .eq("partner_id", partnerId)
-
-            if (options?.storeId) {
-                query = query.eq("store_id", options.storeId)
-            }
-
-            if (cursor) {
-                query = query.or(buildOrdersKeysetOrFilter(cursor))
-            }
-
-            return query
-                .order("created_at", { ascending: false })
-                .order("id", { ascending: false })
-                .limit(fetchLimit)
-        }
-
-        // P5: usa o resultado da detecção em cache para escolher o select correto de
-        // primeira, sem depender de tentativa-e-erro a cada request. Só faz o fallback
-        // (e custa 2 queries) na primeira vez que a coluna ausente é detectada.
-        let queryResult = await buildQuery(
-            ordersHasPosSaleColumn === false ? selectWithoutPosSale : selectWithPosSale,
+                let queryResult = await buildQuery(ordersHasPosSaleColumn === false ? baseSelect : selectWithPosSale)
+                if (queryResult.error && isMissingOrdersIsPosSaleColumnError(queryResult.error)) {
+                    ordersHasPosSaleColumn = false
+                    queryResult = await buildQuery(baseSelect)
+                } else if (!queryResult.error && ordersHasPosSaleColumn === null) {
+                    ordersHasPosSaleColumn = true
+                }
+                if (queryResult.error) throw queryResult.error
+                return queryResult.data || []
+            },
+            30,
         )
-        if (queryResult.error && isMissingOrdersIsPosSaleColumnError(queryResult.error)) {
-            ordersHasPosSaleColumn = false
-            queryResult = await buildQuery(selectWithoutPosSale)
-        } else if (!queryResult.error && ordersHasPosSaleColumn === null) {
-            ordersHasPosSaleColumn = true
-        }
-
-        const { data, error } = queryResult
-
-        if (error) throw error
-
-        const rows = data || []
         const hasMore = rows.length > limit
         const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
             const returnedToInventoryQtyMap = new Map<string, number>()

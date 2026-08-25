@@ -2,6 +2,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -10,6 +11,9 @@ import { sanitizeInput } from "@/lib/input-validator"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { requireAuthorizedCustomerContext } from "@/lib/services/authorized-customer-access"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
 
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly"
 export type RecurringType = "income" | "expense"
@@ -88,12 +92,19 @@ export async function getRecurringTransactionsAction(partnerId: string) {
   try {
     // await requireMinimumPlan(partnerId, "escalar")
     await requirePermission(partnerId, "financial", "view")
-    const supabase = await getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from("recurring_transactions")
-      .select("id, partner_id, type, amount, description, frequency, interval_value, week_days, month_day, use_last_day, year_month, year_day, start_date, end_date, next_run_date, account_id, category_id, subcategory_id, contact_id, customer_id, contact_type, payment_method_id, active, status, effective_from_date, created_at")
-      .eq("partner_id", partnerId)
-      .order("created_at", { ascending: false })
+    const { data, error } = await getCachedErpPage(
+      ["erp-recurring-transactions", partnerId],
+      [TAGS.recurringTransactions(partnerId)],
+      async () => {
+        const supabase = createAdminClient()
+        return supabase
+          .from("recurring_transactions")
+          .select("id, partner_id, type, amount, description, frequency, interval_value, week_days, month_day, use_last_day, year_month, year_day, start_date, end_date, next_run_date, account_id, category_id, subcategory_id, contact_id, customer_id, contact_type, payment_method_id, active, status, effective_from_date, created_at")
+          .eq("partner_id", partnerId)
+          .order("created_at", { ascending: false })
+      },
+      30,
+    )
     if (error) throw error
     return { success: true, data: data || [] }
   } catch (e: any) {
@@ -198,6 +209,7 @@ export async function createRecurringTransactionAction(input: {
       })
     }
 
+    await safeRevalidateTag(TAGS.recurringTransactions(input.partnerId))
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }
@@ -332,6 +344,7 @@ export async function updateRecurringTransactionAction(
       source: "manual",
     })
 
+    await safeRevalidateTag(TAGS.recurringTransactions(partnerId))
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }
@@ -397,6 +410,7 @@ export async function cancelRecurringTransactionAction(id: string, partnerId: st
       source: "manual",
     })
 
+    await safeRevalidateTag(TAGS.recurringTransactions(partnerId))
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }
@@ -451,6 +465,7 @@ export async function duplicateRecurringTransactionAction(id: string, partnerId:
       .single()
     if (error) throw error
     logRecurring("duplicated", { fromId: id, newId: data?.id, partnerId })
+    await safeRevalidateTag(TAGS.recurringTransactions(partnerId))
     return { success: true, data }
   } catch (e: any) {
     return { success: false, error: e.message }

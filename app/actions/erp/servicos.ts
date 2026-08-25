@@ -12,6 +12,8 @@ import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
 import { requireCSRF } from "@/lib/security/csrf-action-wrapper"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
@@ -76,8 +78,6 @@ export async function getERPServicesPageAction(
     try {
         // await requireMinimumPlan(partnerId, "crescer")
         await requirePermission(partnerId, "services", "view")
-        const supabase = await getSupabaseServerClient()
-
         if (options?.storeId) {
             await requireStorePermission(options.storeId, partnerId, "services", "view")
         }
@@ -86,35 +86,34 @@ export async function getERPServicesPageAction(
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_SERVICES_PAGE_SIZE))))
         const fetchLimit = limit + 1
 
-        let q = supabase
-            .from("services")
-            .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
-            .eq("partner_id", partnerId)
-
-        if (options?.storeId) {
-            q = q.eq("store_id", options.storeId)
-        }
-
-        if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
-            q = scopeArchivedOnly(q)
-        } else if (!options?.filters?.includeArchived) {
-            q = scopeActiveOnly(q)
-        } else {
-            q = scopeWithArchived(q)
-        }
-
-        if (cursor) {
-            q = q.or(buildServicesKeysetOrFilter(cursor))
-        }
-
-        const { data, error } = await q
-            .order("created_at", { ascending: false })
-            .order("id", { ascending: false })
-            .limit(fetchLimit)
-
-        if (error) throw error
-
-        const rows = data || []
+        const filterKey = options?.filters?.status || options?.filters?.tab || (options?.filters?.includeArchived ? "all" : "active")
+        const rows = await getCachedErpPage(
+            ["erp-services-page", partnerId, options?.storeId || "all-stores", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit), String(filterKey)],
+            [TAGS.services(partnerId)],
+            async () => {
+                const supabase = getAdminClient()
+                let q = supabase
+                    .from("services")
+                    .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
+                    .eq("partner_id", partnerId)
+                if (options?.storeId) q = q.eq("store_id", options.storeId)
+                if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+                    q = scopeArchivedOnly(q)
+                } else if (!options?.filters?.includeArchived) {
+                    q = scopeActiveOnly(q)
+                } else {
+                    q = scopeWithArchived(q)
+                }
+                if (cursor) q = q.or(buildServicesKeysetOrFilter(cursor))
+                const { data, error } = await q
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .limit(fetchLimit)
+                if (error) throw error
+                return data || []
+            },
+            30,
+        )
         const hasMore = rows.length > limit
         const items = hasMore ? rows.slice(0, limit) : rows
         const last = items[items.length - 1]

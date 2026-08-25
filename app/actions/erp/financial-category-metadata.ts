@@ -6,6 +6,9 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeInput } from "@/lib/input-validator"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
 
 function normalizeName(value: string) {
   return sanitizeInput(value, 150).trim().replace(/\s+/g, " ")
@@ -27,12 +30,19 @@ export async function getFinancialCategoriesAction(partnerId: string) {
     await requirePermission(partnerId, "financial", "view")
 
     // Use admin client after authz check so invited ERP users can read data.
-    const supabase = createAdminClient()
-    const { data, error } = await supabase
-      .from("financial_categories")
-      .select("id, name, parent_id, is_active, created_at, category_type, dre_group")
-      .eq("partner_id", partnerId)
-      .order("name")
+    const { data, error } = await getCachedErpPage(
+      ["erp-financial-categories", partnerId],
+      [TAGS.financialCategories(partnerId)],
+      async () => {
+        const supabase = createAdminClient()
+        return supabase
+          .from("financial_categories")
+          .select("id, name, parent_id, is_active, created_at, category_type, dre_group")
+          .eq("partner_id", partnerId)
+          .order("name")
+      },
+      60,
+    )
 
     if (error) throw error
     return { success: true, data: { categories: data || [] } }
@@ -103,6 +113,7 @@ export async function createFinancialCategoryAction(data: {
       .single()
 
     if (error) throw error
+    await safeRevalidateTag(TAGS.financialCategories(data.partnerId))
     return { success: true, data: inserted }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -167,6 +178,7 @@ export async function updateFinancialCategoryAction(
       .single()
 
     if (error) throw error
+    await safeRevalidateTag(TAGS.financialCategories(partnerId))
     return { success: true, data: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -185,6 +197,7 @@ export async function deleteFinancialCategoryAction(id: string, partnerId: strin
       .eq("partner_id", partnerId)
 
     if (error) throw error
+    await safeRevalidateTag(TAGS.financialCategories(partnerId))
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

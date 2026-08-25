@@ -13,82 +13,76 @@ import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 import { validateBrazilMobile, sanitizeInput } from "@/lib/input-validator"
 import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 
 export async function listStoresAction(partnerId: string) {
     const user = await requireUser()
     await requirePartnerAccess(partnerId)
 
-    // Escopo por store_members: dono (partners.user_id) ou role owner veem todas
-    // as lojas; membros convidados veem APENAS as lojas em que têm store_member.
-    const admin = createAdminClient()
-    const [partnerRes, puRes] = await Promise.all([
-        admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
-        admin.from("partner_users").select("id, role_id").eq("partner_id", partnerId).eq("user_id", user.id).maybeSingle(),
-    ])
+    return getCachedErpPage(
+        ["erp-stores", user.id, partnerId],
+        [TAGS.partner(partnerId), TAGS.userAccess(user.id)],
+        async () => {
+            // Escopo por store_members: dono (partners.user_id) ou role owner veem todas
+            // as lojas; membros convidados veem APENAS as lojas em que têm store_member.
+            const admin = createAdminClient()
+            const [partnerRes, puRes] = await Promise.all([
+                admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
+                admin.from("partner_users").select("id, role_id").eq("partner_id", partnerId).eq("user_id", user.id).maybeSingle(),
+            ])
 
-    const isPartnerOwner = partnerRes.data?.user_id === user.id
-    const roleId = String(puRes.data?.role_id || "").toLowerCase()
-    let allowedStoreIds: string[] | null = null
+            const isPartnerOwner = partnerRes.data?.user_id === user.id
+            const roleId = String(puRes.data?.role_id || "").toLowerCase()
+            let allowedStoreIds: string[] | null = null
 
-    if (!isPartnerOwner && roleId !== "owner") {
-        if (!puRes.data) return [] // membro sem partner_users -> sem acesso a lojas
-        const { data: members } = await admin
-            .from("store_members")
-            .select("store_id")
-            .eq("partner_user_id", puRes.data.id)
-        const memberStoreIds = (members || []).map((m: any) => m.store_id)
-        if (memberStoreIds.length === 0) return []
-        allowedStoreIds = memberStoreIds
-    }
+            if (!isPartnerOwner && roleId !== "owner") {
+                if (!puRes.data) return []
+                const { data: members } = await admin
+                    .from("store_members")
+                    .select("store_id")
+                    .eq("partner_user_id", puRes.data.id)
+                const memberStoreIds = (members || []).map((m: any) => m.store_id)
+                if (memberStoreIds.length === 0) return []
+                allowedStoreIds = memberStoreIds
+            }
 
-    const supabase = await getSupabaseServerClient()
-    let query = supabase
-        .from("stores")
-        .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
-        .eq("partner_id", partnerId)
-        .eq("is_active", true)
-        .is("suspended_at", null)
-    if (allowedStoreIds !== null) {
-        query = query.in("id", allowedStoreIds)
-    }
-    const { data, error } = await query.order("created_at", { ascending: true })
+            let query = admin
+                .from("stores")
+                .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+                .eq("partner_id", partnerId)
+                .eq("is_active", true)
+                .is("suspended_at", null)
+            if (allowedStoreIds !== null) query = query.in("id", allowedStoreIds)
+            const { data, error } = await query.order("created_at", { ascending: true })
+            if (error) throw new Error(error.message)
 
-    if (error) throw new Error(error.message)
-
-    // Merge the store's address (addresses table) onto the store row so the UI
-    // can render street/city/state/etc. directly (moved out of stores table).
-    const stores: any[] = []
-    for (const store of data || []) {
-        const { addresses, ...rest } = store
-        const addrList = Array.isArray(addresses) ? addresses : []
-        const address = addrList.find((a: any) => a.is_default) || addrList[0] || null
-
-        const merged: any = {
-            ...rest,
-            addresses: addrList,
-        }
-
-        if (address) {
-            merged.zip_code = address.zip_code ?? null
-            merged.street = address.street ?? null
-            merged.number = address.number ?? null
-            merged.complement = address.complement ?? null
-            merged.neighborhood = address.neighborhood ?? null
-            merged.city = address.city ?? null
-            merged.state = address.state ?? null
-        }
-
-        if (merged.cpf) {
-            try {
-                const { decryptCPF } = await import("@/lib/crypto")
-                merged.cpf = await decryptCPF(merged.cpf as string)
-            } catch { /* keep encrypted */ }
-        }
-
-        stores.push(merged)
-    }
-
-    return stores
+            const stores: any[] = []
+            for (const store of data || []) {
+                const { addresses, ...rest } = store
+                const addrList = Array.isArray(addresses) ? addresses : []
+                const address = addrList.find((a: any) => a.is_default) || addrList[0] || null
+                const merged: any = { ...rest, addresses: addrList }
+                if (address) {
+                    merged.zip_code = address.zip_code ?? null
+                    merged.street = address.street ?? null
+                    merged.number = address.number ?? null
+                    merged.complement = address.complement ?? null
+                    merged.neighborhood = address.neighborhood ?? null
+                    merged.city = address.city ?? null
+                    merged.state = address.state ?? null
+                }
+                if (merged.cpf) {
+                    try {
+                        const { decryptCPF } = await import("@/lib/crypto")
+                        merged.cpf = await decryptCPF(merged.cpf as string)
+                    } catch { /* keep encrypted */ }
+                }
+                stores.push(merged)
+            }
+            return stores
+        },
+        60,
+    )
 }
 
 export async function getStoreAction(storeId: string) {
@@ -217,6 +211,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
             storeName: input.name,
         })
 
+        await safeRevalidateTag(TAGS.partner(input.partnerId))
         revalidatePath("/erp/lojas")
         return { success: true, data: { id: data.id } }
     } catch (error) {
@@ -390,6 +385,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
             changes: Object.keys(updateData),
         })
 
+        await safeRevalidateTag(TAGS.partner(input.partnerId))
         revalidatePath("/erp/lojas")
         return { success: true, data: undefined }
     } catch (error) {
@@ -416,6 +412,7 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
             storeId,
         })
 
+        await safeRevalidateTag(TAGS.partner(partnerId))
         revalidatePath("/erp/lojas")
         return { success: true, data: undefined }
     } catch (error) {

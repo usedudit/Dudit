@@ -48,6 +48,11 @@ export type AuditAction =
     // Document uploads
     | "document.uploaded"
     | "document.deleted"
+    // Account deletion lifecycle
+    | "account.deletion_code_requested"
+    | "account.deletion_code_failed"
+    | "account.deletion_confirmed"
+    | "account.deletion_requested"
 
 interface AuditLogEntry {
     /** The action being logged */
@@ -89,6 +94,10 @@ const ACTION_MESSAGES: Record<string, string> = {
     "subscription.status_changed": "status da assinatura alterado.",
     "document.uploaded": "enviou um documento.",
     "document.deleted": "deletou um documento.",
+    "account.deletion_code_requested": "solicitou código de confirmação para exclusão de conta.",
+    "account.deletion_code_failed": "falha na validação do código de exclusão de conta.",
+    "account.deletion_confirmed": "confirmou a exclusão definitiva da conta.",
+    "account.deletion_requested": "iniciou o processo de exclusão de conta.",
 }
 
 // ─── Main Logger ────────────────────────────────────────────────────────────

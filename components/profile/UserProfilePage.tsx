@@ -54,15 +54,41 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     const [success, setSuccess] = useState<string | null>(null)
 
     // Account deletion states
-    const [deleteStep, setDeleteStep] = useState<"none" | "reason" | "confirm" | "success">("none")
+    const [deleteStep, setDeleteStep] = useState<"none" | "reason" | "verify_code" | "success">("none")
     const [customReason, setCustomReason] = useState("")
-    const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteCode, setDeleteCode] = useState("")
+    const [deleteMaskedEmail, setDeleteMaskedEmail] = useState("")
+    const [deleteCooldown, setDeleteCooldown] = useState(0)
+    const [deleteAttemptsRemaining, setDeleteAttemptsRemaining] = useState<number | null>(null)
+    const [deleteError, setDeleteError] = useState<string | null>(null)
+    const [isRequestingCode, setIsRequestingCode] = useState(false)
+    const [isConfirmingCode, setIsConfirmingCode] = useState(false)
     const [dryRunReport, setDryRunReport] = useState<any>(null)
     const [loadingDryRun, setLoadingDryRun] = useState(false)
     const [confirmText, setConfirmText] = useState("")
     const [activeSubModalOpen, setActiveSubModalOpen] = useState(false)
+    const deleteCooldownRef = useRef<NodeJS.Timeout | null>(null)
 
-    const handleContinueToConfirm = async () => {
+    const startDeleteCooldown = (seconds: number) => {
+        setDeleteCooldown(seconds)
+        if (deleteCooldownRef.current) clearInterval(deleteCooldownRef.current)
+        deleteCooldownRef.current = setInterval(() => {
+            setDeleteCooldown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(deleteCooldownRef.current!)
+                    deleteCooldownRef.current = null
+                    return 0
+                }
+                return prev - 1
+            })
+        }, 1000)
+    }
+
+    const handleOpenDeleteModal = async () => {
+        setDeleteStep("reason")
+        setDeleteError(null)
+        setDeleteCode("")
+        setConfirmText("")
         setLoadingDryRun(true)
         try {
             const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
@@ -71,50 +97,99 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
             const res = await getAccountDeletionDryRunAction(token)
             if (res.success && res.report) {
                 setDryRunReport(res.report)
-                setDeleteStep("confirm")
-            } else {
-                notifyError("Erro", res.error || "Não foi possível carregar o resumo da conta.")
             }
-        } catch (err) {
-            notifyError("Erro", "Erro ao carregar o resumo da conta.")
+        } catch {
+            // non-critical simulation failure
         } finally {
             setLoadingDryRun(false)
         }
     }
 
-    const handleDeleteAccount = async () => {
-        if (confirmText !== "EXCLUIR") {
-            notifyError("Erro", "Por favor, digite EXCLUIR para confirmar.")
-            return
-        }
-
-        setIsDeleting(true)
+    const handleRequestDeletionCode = async () => {
+        setIsRequestingCode(true)
+        setDeleteError(null)
         try {
             const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
             const token = await getCSRFToken()
-            const finalReason = customReason.trim() || null
-
-            const { deleteAccountAction } = await import("@/app/actions/shared/account")
-            const res = await deleteAccountAction(userId, finalReason, token)
+            const { requestAccountDeletionCodeAction } = await import("@/app/actions/shared/account")
+            const res = await requestAccountDeletionCodeAction(customReason.trim() || null, token)
 
             if (res.error) {
                 if (res.error === "active_subscription") {
                     setDeleteStep("none")
                     setActiveSubModalOpen(true)
                 } else {
-                    notifyError("Erro ao excluir", res.error)
+                    setDeleteError(res.error)
+                    notifyError("Erro ao solicitar código", res.error)
+                }
+                if (res.cooldownSeconds) {
+                    startDeleteCooldown(res.cooldownSeconds)
                 }
                 return
             }
 
-            // On success, sign out and redirect immediately
-            const supabase = createClient()
-            await supabase.auth.signOut()
-            window.location.href = "/auth/login?deleted=true"
-        } catch (e: any) {
-            notifyError("Erro", "Ocorreu um erro ao excluir a conta.")
+            if (res.success) {
+                setDeleteMaskedEmail(res.maskedEmail || "seu e-mail")
+                setDeleteStep("verify_code")
+                setDeleteCode("")
+                setConfirmText("")
+                setDeleteAttemptsRemaining(null)
+                if (res.cooldownSeconds) {
+                    startDeleteCooldown(res.cooldownSeconds)
+                }
+                notifySuccess("Código enviado", `Enviamos o código para ${res.maskedEmail || "seu e-mail"}.`)
+            }
+        } catch (err) {
+            setDeleteError("Ocorreu um erro ao enviar o código de confirmação.")
+            notifyError("Erro", "Ocorreu um erro ao enviar o código de confirmação.")
         } finally {
-            setIsDeleting(false)
+            setIsRequestingCode(false)
+        }
+    }
+
+    const handleConfirmDeletion = async () => {
+        if (deleteCode.trim().length !== 6) {
+            setDeleteError("Digite o código de 6 dígitos recebido por e-mail.")
+            return
+        }
+
+        if (confirmText !== "EXCLUIR") {
+            setDeleteError("Digite EXCLUIR para confirmar.")
+            return
+        }
+
+        setIsConfirmingCode(true)
+        setDeleteError(null)
+        try {
+            const { getCSRFToken } = await import("@/lib/utils/fetch-with-csrf")
+            const token = await getCSRFToken()
+            const { confirmAccountDeletionAction } = await import("@/app/actions/shared/account")
+            const res = await confirmAccountDeletionAction({
+                code: deleteCode.trim(),
+                reason: customReason.trim() || null,
+                csrf_token: token,
+            })
+
+            if (res.error) {
+                setDeleteError(res.error)
+                if (res.remainingAttempts !== undefined) {
+                    setDeleteAttemptsRemaining(res.remainingAttempts)
+                }
+                notifyError("Erro na confirmação", res.error)
+                return
+            }
+
+            if (res.success) {
+                setDeleteStep("success")
+                const supabase = createClient()
+                await supabase.auth.signOut()
+                window.location.href = "/auth/login?deleted=true"
+            }
+        } catch (err) {
+            setDeleteError("Ocorreu um erro ao confirmar a exclusão.")
+            notifyError("Erro", "Ocorreu um erro ao confirmar a exclusão.")
+        } finally {
+            setIsConfirmingCode(false)
         }
     }
     const [userAddresses, setUserAddresses] = useState<any[]>(initialAddresses || [])
@@ -179,6 +254,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
     useEffect(() => () => {
         if (timerRef.current) clearInterval(timerRef.current)
         if (secTimerRef.current) clearInterval(secTimerRef.current)
+        if (deleteCooldownRef.current) clearInterval(deleteCooldownRef.current)
     }, [])
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -460,7 +536,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 handleChangePassword={handleChangePassword}
                                 handleSavePhone={handleSavePhone}
                                 clearMessages={clearMessages}
-                                onDeleteClick={() => setDeleteStep("reason")}
+                                onDeleteClick={handleOpenDeleteModal}
                             />
                         )}
                         {currentView === "avaliacoes" && <ReviewsView key="avaliacoes" navigate={navigate} />}
@@ -474,75 +550,84 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
             <DefaultModal
                 isOpen={deleteStep !== "none" && deleteStep !== "success"}
                 onClose={() => {
-                    if (!isDeleting) {
+                    if (!isRequestingCode && !isConfirmingCode) {
                         setDeleteStep("none")
                         setCustomReason("")
+                        setDeleteError(null)
                     }
                 }}
-                title={deleteStep === "confirm" ? "Confirmar encerramento da conta" : "O que fez você decidir encerrar sua conta?"}
+                title={deleteStep === "verify_code" ? "Confirmação por E-mail" : "Encerramento de Conta"}
                 footer={
-                    <>
-                        <Button
-                            variant="outline"
-                            onClick={() => setDeleteStep("none")}
-                            disabled={isDeleting}
-                            className="flex-1 h-12"
-                        >
-                            Continuar com minha conta
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDeleteAccount}
-                            disabled={isDeleting || confirmText !== "EXCLUIR"}
-                            className="flex-1 h-12 bg-red-600"
-                        >
-                            {isDeleting ? "Excluindo..." : "Confirmar exclusão da conta"}
-                        </Button>
-                    </>
+                    deleteStep === "verify_code" ? (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setDeleteStep("reason")
+                                    setDeleteError(null)
+                                }}
+                                disabled={isConfirmingCode}
+                                className="flex-1 h-12"
+                            >
+                                Voltar
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleConfirmDeletion}
+                                disabled={isConfirmingCode || deleteCode.length !== 6 || confirmText !== "EXCLUIR"}
+                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 font-bold"
+                            >
+                                {isConfirmingCode ? "Excluindo conta..." : "Excluir conta definitivamente"}
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button
+                                variant="outline"
+                                onClick={() => setDeleteStep("none")}
+                                disabled={isRequestingCode || loadingDryRun}
+                                className="flex-1 h-12"
+                            >
+                                Continuar com minha conta
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleRequestDeletionCode}
+                                disabled={isRequestingCode || loadingDryRun}
+                                className="flex-1 h-12 bg-red-600 hover:bg-red-700 font-bold"
+                            >
+                                {isRequestingCode ? "Enviando código..." : "Enviar código de confirmação"}
+                            </Button>
+                        </>
+                    )
                 }
             >
                 {deleteStep === "reason" && (
-                    <div className="space-y-6 pt-2 pb-4">
-                        <p className="text-sm text-brand-dark dark:text-dark-body">
-                            Antes de continuar, queremos apenas garantir que você saiba exatamente o que acontecerá. Ao confirmar, iniciaremos o processo de encerramento da sua conta. Durante as próximas 48 horas você poderá cancelar essa decisão. Depois desse período, a exclusão será definitiva e não poderá ser revertida.
-                        </p>
+                    <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <InfoCard
+                            title="Ação permanente"
+                            message="Ao solicitar a exclusão, enviaremos um código de 6 dígitos para seu e-mail cadastrado para validação de segurança."
+                            color="red"
+                        />
+
+                        {deleteError && (
+                            <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl text-xs font-semibold text-red-700 dark:text-red-400">
+                                {deleteError}
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <FormTextarea
-                                label="Sua resposta (opcional)"
+                                label="O que fez você decidir encerrar sua conta? (opcional)"
                                 placeholder="Seu feedback ajuda a melhorar a Dudit."
                                 value={customReason}
                                 onChange={(e: any) => setCustomReason(e.target.value)}
                                 maxLength={500}
                                 showCharacterCount
                                 name="observacoes"
-                                className="min-h-[120px]"
+                                className="min-h-[100px]"
                             />
                         </div>
-
-                        <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-brand-border dark:border-dark-border">
-                            <Button
-                                variant="outline"
-                                onClick={() => setDeleteStep("none")}
-                                disabled={loadingDryRun}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                variant="default"
-                                onClick={handleContinueToConfirm}
-                                disabled={loadingDryRun}
-                                className="bg-brand-green text-white hover:bg-brand-green/90"
-                            >
-                                {loadingDryRun ? "Carregando..." : "Continuar"}
-                            </Button>
-                        </div>
-                    </div>
-                )}
-
-                {deleteStep === "confirm" && (
-                    <div className="space-y-6 pt-2 pb-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
-                        <InfoCard title="Essa decisão é sua." message="Ao confirmar, sua assinatura será cancelada e iniciaremos o encerramento da sua conta." color="red" />
 
                         {/* SUA CONTA HOJE */}
                         {dryRunReport && (
@@ -710,19 +795,74 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 </li>
                             </ul>
                         </div>
+                    </div>
+                )}
 
-                        {/* CONFIRMAÇÃO POR ESCRITO */}
-                        <div className="py-4 border-t border-brand-border dark:border-dark-border text-center space-y-3">
-                            <p className="text-xs font-bold text-brand-red">
-                                Atenção: Esta ação é definitiva e removerá todos os seus dados.
-                            </p>
+                {deleteStep === "verify_code" && (
+                    <div className="space-y-5 pt-2 pb-4">
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-start gap-3">
+                            <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                            <div className="space-y-1 text-xs text-emerald-900 dark:text-emerald-200">
+                                <p className="font-bold text-emerald-950 dark:text-emerald-100">
+                                    Código enviado por e-mail
+                                </p>
+                                <p>
+                                    Enviamos um código numérico de 6 dígitos para <strong>{deleteMaskedEmail}</strong>. O código expira em 15 minutos.
+                                </p>
+                            </div>
+                        </div>
+
+                        {deleteError && (
+                            <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl text-xs font-semibold text-red-700 dark:text-red-400 space-y-1">
+                                <p>{deleteError}</p>
+                                {deleteAttemptsRemaining !== null && deleteAttemptsRemaining > 0 && (
+                                    <p className="text-[11px] opacity-90">Tentativas restantes: {deleteAttemptsRemaining}</p>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">
+                                Código de Confirmação (6 dígitos) *
+                            </label>
+                            <Input
+                                value={deleteCode}
+                                onChange={(e) => setDeleteCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                placeholder="000000"
+                                maxLength={6}
+                                autoFocus
+                                className="text-center font-mono text-2xl tracking-[0.4em] font-extrabold h-14"
+                            />
+                            <div className="flex items-center justify-between text-xs pt-1">
+                                <span className="text-brand-inactive-text dark:text-dark-body">
+                                    Não recebeu o e-mail?
+                                </span>
+                                {deleteCooldown > 0 ? (
+                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                                        Reenviar em {deleteCooldown}s
+                                    </span>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleRequestDeletionCode}
+                                        disabled={isRequestingCode}
+                                        className="font-bold text-brand-green hover:underline cursor-pointer disabled:opacity-50"
+                                    >
+                                        {isRequestingCode ? "Reenviando..." : "Reenviar novo código"}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-2">
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar.
+                                Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar a ação irreversível:
                             </p>
                             <Input
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
                                 placeholder="EXCLUIR"
+                                className="text-center font-bold"
                             />
                         </div>
                     </div>

@@ -13,6 +13,8 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidateStockMovements } from "@/lib/utils/revalidation"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export async function searchProductsForMovement(query: string, storeId?: string | null) {
     if (!query || query.trim().length < 2) return []
@@ -599,46 +601,34 @@ export async function getERPStockMovementsPageAction(
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
         await requirePermission(partnerId, "stock_movements", "view")
-        const supabase = createAdminClient()
         const cursor = options?.cursor ?? null
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_STOCK_MOVEMENTS_PAGE_SIZE))))
         const fetchLimit = limit + 1
-
-        let q = supabase
-            .from("stock_movements")
-            .select(`
-                id,
-                created_at,
-                movement_type,
-                order_id,
-                reference_type,
-                reference_name,
-                reason,
-                notes,
-                created_by,
-                store_id,
-                orders(order_number),
-                stock_movement_items(quantity, products(name, sku))
-            `)
-            .eq("partner_id", partnerId)
-
         const storeId = options?.storeId
-        if (storeId) {
-            q = q.eq("store_id", storeId)
-        }
-
-        if (cursor) {
-            q = q.or(buildStockMovementKeysetOrFilter(cursor))
-        }
-
-        const { data, error } = await q
-            .order("created_at", { ascending: false })
-            .order("id", { ascending: false })
-            .limit(fetchLimit)
-
-        if (error) throw error
-
-        const rows = data || []
+        const rows = await getCachedErpPage(
+            ["erp-stock-movements-page", partnerId, storeId || "all-stores", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
+            [TAGS.stockMovements(partnerId)],
+            async () => {
+                const supabase = createAdminClient()
+                let q = supabase
+                    .from("stock_movements")
+                    .select(`
+                        id, created_at, movement_type, order_id, reference_type,
+                        reference_name, reason, notes, created_by, store_id,
+                        orders(order_number), stock_movement_items(quantity, products(name, sku))
+                    `)
+                    .eq("partner_id", partnerId)
+                if (storeId) q = q.eq("store_id", storeId)
+                if (cursor) q = q.or(buildStockMovementKeysetOrFilter(cursor))
+                const { data, error } = await q
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .limit(fetchLimit)
+                if (error) throw error
+                return data || []
+            },
+            30,
+        )
         const hasMore = rows.length > limit
         const items = hasMore ? rows.slice(0, limit) : rows
         const last = items[items.length - 1]

@@ -122,6 +122,18 @@ function getSupplierConflict(item: any) {
     return (item.conflicts || []).find((c: any) => c.campo === "fornecedor_diferente")
 }
 
+function getFinanceStatusBadge(t: any): { label: string; variant: "green" | "orange" | "red" | "gray" | "blue" } {
+    if (t.transaction_type === "refund") {
+        if (t.status === "paid") return { label: "Estornado", variant: "green" }
+        if (t.status === "cancelled") return { label: "Cancelado", variant: "gray" }
+        return { label: "Estorno Pendente", variant: "blue" }
+    }
+    if (t.status === "paid") return { label: "Pago", variant: "green" }
+    if (t.status === "cancelled") return { label: "Cancelado", variant: "gray" }
+    if (t.status === "overdue" || t.status === "atrasado") return { label: "Atrasado", variant: "red" }
+    return { label: "Pendente", variant: "orange" }
+}
+
 interface ImportItemRowProps {
     item: any
     d: any
@@ -1579,19 +1591,22 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body my-2">Contas a Pagar</span>
                                                                         <div className="space-y-1">
-                                                                            {financeData.map((t: any, i: number) => (
-                                                                                <div key={i} className="flex items-center justify-between text-xs">
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                                                        <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                                                            {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                                                                        </Badge>
+                                                                            {financeData.map((t: any, i: number) => {
+                                                                                const badge = getFinanceStatusBadge(t)
+                                                                                return (
+                                                                                    <div key={i} className="flex items-center justify-between text-xs">
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                                                            <Badge variant={badge.variant}>
+                                                                                                {badge.label}
+                                                                                            </Badge>
+                                                                                        </div>
+                                                                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
                                                                                     </div>
-                                                                                    <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
-                                                                                </div>
-                                                                            ))}
+                                                                                )
+                                                                            })}
                                                                         </div>
                                                                     </>
                                                                 )}
@@ -1600,7 +1615,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                         {/* Stock movements for completed/reversed imports */}
                                                         {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Movimentações de Estoque</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body my-2">Movimentações de Estoque</span>
                                                                 <div className="space-y-1">
                                                                     {stockData.map((m: any, i: number) => (
                                                                         <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
@@ -1632,6 +1647,22 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                     </div>
                 </Tabs>
             </div>
+
+            {!isPreview && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
+                    <Button variant="outline" className="flex-1 h-12" onClick={onBack}>
+                        <ChevronLeftIcon className="w-4 h-4" /> Voltar
+                    </Button>
+                    <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadXml} disabled={isDownloadingXml}>
+                        <FileIcon className="w-4 h-4" /> {isDownloadingXml ? "..." : "XML"}
+                    </Button>
+                    {isCompleted && !isReversed && (
+                        <Button variant="outlinered" className="flex-1 h-12" onClick={() => setShowRevertModal(true)}>
+                            <ReloadIcon className="w-4 h-4" /> Desfazer
+                        </Button>
+                    )}
+                </div>
+            )}
 
             {isPreview && (
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
@@ -1775,17 +1806,20 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 <>
                                     <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Contas a Pagar</span>
                                     <div className="space-y-1">
-                                        {financeData.map((t: any, i: number) => (
-                                            <div key={i} className="flex items-center justify-between text-xs">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                    <Badge variant={t.status === "paid" ? "green" : t.status === "cancelled" ? "gray" : "orange"}>
-                                                        {t.status === "paid" ? "Pago" : t.status === "cancelled" ? "Cancelado" : "Pendente"}
-                                                    </Badge>
+                                        {financeData.map((t: any, i: number) => {
+                                            const badge = getFinanceStatusBadge(t)
+                                            return (
+                                                <div key={i} className="flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                        <Badge variant={badge.variant}>
+                                                            {badge.label}
+                                                        </Badge>
+                                                    </div>
+                                                    <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
                                                 </div>
-                                                <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </>
                             )}

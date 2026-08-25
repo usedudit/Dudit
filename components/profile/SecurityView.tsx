@@ -193,7 +193,7 @@ export const SecurityView = ({
                                 Encerrar minha conta definitivamente
                             </span>
                             <span className="block text-xs text-brand-inactive-text dark:text-dark-body">
-                                Ao excluir sua conta, você perderá o acesso à plataforma e todos os dados associados serão apagados permanentemente após o prazo de carência de 48 horas.
+                                Ao solicitar a exclusão, enviaremos um código de confirmação para o seu e-mail para validar a remoção definitiva da conta e de todos os dados associados.
                             </span>
                         </div>
                         <Button

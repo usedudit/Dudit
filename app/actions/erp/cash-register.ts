@@ -9,6 +9,8 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { sanitizeNotes } from "@/lib/input-validator"
 import { revalidateEntityTimeline } from "@/lib/utils/revalidation"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import { revalidatePath } from "next/cache"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
@@ -1115,30 +1117,29 @@ export async function getCashSessionsHistoryPageAction(
 ) {
   await requirePermission(partnerId, "pdv", "view")
   // Read with admin client after authz so invited users can load history.
-  const supabase = createAdminClient()
-
   const cursor = options?.cursor ?? null
   const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CASH_SESSIONS_PAGE_SIZE))))
   const fetchLimit = limit + 1
-
-  let q = supabase
-    .from("cash_sessions")
-    .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
-    .eq("partner_id", partnerId)
-
   const storeId = options?.storeId
-  if (storeId) {
-    q = q.eq("store_id", storeId)
-  }
-
-  if (cursor) q = q.or(buildCashSessionsKeysetOrFilter(cursor))
-
-  const { data: sessions, error: sessionError } = await q
-    .order("opened_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(fetchLimit)
+  const { data: sessions, error: sessionError } = await getCachedErpPage(
+    ["erp-cash-sessions-page", partnerId, storeId || "all-stores", cursor ? `${cursor.openedAt}:${cursor.id}` : "first", String(limit)],
+    [TAGS.cashSessions(partnerId)],
+    async () => {
+      const cachedSupabase = createAdminClient()
+      let q = cachedSupabase
+        .from("cash_sessions")
+        .select("id, opened_by_user_id, closed_by_user_id, opened_at, closed_at, initial_amount, closing_amount, calculated_amount, difference_amount, status, notes, created_at")
+        .eq("partner_id", partnerId)
+      if (storeId) q = q.eq("store_id", storeId)
+      if (cursor) q = q.or(buildCashSessionsKeysetOrFilter(cursor))
+      return q.order("opened_at", { ascending: false }).order("id", { ascending: false }).limit(fetchLimit)
+    },
+    15,
+  )
 
   if (sessionError) return { success: false as const, error: sessionError.message }
+
+  const supabase = createAdminClient()
 
   const rows = sessions || []
   const hasMore = rows.length > limit

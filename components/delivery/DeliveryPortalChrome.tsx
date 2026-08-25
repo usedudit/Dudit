@@ -250,7 +250,7 @@ export function DeliveryPortalHeader({
                                 <div className="border-b border-brand-border dark:border-dark-border">
                                     <div className="px-1 py-2.5 flex items-center justify-between">
                                         <span className="flex items-center gap-3">
-                                            <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                            <TruckIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
                                             <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Disponível</span>
                                         </span>
                                         <Switch checked={isOnline} onCheckedChange={handleToggleAvailability} disabled={isTogglingAvailability} />
@@ -302,87 +302,74 @@ export function DeliveryPortalHeader({
             </div>
 
             <BottomSheet isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)}>
-                <div className="flex flex-col py-1">
-                    <div className="flex items-center space-x-4 mb-6 px-2 mt-4">
+                <div className="pt-3 px-3 py-3">
+                    <div className="flex items-center space-x-3 pb-4 border-b border-brand-border dark:border-dark-border">
                         <div
-                            className={`w-14 h-14 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-xl border border-brand-border dark:border-dark-border shadow-md`}
+                            className={`w-10 h-10 rounded-full ${avatarColor || getAvatarColor(userName)} flex items-center justify-center text-white font-bold text-sm border border-brand-border dark:border-dark-border`}
                         >
                             {userInitials || getUserInitials(userName)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                                <p className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">
+                                <p className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                                     {userName}
                                 </p>
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-brand-green text-white whitespace-nowrap">
-                                    ENTREGADOR
-                                </span>
                             </div>
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body truncate">{userEmail}</p>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">{userEmail}</p>
                         </div>
                         <div className="shrink-0" onClick={() => setIsProfileOpen(false)}>
                             <NotificationBell variant="erp" />
                         </div>
                     </div>
 
-                    <nav className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
-                            <div className="flex items-center gap-3">
-                                <MoonIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Modo escuro</span>
-                            </div>
-                            <button
-                                onClick={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${theme === "dark" ? "bg-brand-green" : "bg-gray-300 dark:bg-dark-border"
-                                    }`}
-                            >
-                                <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${theme === "dark" ? "translate-x-5" : "translate-x-1"
-                                        }`}
-                                />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 dark:bg-dark-border/30 border border-transparent hover:border-brand-border/30 dark:hover:border-dark-border/50 transition-all">
-                            <div className="flex items-center gap-3">
-                                <span className={`w-5 h-5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-gray-300 dark:bg-dark-border"}`} />
-                                <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Disponível</span>
-                            </div>
+                    <div className="border-b border-brand-border dark:border-dark-border">
+                        <div className="px-1 py-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-3">
+                                <TruckIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Disponível</span>
+                            </span>
                             <Switch checked={isOnline} onCheckedChange={handleToggleAvailability} disabled={isTogglingAvailability} />
                         </div>
+                    </div>
 
-                        <Link
-                            href="/perfil"
-                            onClick={() => setIsProfileOpen(false)}
-                            prefetch={false}
-                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
-                        >
-                            <UserIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Meu perfil</span>
-                        </Link>
+                    <div className="border-b border-brand-border dark:border-dark-border">
+                        <div className="px-1 py-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-3">
+                                <MoonIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" />
+                                <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Modo escuro</span>
+                            </span>
+                            <Switch checked={theme === "dark"} onCheckedChange={() => handleThemeButtonClick(theme === "dark" ? "light" : "dark")} />
+                        </div>
+                    </div>
 
-                        <Link
-                            href="/ajuda"
-                            onClick={() => setIsProfileOpen(false)}
-                            prefetch={false}
-                            className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-all w-full text-left"
-                        >
-                            <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                            <span className="text-[16px] font-medium text-brand-dark dark:text-dark-heading">Central de ajuda</span>
-                        </Link>
+                    <div className="pt-2">
+                        {([
+                            { label: "Meu Perfil", href: "/perfil", icon: <UserIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                            { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
+                            { label: "Sair da sessão", className: "brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                        ] as any[]).map((item, idx) => {
+                            const ItemWrapper: any = item.href ? Link : "div";
+                            const wrapProps = item.href
+                                ? { href: item.href, prefetch: false }
+                                : { onClick: item.onClick };
 
-                        <div className="h-px bg-brand-border dark:bg-dark-border my-2 mx-2 opacity-50" />
-
-                        <button
-                            onClick={handleSignOut}
-                            className="flex items-center gap-4 p-4 rounded-2xl bg-red-50/50 dark:bg-red-900/10 text-brand-red w-full text-left transition-all hover:bg-red-50 dark:hover:bg-red-900/20"
-                        >
-                            <div className="w-5 h-5 bg-red-500 rounded flex items-center justify-center shadow-sm">
-                                <LogoutIcon className="w-3.5 h-3.5 text-white" />
-                            </div>
-                            <span className="text-[16px] font-bold">Sair da sessão</span>
-                        </button>
-                    </nav>
+                            return (
+                                <ItemWrapper
+                                    key={idx}
+                                    {...wrapProps}
+                                    className="px-1 py-2.5 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors block w-full text-left"
+                                    onClick={() => {
+                                        if (wrapProps.onClick) wrapProps.onClick();
+                                    }}
+                                >
+                                    <span className="flex items-center gap-3">
+                                        {item.icon}
+                                        <span className={`text-[14px] font-normal ${item.className ? `text-${item.className}` : "text-brand-inactive-text dark:text-dark-body"}`}>{item.label}</span>
+                                    </span>
+                                </ItemWrapper>
+                            )
+                        })}
+                    </div>
                 </div>
             </BottomSheet>
 

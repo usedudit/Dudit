@@ -141,15 +141,15 @@ export async function submitFeedbackAction(
   let partnerName: string | null = null
 
   try {
-    const [{ data: profile }, partnerRes] = await Promise.all([
+    const [{ data: profile }, storeRes] = await Promise.all([
       admin.from("user_profiles").select("full_name").eq("user_id", user.id).maybeSingle(),
       sanitizedPartnerId
-        ? admin.from("partners").select("store_name").eq("id", sanitizedPartnerId).maybeSingle()
+        ? admin.from("stores").select("name").eq("partner_id", sanitizedPartnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
     ])
 
     if (profile?.full_name) userName = profile.full_name
-    if (partnerRes?.data?.store_name) partnerName = partnerRes.data.store_name
+    if (storeRes?.data?.name) partnerName = storeRes.data.name
   } catch {
     // Non-critical, fallback to defaults
   }
@@ -237,12 +237,21 @@ export async function checkERPOnboardingFeedbackPromptAction(partnerId: string):
 
     const admin = getAdminClient()
 
-    // 1. Check partner creation date and user access
-    const { data: partner } = await admin
-      .from("partners")
-      .select("id, store_name, created_at")
-      .eq("id", sanitizedPartnerId)
-      .maybeSingle()
+    // 1. Check partner creation date and store name
+    const [{ data: partner }, { data: store }] = await Promise.all([
+      admin
+        .from("partners")
+        .select("id, created_at")
+        .eq("id", sanitizedPartnerId)
+        .maybeSingle(),
+      admin
+        .from("stores")
+        .select("name")
+        .eq("partner_id", sanitizedPartnerId)
+        .order("is_headquarters", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ])
 
     if (!partner?.created_at) return { shouldShow: false }
 
@@ -270,7 +279,7 @@ export async function checkERPOnboardingFeedbackPromptAction(partnerId: string):
 
     return {
       shouldShow: true,
-      partnerName: partner.store_name,
+      partnerName: store?.name || "Loja",
       daysSinceCreation: Math.floor(diffDays),
     }
   } catch (err) {

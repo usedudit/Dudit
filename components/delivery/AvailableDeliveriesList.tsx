@@ -115,16 +115,23 @@ export default function AvailableDeliveriesList() {
         try {
             const res = await listAvailableDeliveryOffersAction({ limit: 50 })
             if (res.success) {
-                const incoming = res.items || []
+                const FIFTEEN_MINUTES_MS = 15 * 60 * 1000
+                const now = Date.now()
+                const incoming = (res.items || []).filter((item) => {
+                    if (!item.assigned_at) return true
+                    const diff = now - new Date(item.assigned_at).getTime()
+                    return diff >= 0 && diff <= FIFTEEN_MINUTES_MS
+                })
+
                 // Se for refresh e chegaram novos IDs, toca som de notificação
                 if (isRefresh && knownOfferIdsRef.current.size > 0) {
-                    const hasNew = incoming.some((item) => !knownOfferIdsRef.current.has(item.id))
+                    const hasNew = incoming.some((item) => !knownOfferIdsRef.current.has(item.assignment_id || item.id))
                     if (hasNew) {
                         playNewOfferSound()
                         toast.info("Nova entrega disponível na sua região!")
                     }
                 }
-                knownOfferIdsRef.current = new Set(incoming.map((item) => item.id))
+                knownOfferIdsRef.current = new Set(incoming.map((item) => item.assignment_id || item.id))
                 setOffers(incoming)
             } else {
                 toast.error(res.error || "Não foi possível carregar entregas disponíveis.")
@@ -421,10 +428,10 @@ export default function AvailableDeliveriesList() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                     {paginatedOffers.map((offer) => (
                                         <AvailableDeliveryGridCard
-                                            key={offer.assignment_id}
+                                            key={offer.assignment_id || (offer as any).id}
                                             offer={offer}
                                             onAccept={handleAccept}
-                                            isAccepting={acceptingId === offer.assignment_id}
+                                            isAccepting={acceptingId === (offer.assignment_id || (offer as any).id)}
                                         />
                                     ))}
                                 </div>
@@ -484,10 +491,10 @@ export default function AvailableDeliveriesList() {
                                             <tbody>
                                                 {paginatedOffers.map((offer) => (
                                                     <AvailableDeliveryListRow
-                                                        key={offer.assignment_id}
+                                                        key={offer.assignment_id || (offer as any).id}
                                                         offer={offer}
                                                         onAccept={handleAccept}
-                                                        isAccepting={acceptingId === offer.assignment_id}
+                                                        isAccepting={acceptingId === (offer.assignment_id || (offer as any).id)}
                                                     />
                                                 ))}
                                             </tbody>

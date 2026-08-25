@@ -38,6 +38,8 @@ export enum RateLimitCategory {
   ADMIN_READ = "ADMIN_READ",
   PARTNER_REGISTER = "PARTNER_REGISTER",
   ACCOUNT_DELETE = "ACCOUNT_DELETE",
+  ACCOUNT_DELETE_REQUEST = "ACCOUNT_DELETE_REQUEST",
+  ACCOUNT_DELETE_VERIFY = "ACCOUNT_DELETE_VERIFY",
   CART = "CART",
   ERP_GENERAL = "ERP_GENERAL",
   INVITE_CREATE = "INVITE_CREATE",
@@ -224,6 +226,18 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
   [RateLimitCategory.ACCOUNT_DELETE]: {
     maxRequests: 3,
     window: "1 h",
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: true,
+  },
+  [RateLimitCategory.ACCOUNT_DELETE_REQUEST]: {
+    maxRequests: 3,
+    window: "1 h",
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: true,
+  },
+  [RateLimitCategory.ACCOUNT_DELETE_VERIFY]: {
+    maxRequests: 5,
+    window: "15 m",
     identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: true,
   },

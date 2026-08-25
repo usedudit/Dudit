@@ -19,6 +19,8 @@ import { validateCPF, validateCNPJ, validateEmail, validateBrazilMobile, validat
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
 import { checkLimit } from "@/lib/services/subscription.service"
 import { requireAuthorizedCustomerContext, requireAuthorizedCustomerRecord } from "@/lib/services/authorized-customer-access"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 async function prepareEncryptedCpf(
   supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
@@ -563,20 +565,25 @@ export async function updateComprehensiveCustomerAction(data: {
 export async function getCustomerByIdAction(customerId: string) {
   const customerAccess = await requireAuthorizedCustomerContext(undefined, "view")
   const authorizedPartner = { partnerId: customerAccess.partnerId }
-  const supabase = customerAccess.admin
-
-  const { data: customer, error: customerError } = await supabase
-    .from("customers")
-    .select(`
-      id, partner_id, name, email, phone, phone_fixed, status, person_type,
-      cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
-      store_credit, notes, birth_date, mother_name, father_name, website,
-      created_at, user_id, marketplace_user_id, image_url,
-      addresses!customer_id(address_type, zip_code, street, number, complement, neighborhood, city, state, country, is_default)
-    `)
-    .eq("id", customerId)
-    .eq("partner_id", authorizedPartner.partnerId)
-    .maybeSingle()
+  const { data: customer, error: customerError } = await getCachedErpPage(
+    ["erp-customer-detail", authorizedPartner.partnerId, customerId],
+    [TAGS.customers(authorizedPartner.partnerId), TAGS.orders(authorizedPartner.partnerId)],
+    async () => {
+      const detailClient = createAdminClient()
+      return detailClient
+        .from("customers")
+        .select(`
+          id, partner_id, name, email, phone, phone_fixed, status, person_type,
+          cpf, cnpj, nome_fantasia, inscricao_estadual, contribuinte,
+          store_credit, notes, birth_date, mother_name, father_name, website,
+          created_at, user_id, marketplace_user_id, image_url,
+          addresses!customer_id(address_type, zip_code, street, number, complement, neighborhood, city, state, country, is_default)
+        `)
+        .eq("id", customerId)
+        .eq("partner_id", authorizedPartner.partnerId)
+        .maybeSingle()
+    },
+  )
 
   if (customerError) {
     console.error("[getCustomerByIdAction] Customer lookup error:", customerError)
@@ -820,8 +827,8 @@ export async function getCustomerOrdersAction(customerId: string) {
 export async function getPartnerCustomersAction(partnerId: string, currentStoreId?: string | null) {
   try {
     const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
-    const supabase = customerAccess.admin
     partnerId = customerAccess.partnerId
+    const supabase = customerAccess.admin
 
     let q = supabase
       .from("customers")
@@ -1003,79 +1010,93 @@ export async function getERPCustomersPageAction(
     if (customerAccess.roleId === "delivery") {
       return { success: false, error: "Sem permissão para acessar a listagem de clientes." }
     }
-    const supabase = customerAccess.admin
     partnerId = customerAccess.partnerId
 
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_CUSTOMERS_PAGE_SIZE))))
     const fetchLimit = limit + 1
 
-    let q = supabase
-      .from("customers")
-      .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, person_type, birth_date, user_id, image_url")
-      .eq("partner_id", partnerId)
+    const filterKey = options?.filters?.status || options?.filters?.tab || (options?.filters?.includeArchived ? "all" : "active")
+    const page = await getCachedErpPage(
+      [
+        "erp-customers-page",
+        partnerId,
+        options?.storeId || "all-stores",
+        cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+        String(limit),
+        String(filterKey),
+      ],
+      [TAGS.customers(partnerId)],
+      async () => {
+        const supabase = createAdminClient()
+        let q = supabase
+          .from("customers")
+          .select("id, partner_id, name, email, phone, phone_fixed, status, is_active, store_credit, created_at, person_type, birth_date, user_id, image_url")
+          .eq("partner_id", partnerId)
 
-    if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
-      q = scopeArchivedOnly(q)
-    } else if (!options?.filters?.includeArchived) {
-      q = scopeActiveOnly(q)
-    } else {
-      q = scopeWithArchived(q)
-    }
+        if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+          q = scopeArchivedOnly(q)
+        } else if (!options?.filters?.includeArchived) {
+          q = scopeActiveOnly(q)
+        } else {
+          q = scopeWithArchived(q)
+        }
 
-    if (cursor) {
-      q = q.or(buildCustomersKeysetOrFilter(cursor))
-    }
+        if (cursor) q = q.or(buildCustomersKeysetOrFilter(cursor))
 
-    const { data, error } = await q
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(fetchLimit)
+        const { data, error } = await q
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(fetchLimit)
 
-    if (error) throw error
+        if (error) throw error
 
-    const rows = data || []
-    const hasMore = rows.length > limit
-    const items: any[] = hasMore ? rows.slice(0, limit) : rows
+        const rows = data || []
+        const hasMore = rows.length > limit
+        const items: any[] = hasMore ? rows.slice(0, limit) : rows
+
+        // Aggregate order stats only for the visible page, then cache the
+        // result together with the list so revisiting the route is one hit.
+        const customerIds = items.map((c: any) => c.id).filter(Boolean)
+        if (customerIds.length > 0) {
+          const { data: orderAgg } = await supabase
+            .from("orders")
+            .select("buyer_id, customer_id, total_amount, created_at")
+            .eq("partner_id", partnerId)
+            .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
+            .neq("situation", "cancelled")
+
+          if (orderAgg) {
+            const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
+            for (const o of orderAgg) {
+              const key = customerIds.includes(o.customer_id) ? o.customer_id : o.buyer_id
+              if (!key) continue
+              const prev = statsMap.get(key) || { orders_count: 0, total_spent: 0, last_order_at: null }
+              prev.orders_count++
+              prev.total_spent += Number(o.total_amount) || 0
+              if (o.created_at && (!prev.last_order_at || o.created_at > prev.last_order_at)) prev.last_order_at = o.created_at
+              statsMap.set(key, prev)
+            }
+            for (const item of items) {
+              const stats = statsMap.get(item.id)
+              item.orders_count = stats?.orders_count || 0
+              item.total_spent = stats?.total_spent || 0
+              item.last_order_at = stats?.last_order_at || null
+            }
+          }
+        }
+
+        return { items, hasMore }
+      },
+    )
+
+    const hasMore = page.hasMore
+    const items: any[] = page.items
 
     if (customerAccess.roleId === "operator") {
       for (const item of items) {
         delete item.birth_date
         delete item.user_id
-      }
-    }
-
-    // Aggregate order stats for this page of customers (by buyer_id OR customer_id)
-    const customerIds = items.map((c: any) => c.id).filter(Boolean)
-    if (customerIds.length > 0) {
-      const { data: orderAgg } = await supabase
-        .from("orders")
-        .select("buyer_id, customer_id, total_amount, created_at")
-        .eq("partner_id", partnerId)
-        .or(`buyer_id.in.(${customerIds.join(",")}),customer_id.in.(${customerIds.join(",")})`)
-        .neq("situation", "cancelled")
-
-      if (orderAgg) {
-        const statsMap = new Map<string, { orders_count: number; total_spent: number; last_order_at: string | null }>()
-        for (const o of orderAgg) {
-          // Prefer the canonical ERP customer id when both fields happen to
-          // match an id in the current page.
-          const key = customerIds.includes(o.customer_id) ? o.customer_id : o.buyer_id
-          if (!key) continue
-          const prev = statsMap.get(key) || { orders_count: 0, total_spent: 0, last_order_at: null }
-          prev.orders_count++
-          prev.total_spent += Number(o.total_amount) || 0
-          if (o.created_at && (!prev.last_order_at || o.created_at > prev.last_order_at)) {
-            prev.last_order_at = o.created_at
-          }
-          statsMap.set(key, prev)
-        }
-        for (const item of items) {
-          const stats = statsMap.get(item.id)
-          item.orders_count = stats?.orders_count || 0
-          item.total_spent = stats?.total_spent || 0
-          item.last_order_at = stats?.last_order_at || null
-        }
       }
     }
 

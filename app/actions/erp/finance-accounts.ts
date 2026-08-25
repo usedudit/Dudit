@@ -8,6 +8,9 @@ import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { createManualTransactionAction } from "@/app/actions/erp/transactions"
 import { startOfDay } from "@/lib/date"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
 
 import { 
   type FinanceAccountType, 
@@ -82,23 +85,22 @@ export async function getFinanceAccountsAction(partnerId: string, storeId?: stri
     await requirePermission(partnerId, "financial", "view")
 
     // Use admin client after authz check so invited ERP users can read accounts.
-    const supabase = createAdminClient()
-    let query = supabase
-      .from("finance_accounts")
-      .select(
-        "id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source",
-      )
-      .eq("partner_id", partnerId)
-
-    if (storeId !== undefined) {
-      if (storeId === null) {
-        query = query.is("store_id", null)
-      } else {
-        query = query.eq("store_id", storeId)
-      }
-    }
-
-    const { data, error } = await query.order("name")
+    const { data, error } = await getCachedErpPage(
+      ["erp-finance-accounts", partnerId, storeId === undefined ? "all" : storeId || "none"],
+      [TAGS.financeAccounts(partnerId)],
+      async () => {
+        const supabase = createAdminClient()
+        let query = supabase
+          .from("finance_accounts")
+          .select("id, name, type, initial_balance, current_balance, is_active, is_default, created_at, updated_at, is_system_managed, integration_source")
+          .eq("partner_id", partnerId)
+        if (storeId !== undefined) {
+          query = storeId === null ? query.is("store_id", null) : query.eq("store_id", storeId)
+        }
+        return query.order("name")
+      },
+      30,
+    )
     if (error) throw error
     return { success: true, data: { accounts: data || [] } }
   } catch (error: any) {
@@ -241,6 +243,7 @@ export async function createFinanceAccountAction(data: {
       .eq("id", inserted.id)
       .single()
 
+    await safeRevalidateTag(TAGS.financeAccounts(data.partnerId))
     return { success: true, data: refreshed || inserted }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -332,6 +335,7 @@ export async function updateFinanceAccountAction(
 
     if (error) throw error
 
+    await safeRevalidateTag(TAGS.financeAccounts(partnerId))
     return { success: true, data: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -365,6 +369,7 @@ export async function deleteFinanceAccountAction(id: string, partnerId: string) 
     const { error } = await supabase.from("finance_accounts").delete().eq("id", id).eq("partner_id", partnerId)
 
     if (error) throw error
+    await safeRevalidateTag(TAGS.financeAccounts(partnerId))
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

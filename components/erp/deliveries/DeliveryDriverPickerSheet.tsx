@@ -148,30 +148,12 @@ export default function DeliveryDriverPickerSheet({
     }
 
     const content = (
-        <div className="flex h-full flex-col bg-white dark:bg-dark-surface text-brand-dark dark:text-white">
-            {/* HEADER */}
-            <header className="flex items-center justify-between border-b border-brand-border px-6 py-4 dark:border-dark-border">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-green/10 text-brand-green">
-                        <TruckIcon size={20} />
-                    </div>
-                    <div>
-                        <h2 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                            Entregadores Dudit
-                        </h2>
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                            Rede de entregadores parceiros sob demanda
-                        </p>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="rounded-full p-2 text-brand-inactive-text hover:bg-brand-gray dark:hover:bg-dark-border transition-colors cursor-pointer"
-                    aria-label="Fechar"
-                >
-                    <XIcon size={18} />
-                </button>
+        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Entregadores Dudit</h2>
+                <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
+                    <XIcon className="h-5 w-5" />
+                </Button>
             </header>
 
             {/* BODY */}
@@ -372,7 +354,7 @@ export default function DeliveryDriverPickerSheet({
                 <footer className="border-t border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
                     <Button
                         variant="default"
-                        className="w-full h-11 text-sm font-bold shadow-md"
+                        className="w-full h-11"
                         onClick={handleRequestDelivery}
                         disabled={isSubmitting || !orderId}
                     >

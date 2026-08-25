@@ -13,6 +13,9 @@ import { generateUniqueSupplierCode } from "@/lib/utils/code-generators"
 import { canUseFeature } from "@/lib/services/subscription.service"
 import { revalidateSuppliers } from "@/lib/utils/revalidation"
 import { enrichAddressData } from "@/lib/services/location.service"
+import { createAdminClient } from "@/lib/supabase/server"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export async function createComprehensiveSupplierAction(data: {
   partnerId: string
@@ -466,60 +469,72 @@ export async function getERPSuppliersPageAction(
 > {
   try {
     await requirePermission(partnerId, "suppliers", "view")
-    const supabase = await getSupabaseServerClient()
-
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_SUPPLIERS_PAGE_SIZE))))
     const fetchLimit = limit + 1
 
-    let q = supabase
-      .from("suppliers")
-      .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes, image_url")
-      .eq("partner_id", partnerId)
+    const page = await getCachedErpPage(
+      [
+        "erp-suppliers-page",
+        partnerId,
+        options?.storeId || "all-stores",
+        cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+        String(limit),
+      ],
+      [TAGS.suppliers(partnerId)],
+      async () => {
+        const supabase = createAdminClient()
+        let q = supabase
+          .from("suppliers")
+          .select("id, name, email, phone, person_type, cpf, cnpj, nome_fantasia, inscricao_estadual, status, created_at, supplier_code, notes, image_url")
+          .eq("partner_id", partnerId)
 
-    if (cursor) {
-      q = q.or(buildSupplierKeysetOrFilter(cursor))
-    }
+        if (cursor) q = q.or(buildSupplierKeysetOrFilter(cursor))
 
-    const { data, error } = await q
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(fetchLimit)
+        const { data, error } = await q
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(fetchLimit)
 
-    if (error) throw error
+        if (error) throw error
 
-    const rows = data || []
-    const hasMore = rows.length > limit
-    const items: any[] = hasMore ? rows.slice(0, limit) : rows
+        const rows = data || []
+        const hasMore = rows.length > limit
+        const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
-    // Aggregate XML import stats for this page of suppliers
-    const supplierIds = items.map((s: any) => s.id).filter(Boolean)
-    if (supplierIds.length > 0) {
-      const { data: xmlAgg } = await supabase
-        .from("xml_imports")
-        .select("supplier_id, total_value, created_at, id")
-        .in("supplier_id", supplierIds)
-        .neq("status", "reversed")
+        // Aggregate XML import stats only for the visible page.
+        const supplierIds = items.map((s: any) => s.id).filter(Boolean)
+        if (supplierIds.length > 0) {
+          const { data: xmlAgg } = await supabase
+            .from("xml_imports")
+            .select("supplier_id, total_value, created_at, id")
+            .in("supplier_id", supplierIds)
+            .neq("status", "reversed")
 
-      if (xmlAgg) {
-        const statsMap = new Map<string, { xml_count: number; total_value: number; last_import_at: string | null }>()
-        for (const x of xmlAgg) {
-          const prev = statsMap.get(x.supplier_id) || { xml_count: 0, total_value: 0, last_import_at: null }
-          prev.xml_count++
-          prev.total_value += Number(x.total_value) || 0
-          if (x.created_at && (!prev.last_import_at || x.created_at > prev.last_import_at)) {
-            prev.last_import_at = x.created_at
+          if (xmlAgg) {
+            const statsMap = new Map<string, { xml_count: number; total_value: number; last_import_at: string | null }>()
+            for (const x of xmlAgg) {
+              const prev = statsMap.get(x.supplier_id) || { xml_count: 0, total_value: 0, last_import_at: null }
+              prev.xml_count++
+              prev.total_value += Number(x.total_value) || 0
+              if (x.created_at && (!prev.last_import_at || x.created_at > prev.last_import_at)) prev.last_import_at = x.created_at
+              statsMap.set(x.supplier_id, prev)
+            }
+            for (const item of items) {
+              const stats = statsMap.get(item.id)
+              item.xml_count = stats?.xml_count || 0
+              item.total_imported_value = stats?.total_value || 0
+              item.last_import_at = stats?.last_import_at || null
+            }
           }
-          statsMap.set(x.supplier_id, prev)
         }
-        for (const item of items) {
-          const stats = statsMap.get(item.id)
-          item.xml_count = stats?.xml_count || 0
-          item.total_imported_value = stats?.total_value || 0
-          item.last_import_at = stats?.last_import_at || null
-        }
-      }
-    }
+
+        return { items, hasMore }
+      },
+    )
+
+    const hasMore = page.hasMore
+    const items: any[] = page.items
 
     const last = items[items.length - 1]
     const nextCursor: ERPSupplierListCursor | null =

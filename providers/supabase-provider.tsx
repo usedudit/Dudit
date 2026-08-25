@@ -67,6 +67,41 @@ export function SupabaseProvider({
         }
     }, [supabase, initialUser])
 
+    // Handle Back-Forward Cache (bfcache): when the page is frozen/hidden the
+    // realtime WebSocket is killed by the browser. Disconnect cleanly on hide
+    // and reconnect on restore so channels rejoin instead of staying dead.
+    useEffect(() => {
+        const disconnect = () => {
+            try { supabase.realtime.disconnect() } catch {}
+        }
+
+        const reconnect = (event: Event) => {
+            // "pageshow" only fires with persisted=true when restoring from
+            // bfcache; the "resume" event always means the page was frozen.
+            if ("persisted" in event && !event.persisted) return
+            try {
+                supabase.realtime.connect()
+                for (const channel of supabase.realtime.getChannels()) {
+                    if (channel.state === "errored" || channel.state === "closed") {
+                        supabase.realtime.channel(channel.topic).subscribe()
+                    }
+                }
+            } catch {}
+        }
+
+        window.addEventListener("pagehide", disconnect)
+        window.addEventListener("pageshow", reconnect)
+        document.addEventListener("freeze", disconnect)
+        document.addEventListener("resume", reconnect as EventListener)
+
+        return () => {
+            window.removeEventListener("pagehide", disconnect)
+            window.removeEventListener("pageshow", reconnect)
+            document.removeEventListener("freeze", disconnect)
+            document.removeEventListener("resume", reconnect as EventListener)
+        }
+    }, [supabase])
+
     const contextValue = useMemo(() => ({
         supabase,
         user,

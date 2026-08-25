@@ -28,6 +28,7 @@ import { normalizeBusinessInfo } from "@/lib/business-info"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata, type VideoType } from "@/lib/video/shared"
 import { ALLOWED_VIDEO_MIME_TYPES, MAX_FILE_SIZE, MAX_VIDEO_FILE_SIZE, R2_PREFIXES } from "@/lib/r2/config"
 import { buildSoftDeletePayload, buildRestorePayload, buildArchivePayload, scopeActiveOnly, scopeArchivedOnly, scopeWithArchived } from "@/lib/supabase/query-helpers"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { headers } from "next/headers"
 
@@ -2413,8 +2414,6 @@ export async function getERPProductsPageAction(
     try {
         // await requireMinimumPlan(partnerId, "crescer")
         await requirePermission(partnerId, "products", "view")
-        const supabase = await getSupabaseServerClient()
-
         if (options?.storeId) {
             await requireStorePermission(options.storeId, partnerId, "products", "view")
         }
@@ -2423,56 +2422,69 @@ export async function getERPProductsPageAction(
         const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || ERP_PRODUCTS_PAGE_SIZE))))
         const fetchLimit = limit + 1
 
-        let q = supabase
-            .from("products")
-            .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
-            .eq("partner_id", partnerId)
+        const filterKey = options?.filters?.status || options?.filters?.tab || (options?.filters?.includeArchived ? "all" : "active")
+        const rows = await getCachedErpPage(
+            [
+                "erp-products-page",
+                partnerId,
+                options?.storeId || "all-stores",
+                cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+                String(limit),
+                String(filterKey),
+            ],
+            [TAGS.products(partnerId)],
+            async () => {
+                const supabase = getAdminClient()
+                let q = supabase
+                    .from("products")
+                    .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
+                    .eq("partner_id", partnerId)
 
-        if (options?.storeId) {
-            q = q.eq("store_id", options.storeId)
-        }
+                if (options?.storeId) q = q.eq("store_id", options.storeId)
 
-        if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
-            q = scopeArchivedOnly(q)
-        } else if (!options?.filters?.includeArchived) {
-            q = scopeActiveOnly(q)
-        } else {
-            q = scopeWithArchived(q)
-        }
-
-        if (cursor) {
-            q = q.or(buildProductsKeysetOrFilter(cursor))
-        }
-
-        const { data, error } = await q
-            .order("created_at", { ascending: false })
-            .order("id", { ascending: false })
-            .limit(fetchLimit)
-
-        if (error) throw error
-
-        const rows = (data || []).map((p: any) => ({
-            ...p,
-            category: p.category?.name || null,
-            brand: p.brand_rel?.name || p.brand || null,
-            location: p.location_rel?.name || p.location || null
-        }))
-
-        const withVariants = rows.filter((p: any) => {
-            const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
-            return count > 0
-        })
-        if (withVariants.length > 0) {
-            const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
-            for (const p of rows) {
-                const agg = aggregates[p.id]
-                if (agg) {
-                    p.variant_min_price = agg.variant_min_price
-                    p.variant_max_price = agg.variant_max_price
-                    p.variant_total_stock = agg.variant_total_stock
+                if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
+                    q = scopeArchivedOnly(q)
+                } else if (!options?.filters?.includeArchived) {
+                    q = scopeActiveOnly(q)
+                } else {
+                    q = scopeWithArchived(q)
                 }
-            }
-        }
+
+                if (cursor) q = q.or(buildProductsKeysetOrFilter(cursor))
+
+                const { data, error } = await q
+                    .order("created_at", { ascending: false })
+                    .order("id", { ascending: false })
+                    .limit(fetchLimit)
+
+                if (error) throw error
+
+                const mappedRows = (data || []).map((p: any) => ({
+                    ...p,
+                    category: p.category?.name || null,
+                    brand: p.brand_rel?.name || p.brand || null,
+                    location: p.location_rel?.name || p.location || null,
+                }))
+
+                const withVariants = mappedRows.filter((p: any) => {
+                    const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+                    return count > 0
+                })
+                if (withVariants.length > 0) {
+                    const aggregates = await fetchVariantAggregates(withVariants.map((p: any) => p.id))
+                    for (const p of mappedRows) {
+                        const agg = aggregates[p.id]
+                        if (agg) {
+                            p.variant_min_price = agg.variant_min_price
+                            p.variant_max_price = agg.variant_max_price
+                            p.variant_total_stock = agg.variant_total_stock
+                        }
+                    }
+                }
+
+                return mappedRows
+            },
+        )
 
         const hasMore = rows.length > limit
         const items = hasMore ? rows.slice(0, limit) : rows

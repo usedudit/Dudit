@@ -3339,9 +3339,10 @@ const PaymentModal = ({
 
                                     {/* Action Cards Grid */}
                                     <div className="grid grid-cols-1 gap-4 mb-8">
-                                        <SuccessActionCard
+                                        <ListItem
                                             icon={FileIcon}
-                                            label="Imprimir recibo"
+                                            title="Imprimir recibo"
+                                            description="Gerar e imprimir recibo da venda"
                                             onClick={() => setPrintOrderId(saleId)}
                                         />
                                     </div>

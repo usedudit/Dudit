@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
+import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 
 import { FadeIn } from "@/components/animations/FadeIn"
 import { parseAddressString } from "../orders/CreateOrder"
@@ -913,6 +914,8 @@ export default function CreateDeliveryPage({
                     </div>
                 </Tabs >
             </div >
+
+            <SavingStatusModal isOpen={isSaving} text={editDeliveryId ? "Salvando entrega..." : "Criando entrega..."} />
 
             <UnsavedChangesDialog
                 open={showConfirmDialog}

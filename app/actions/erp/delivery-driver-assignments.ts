@@ -42,6 +42,49 @@ export async function assignPlatformDriverToDeliveryAction(input: {
   const orderIds = Array.from(new Set(input.orderIds || [])).filter(Boolean)
   if (!input.deliveryId || !input.driverId || orderIds.length === 0) return { success: false as const, error: "Dados da atribuição inválidos." }
   const admin = getAdminClient()
+
+  if (input.driverId === "dudit_network" || input.driverId === "platform:dudit_network") {
+    const { data: orders } = await admin.from("orders").select("id, partner_id, delivery_fee").in("id", orderIds).eq("partner_id", input.partnerId)
+    if (!orders || orders.length === 0) return { success: false as const, error: "Pedidos não encontrados." }
+
+    await admin
+      .from("delivery_assignments")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .in("order_id", orderIds)
+      .in("status", ["available", "requested", "assigned"])
+
+    const rows = orders.map((order: any) => ({
+      order_id: order.id,
+      delivery_id: input.deliveryId,
+      partner_id: input.partnerId,
+      driver_id: null,
+      assigned_by: user.id,
+      status: "available",
+      delivery_fee: Number(order.delivery_fee || 0),
+      notes: String(input.notes || "").trim().slice(0, 500) || null,
+      assigned_at: new Date().toISOString(),
+    }))
+
+    const { data: inserted, error } = await admin.from("delivery_assignments").insert(rows).select("id")
+    if (error) return { success: false as const, error: "Não foi possível solicitar entrega Dudit: " + error.message }
+
+    await logAuditEvent({
+      partnerId: input.partnerId,
+      actorUserId: user.id,
+      entityType: "delivery_assignment",
+      entityId: inserted?.[0]?.id || input.deliveryId,
+      actionType: "dudit_delivery_requested",
+      changeLines: ["Entrega solicitada para a rede de entregadores Dudit"],
+      metadata: { deliveryId: input.deliveryId, orderCount: rows.length },
+      source: "erp",
+    })
+
+    revalidatePath("/erp/logistica")
+    revalidatePath("/erp/pedidos")
+    revalidatePath("/entregadores")
+    revalidatePath("/entregadores/entregas-disponiveis")
+    return { success: true as const, count: rows.length }
+  }
   const [{ data: driver }, { data: orders }, { data: existing }, { data: driverPartners }, { data: activeDriverAssignments }] = await Promise.all([
     admin.from("delivery_drivers").select("user_id, is_active, availability_status").eq("user_id", input.driverId).maybeSingle(),
     admin.from("orders").select("id, partner_id, delivery_fee").in("id", orderIds).eq("partner_id", input.partnerId),

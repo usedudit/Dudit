@@ -20,6 +20,8 @@ import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import { generateShortId, isUuid } from "@/lib/utils/short-id"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export type ServiceOrderListCursor = { createdAt: string; id: string } | null
 
@@ -41,37 +43,30 @@ export async function getERPServiceOrdersPageAction(
 > {
   try {
     await requirePermission(partnerId, "service_orders", "view")
-    const supabase = await getSupabaseServerClient()
-
     const cursor = options?.cursor ?? null
     const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || PAGE_SIZE))))
     const fetchLimit = limit + 1
-
-    let q = supabase
-      .from("service_orders")
-      .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
-      .eq("partner_id", partnerId)
-
-    if (options?.status && options.status !== "all") {
-      q = q.eq("status", options.status)
-    }
-
-    if (options?.storeId) {
-      q = q.eq("store_id", options.storeId)
-    }
-
-    if (cursor) {
-      q = q.or(buildKeysetOrFilter(cursor))
-    }
-
-    const { data, error } = await q
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(fetchLimit)
-
-    if (error) throw error
-
-    const rows = data || []
+    const rows = await getCachedErpPage(
+      ["erp-service-orders-page", partnerId, options?.storeId || "all-stores", options?.status || "all", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
+      [TAGS.serviceOrders(partnerId)],
+      async () => {
+        const supabase = getAdminClient()
+        let q = supabase
+          .from("service_orders")
+          .select("id, order_number, title, status, customer_id, customer_snapshot, assigned_user_id, expected_completion_date, total_amount, store_id, created_at, updated_at, created_by, completed_at, signature_image_key, signed_at")
+          .eq("partner_id", partnerId)
+        if (options?.status && options.status !== "all") q = q.eq("status", options.status)
+        if (options?.storeId) q = q.eq("store_id", options.storeId)
+        if (cursor) q = q.or(buildKeysetOrFilter(cursor))
+        const { data, error } = await q
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(fetchLimit)
+        if (error) throw error
+        return data || []
+      },
+      30,
+    )
     const hasMore = rows.length > limit
     const items = hasMore ? rows.slice(0, limit) : rows
     const last = items[items.length - 1]

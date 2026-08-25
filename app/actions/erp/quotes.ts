@@ -32,6 +32,8 @@ import { endOfDay, getTodayYmd } from "@/lib/date"
 import { requireAuthorizedCustomerContext, requireAuthorizedPartnerContext } from "@/lib/services/authorized-customer-access"
 import { createNotification } from "@/lib/services/notification.service"
 import { generateShortId, isUuid } from "@/lib/utils/short-id"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 
 export type ERPQuoteListCursor = { createdAt: string; id: string }
@@ -100,25 +102,26 @@ export async function getERPQuotesPageAction(
                     customers (id, name, email),
                     items_count:quote_items(count)
                 `
-            const runQuotesPageQuery = async (selectClause: string) => {
-                let query = supabase.from("quotes").select(selectClause).eq("partner_id", partnerId)
-                if (storeId) {
-                    query = query.eq("store_id", storeId)
-                }
-                if (cursor) {
-                    query = query.or(buildQuotesKeysetOrFilter(cursor))
-                }
-                return query
-                    .order("created_at", { ascending: false })
-                    .order("id", { ascending: false })
-                    .limit(fetchLimit)
-            }
-
-            let queryResult = await runQuotesPageQuery(selectWithCreator)
-            if (queryResult.error && isMissingQuotesCreatedByUserIdColumnError(queryResult.error)) {
-                queryResult = await runQuotesPageQuery(selectWithoutCreator)
-            }
-            if (queryResult.error) throw queryResult.error
+            const queryResult = await getCachedErpPage(
+                ["erp-quotes-page", partnerId, storeId || "all-stores", cursor ? `${cursor.createdAt}:${cursor.id}` : "first", String(limit)],
+                [TAGS.quotes(partnerId)],
+                async () => {
+                    const cachedSupabase = getAdminClient()
+                    const runQuotesPageQuery = async (selectClause: string) => {
+                        let query = cachedSupabase.from("quotes").select(selectClause).eq("partner_id", partnerId)
+                        if (storeId) query = query.eq("store_id", storeId)
+                        if (cursor) query = query.or(buildQuotesKeysetOrFilter(cursor))
+                        return query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(fetchLimit)
+                    }
+                    let result = await runQuotesPageQuery(selectWithCreator)
+                    if (result.error && isMissingQuotesCreatedByUserIdColumnError(result.error)) {
+                        result = await runQuotesPageQuery(selectWithoutCreator)
+                    }
+                    if (result.error) throw result.error
+                    return { data: result.data || [], error: null }
+                },
+                30,
+            )
 
             const rowsWithCreator = (queryResult.data || []).map((row: any) => ({
                 ...row,

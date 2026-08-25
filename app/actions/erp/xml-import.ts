@@ -17,6 +17,8 @@ import { enrichAddressData } from "@/lib/services/location.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { uploadBufferToR2, generateSignedDownloadUrl } from "@/lib/r2/server"
 import { R2_PREFIXES } from "@/lib/r2/config"
+import { revalidatePath } from "next/cache"
+import { revalidateTransactions } from "@/lib/utils/revalidation"
 
 interface ImportPreview {
   xml_import_id: string
@@ -554,13 +556,21 @@ export async function uploadXMLAction(
       return { success: false, error: "Parceiro não encontrado" }
     }
 
-    const { data: storeDoc } = await supabase
+    let storeQuery = supabase
       .from("stores")
-      .select("cpf, cnpj, person_type")
+      .select("id, name, cpf, cnpj, person_type")
       .eq("partner_id", partnerId)
-      .order("is_headquarters", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+
+    if (storeId) {
+      storeQuery = storeQuery.eq("id", storeId)
+    } else {
+      storeQuery = storeQuery.order("is_headquarters", { ascending: false }).limit(1)
+    }
+    const { data: storeDoc } = await storeQuery.maybeSingle()
+
+    if (storeDoc?.id && !storeId) {
+      storeId = storeDoc.id
+    }
 
     let partnerDoc = ""
     if (storeDoc?.person_type === "pj" && storeDoc?.cnpj) {
@@ -1131,18 +1141,22 @@ export async function confirmImportAction(
               partner_id: partnerId,
               store_id: storeId,
               contact_id: contact.id,
+              contact_type: "supplier" as const,
               transaction_type: "expense" as const,
               category: "Compras",
               amount: d.valor,
               description: `NF ${xmlImport.invoice_number || ""} - Parcela ${d.numero || "1"}`,
               due_date: d.vencimento || new Date(Date.now() + 30 * 86400000).toISOString(),
               status: "pending",
+              origin: "xml_import",
+              reference_note: `xml_import:${xmlImportId}`,
               created_by_user_id: user.id,
             }))
             : [{
               partner_id: partnerId,
               store_id: storeId,
               contact_id: contact.id,
+              contact_type: "supplier" as const,
               transaction_type: "expense" as const,
               category: "Compras",
               amount: duplicatas.length === 1 ? duplicatas[0].valor : xmlImport.total_value,
@@ -1151,6 +1165,8 @@ export async function confirmImportAction(
                 ? (duplicatas[0].vencimento || new Date(Date.now() + 30 * 86400000).toISOString())
                 : new Date(Date.now() + 30 * 86400000).toISOString(),
               status: "pending",
+              origin: "xml_import",
+              reference_note: `xml_import:${xmlImportId}`,
               created_by_user_id: user.id,
             }]
 
@@ -1176,6 +1192,10 @@ export async function confirmImportAction(
                 console.error("Erro ao vincular anexo às contas a pagar:", attErr)
               }
             }
+            await revalidateTransactions(partnerId)
+            revalidatePath("/erp/contas-a-pagar")
+            revalidatePath("/erp/transacoes")
+            revalidatePath("/erp/importacao-xml")
           }
         }
       }
@@ -1449,6 +1469,12 @@ export async function revertImportAction(
       source: "manual",
     }).catch(() => { })
 
+    await revalidateTransactions(partnerId)
+    revalidatePath("/erp/contas-a-pagar")
+    revalidatePath("/erp/contas-a-receber")
+    revalidatePath("/erp/transacoes")
+    revalidatePath("/erp/importacao-xml")
+
     return { success: true, message: result.message || "Importação revertida com sucesso" }
   } catch (error: any) {
     return { success: false, error: friendlyError(error.message) }
@@ -1472,12 +1498,26 @@ export async function getImportFinanceAction(
 
     if (!xmlImport) return { success: false, error: "Importação não encontrada" }
 
-    const { data: transactions } = await supabase
+    const invNum = xmlImport.invoice_number?.trim() || ""
+    let query = supabase
       .from("transactions")
       .select("*")
       .eq("partner_id", partnerId)
-      .ilike("description", `%${xmlImport.invoice_number || ""}%`)
-      .order("due_date")
+
+    if (invNum) {
+      query = query.or(`reference_note.eq.xml_import:${xmlImportId},reference_note.ilike.xml_import_refund:${xmlImportId}:%,description.ilike.NF ${invNum} - %,description.ilike.Estorno: NF ${invNum}%`)
+    } else {
+      query = query.or(`reference_note.eq.xml_import:${xmlImportId},reference_note.ilike.xml_import_refund:${xmlImportId}:%`)
+    }
+
+    const { data: transactions, error } = await query
+      .order("created_at", { ascending: true })
+      .order("due_date", { ascending: true })
+
+    if (error) {
+      console.error("Erro ao buscar finanças da importação:", error)
+      return { success: false, error: error.message }
+    }
 
     return { success: true, transactions: transactions || [] }
   } catch (error: any) {
