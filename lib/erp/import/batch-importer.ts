@@ -49,7 +49,36 @@ export async function executeImport(
   const startTime = Date.now()
   const supabase = await getSupabaseServerClient()
   const admin = getAdminClient()
-  const { partnerId, storeId, entityType, rows, headers } = session
+  let { partnerId, storeId, entityType, rows, headers } = session
+
+  // Ensure storeId is resolved for entity types that require it
+  if (!storeId && (entityType === "products" || entityType === "services")) {
+    const { data: stores } = await admin.from("stores").select("id").eq("partner_id", partnerId).limit(1)
+    if (stores && stores.length > 0) {
+      storeId = stores[0].id
+    }
+  }
+
+  // Auto-backfill existing orphan records for this partner if we have a valid storeId
+  if (storeId) {
+    try {
+      if (entityType === "services") {
+        await admin
+          .from("services")
+          .update({ store_id: storeId })
+          .eq("partner_id", partnerId)
+          .is("store_id", null)
+      } else if (entityType === "products") {
+        await admin
+          .from("products")
+          .update({ store_id: storeId })
+          .eq("partner_id", partnerId)
+          .is("store_id", null)
+      }
+    } catch (backfillErr) {
+      console.warn("[BatchImport] Error backfilling orphan store_id:", backfillErr)
+    }
+  }
 
   const duplicateStrategy = options.duplicateStrategy || (options.skipDuplicates ? "skip" : "update")
   const autoCreateCategories = options.autoCreateCategories !== false
@@ -619,7 +648,7 @@ async function importProductBatch(
 
     const productData: any = {
       partner_id: partnerId,
-      store_id: storeId || undefined,
+      store_id: storeId || null,
       name,
       sku,
       description: row["description"] || null,
@@ -1159,7 +1188,7 @@ async function importServiceBatch(
 
     const serviceData: any = {
       partner_id: partnerId,
-      store_id: storeId || undefined,
+      store_id: storeId || null,
       name,
       description: row["description"] || null,
       price,

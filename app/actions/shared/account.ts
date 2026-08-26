@@ -183,8 +183,9 @@ export async function requestAccountDeletionCodeAction(
       variables: {
         code: rawCode,
         codigo: rawCode,
+        expirationMinutes: "15",
         expiration_minutes: "15",
-        validade: "15 minutos",
+        validade: "15",
         validade_minutos: "15",
         full_name: user.user_metadata?.full_name || "",
         nome: user.user_metadata?.full_name || "",

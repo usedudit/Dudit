@@ -1,18 +1,14 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, Input, FormTextarea, Badge, Checkbox, Separator } from "@/components/reusable"
+import { DefaultModal, Button, Input, FormTextarea, Badge, Checkbox, Separator, ListItem, FormSection, InfoCard, PasswordInput } from "@/components/reusable"
 import {
     AlertTriangleIcon,
     ShieldIcon,
-    LockIcon,
-    CheckCircleIcon,
     StoreIcon,
     UserIcon,
-    EyeIcon,
-    EyeOffIcon,
-    ClockIcon,
-    CalendarIcon
+    CalendarIcon,
+    NotificationIcon
 } from "@/lib/icons"
 import { requestStepUpToken } from "@/app/actions/admin/step-up"
 
@@ -312,44 +308,40 @@ export function AdminEnforcementModal({
             title={isSuspend ? "Aplicar Suspensão Disciplinar" : "Reativar e Restaurar Acesso"}
             maxWidth="2xl"
             description={`Passo ${step} de 2: ${step === 1 ? "Parâmetros e Configuração" : "Autenticação e Confirmação"}`}
+            footer={
+                <div className="flex items-center justify-end gap-3 pt-2">
+                    <Button variant="outline" onClick={onClose}>
+                        Cancelar
+                    </Button>
+                    <Button variant={isSuspend ? "destructive" : "default"} onClick={handleNextStep}>
+                        Avançar para Confirmação →
+                    </Button>
+                </div>
+            }
         >
             <div className="space-y-6 pt-2">
                 {/* Step Progress Bar */}
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-brand-primary" />
-                    <div className={`flex-1 h-1.5 rounded-full transition-colors ${step === 2 ? "bg-brand-primary" : "bg-gray-200 dark:bg-dark-border"}`} />
+                    <div className="flex-1 h-1.5 rounded-full bg-brand-green" />
+                    <div className={`flex-1 h-1.5 rounded-full transition-colors ${step === 2 ? "bg-brand-green" : "bg-brand-gray dark:bg-dark-border/50"}`} />
                 </div>
 
                 {/* Entity & Scope Header Card */}
-                <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 ${isSuspend ? "bg-red-50/70 dark:bg-red-950/20 border-red-200 dark:border-red-900/40" : "bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40"}`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isSuspend ? "bg-brand-red/10 text-brand-red" : "bg-brand-green/10 text-brand-green"}`}>
-                            <ScopeIcon size={22} />
-                        </div>
-                        <div className="min-w-0">
-                            <h3 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                {entityName}
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Escopo: <span className="font-semibold text-brand-dark dark:text-white">{config.label}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <Badge variant={isSuspend ? "red" : "green"} className="shrink-0 text-xs uppercase font-bold">
+                <ListItem
+                    icon={<ScopeIcon />}
+                    title={entityName}
+                    description={scope}
+                    right={<Badge variant={isSuspend ? "red" : "green"} className="shrink-0 text-xs uppercase font-bold">
                         {isSuspend ? "Suspensão" : "Reativação"}
-                    </Badge>
-                </div>
+                    </Badge>}
+                />
 
                 {/* STEP 1: CONFIGURATION */}
                 {step === 1 && (
                     <div className="space-y-5">
                         {/* Suspension Duration Options (Only for Suspend) */}
                         {isSuspend && (
-                            <div className="space-y-2.5">
-                                <label className="block text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                    <ClockIcon size={14} className="text-brand-orange" />
-                                    Período de Vigência da Suspensão:
-                                </label>
+                            <FormSection title="Período de Vigência da Suspensão:">
                                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                                     {DURATION_OPTIONS.map((opt) => {
                                         const isSelected = selectedDurationOption === opt.days
@@ -359,8 +351,8 @@ export function AdminEnforcementModal({
                                                 type="button"
                                                 onClick={() => setSelectedDurationOption(opt.days)}
                                                 className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer text-center ${isSelected
-                                                    ? "bg-brand-primary text-white border-brand-primary shadow-sm"
-                                                    : "bg-white dark:bg-dark-surface border-gray-200 dark:border-dark-border text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border"
+                                                    ? "border-brand-green"
+                                                    : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading"
                                                     }`}
                                             >
                                                 {opt.label}
@@ -395,15 +387,11 @@ export function AdminEnforcementModal({
                                         )}
                                     </span>
                                 </div>
-                            </div>
+                            </FormSection>
                         )}
 
                         {/* Reason and Preset Chips */}
-                        <div className="space-y-2.5">
-                            <label className="block text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading">
-                                {isSuspend ? "Justificativa / Motivo Detalhado *" : "Motivo da Reativação (Opcional):"}
-                            </label>
-
+                        <FormSection title={isSuspend ? "Justificativa / Motivo Detalhado *" : "Motivo da Reativação (Opcional):"} hasSeparator>
                             {/* Quick Presets */}
                             <div className="flex flex-wrap gap-1.5">
                                 {presets.map((preset) => (
@@ -423,19 +411,15 @@ export function AdminEnforcementModal({
                                 value={reason}
                                 onChange={(e) => setReason(e.target.value)}
                                 placeholder={isSuspend ? "Descreva o motivo claro e circunstanciado para a suspensão..." : "Descreva os motivos da liberação..."}
-                                className="w-full text-xs"
+                                className="w-full"
                             />
-                        </div>
+                        </FormSection>
 
                         {/* Risk Score Setting */}
-                        <div className="space-y-2.5">
+                        <FormSection title={`Score de Risco (${riskScore} pts):`} hasSeparator>
                             <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading">
-                                    Score de Risco ({riskScore} pts):
-                                </label>
                                 <Badge
                                     variant={riskScore >= 80 ? "red" : riskScore >= 50 ? "orange" : riskScore >= 25 ? "orange" : "green"}
-                                    className="text-[11px] font-bold uppercase"
                                 >
                                     {riskScore >= 80 ? "Crítico" : riskScore >= 50 ? "Alto" : riskScore >= 25 ? "Médio" : "Baixo / Seguro"}
                                 </Badge>
@@ -462,7 +446,7 @@ export function AdminEnforcementModal({
                                         key={chip.label}
                                         type="button"
                                         onClick={() => setRiskScore(chip.val)}
-                                        className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${riskScore === chip.val
+                                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all cursor-pointer ${riskScore === chip.val
                                             ? "bg-brand-dark text-white border-brand-dark dark:bg-white dark:text-brand-dark"
                                             : "bg-white dark:bg-dark-surface border-gray-200 dark:border-dark-border text-brand-inactive-text dark:text-dark-body hover:bg-gray-50"
                                             }`}
@@ -471,48 +455,26 @@ export function AdminEnforcementModal({
                                     </button>
                                 ))}
                             </div>
-                        </div>
+                        </FormSection>
 
                         {/* Notification Toggle */}
-                        <div className="p-3.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-dark-surface flex items-start gap-3">
-                            <Checkbox
+                        <ListItem
+                            icon={<NotificationIcon />}
+                            title="Enviar Notificação no App e Alertas"
+                            description={isSuspend
+                                ? "Dispara notificação com o protocolo do caso para que o lojista possa acompanhar ou recorrer."
+                                : "Informa o lojista e seus operadores sobre o restabelecimento imediato dos serviços."}
+                            right={<Checkbox
                                 id="notifyOwner"
                                 checked={notifyOwner}
                                 onCheckedChange={(checked) => setNotifyOwner(!!checked)}
                                 className="mt-0.5"
-                            />
-                            <label htmlFor="notifyOwner" className="text-xs text-brand-dark dark:text-dark-heading cursor-pointer">
-                                <span className="font-bold block">
-                                    Enviar Notificação no App e Alertas
-                                </span>
-                                <span className="text-brand-inactive-text dark:text-dark-body text-[11px]">
-                                    {isSuspend
-                                        ? "Dispara notificação com o protocolo do caso para que o lojista possa acompanhar ou recorrer."
-                                        : "Informa o lojista e seus operadores sobre o restabelecimento imediato dos serviços."}
-                                </span>
-                            </label>
-                        </div>
+                            />}
+                        />
 
                         {errorMessage && (
-                            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl text-xs font-semibold text-brand-red flex items-center gap-2">
-                                <AlertTriangleIcon size={16} className="shrink-0" />
-                                <span>{errorMessage}</span>
-                            </div>
+                            <InfoCard color="red" message={errorMessage} />
                         )}
-
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <Button type="button" variant="outline" onClick={onClose} className="text-xs">
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="filled"
-                                onClick={handleNextStep}
-                                className={`text-xs font-bold ${isSuspend ? "bg-brand-red hover:bg-brand-red/90 text-white" : "bg-brand-green hover:bg-brand-green/90 text-white"}`}
-                            >
-                                Avançar para Confirmação →
-                            </Button>
-                        </div>
                     </div>
                 )}
 
@@ -520,10 +482,7 @@ export function AdminEnforcementModal({
                 {step === 2 && (
                     <div className="space-y-5">
                         {/* Summary Box */}
-                        <div className="p-4 rounded-xl bg-gray-50 dark:bg-dark-surface border border-gray-200 dark:border-dark-border space-y-2 text-xs">
-                            <h4 className="font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider text-[11px]">
-                                Resumo da Ação Disciplinar:
-                            </h4>
+                        <FormSection title="Resumo da Ação Disciplinar:">
                             <div className="grid grid-cols-2 gap-2 text-brand-dark dark:text-dark-heading">
                                 <div>
                                     <span className="text-brand-inactive-text dark:text-dark-body">Alvo:</span>{" "}
@@ -544,10 +503,10 @@ export function AdminEnforcementModal({
                                     <strong>{riskScore} pts</strong>
                                 </div>
                             </div>
-                            <div className="pt-2 border-t border-gray-200 dark:border-dark-border text-brand-inactive-text dark:text-dark-body">
+                            <div className="pt-2 border-t border-brand-border dark:border-dark-border text-brand-inactive-text dark:text-dark-body">
                                 <span>Motivo:</span> <strong className="text-brand-dark dark:text-white">{reason || "Padrão"}</strong>
                             </div>
-                        </div>
+                        </FormSection>
 
                         {/* Consequences Box */}
                         <div className="space-y-1.5">
@@ -566,47 +525,29 @@ export function AdminEnforcementModal({
 
                         {/* Step-Up Password Input */}
                         <div className="space-y-2">
-                            <label className="block text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                <LockIcon size={14} className="text-brand-primary" />
-                                Confirme sua Senha de Administrador (Step-Up) *
-                            </label>
                             <div className="relative">
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Digite sua senha de admin..."
+                                <PasswordInput
+                                    title="Confirme sua senha"
                                     value={adminPassword}
                                     onChange={(e) => setAdminPassword(e.target.value)}
-                                    className="w-full text-xs pr-10"
+                                    className="w-full"
                                     autoFocus
+                                    autoComplete="off"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
-                                >
-                                    {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
-                                </button>
                             </div>
                         </div>
 
                         {/* Science Checkbox */}
-                        <div className="flex items-start gap-2.5">
-                            <Checkbox
-                                id="acknowledged"
-                                checked={acknowledged}
-                                onCheckedChange={(checked) => setAcknowledged(!!checked)}
-                                className="mt-0.5"
-                            />
-                            <label htmlFor="acknowledged" className="text-xs font-medium text-brand-dark dark:text-dark-heading cursor-pointer leading-tight">
-                                Confirmo que revisei os parâmetros acima e autorizo a execução imediata desta medida administrativa.
-                            </label>
-                        </div>
+                        <Checkbox
+                            label="Confirmo que revisei os parâmetros acima e autorizo a execução imediata desta medida administrativa."
+                            id="acknowledged"
+                            checked={acknowledged}
+                            onCheckedChange={(checked) => setAcknowledged(!!checked)}
+                            className="mt-0.5"
+                        />
 
                         {errorMessage && (
-                            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl text-xs font-semibold text-brand-red flex items-center gap-2">
-                                <AlertTriangleIcon size={16} className="shrink-0" />
-                                <span>{errorMessage}</span>
-                            </div>
+                            <InfoCard color="red" message={errorMessage} />
                         )}
 
                         <div className="flex items-center justify-between gap-3 pt-2">
@@ -635,6 +576,6 @@ export function AdminEnforcementModal({
                     </div>
                 )}
             </div>
-        </DefaultModal>
+        </DefaultModal >
     )
 }

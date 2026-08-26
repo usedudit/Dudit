@@ -1401,9 +1401,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             if (result.success) {
                 const createdOrderId = 'orderId' in result ? result.orderId : undefined
                 const targetOrderId = createdOrderId || editOrderId
-                if (targetOrderId) {
-                    await uploadStagedAttachments(targetOrderId)
-                }
+                // Uploads do not depend on delivery creation. Running them in
+                // parallel removes avoidable time from the payment modal.
+                const attachmentPromise = targetOrderId
+                    ? uploadStagedAttachments(targetOrderId)
+                    : Promise.resolve()
 
                 if (!editOrderId && payload.deliveryMethod === "delivery" && createdOrderId) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
@@ -1416,6 +1418,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                         startedAt: new Date(`${deliveryDate}T${deliveryTime}:00`).toISOString(),
                         notes: notes?.trim() || undefined,
                     })
+                    await attachmentPromise
 
                     if (!autoDeliveryResult.success) {
                         notifyError("Pedido criado, mas a entrega automÃ¡tica falhou", autoDeliveryResult.error)
@@ -1431,13 +1434,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     }
                 } else if (editOrderId) {
                     const isPlatformDriver = selectedDeliveryPersonId.startsWith("platform:")
-                    const syncResult = await syncPlatformDriverForOrderAction({
-                        partnerId,
-                        orderId: editOrderId,
-                        driverId: isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null,
-                        notes: notes?.trim() || undefined,
-                    })
+                    const [syncResult] = await Promise.all([
+                        syncPlatformDriverForOrderAction({
+                            partnerId,
+                            orderId: editOrderId,
+                            driverId: isPlatformDriver ? selectedDeliveryPersonId.slice("platform:".length) : null,
+                            notes: notes?.trim() || undefined,
+                        }),
+                        attachmentPromise,
+                    ])
                     if (!syncResult.success) notifyError("Pedido salvo, mas não foi possível atualizar o entregador Dudit", syncResult.error)
+                } else {
+                    await attachmentPromise
                 }
 
                 notifySuccess(editOrderId ? `Pedido atualizado com sucesso!` : `Pedido criado com sucesso!`)

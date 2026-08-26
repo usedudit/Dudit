@@ -17,6 +17,8 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireActivePartnerContext } from "@/lib/services/authorized-customer-access"
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -1557,7 +1559,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     if (!planCheck.allowed) return { success: false as const, error: planCheck.error }
     const supabase = await getSupabaseServerClient()
 
-    const { data, error } = await supabase
+    const { data, error } = await getCachedErpPage(
+      ["erp-delivery-detail", partnerId, deliveryId],
+      [TAGS.orders(partnerId), TAGS.partner(partnerId), `delivery-${deliveryId}`],
+      async () => {
+        const admin = getAdminClient()
+        return admin
       .from("deliveries")
       .select(`
       id,
@@ -1621,6 +1628,9 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       .eq("id", deliveryId)
       .eq("partner_id", partnerId)
       .single()
+      },
+      15,
+    )
 
     if (actor.roleId === "delivery") {
       const isAssigned = (actor.partnerUserId && String(data?.delivery_person_id || "") === actor.partnerUserId) ||

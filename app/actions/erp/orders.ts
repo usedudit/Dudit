@@ -2076,21 +2076,20 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         }
     }
 
-    await logAuditEvent({
-        partnerId,
-        actorUserId: user.id,
-        entityType: "order",
-        entityId: order.id,
-        actionType: "created",
-        changeLines: ["criou venda"],
-        source: "manual",
-    })
-
     const skippedGifts = filteredPromotions.filter(
         (p) => p.giftUnavailable && pricingResult.appliedPromotionIds.includes(p.id)
     )
-    for (const promo of skippedGifts) {
-        await logAuditEvent({
+    const auditPromises = [
+        logAuditEvent({
+            partnerId,
+            actorUserId: user.id,
+            entityType: "order",
+            entityId: order.id,
+            actionType: "created",
+            changeLines: ["criou venda"],
+            source: "manual",
+        }),
+        ...skippedGifts.map((promo) => logAuditEvent({
             partnerId,
             actorUserId: user.id,
             entityType: "order",
@@ -2098,14 +2097,10 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             actionType: "created",
             changeLines: [`Brinde da campanha "${promo.name}" temporariamente indisponível (sem estoque).`],
             source: "manual",
-        })
-    }
-
-    await increment_usage_counter(partnerId, "orders_month_count")
-
-    if (capabilities.hasCoupons && couponIdToSave) {
-        const adminClient = createAdminClient()
-        await adminClient.from("coupon_usages").upsert(
+        })),
+    ]
+    const couponUsagePromise = capabilities.hasCoupons && couponIdToSave
+        ? createAdminClient().from("coupon_usages").upsert(
             {
                 coupon_id: couponIdToSave,
                 customer_id: customerId,
@@ -2113,7 +2108,13 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             },
             { onConflict: "coupon_id,order_id", ignoreDuplicates: true }
         )
-    }
+        : Promise.resolve()
+
+    await Promise.all([
+        Promise.all(auditPromises),
+        increment_usage_counter(partnerId, "orders_month_count"),
+        couponUsagePromise,
+    ])
 
     if (capabilities.hasFinancial && paymentState.paidAmount > 0.009) {
         const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
@@ -2477,13 +2478,18 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             return null
         }
 
-        const [customers, sellerName, { platformDriverId, platformDriver }, sourceServiceOrder, sourceQuote] = await Promise.all([
-            resolveCustomer(),
-            resolveSellerName(),
-            resolvePlatformDriver(),
-            resolveSourceServiceOrder(),
-            resolveSourceQuote(),
-        ])
+        const [customers, sellerName, { platformDriverId, platformDriver }, sourceServiceOrder, sourceQuote] = await getCachedErpPage(
+            ["erp-order-detail-enrichment", partnerId, String(data.id)],
+            [TAGS.orders(partnerId), `order-${data.id}`],
+            () => Promise.all([
+                resolveCustomer(),
+                resolveSellerName(),
+                resolvePlatformDriver(),
+                resolveSourceServiceOrder(),
+                resolveSourceQuote(),
+            ]),
+            15,
+        )
 
         const subtotalValue = Number((data.order_items || []).reduce((acc: number, item: any) => {
             return acc + Number(item?.subtotal ?? (Number(item?.quantity || 0) * Number(item?.product_price || 0)))

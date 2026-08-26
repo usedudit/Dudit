@@ -1228,15 +1228,25 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
   await requirePermission(partnerId, "pdv", "view")
   const supabase = createAdminClient()
 
-  const { data: session, error: sessionError } = await supabase
-    .from("cash_sessions")
-    .select("*")
-    .eq("partner_id", partnerId)
-    .eq("id", cashSessionId)
-    .single()
+  const { data: session, error: sessionError } = await getCachedErpPage(
+    ["erp-cash-session-detail", partnerId, cashSessionId],
+    [TAGS.cashSessions(partnerId), TAGS.transactions(partnerId), TAGS.entityTimeline("cash_session", cashSessionId), `cash-session-${cashSessionId}`],
+    async () => createAdminClient()
+      .from("cash_sessions")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .eq("id", cashSessionId)
+      .single(),
+    10,
+  )
   if (sessionError || !session) return { success: false as const, error: sessionError?.message || "Caixa não encontrado." }
 
-  const movements = await loadMovementsForSession(supabase, partnerId, cashSessionId)
+  const movements = await getCachedErpPage(
+    ["erp-cash-session-movements", partnerId, cashSessionId],
+    [TAGS.cashSessions(partnerId), TAGS.transactions(partnerId), TAGS.entityTimeline("cash_session", cashSessionId), `cash-session-${cashSessionId}`],
+    () => loadMovementsForSession(createAdminClient(), partnerId, cashSessionId),
+    10,
+  )
 
   const userIds = Array.from(
     new Set(

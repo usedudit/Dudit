@@ -68,8 +68,19 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
         .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
 
-    // Fallback: sempre busca a primeira loja do parceiro
-    supabase.from("stores").select(STORE_SELECT).eq("partner_id", partnerId).maybeSingle(),
+    // Fallback: busca deterministicamente a sede (ou a primeira loja ativa).
+    // `maybeSingle()` sem limit/order falha quando o parceiro possui múltiplas
+    // lojas e isso fazia o dashboard cair para `partnerUrl: "/"`.
+    supabase
+      .from("stores")
+      .select(STORE_SELECT)
+      .eq("partner_id", partnerId)
+      .eq("is_active", true)
+      .is("suspended_at", null)
+      .order("is_headquarters", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
 
     supabase
       .from("addresses")

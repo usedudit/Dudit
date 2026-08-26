@@ -9,6 +9,9 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getDashboardLayout } from "@/lib/dashboard-engine/engine"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
+import { getActiveStoreId } from "@/lib/auth/partner-context"
 
 export async function getQuickModeHomeDataAction(partnerId: string) {
     try {
@@ -242,11 +245,22 @@ export async function getUnifiedDashboardAction(partnerId: string) {
         // Basic check for view permission on general modules
         await requirePermission(partnerId, "products", "view")
 
-        const layout = await getDashboardLayout(partnerId)
+        const activeStoreId = await getActiveStoreId()
+        const layout = await getCachedErpPage(
+            ["erp-dashboard-layout", partnerId, activeStoreId || "default-store"],
+            [
+                TAGS.partner(partnerId),
+                TAGS.products(partnerId),
+                TAGS.services(partnerId),
+                TAGS.orders(partnerId),
+                TAGS.transactions(partnerId),
+            ],
+            () => getDashboardLayout(partnerId),
+            30,
+        )
         return { success: true, data: layout }
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar o dashboard inteligente" }
     }
 }
-
 

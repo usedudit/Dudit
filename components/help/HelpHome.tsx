@@ -113,7 +113,7 @@ export default function HelpHome() {
                         description="Defina taxas de entrega e horários de funcionamento."
                         className="px-6 py-5"
                         showChevron
-                        onClick={() => window.location.href = "/ajuda/configuracoes/delivery"}
+                        onClick={() => window.location.href = "/ajuda/entregas/configurando-entregas-loja"}
                     />
                 </div>
             </section>
@@ -136,6 +136,7 @@ export default function HelpHome() {
                     <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Produtos e Estoque" link="/ajuda/produtos-estoque/visao-geral-produtos-estoque" color="green" />
                     <ModuleCard icon={<StoreIcon size={24} />} title="Vitrine Online" link="/ajuda/vitrine-online/visao-geral-vitrine-online" color="green" />
                     <ModuleCard icon={<ShoppingBagIcon size={24} />} title="Vendas" link="/ajuda/vendas/visao-geral-vendas" color="green" />
+                    <ModuleCard icon={<TruckIcon size={24} />} title="Entregas" link="/ajuda/entregas/visao-geral-entregas" color="blue" />
                     <ModuleCard icon={<ServiceIcon size={24} />} title="Serviços" link="/ajuda/servicos/visao-geral-servicos" color="green" />
                     <ModuleCard icon={<UserIcon size={24} />} title="Clientes" link="/ajuda/clientes/visao-geral-clientes" color="green" />
                     <ModuleCard icon={<MoneyIcon size={24} />} title="Financeiro" link="/ajuda/financeiro/visao-geral-financeiro" color="green" />

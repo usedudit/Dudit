@@ -2440,7 +2440,7 @@ export async function getERPProductsPageAction(
                     .select("id, short_id, store_id, name, stock_quantity, price, promotional_price, min_stock, is_active, status, sku, images, unit, location, brand, created_at, variants:product_variants(count), show_in_marketplace, moderation_status, category_id, category:product_categories!category_id(name), brand_id, brand_rel:brands!brand_id(name), location_id, location_rel:storage_locations!location_id(name)")
                     .eq("partner_id", partnerId)
 
-                if (options?.storeId) q = q.eq("store_id", options.storeId)
+                if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
 
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
                     q = scopeArchivedOnly(q)

@@ -96,7 +96,7 @@ export async function getERPServicesPageAction(
                     .from("services")
                     .select("id, short_id, store_id, name, category_id, subcategory_id, price, cost_price, is_active, status, sku, images, unit, duration_minutes, created_at, description, service_categories!category_id(name)")
                     .eq("partner_id", partnerId)
-                if (options?.storeId) q = q.eq("store_id", options.storeId)
+                if (options?.storeId) q = q.or(`store_id.eq.${options.storeId},store_id.is.null`)
                 if (options?.filters?.status === "archived" || options?.filters?.tab === "archived" || options?.filters?.status === "arquivado") {
                     q = scopeArchivedOnly(q)
                 } else if (!options?.filters?.includeArchived) {

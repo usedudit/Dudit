@@ -22,6 +22,7 @@ export default function HelpSidebar({
         "boas-vindas": true,
         "login-registro": true,
         "vendas": true,
+        "entregas": true,
         "produtos-estoque": true,
         "servicos": true,
         "clientes": true,
@@ -46,6 +47,7 @@ export default function HelpSidebar({
         if (id === "boas-vindas") return "👋"
         if (id === "login-registro") return "🔐"
         if (id === "vendas") return "🛒"
+        if (id === "entregas") return "🚚"
         if (id === "financeiro") return "💰"
         if (id === "produtos-estoque") return "📦"
         if (id === "servicos") return "🛠️"

@@ -1161,7 +1161,7 @@ export function ExplorarPageClient({
                 key={`${item.itemType}-${item.id}`}
                 href={getItemUrl(item)}
                 prefetch={false}
-                className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 sm:grid-cols-[180px_1fr] hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
+                className="group grid grid-cols-[100px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30"
             >
                 <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
                     <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />

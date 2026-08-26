@@ -103,6 +103,7 @@ const StepUpModal = ({
                                 if (e.key === "Enter" && password.trim()) handleSubmit()
                             }}
                             autoFocus
+                            autoComplete="off"
                         />
                         <button
                             type="button"

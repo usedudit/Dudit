@@ -497,17 +497,6 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                             icon={CheckCircleIcon}
                             title='Importação Processada!'
                             subtitle={`Processamos ${totalRows} linhas da sua planilha em ${(importStats.durationMs / 1000).toFixed(1)}s.`}
-                            buttons={[
-                                { text: "Voltar", action: "/erp/produtos", variant: "outline" },
-                                {
-                                    text: "Nova Importação", action: () => {
-                                        setStep("upload")
-                                        setImportDone(false)
-                                        setImportStats(null)
-                                        setParsedProducts([])
-                                        setMapping([])
-                                    }
-                                }]}
                         />
 
                         {/* Breakdown Cards */}
@@ -548,10 +537,9 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                             </>
                         )}
 
-                        {/* Action Buttons */}
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={() => router.push("/erp/produtos")}>
-                                Ver Produtos no ERP
+                                Voltar
                             </Button>
                             <Button onClick={() => {
                                 setStep("upload")

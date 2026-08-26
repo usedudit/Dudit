@@ -1,10 +1,15 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
+import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { revalidatePath } from "next/cache"
+import { safeRevalidateTag, revalidateProducts, revalidateCustomers } from "@/lib/utils/revalidation"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 import {
   readSpreadsheet,
   suggestMapping,
@@ -99,7 +104,7 @@ export async function uploadPlanilhaAction(
 
     const entityTypeParam = formData.get("entityType") as string | null
     let partnerId = formData.get("partnerId") as string
-    const storeId = formData.get("storeId") as string
+    let storeId = (formData.get("storeId") as string) || null
 
     if (!partnerId) {
       return { success: false, error: "Parceiro não identificado." }
@@ -112,6 +117,21 @@ export async function uploadPlanilhaAction(
     const detectedEntity = entityType || detectEntity(readResult.headers)
     const access = await requireAuthorizedPartnerContext(partnerId, detectedEntity as any, "create")
     partnerId = access.partnerId
+
+    if (!storeId && (detectedEntity === "products" || detectedEntity === "services")) {
+      const partnerContext = await getCurrentPartnerContext()
+      if (partnerContext?.activeStoreId && partnerContext.partnerId === partnerId) {
+        storeId = partnerContext.activeStoreId
+      }
+      if (!storeId) {
+        const admin = getAdminClient()
+        const { data: stores } = await admin.from("stores").select("id").eq("partner_id", partnerId).limit(1)
+        if (stores && stores.length > 0) {
+          storeId = stores[0].id
+        }
+      }
+    }
+
     const mapping = suggestMapping(readResult.headers, detectedEntity, readResult.rows)
     const fields = getFieldsForEntity(detectedEntity)
     const availableFields = fields.map((f) => ({
@@ -129,7 +149,7 @@ export async function uploadPlanilhaAction(
       totalRows: readResult.totalRows,
       fileName: readResult.fileName,
       partnerId,
-      storeId,
+      storeId: storeId || "",
     })
 
     // Verify session was stored
@@ -218,6 +238,21 @@ export async function confirmImportAction(
     await requirePermission(canonicalPartnerId, session.entityType as any, "create", user)
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
 
+    // Ensure session has resolved storeId if missing for products or services
+    if (!session.storeId && (session.entityType === "products" || session.entityType === "services")) {
+      const partnerContext = await getCurrentPartnerContext(user)
+      if (partnerContext?.activeStoreId && partnerContext.partnerId === canonicalPartnerId) {
+        session.storeId = partnerContext.activeStoreId
+      }
+      if (!session.storeId) {
+        const admin = getAdminClient()
+        const { data: stores } = await admin.from("stores").select("id").eq("partner_id", canonicalPartnerId).limit(1)
+        if (stores && stores.length > 0) {
+          session.storeId = stores[0].id
+        }
+      }
+    }
+
     const result = await executeImport(session, mapping, options)
 
     const supabase = await getSupabaseServerClient()
@@ -238,6 +273,20 @@ export async function confirmImportAction(
     })
 
     await deleteImportSession(canonicalPartnerId, sessionId)
+
+    // Invalidate caches & tags on successful import
+    if (result.successRows > 0) {
+      if (session.entityType === "services") {
+        await safeRevalidateTag(TAGS.services(canonicalPartnerId))
+        revalidatePath("/erp/servicos")
+      } else if (session.entityType === "products") {
+        await revalidateProducts(canonicalPartnerId)
+        revalidatePath("/erp/produtos")
+      } else if (session.entityType === "customers") {
+        await revalidateCustomers(canonicalPartnerId)
+        revalidatePath("/erp/clientes")
+      }
+    }
 
     if (status === "failed") {
       return { success: false, error: result.errorMessage || "Nenhum dado pôde ser importado. Verifique os erros na planilha.", result }

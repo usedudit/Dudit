@@ -309,6 +309,7 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                                 value={refundPassword}
                                 onChange={(e) => setRefundPassword(e.target.value)}
                                 placeholder="Digite sua senha para autorizar"
+                                autoComplete="off"
                             />
                         </div>
 

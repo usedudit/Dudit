@@ -7132,6 +7132,360 @@ Relatórios exigem o plano **Crescer** ou superior.
 `
             }
         ]
+    },
+    {
+        id: "entregas",
+        title: "Entregas",
+        icon: "🚚",
+        articles: [
+            {
+                id: "visao-geral-entregas",
+                title: "Visão geral das entregas",
+                description: "Entenda como funciona o sistema de entregas na Dudit.",
+                slug: "visao-geral-entregas",
+                category: "entregas",
+                content: `
+O sistema de entregas da Dudit conecta vendedores, clientes e entregadores de forma simples e organizada. Aqui você entende como tudo funciona, seja você quem vende ou quem compra.
+
+## Como funciona na prática
+
+Quando um cliente faz um pedido com entrega, o vendedor precisa organizar logística: quem vai entregar, quando sai a rota e como acompanhar tudo. O cliente, por sua vez, quer saber onde está o pedido.
+
+O sistema_resolve isso em etapas simples:
+
+1. **Pedido feito** - O cliente escolhe "entrega" no momento da compra e informa o endereço.
+2. **Loja organiza** - O vendedor cria uma entrega, agrupa pedidos da mesma região e designa um entregador.
+3. **Saiu para entrega** - O entregador sai com a mercadoria e o cliente recebe aviso no WhatsApp.
+4. **Entregue** - O cliente confirma o recebimento e o pedido é finalizado.
+
+## Para quem é?
+
+### Para vendedores (lojas)
+- Organize suas entregas criando rotas inteligentes por região
+- Cadastre seus entregadores (funcionários ou motoboys)
+- Acompanhe cada entrega em tempo real
+- Veja métricas de desempenho da sua operação
+
+### Para clientes
+- Acompanhe onde está seu pedido pelo WhatsApp
+- Receba notificações a cada etapa da entrega
+- Saiba o horário previsto de chegada
+
+### Para entregadores
+- Acesse suas rotas pelo celular
+- Veja endereços e pedidos para entregar
+- Confirme entregas direto no aplicativo
+
+## O que você precisa saber
+
+> [!TIP]
+> As entregas são organizadas por **rotas**. Uma rota pode conter vários pedidos da mesma região, otimizando tempo e combustível.
+
+- Cada entrega tem um **status** que acompanha o progresso
+- O sistema calcula **distância e tempo estimado** automaticamente
+- O cliente recebe **notificação no WhatsApp** a cada atualização
+- Entregadores podem atualizar status pelo celular
+
+## Artigos relacionados
+
+- **Configurando entregas da loja** - Passo a passo para ativar e configurar entregas
+- **Portal de entregadores** - Como funciona o acesso dos entregadores
+- **Acompanhando sua entrega** - Guia para clientes rastrearem pedidos
+`
+            },
+            {
+                id: "configurando-entregas-loja",
+                title: "Configurando entregas da loja",
+                description: "Ative e configure as entregas para sua loja.",
+                slug: "configurando-entregas-loja",
+                category: "entregas",
+                content: `
+Para começar a fazer entregas, você precisa configurar algumas coisas na sua loja. É simples e rápido!
+
+## O que você precisa configurar
+
+Antes de criar sua primeira entrega, verifique se está tudo certo:
+
+- **Endereço da loja** - O sistema usa para calcular distâncias e taxas de entrega
+- **Raio de entrega** - Até quantos km vocês entregam
+- **Taxa de entrega** - Quanto cobrar por km ou valor fixo
+- **Entregadores** - Cadastre quem vai fazer as entregas
+
+## Como ativar entregas
+
+1. No menu lateral, vá em **Configurações**
+2. Clique na aba **Entregas**
+3. Ative a opção **"Permitir entregas"**
+4. Preencha os dados:
+   - **Taxa base** (valor fixo da entrega)
+   - **Km incluso** (quantos km estão no preço)
+   - **Valor por km extra** (quanto cobrar além do incluso)
+   - **Raio máximo** (distância máxima que vocês entregam)
+
+> [!IMPORTANT]
+> Se você não preencher esses campos, o sistema não vai calcular frete para seus clientes.
+
+## Cadastro de entregadores
+
+### Como cadastrar
+
+1. Acesse **Vendas > Expedição e entregas**
+2. Clique em **Entregadores**
+3. Clique em **Novo entregador**
+4. Preencha:
+   - **Nome** do entregador
+   - **Telefone** para contato
+   - **Observações** (horários disponíveis, por exemplo)
+5. Salve
+
+### Ativar ou desativar
+
+- Entregadores **ativos** aparecem nas opções ao criar entregas
+- Entregadores **desativados** ficam escondidos mas o histórico continua
+
+## Como funciona o cálculo do frete
+
+Quando o cliente faz um pedido, o sistema:
+
+1. Calcula a **distância** entre a loja e o endereço do cliente
+2. Verifica se está dentro do **raio máximo**
+3. Aplica a **taxa base** + **km extra** se necessário
+4. Mostra o valor final para o cliente
+
+**Exemplo:**
+- Taxa base: R$ 5,00
+- Km incluso: 3 km
+- Valor por km extra: R$ 2,00
+- Cliente está a 5 km
+
+Cálculo: R$ 5,00 (base) + R$ 4,00 (2 km extra × R$ 2,00) = **R$ 9,00**
+
+## Entrega gratuita
+
+Você pode oferecer entrega gratuita:
+
+- **Acima de um valor** - Ex: "Entrega grátis para compras acima de R$ 50"
+- **Sempre** - Defina a taxa como R$ 0
+
+Para configurar entrega grátis acima de um valor:
+1. Vá em **Configurações > Entregas**
+2. Preencha **"Limite para entrega grátis"** (ex: 50)
+3. Salve
+
+## Dicas importantes
+
+- Mantenha o **endereço da loja** sempre atualizado - ele é usado nos cálculos
+- Cadastre **todos os entregadores** que trabalham com você
+- Revise as **taxas** periodicamente - combustível e custos mudam
+- Se não tiver entregadores próprios, pode usar transportadoras parceiras
+
+## Problemas comuns
+
+**"O frete está muito caro para o cliente"**
+Verifique se o raio de entrega não está muito longe. Considere reduzir a taxa base ou o valor por km.
+
+**"Não consigo ativar entregas"**
+Verifique se você tem o plano adequado. Entregas básicas estão disponíveis em todos os planos, mas rotas inteligentes exigem plano Escalar.
+
+**"O cálculo do frete está errado"**
+Confira o endereço da loja e o endereço do cliente. Um CEP incorreto pode gerar distâncias erradas.
+`
+            },
+            {
+                id: "portal-entregadores",
+                title: "Portal de entregadores",
+                description: "Como funciona o acesso e uso pelo entregador.",
+                slug: "portal-entregadores",
+                category: "entregas",
+                content: `
+O Portal de Entregadores é o app que seus entregadores usam no celular para ver as rotas, endereços e confirmar entregas. É simples e direto.
+
+## O que é o Portal
+
+É uma versão simplificada do sistema feita especialmente para quem faz entregas. O entregador vê apenas o que precisa:
+- Entregas atribuídas a ele
+- Lista de endereços
+- Status de cada entrega
+- Opção de confirmar entrega
+
+## Como o entregador acessa
+
+1. O vendedor cadastra o entregador no sistema (.nome, telefone)
+2. O entregador recebe um **convite por WhatsApp ou email**
+3. Ele cria uma senha e acessa o portal
+4. Pode usar pelo **celular** (navegador) ou **computador**
+
+> [!TIP]
+> O entregador não precisa baixar nenhum aplicativo. Ele acessa direto pelo navegador do celular.
+
+## O que o entregador vê
+
+### Tela principal
+- Lista de **entregas pendentes** (que ainda não saíram)
+- Lista de **entregas em andamento** (já saiu para entrega)
+- Histórico de **entregas concluídas**
+
+### Detalhes da entrega
+- **Endereços** na ordem da rota
+- **Nome do cliente** em cada parada
+- **Itens** que está levando
+- **Telefone** do cliente (para ligar se precisar)
+- **Observações** especiais (ex: "Tocar campainha 2 vezes")
+
+### Confirmação de entrega
+Para cada pedido na rota, o entregador pode marcar como:
+- ✅ **Entregue** - Cliente recebeu o pedido
+- ❌ **Falha** - Não conseguiu entregar (cliente ausente, endereço errado, etc.)
+
+## Como funciona na prática
+
+### Dia a dia do entregador
+
+1. **Manhã** - Acessa o portal e vê as entregas do dia
+2. **Sai para rota** - O vendedor marca como "Saiu para entrega"
+3. **A cada parada** - Confirma entrega ou falha pelo celular
+4. **Fim do dia** - Todas as entregas são finalizadas
+
+### Exemplo real
+
+**João é entregador da Padaria do Seu José:**
+
+1. João acessa o portal pelo celular
+2. Vê 3 entregas pendentes para hoje
+3. Seu José cria uma rota e atribui a João
+4. João sai com os pedidos
+5. Na primeira parada: cliente ausente → marca como "Falha"
+6. Na segunda parada: cliente recebeu → marca como "Entregue"
+7. Na terceira parada: cliente recebeu → marca como "Entregue"
+8. Rota finalizada automaticamente
+
+## Permissões do entregador
+
+O entregador **pode**:
+- Ver entregas atribuídas a ele
+- Ver endereços e dados dos clientes
+- Atualizar status (entregue/falha)
+- Ver observações da entrega
+
+O entregador **não pode**:
+- Criar entregas novas
+- Alterar dados de pedidos
+- Ver valores dos pedidos
+- Acessar outras partes do sistema
+
+## Dicas para o entregador
+
+- **Atualize o status** a cada entrega - isso avisa o cliente e o vendedor
+- Se tiver problema, use o campo de **observações** para explicar
+- Mantenha o **telefone** atualizado para contato
+- Em caso de falha, tente novamente no mesmo dia se possível
+
+## Perguntas frequentes
+
+**O entregador precisa de internet?**
+Sim, ele precisa de conexão para acessar o portal e enviar as atualizações.
+
+**O entregador vê o valor do pedido?**
+Não, por padrão. Ele vê apenas endereço, nome e itens. O vendedor pode alterar isso nas permissões.
+
+**E se o entregador esquecer a senha?**
+Ele pode usar "Esqueci minha senha" na tela de login. Um link será enviado por email.
+
+**Posso ter vários entregadores na mesma rota?**
+Não. Cada rota é atribuída a um único entregador. Se precisar dividir, crie rotas separadas.
+`
+            },
+            {
+                id: "acompanhando-entrega-cliente",
+                title: "Acompanhando sua entrega",
+                description: "Guia para clientes rastrearem seus pedidos.",
+                slug: "acompanhando-entrega-cliente",
+                category: "entregas",
+                content: `
+Fez um pedido com entrega? Aqui você vê como acompanhar cada etapa, do pedido até chegar na sua porta.
+
+## Como funciona o acompanhamento
+
+Quando sua compra é confirmada, você recebe atualizações pelo **WhatsApp** a cada etapa importante:
+
+1. **Pedido confirmado** - A loja recebeu e está preparando
+2. **Saiu para entrega** - O entregador está a caminho
+3. **Entregue** - Pedido chegou!
+
+Você também pode acompanhar pelo site da loja, se disponível.
+
+## Onde ver o status
+
+### Pelo WhatsApp
+- Você recebe mensagens automáticas com o status
+- Pode responder para tirar dúvidas (se a loja ativar)
+
+### Pelo site da loja
+1. Acesse a loja online
+2. Vá em **Meus Pedidos**
+3. Clique no pedido que quer acompanhar
+4. Veja o status atual e o histórico
+
+### Pelo link de rastreio
+- Alguns pedidos enviados por transportadora têm link de rastreio
+- Clique no link para ver onde está o pacote
+
+## Status e o que significam
+
+| Status | O que acontece |
+|--------|----------------|
+| **Pendente** | Pedido recebido, aguardando preparação |
+| **Em preparação** | Sendo separado e embalado |
+| **Saiu para entrega** | O entregador saiu com seu pedido |
+| **Entregue** | Chegou! Confirme o recebimento |
+| **Falha na entrega** | Não conseguiu entregar (verifique o motivo) |
+
+## O que fazer em cada situação
+
+### Se o pedido está "Em preparação"
+- Aguarde. O tempo depende da loja
+- Se demorar muito, entre em contato com a loja
+
+### Se saiu para entrega
+- Fique atento ao WhatsApp
+- O entregador pode ligar se não encontrar o endereço
+- Verifique se tem alguém em casa para receber
+
+### Se deu falha na entrega
+- Verifique o motivo (cliente ausente, endereço errado, etc.)
+- Entre em contato com a loja para reagendar
+- Geralmente a loja tenta entregar novamente
+
+### Se foi entregue
+- Confirme o recebimento pelo WhatsApp ou site
+- Se não recebeu, avise a loja imediatamente
+
+## Dicas importantes
+
+- Mantenha seu **WhatsApp** atualizado para receber notificações
+- Confira se o **endereço** está correto antes de finalizar a compra
+- Se mora em condomínio, coloque **complemento** (bloco, apto, etc.)
+- Esteja disponível no **horário estimado** de entrega
+
+## Perguntas frequentes
+
+**Não recebi notificação no WhatsApp.**
+Verifique se o número está correto. Entre em contato com a loja para confirmar.
+
+**Meu pedido atrasou, o que faço?**
+Entre em contato com a loja pelo WhatsApp ou telefone. O atraso pode ser de trânsito ou alta demanda.
+
+**Posso trocar o endereço depois de feito o pedido?**
+Depende. Se ainda não saiu para entrega, entre em contato com a loja o quanto antes.
+
+**O entregador não encontrou meu endereço.**
+Verifique se o endereço está completo com CEP, rua, número, bairro, cidade. Se tiver erro, corrija e peça nova entrega.
+
+**Meu pedido chegou com problema.**
+Tire fotos e entre em contato com a loja. Eles vão orientar sobre troca ou devolução.
+`
+            }
+        ]
     }
 ]
 

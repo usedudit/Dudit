@@ -24,6 +24,8 @@ import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 type DbTransaction = {
     id: string
@@ -2902,36 +2904,45 @@ export async function getTransactionDetailsAction(
         await requirePermission(partnerId, "financial", "view")
         const supabase = createAdminClient()
 
-        let txQuery = await supabase
-            .from("transactions")
-            .select(
-                `
+        const txQuery = await getCachedErpPage<any>(
+            ["erp-transaction-detail-row", partnerId, transactionId],
+            [TAGS.transactions(partnerId), TAGS.transactionHistory(transactionId)],
+            async () => {
+                const detailClient = createAdminClient()
+                let result = await detailClient
+                    .from("transactions")
+                    .select(
+                        `
         id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, created_by_user_id, installment_group_id,
         transaction_contacts(name, type, description)
       `,
-            )
-            .eq("id", transactionId)
-            .eq("partner_id", partnerId)
-            .single()
-        if (txQuery.error && isMissingCreatedByUserIdColumnError(txQuery.error)) {
-            txQuery = await supabase
-                .from("transactions")
-                .select(
-                    `
+                    )
+                    .eq("id", transactionId)
+                    .eq("partner_id", partnerId)
+                    .single()
+                if (result.error && isMissingCreatedByUserIdColumnError(result.error)) {
+                    result = await detailClient
+                        .from("transactions")
+                        .select(
+                            `
         id, description, category, amount, original_amount, interest_amount, discount_amount, paid_amount, due_date, payment_date, created_at, updated_at, status, notes,
         payment_type, transaction_type, contact_id, customer_id, contact_type, transfer_group_id,
         refund_kind, reference_note, origin, account_id, category_id, subcategory_id, recurring_id,
         payment_method_id, transaction_date, installment_group_id,
         transaction_contacts(name, type, description)
       `,
-                )
-                .eq("id", transactionId)
-                .eq("partner_id", partnerId)
-                .single()
-        }
+                        )
+                        .eq("id", transactionId)
+                        .eq("partner_id", partnerId)
+                        .single()
+                }
+                return result
+            },
+            15,
+        )
 
         const t = txQuery.data
         const error = txQuery.error

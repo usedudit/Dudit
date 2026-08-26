@@ -59,7 +59,7 @@ export async function fetchProductsExport(
     fetchPage: async (cursor) => {
       let query: any = (supabase as any).from("products").select(selectFields).eq("partner_id", partnerId)
 
-      if (filters.storeId) query = query.eq("store_id", filters.storeId)
+      if (filters.storeId) query = query.or(`store_id.eq.${filters.storeId},store_id.is.null`)
       if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
 
       if (statusLabels.length === 1) {

@@ -44,7 +44,7 @@ export function getProductDisplayImages(
   }
 
   const variants = product.product_variants || product.variants
-  if (variants && variants.length > 0) {
+  if (Array.isArray(variants) && variants.length > 0) {
     const variantImg = findVariantImage(variants)
     if (variantImg) {
       return [resolveMediaUrl(variantImg, size)]

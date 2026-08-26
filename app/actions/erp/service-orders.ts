@@ -86,25 +86,48 @@ export async function getServiceOrderDetailsAction(
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requirePermission(partnerId, "service_orders", "view")
-    const supabase = await getSupabaseServerClient()
+    const detail = await getCachedErpPage(
+      ["erp-service-order-detail", partnerId, serviceOrderId],
+      [
+        TAGS.serviceOrders(partnerId),
+        TAGS.orders(partnerId),
+        TAGS.entityTimeline("service_order", serviceOrderId),
+      ],
+      async () => {
+        // Authorization is performed above. The cached loader is tenant-scoped
+        // and read-only, so it can use the admin client safely.
+        const admin = getAdminClient()
+        const { data: order, error } = await admin
+          .from("service_orders")
+          .select("*")
+          .eq("id", serviceOrderId)
+          .eq("partner_id", partnerId)
+          .single()
 
-    const { data: order, error } = await supabase
-      .from("service_orders")
-      .select("*")
-      .eq("id", serviceOrderId)
-      .eq("partner_id", partnerId)
-      .single()
+        if (error) throw error
+        if (!order) throw new Error("Ordem de serviço não encontrada")
 
-    if (error) throw error
-    if (!order) throw new Error("Ordem de serviço não encontrada")
+        const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes] = await Promise.all([
+          admin.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
+          admin.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
+          admin.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
+          fetchTimelineForEntity("service_order", serviceOrderId, partnerId),
+          order.sale_id ? admin.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
+        ])
 
-    const [servicesRes, productsRes, attachmentsRes, historyRes, saleRes] = await Promise.all([
-      supabase.from("service_order_services").select("*, services(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
-      supabase.from("service_order_products").select("*, products(name, price)").eq("service_order_id", serviceOrderId).order("sort_order"),
-      supabase.from("service_order_attachments").select("*").eq("service_order_id", serviceOrderId).order("created_at", { ascending: false }),
-      fetchTimelineForEntity("service_order", serviceOrderId, partnerId),
-      order.sale_id ? supabase.from("sales").select("*").eq("id", order.sale_id).single() : Promise.resolve({ data: null }),
-    ])
+        return {
+          order,
+          services: servicesRes.data || [],
+          products: productsRes.data || [],
+          attachments: attachmentsRes.data || [],
+          history: historyRes,
+          sale: saleRes?.data || null,
+        }
+      },
+      15,
+    )
+
+    const { order } = detail
 
     let specifications = order.specifications
     if (typeof specifications === "string") {
@@ -120,11 +143,11 @@ export async function getServiceOrderDetailsAction(
       data: {
         ...order,
         specifications,
-        services: servicesRes.data || [],
-        products: productsRes.data || [],
-        attachments: attachmentsRes.data || [],
-        history: historyRes,
-        sale: saleRes?.data || null,
+        services: detail.services,
+        products: detail.products,
+        attachments: detail.attachments,
+        history: detail.history,
+        sale: detail.sale,
       },
     }
   } catch (err: any) {

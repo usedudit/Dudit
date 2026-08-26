@@ -6,6 +6,7 @@ import { Button, Checkbox, Spinner, SelectionBanner, Pagination, IconPlaceholder
 import { ChevronLeftIcon, UploadIcon, CheckCircleIcon, SearchIcon, DownloadIcon, AlertCircleIcon, GridIcon, ListIcon } from "@/lib/icons"
 import { useDropzone } from "react-dropzone"
 import { useNotification } from "@/hooks/use-notification"
+import { useStore } from "@/lib/store-context"
 import {
     uploadPlanilhaAction,
     confirmImportAction,
@@ -232,6 +233,7 @@ function ServicePreviewRow({ service, selected, onSelect }: { service: any; sele
 export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const { selectedStore } = useStore()
 
     const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload")
     const [uploading, setUploading] = useState(false)
@@ -368,6 +370,9 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
             formData.append("file", file)
             formData.append("partnerId", partnerId)
             formData.append("entityType", "services")
+            if (selectedStore?.id) {
+                formData.append("storeId", selectedStore.id)
+            }
 
             const result = await uploadPlanilhaAction(formData)
 
@@ -387,7 +392,7 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
             setUploading(false)
             setStep("mapping")
         },
-        [partnerId, notifyError],
+        [partnerId, selectedStore, notifyError],
     )
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -516,17 +521,6 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                             icon={CheckCircleIcon}
                             title='Importação Processada!'
                             subtitle={`Processamos ${totalRows} linhas da sua planilha em ${(importStats.durationMs / 1000).toFixed(1)}s.`}
-                            buttons={[
-                                { text: "Voltar", action: "/erp/servicos", variant: "outline" },
-                                {
-                                    text: "Nova Importação", action: () => {
-                                        setStep("upload")
-                                        setImportDone(false)
-                                        setImportStats(null)
-                                        setParsedServices([])
-                                        setMapping([])
-                                    }
-                                }]}
                         />
 
                         {/* Breakdown Cards */}
@@ -567,10 +561,9 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                             </>
                         )}
 
-                        {/* Action Buttons */}
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={() => router.push("/erp/servicos")}>
-                                Ver Serviços no ERP
+                                Voltar
                             </Button>
                             <Button onClick={() => {
                                 setStep("upload")

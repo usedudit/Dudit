@@ -513,17 +513,6 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                             icon={CheckCircleIcon}
                             title='Importação Processada!'
                             subtitle={`Processamos ${totalRows} linhas da sua planilha em ${(importStats.durationMs / 1000).toFixed(1)}s.`}
-                            buttons={[
-                                { text: "Voltar", action: "/erp/clientes", variant: "outline" },
-                                {
-                                    text: "Nova Importação", action: () => {
-                                        setStep("upload")
-                                        setImportDone(false)
-                                        setImportStats(null)
-                                        setParsedCustomers([])
-                                        setMapping([])
-                                    }
-                                }]}
                         />
 
                         {/* Breakdown Cards */}
@@ -564,10 +553,9 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                             </>
                         )}
 
-                        {/* Action Buttons */}
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={() => router.push("/erp/clientes")}>
-                                Ver Clientes no ERP
+                                Voltar
                             </Button>
                             <Button onClick={() => {
                                 setStep("upload")
