@@ -492,11 +492,10 @@ export async function middleware(request: NextRequest) {
           const activePartnerId = request.cookies.get("active_partner_id")?.value
           const needsPartnerCheck = pathname.startsWith("/erp") && !!activePartnerId
 
-          // Only query account_deletions if the flag cookie exists - avoids an unnecessary
-          // DB call on every request for the 99.99% of users who never request deletion.
+          // Only query account_deletions if the flag cookie exists or on protected routes.
           const hasDeletionFlag = request.cookies.get("x-account-deleting")?.value === "true"
-          const needsUserDeletionCheck = hasDeletionFlag && (isProtected || pathname.startsWith("/sacola") || pathname.startsWith("/checkout"))
-          const needsPartnerDeletionCheck = hasDeletionFlag && needsPartnerCheck
+          const needsUserDeletionCheck = (hasDeletionFlag || isProtected) && (isProtected || pathname.startsWith("/sacola") || pathname.startsWith("/checkout"))
+          const needsPartnerDeletionCheck = (hasDeletionFlag || isProtected) && needsPartnerCheck
 
           // Launch all queries in parallel
           const [profileResult, partnerResult, deletionResult, partnerDeletionResult] = await Promise.all([
@@ -551,6 +550,8 @@ export async function middleware(request: NextRequest) {
               }
             })
             responseRedirect.cookies.delete("active_partner_id")
+            responseRedirect.cookies.delete("active_store_id")
+            responseRedirect.cookies.delete("x-account-deleting")
             return responseRedirect
           }
 
@@ -642,23 +643,32 @@ export async function middleware(request: NextRequest) {
 
         // SECURITY: If already logged in and trying to access auth pages -> redirect to home
         // Exception: allow through if there's a ?next= param (e.g. invite flow) or ?mode=partner (partner registration)
-        // Prevents duplicate login/signup attempts and confusing UX
+        // or if returning from account deletion flow (?deleted=true or ?error=account_deleting)
         const authBlockedPaths = ["/auth/login"]
         const hasNextParam = request.nextUrl.searchParams.has("next")
         const hasModePartner = request.nextUrl.searchParams.get("mode") === "partner"
+        const isAuthDeleted = request.nextUrl.searchParams.get("deleted") === "true"
+        const isAuthErrorDeleting = request.nextUrl.searchParams.get("error") === "account_deleting"
+        const isDeletionState = isAuthDeleted || isAuthErrorDeleting
 
-        if (user && !hasNextParam && !hasModePartner && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
-          // Define a base usando a sua variável de ambiente ou o domínio fixo
-          // Cria uma URL nova do zero baseada no domínio atual do request
+        // If landing on /auth/login with deletion state, purge any lingering auth cookies and allow staying on /auth/login
+        if (isDeletionState && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
+          request.cookies.getAll().forEach(c => {
+            if (c.name.startsWith("sb-")) {
+              response.cookies.delete(c.name)
+            }
+          })
+          response.cookies.delete("active_partner_id")
+          response.cookies.delete("active_store_id")
+          response.cookies.delete("x-account-deleting")
+          return response
+        }
+
+        if (user && !hasNextParam && !hasModePartner && !isDeletionState && authBlockedPaths.some(p => pathname === p || pathname.startsWith(p + "/"))) {
           const url = new URL("/", request.url)
-
-          // Se você quiser manter os parâmetros da busca original (exceto os deletados), 
-          // você pode copiá-los assim:
           request.nextUrl.searchParams.forEach((value, key) => {
             url.searchParams.set(key, value)
           })
-
-          // Agora limpa os parâmetros específicos que você não quer levar pra Home
           url.searchParams.delete("mode")
           url.searchParams.delete("verified")
 

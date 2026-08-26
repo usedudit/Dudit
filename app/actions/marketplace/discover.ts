@@ -522,7 +522,11 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
         .order("created_at", { ascending: false })
         .limit(60)
 
-    if (error || !data) return []
+    if (error) {
+        console.error("[Discover] getSharedHomeServicesPool error:", error)
+        return []
+    }
+    if (!data) return []
     return data as any[]
 })
 

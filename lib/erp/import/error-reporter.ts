@@ -8,7 +8,7 @@ export async function generateFailedRowsReport(
   failedRows: FailedRow[],
 ): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = "Dudit ERP"
+  workbook.creator = "Dudit"
   workbook.created = new Date()
 
   const sheet = workbook.addWorksheet("Linhas com Falhas", {

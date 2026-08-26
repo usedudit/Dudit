@@ -1801,10 +1801,6 @@ export function ProductDetailsPageClient({
                                             <span className="font-bold text-brand-dark dark:text-dark-heading text-base truncate">
                                                 {partner.store_name}
                                             </span>
-                                            <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
-                                                <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
-                                            </div>
                                         </div>
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
                                             {partner.city} - {partner.state}

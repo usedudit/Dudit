@@ -22,7 +22,7 @@ export async function buildExportFile(params: {
   }
 
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = "Dudit ERP"
+  workbook.creator = "Dudit"
   workbook.created = new Date()
 
   const sheet = workbook.addWorksheet(params.sheetName)

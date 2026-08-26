@@ -235,8 +235,8 @@ export async function createPartnerAction(data: CreatePartnerData) {
           from: process.env.SMTP2GO_FROM_EMAIL || "contato@dudit.com.br",
           to: [{ email: userEmail }],
           subject: "Conta de Parceiro Criada com Sucesso! 🚀",
-          html: `<h1>Conta de parceiro criada com sucesso!</h1><p>Olá, ${data.storeName}.</p><p>Sua conta já está pronta para uso no Dudit ERP.</p><p><a href="https://dudit.com.br/erp/inicio">Acessar o ERP</a></p>`,
-          text: `Olá, ${data.storeName}. Sua conta de parceiro foi criada com sucesso. Acesse https://dudit.com.br/erp/inicio para entrar no Dudit ERP.`,
+          html: `<h1>Conta de parceiro criada com sucesso!</h1><p>Olá, ${data.storeName}.</p><p>Sua conta já está pronta para uso na Dudit.</p><p><a href="https://dudit.com.br/erp/inicio">Acessar o ERP</a></p>`,
+          text: `Olá, ${data.storeName}. Sua conta de parceiro foi criada com sucesso. Acesse https://dudit.com.br/erp/inicio para entrar na Dudit.`,
         })
 
         if (emailResult.success) {

@@ -10,9 +10,7 @@ import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { createClient } from "@/lib/supabase/client"
-import { DefaultModal, RadioButton, Button, FormTextarea, InfoCard, Input } from "@/components/reusable"
-import { Calendar, Users as UsersIcon, FileText, AlertOctagon, CheckCircle } from "lucide-react"
-
+import { DefaultModal, Button, FormTextarea, InfoCard, Input, IconPlaceholder } from "@/components/reusable"
 import { View, EditField } from "./profile-shared"
 import { MainView } from "./MainView"
 import { AccountView } from "./AccountView"
@@ -20,7 +18,7 @@ import { AddressView } from "./AddressView"
 import { SecurityView } from "./SecurityView"
 import { ReviewsView } from "./ReviewsView"
 import { NotificationsView } from "./NotificationsView"
-import { AlertTriangleIcon } from "@/lib/icons"
+import { AlertCircleIcon } from "@/lib/icons"
 
 interface UserProfilePageProps {
     userId: string
@@ -181,9 +179,17 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
             if (res.success) {
                 setDeleteStep("success")
-                const supabase = createClient()
-                await supabase.auth.signOut()
-                window.location.href = "/auth/login?deleted=true"
+                try {
+                    const supabase = createClient()
+                    await supabase.auth.signOut({ scope: "global" })
+                } catch {}
+                if (typeof window !== "undefined") {
+                    try {
+                        localStorage.clear()
+                        sessionStorage.clear()
+                    } catch {}
+                    window.location.replace("/auth/login?deleted=true")
+                }
             }
         } catch (err) {
             setDeleteError("Ocorreu um erro ao confirmar a exclusão.")
@@ -799,39 +805,30 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 )}
 
                 {deleteStep === "verify_code" && (
-                    <div className="space-y-5 pt-2 pb-4">
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                            <div className="space-y-1 text-xs text-emerald-900 dark:text-emerald-200">
-                                <p className="font-bold text-emerald-950 dark:text-emerald-100">
-                                    Código enviado por e-mail
-                                </p>
-                                <p>
-                                    Enviamos um código numérico de 6 dígitos para <strong>{deleteMaskedEmail}</strong>. O código expira em 15 minutos.
-                                </p>
-                            </div>
-                        </div>
+                    <div className="pt-2 pb-4">
+                        <InfoCard
+                            title="Código enviado por e-mail"
+                            message={`Enviamos um código numérico de 6 dígitos para ${deleteMaskedEmail}. O código expira em 15 minutos.`}
+                            color="green"
+                        />
 
                         {deleteError && (
-                            <div className="p-3.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xl text-xs font-semibold text-red-700 dark:text-red-400 space-y-1">
-                                <p>{deleteError}</p>
-                                {deleteAttemptsRemaining !== null && deleteAttemptsRemaining > 0 && (
-                                    <p className="text-[11px] opacity-90">Tentativas restantes: {deleteAttemptsRemaining}</p>
-                                )}
-                            </div>
+                            <InfoCard
+                                title="Erro ao enviar código"
+                                message={`${deleteError} ${deleteAttemptsRemaining !== null && deleteAttemptsRemaining > 0 && `Tentativas restantes: ${deleteAttemptsRemaining}`}`}
+                                color="red"
+                            />
                         )}
 
                         <div className="space-y-2">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">
-                                Código de Confirmação (6 dígitos) *
-                            </label>
                             <Input
+                                label="Código de Confirmação (6 dígitos)"
                                 value={deleteCode}
                                 onChange={(e) => setDeleteCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                                 placeholder="000000"
                                 maxLength={6}
                                 autoFocus
-                                className="text-center font-mono text-2xl tracking-[0.4em] font-extrabold h-14"
+                                required
                             />
                             <div className="flex items-center justify-between text-xs pt-1">
                                 <span className="text-brand-inactive-text dark:text-dark-body">
@@ -842,27 +839,24 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                         Reenviar em {deleteCooldown}s
                                     </span>
                                 ) : (
-                                    <button
-                                        type="button"
+                                    <Button
+                                        variant="link"
                                         onClick={handleRequestDeletionCode}
                                         disabled={isRequestingCode}
-                                        className="font-bold text-brand-green hover:underline cursor-pointer disabled:opacity-50"
+                                        className="text-xs"
                                     >
                                         {isRequestingCode ? "Reenviando..." : "Reenviar novo código"}
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         </div>
 
                         <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-2">
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Digite <strong className="text-brand-dark dark:text-dark-heading">EXCLUIR</strong> abaixo para confirmar a ação irreversível:
-                            </p>
                             <Input
+                                label="Digite EXCLUIR para confirmar"
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
                                 placeholder="EXCLUIR"
-                                className="text-center font-bold"
                             />
                         </div>
                     </div>
@@ -875,37 +869,22 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 onClose={() => setActiveSubModalOpen(false)}
                 title="Assinatura Ativa Detectada"
             >
-                <div className="space-y-6 pt-2 pb-4 text-center">
-                    <div className="mx-auto flex items-center justify-center w-16 h-16 rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-500 mb-2">
-                        <svg className="w-8 h-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                        Cancele sua Assinatura Primeiro
-                    </h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body px-4">
-                        Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta.
-                    </p>
-                    <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button
-                            variant="outline"
-                            onClick={() => setActiveSubModalOpen(false)}
-                            className="flex-1 h-12 font-bold"
-                        >
-                            Fechar
-                        </Button>
-                        <Button
-                            variant="default"
-                            onClick={() => {
-                                setActiveSubModalOpen(false)
-                                window.location.href = "/erp/configuracoes/assinatura"
-                            }}
-                            className="flex-1 h-12 font-bold bg-amber-600 text-white hover:bg-amber-700"
-                        >
-                            Ir para Assinaturas
-                        </Button>
-                    </div>
+                <div>
+                    <IconPlaceholder
+                        icon={AlertCircleIcon}
+                        title="Assinatura Ativa Detectada"
+                        subtitle="Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta."
+                        buttons={[
+                            { text: "Fechar", type: "button", action: () => setActiveSubModalOpen(false) },
+                            {
+                                text: "Ir para Assinaturas", type: "button", action: () => {
+                                    setActiveSubModalOpen(false)
+                                    window.location.href = "/erp/configuracoes/assinatura"
+                                }
+                            }
+                        ]}
+
+                    />
                 </div>
             </DefaultModal>
         </>

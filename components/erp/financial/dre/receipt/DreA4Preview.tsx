@@ -59,9 +59,8 @@ export function DreA4Preview({
 
   return (
     <div
-      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${
-        printMode ? "dre-a4-print" : "border-l border-brand-border dark:border-dark-border"
-      }`}
+      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "dre-a4-print" : "border-l border-brand-border dark:border-dark-border"
+        }`}
     >
       <div
         className={
@@ -79,12 +78,11 @@ export function DreA4Preview({
         >
           {/* Folha A4 Padronizada */}
           <div
-            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col justify-between ${
-              printMode ? "pdf-print-page" : "shadow-md rounded-xs"
-            }`}
+            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-xs"
+              }`}
           >
             <div>
-              {/* ── 1. Top Banner Estilo Canônico do Dudit ERP ─────────────────── */}
+              {/* ── 1. Top Banner Estilo Canônico da Dudit ─────────────────── */}
               <div
                 className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
                 style={{ backgroundColor: primaryColor }}
@@ -260,7 +258,7 @@ export function DreA4Preview({
               style={{ backgroundColor: primaryColor }}
             >
               <span>Demonstração Contábil Gerencial</span>
-              <span>Criado via Dudit ERP • dudit.com.br</span>
+              <span>Criado via Dudit • dudit.com.br</span>
             </div>
           </div>
         </div>
@@ -378,9 +376,8 @@ function VariationBadgeA4({
 
   return (
     <span
-      className={`font-semibold ${
-        isGood ? "text-brand-green" : "text-[#cc4745]"
-      }`}
+      className={`font-semibold ${isGood ? "text-brand-green" : "text-[#cc4745]"
+        }`}
     >
       {isPositive ? `+${value}%` : `${value}%`}
     </span>

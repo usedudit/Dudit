@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { MailIcon, HelpCircleIcon } from "@/lib/icons"
+import { MailIcon } from "@/lib/icons"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { generateNameFromEmail } from "@/lib/utils"
-import { Button, EmailInput, Input, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner } from "@/components/reusable"
+import { Button, EmailInput, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner } from "@/components/reusable"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
@@ -47,7 +47,6 @@ function getEmailProvider(email: string) {
 
     return providers[domain] || null
 }
-
 
 // Otimização: Static Background Memoized
 const WavesBackground = React.memo(() => (
@@ -94,7 +93,7 @@ export default function AuthView({
         }
     }, [initialMode])
 
-    // Logic to handle timer decrement (Fix for the reported bug)
+    // Logic to handle timer decrement
     useEffect(() => {
         let timer: NodeJS.Timeout
         if (mode === "verify-email" && resendTimer > 0) {
@@ -109,7 +108,6 @@ export default function AuthView({
 
     // Logic to handle Supabase Auth implicit flow (hash fragments)
     useEffect(() => {
-        // If the user lands on the page with #access_token=... or #error=... in the URL
         if (typeof window !== 'undefined' && window.location.hash) {
             const hash = window.location.hash
 
@@ -117,18 +115,15 @@ export default function AuthView({
                 const errorDescriptionMatch = hash.match(/error_description=([^&]+)/)
                 const errorDescription = errorDescriptionMatch ? decodeURIComponent(errorDescriptionMatch[1].replace(/\+/g, ' ')) : "Erro na autenticação"
                 setError(getErrorMessage(errorDescription))
-                // Clear the hash without reloading
                 window.history.replaceState(null, '', window.location.pathname + window.location.search)
             } else if (hash.includes("access_token=")) {
                 setIsLoading(true)
-                // supabase-js automatically parses the hash into a session
                 supabase.auth.getSession().then((res: any) => {
-                    const { data, error } = res;
+                    const { data, error } = res
                     if (error) {
                         setError(getErrorMessage(error))
                         setIsLoading(false)
                     } else if (data?.session) {
-                        // Successfully logged in via hash fragment, hard navigate to destination
                         window.location.assign(getSafeNext(nextParam))
                     } else {
                         setIsLoading(false)
@@ -175,13 +170,10 @@ export default function AuthView({
                     throw error
                 }
 
-                // SECURITY: Supabase returns a user with empty identities when email already exists
                 if (data.user && data.user.identities && data.user.identities.length === 0) {
                     throw new Error("Este email já está cadastrado.")
                 }
 
-                // LEGAL: registra o aceite dos Termos de Uso e da Política de
-                // Privacidade. Não bloqueia o cadastro se o registro falhar.
                 if (data.user) {
                     try {
                         await Promise.all(
@@ -238,6 +230,22 @@ export default function AuthView({
                     return
                 }
 
+                // Check if account is in deletion process immediately after authentication
+                if (signInData?.user?.id) {
+                    try {
+                        const { checkUserDeletionStatusAction } = await import("@/app/actions/shared/account")
+                        const delStatus = await checkUserDeletionStatusAction(signInData.user.id)
+                        if (delStatus.isDeleting) {
+                            await supabase.auth.signOut()
+                            setError("Esta conta está em processo de exclusão definitiva e o acesso foi desativado.")
+                            setIsLoading(false)
+                            return
+                        }
+                    } catch (checkErr) {
+                        console.warn("[AUTH] Error checking user deletion status:", checkErr)
+                    }
+                }
+
                 try {
                     await handleLoginResult(cleanEmail, true)
                 } catch (clearErr) {
@@ -263,8 +271,6 @@ export default function AuthView({
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             const recoveryClient = getPasswordRecoveryClient()
 
-            // A previous recovery attempt must never be reused for a new email.
-            // The recovery client is isolated from the normal login session.
             await recoveryClient.auth.signOut({ scope: "local" })
 
             const { error } = await recoveryClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
@@ -293,7 +299,7 @@ export default function AuthView({
             if (error) throw error
 
             const nextRetryCount = retryCount + 1
-            const nextTimer = 60 * Math.pow(2, nextRetryCount) // Exponential backoff: 60, 120, 240, etc.
+            const nextTimer = 60 * Math.pow(2, nextRetryCount)
 
             setRetryCount(nextRetryCount)
             setResendTimer(nextTimer)
@@ -503,6 +509,22 @@ export default function AuthView({
                                                 <Checkbox id="terms" checked={acceptedTerms} onChange={(checked) => setAcceptedTerms(checked as boolean)} />
                                                 <label htmlFor="terms" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">Aceito os <Link href="institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de uso</Link></label>
                                             </div>
+                                        )}
+
+                                        {searchParams.get("deleted") === "true" && (
+                                            <InfoCard
+                                                title="Conta excluída com sucesso"
+                                                message="Sua solicitação de exclusão foi processada. A conta foi desativada e todos os dados associados estão sendo removidos."
+                                                color="green"
+                                            />
+                                        )}
+
+                                        {searchParams.get("error") === "account_deleting" && (
+                                            <InfoCard
+                                                title="Conta em processo de exclusão"
+                                                message="Esta conta está em processo de exclusão definitiva e não pode mais ser acessada."
+                                                color="red"
+                                            />
                                         )}
 
                                         {error && <InfoCard message={error} color="red" />}

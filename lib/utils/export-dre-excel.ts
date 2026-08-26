@@ -45,7 +45,7 @@ export async function exportDreToXLSX({
 }: ExportDreExcelParams) {
   const ExcelJS = await import("exceljs")
   const workbook = new ExcelJS.default.Workbook()
-  workbook.creator = "Dudit ERP"
+  workbook.creator = "Dudit"
   workbook.created = new Date()
 
   const sheet = workbook.addWorksheet("DRE Contábil", {

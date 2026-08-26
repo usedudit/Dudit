@@ -640,15 +640,18 @@ export class AccountDeletionService {
 
     anonymizedCount += (boughtOrders?.length || 0)
 
-    // 2. Anonymize Audit Logs
+    // 2. Anonymize Audit Logs (change_lines cannot be null per DB constraint)
     await admin
       .from("audit_logs")
       .update({
         user_id: null,
-        change_lines: null,
+        actor_user_id: null,
+        actor_name: "[DADOS ANONIMIZADOS]",
+        actor_email: null,
+        change_lines: ["[DADOS ANONIMIZADOS - CONTA EXCLUÍDA]"],
         new_values: null
       })
-      .eq("user_id", userId)
+      .or(`user_id.eq.${userId},actor_user_id.eq.${userId}`)
 
     await admin
       .from("admin_audit_logs")
@@ -657,7 +660,7 @@ export class AccountDeletionService {
       })
       .eq("admin_user_id", userId)
 
-    // 3. Write minimal compliance log
+    // 3. Write minimal compliance log (include requested_at to satisfy NOT NULL constraint)
     const workflowVersion = "v3"
     const deletionVersion = "1.0.0"
     const requestedTimestamp = new Date(requestedAt)
@@ -674,6 +677,7 @@ export class AccountDeletionService {
         request_country: country,
         user_agent: userAgent,
         request_timestamp: requestedTimestamp.toISOString(),
+        requested_at: requestedTimestamp.toISOString(),
         deletion_version: deletionVersion,
         workflow_version: workflowVersion,
         deletion_reason: reason

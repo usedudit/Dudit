@@ -1,9 +1,9 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, Input, FormTextarea } from "@/components/reusable"
+import { DefaultModal, Button, Input, FormTextarea, PhoneInput, Spinner, ListItem } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
-import { CheckCircleIcon, MapPinIcon, ClockIcon, ArrowRightIcon } from "@/lib/icons"
+import { CheckCircleIcon, MapPinIcon, ClockIcon, ArrowRightIcon, FileIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
 import { requestMarketplaceQuoteAction } from "@/app/actions/marketplace/quotes"
 
@@ -53,15 +53,19 @@ export function RequestQuoteModal({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
 
-    // Pre-fill phone on open
+    // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
             setIsSuccess(false)
-            if (userProfile?.phone && !phone) {
-                setPhone(userProfile.phone)
-            }
         }
-    }, [isOpen, userProfile])
+    }, [isOpen])
+
+    // Pre-fill phone on open
+    useEffect(() => {
+        if (isOpen && userProfile?.phone && !phone) {
+            setPhone(userProfile.phone)
+        }
+    }, [isOpen, userProfile?.phone])
 
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         let v = e.target.value.replace(/\D/g, "")
@@ -144,6 +148,34 @@ export function RequestQuoteModal({
             onClose={handleClose}
             title={isSuccess ? "Solicitação Enviada!" : "Solicitar Orçamento"}
             maxWidth="lg"
+            footer={
+                <div className="flex items-center justify-end gap-2.5">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleClose}
+                        disabled={isSubmitting}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting || !description.trim() || !phone.trim()}
+                        className="min-w-[170px]"
+                    >
+                        {isSubmitting ? (
+                            <span className="flex items-center gap-2">
+                                <Spinner />
+                                Enviando...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-2">
+                                Enviar Solicitação
+                            </span>
+                        )}
+                    </Button>
+                </div>
+            }
         >
             {isSuccess ? (
                 <div className="flex flex-col items-center justify-center text-center py-6 px-2 space-y-4">
@@ -171,34 +203,16 @@ export function RequestQuoteModal({
             ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Service info banner */}
-                    <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/40 rounded-xl flex items-center justify-between gap-3 border border-brand-border/60 dark:border-dark-border">
-                        <div className="min-w-0 flex-1">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-brand-green block">
-                                Orçamento sob medida
-                            </span>
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                {service.name}
-                            </h4>
-                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                {partner.store_name || "Prestador Dudit"}
-                            </span>
-                        </div>
-                        <div className="text-right shrink-0">
-                            <span className="text-[10px] text-brand-inactive-text dark:text-dark-body block">
-                                Preço base
-                            </span>
-                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                A partir de {formatCurrency(startingPrice)}
-                            </span>
-                        </div>
-                    </div>
+                    <ListItem
+                        icon={FileIcon}
+                        title={`${service.name} - A partir de ${formatCurrency(startingPrice)}`}
+                        description={partner.store_name || "Prestador Dudit"}
+                    />
 
                     {/* Description field */}
                     <div>
-                        <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                            O que você precisa? <span className="text-brand-red">*</span>
-                        </label>
                         <FormTextarea
+                            label="O que você precisa?"
                             name="description"
                             value={description}
                             onChange={(e: any) => setDescription(e.target.value)}
@@ -214,24 +228,19 @@ export function RequestQuoteModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Phone / WhatsApp */}
                         <div>
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                                WhatsApp para contato <span className="text-brand-red">*</span>
-                            </label>
-                            <Input
+                            <PhoneInput
+                                label="WhatsApp para contato"
                                 name="phone"
                                 value={phone}
                                 onChange={handlePhoneChange}
-                                placeholder="(11) 99999-9999"
                                 required
                             />
                         </div>
 
                         {/* Preferred date / timeframe */}
                         <div>
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                                Prazo / Data desejada
-                            </label>
                             <Input
+                                label="Prazo / Data desejada"
                                 name="preferredDate"
                                 value={preferredDate}
                                 onChange={(e: any) => setPreferredDate(e.target.value)}
@@ -280,10 +289,8 @@ export function RequestQuoteModal({
                     {/* Address if at_customer */}
                     {fulfillmentMode === "at_customer" && (
                         <div>
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                                Endereço do local do serviço
-                            </label>
                             <Input
+                                label="Endereço do local do serviço"
                                 name="serviceLocation"
                                 value={serviceLocation}
                                 onChange={(e: any) => setServiceLocation(e.target.value)}
@@ -294,44 +301,14 @@ export function RequestQuoteModal({
 
                     {/* Additional Notes */}
                     <div>
-                        <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                            Observações adicionais (opcional)
-                        </label>
                         <Input
+                            label="Observações adicionais"
                             name="additionalNotes"
                             value={additionalNotes}
+                            maxLength={200}
                             onChange={(e: any) => setAdditionalNotes(e.target.value)}
                             placeholder="Horário preferido para contato, restrições, etc."
                         />
-                    </div>
-
-                    {/* Modal footer action buttons */}
-                    <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-brand-border/60 dark:border-dark-border">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleClose}
-                            disabled={isSubmitting}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={isSubmitting || !description.trim() || !phone.trim()}
-                            className="min-w-[170px]"
-                        >
-                            {isSubmitting ? (
-                                <span className="flex items-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                    Enviando...
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-2">
-                                    <ArrowRightIcon size={16} />
-                                    Enviar Solicitação
-                                </span>
-                            )}
-                        </Button>
                     </div>
                 </form>
             )}

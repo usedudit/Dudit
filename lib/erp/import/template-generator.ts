@@ -154,7 +154,7 @@ export async function generateImportTemplate(
   const sampleRows = ENTITY_SAMPLE_ROWS[entityType] || []
 
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = "Dudit ERP"
+  workbook.creator = "Dudit"
   workbook.created = new Date()
   workbook.properties.date1904 = false
 

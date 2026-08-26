@@ -57,7 +57,7 @@ export class OpenRouterProvider implements AiProvider {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${this.apiKey}`,
         "HTTP-Referer": "https://dudit.com.br",
-        "X-Title": "Dudit ERP",
+        "X-Title": "Dudit",
       },
       body: JSON.stringify({
         model: targetModel,

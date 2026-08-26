@@ -1412,13 +1412,6 @@ export function ServiceDetailsPageClient({
                             Solicitar orçamento
                         </span>
                     </Button>
-                    <Button
-                        variant="outline"
-                        onClick={handleLearnMoreClick}
-                        className="w-full h-[46px]"
-                    >
-                        Saber mais
-                    </Button>
                 </div>
             ) : (
                 <div className="hidden lg:block space-y-2 mb-4">
@@ -1572,10 +1565,6 @@ export function ServiceDetailsPageClient({
                                             <span className="font-bold text-brand-dark dark:text-dark-heading text-base truncate">
                                                 {partner.store_name}
                                             </span>
-                                            <div className="flex items-center gap-1 shrink-0 px-1.5 py-0.5">
-                                                <StarIcon size={12} className="text-brand-green fill-brand-green" strokeWidth={0} />
-                                                <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{displayRating}</span>
-                                            </div>
                                         </div>
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5 font-medium">
                                             {partner.city} - {partner.state}
@@ -2240,13 +2229,6 @@ export function ServiceDetailsPageClient({
                                         {billingSuffix ? `por ${billingSuffix.replace("/", "").trim()}` : "Sob medida"}
                                     </span>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    className="rounded-full px-3.5 h-11 text-xs sm:text-sm"
-                                    onClick={handleLearnMoreClick}
-                                >
-                                    Saber mais
-                                </Button>
                                 <Button
                                     className="flex-1 rounded-full min-w-[140px] h-11 text-xs sm:text-sm font-bold"
                                     onClick={handleRequestQuoteClick}

@@ -430,3 +430,23 @@ export async function getAccountDeletionDryRunAction(csrf_token?: string) {
     return { error: "Ocorreu um erro inesperado." }
   }
 }
+
+/**
+ * Check if a user ID is currently in the account deletion pipeline.
+ */
+export async function checkUserDeletionStatusAction(userId: string): Promise<{ isDeleting: boolean }> {
+  try {
+    const admin = getAdminClient()
+    const { data: deletion } = await admin
+      .from("account_deletions")
+      .select("id, status")
+      .eq("user_id", userId)
+      .not("status", "eq", "completed")
+      .not("status", "eq", "failed")
+      .maybeSingle()
+
+    return { isDeleting: !!deletion }
+  } catch {
+    return { isDeleting: false }
+  }
+}

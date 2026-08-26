@@ -619,8 +619,8 @@ const Header: React.FC<HeaderProps> = ({
                         {/* Back Button */}
                         {(!isHome || isProductDetail) ? (
                             <Button
-                                variant="filled"
-                                className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
+                                variant={isTransparentHeader ? "filled" : "ghost"}
+                                className="h-8 w-8"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -743,9 +743,9 @@ const Header: React.FC<HeaderProps> = ({
                                         favoriteButton
                                     ) : onFavorite ? (
                                         <Button
-                                            variant="filled"
+                                            variant={isTransparentHeader ? "filled" : "ghost"}
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
+                                            className="h-8 w-8"
                                         >
                                             <HeartIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"} ${isFavorite ? "fill-current" : ""}`} />
                                         </Button>
@@ -787,7 +787,7 @@ const Header: React.FC<HeaderProps> = ({
                         </Link>
                     )}
                 </div>
-            </header>
+            </header >
         )
     }
 

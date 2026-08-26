@@ -136,15 +136,18 @@ function AuthContent() {
     }
   }, [user, isPartnerMode, router])
 
-  // Forçar logout client-side se a conta estiver em exclusão ativa para evitar redirect loops
+  // Forçar logout client-side se a conta estiver em exclusão ativa ou recém-deletada para evitar redirect loops
   const errorParam = searchParams.get("error")
+  const deletedParam = searchParams.get("deleted")
+  const isDeletionFlow = errorParam === "account_deleting" || deletedParam === "true"
+
   useEffect(() => {
-    if (errorParam === "account_deleting" && user) {
+    if (isDeletionFlow && user) {
       supabase.auth.signOut().then(() => {
         router.refresh()
       })
     }
-  }, [errorParam, user, supabase, router])
+  }, [isDeletionFlow, user, supabase, router])
 
   // Força tema light no modo parceiro
   useEffect(() => {
@@ -154,7 +157,7 @@ function AuthContent() {
     }
   }, [pageMode])
 
-  if (user && !isPartnerMode && errorParam !== "account_deleting") {
+  if (user && !isPartnerMode && !isDeletionFlow) {
     return <RedirectToHome next={nextParam} />
   }
 

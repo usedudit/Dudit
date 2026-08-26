@@ -239,7 +239,7 @@ function UpdatePasswordContent() {
                     </Link>
                     <nav>
                         <Link href="/auth/login" prefetch={false}>
-                            <Button variant="outline" className="h-10 px-5 text-sm font-medium">
+                            <Button variant="outline" className="h-10">
                                 Fazer Login
                             </Button>
                         </Link>
@@ -306,7 +306,7 @@ function UpdatePasswordContent() {
                                 <div className="w-full space-y-3 pt-2">
                                     <Button
                                         onClick={() => window.location.assign("/auth/login?mode=forgot-password")}
-                                        className="w-full h-[46px] font-semibold"
+                                        className="w-full h-[46px]"
                                     >
                                         Solicitar novo link de recuperação
                                     </Button>
@@ -383,7 +383,7 @@ function UpdatePasswordContent() {
                                     <Button
                                         type="submit"
                                         disabled={isLoading || !password || !confirmPassword}
-                                        className="w-full h-[46px] text-[15px] font-bold mt-4"
+                                        className="w-full h-[46px] mt-4"
                                     >
                                         {isLoading ? <Spinner size={20} color="white" /> : "Salvar nova senha"}
                                     </Button>
@@ -425,7 +425,7 @@ function UpdatePasswordContent() {
 
                                 <Button
                                     onClick={() => window.location.assign("/auth/login")}
-                                    className="w-full h-[46px] font-semibold flex items-center justify-center gap-2"
+                                    className="w-full h-[46px]"
                                 >
                                     <span>Ir para o Login</span>
                                     <ArrowRightIcon size={18} />

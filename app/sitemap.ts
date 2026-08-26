@@ -73,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             // Top 500 active services in marketplace
             supabase
                 .from("services")
-                .select("id, short_id, name, slug, updated_at, created_at, partners!inner(id, addresses!left(city, state))")
+                .select("id, short_id, name, updated_at, created_at, partners!inner(id, addresses!left(city, state))")
                 .eq("is_active", true)
                 .eq("show_in_marketplace", true)
                 .order("created_at", { ascending: false })
