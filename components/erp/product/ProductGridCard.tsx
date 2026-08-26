@@ -111,7 +111,7 @@ const ProductGridCard = React.memo(
 
                         {/* Linha 2: SKU • Categoria • Marca */}
                         <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate flex items-center">
-                            <span>SKU: {product.sku || "N/A"}</span>
+                            <span>{hasVariations ? "Múltiplos SKUs" : `SKU: ${product.sku || "N/A"}`}</span>
                             {product.category && (
                                 <>
                                     <span className="mx-1.5">•</span>

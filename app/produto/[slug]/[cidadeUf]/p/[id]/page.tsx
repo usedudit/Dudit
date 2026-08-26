@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -94,7 +94,7 @@ export default async function ProductDetailsPage({
   const cartCount = sessionData?.cartCount || 0
 
   if (!product) {
-    redirect("/")
+    notFound()
   }
 
   // --- MÁGICA DE SEO (Canonical Redirect) ---

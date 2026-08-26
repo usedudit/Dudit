@@ -20,7 +20,7 @@ const productFields: FieldDef[] = [
     type: "string",
     isIdentifier: true,
     example: "CAM-ALG-001",
-    description: "Código interno único para controle de estoque",
+    description: "Código interno único para controle de estoque (deixe em branco se o produto tiver variações)",
     synonyms: [
       "sku", "sku / código", "sku / codigo", "sku/código", "sku/codigo",
       "código sku", "codigo sku", "código interno", "codigo interno",

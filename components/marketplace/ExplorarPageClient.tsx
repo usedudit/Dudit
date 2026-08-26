@@ -1457,8 +1457,8 @@ export function ExplorarPageClient({
                                 />
                             )}
 
-                            {/* 5. SEÇÕES TEMÁTICAS ROTATÓRIAS */}
-                            {themedSections.map((theme) => (
+                            {/* 5. SEÇÕES TEMÁTICAS ROTATÓRIAS (Preservadas no código, desativadas temporariamente no lançamento inicial) */}
+                            {false && themedSections.map((theme) => (
                                 <HorizontalCarousel
                                     key={theme.id}
                                     title={`${theme.emoji} ${theme.title}`}

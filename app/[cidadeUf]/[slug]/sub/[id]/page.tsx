@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { PlanDetailsPageClient } from "@/components/marketplace/PlanDetailsPage"
 import { getMarketplaceRecurringPlanAction } from "@/app/actions/marketplace/recurring-subscriptions"
@@ -72,7 +72,7 @@ export default async function PlanDetailsPage({
     ])
 
     if (!plan) {
-        redirect("/")
+        notFound()
     }
 
     const sessionData = user ? await getUserSessionData(user.id) : null

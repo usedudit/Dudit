@@ -64,7 +64,7 @@ const ProductMobileItem = React.memo(
 
                         {/* Linha 2: SKU • Cat • Marca */}
                         <div className="flex items-center text-sm text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                            <span>{product.sku || "N/A"}</span>
+                            <span>{hasVariants ? "Múltiplos SKUs" : (product.sku || "N/A")}</span>
                             {product.category && (
                                 <>
                                     <span className="mx-1.5">•</span>

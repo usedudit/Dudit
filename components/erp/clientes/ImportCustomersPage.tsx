@@ -554,7 +554,10 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                         )}
 
                         <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => router.push("/erp/clientes")}>
+                            <Button variant="outline" onClick={() => {
+                                router.refresh()
+                                router.push("/erp/clientes")
+                            }}>
                                 Voltar
                             </Button>
                             <Button onClick={() => {

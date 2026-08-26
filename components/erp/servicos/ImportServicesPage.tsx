@@ -562,7 +562,10 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                         )}
 
                         <div className="flex gap-3">
-                            <Button variant="outline" onClick={() => router.push("/erp/servicos")}>
+                            <Button variant="outline" onClick={() => {
+                                router.refresh()
+                                router.push("/erp/servicos")
+                            }}>
                                 Voltar
                             </Button>
                             <Button onClick={() => {

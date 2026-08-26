@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ProductDetailsPageClient } from "@/components/marketplace/ProductDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -83,7 +83,7 @@ export default async function ProductDetailsPage({
   ])
 
   if (!product) {
-    redirect("/")
+    notFound()
   }
 
   const sessionData = user ? await getUserSessionData(user.id) : null

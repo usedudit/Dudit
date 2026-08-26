@@ -668,7 +668,7 @@ export async function getSmartDeliverySuggestionsAction(input: {
         variant_id,
         service_id,
         products(id, name, sku, images, unit, product_type),
-        product_variants(id, variant_name, sku, images),
+        product_variants(id, variant_name, sku, variant_options),
         services(id, name, images)
       )
     `)
@@ -941,7 +941,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
         variant_id,
         service_id,
         products(id, name, sku, images, unit, product_type),
-        product_variants(id, variant_name, sku, images),
+        product_variants(id, variant_name, sku, variant_options),
         services(id, name, images)
       )
     `)
@@ -1058,7 +1058,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
       orderSource: order.order_source || "Manual",
       items: (order.order_items || []).map((item: any) => {
         const sku = item.product_variants?.sku || item.products?.sku || "N/A"
-        const images = item.product_variants?.images || item.products?.images || item.services?.images || null
+        const images = item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || null
         const unit = item.products?.unit || "un"
         const price = Number(item.product_price || 0)
         const qty = Number(item.quantity || 1)
@@ -1619,7 +1619,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
                 variant_id,
                 service_id,
                 products(id, name, sku, images, unit, product_type),
-                product_variants(id, variant_name, sku, images),
+                product_variants(id, variant_name, sku, variant_options),
                 services(id, name, images)
               )
             )

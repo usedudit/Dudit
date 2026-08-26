@@ -93,7 +93,6 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     data.status = resolvedService.store_is_active ? "ativo" : "inativo"
   }
 
-  const user = await getCurrentUser()
   const rawPartner = Array.isArray(data.partners) ? data.partners[0] : data.partners
 
   // Merge store data over partner data
@@ -116,32 +115,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     rawPartner.gallery = rawStore.gallery || rawPartner.gallery
   }
 
-  const partnerId = rawPartner?.id || data.partner_id
-  const isOwner = !!(user && rawPartner?.user_id === user.id)
-  let isTeamMember = false
-
-  if (user && !isOwner && partnerId) {
-    const { data: membership } = await supabase
-      .from("partner_users")
-      .select("id")
-      .eq("partner_id", partnerId)
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle()
-    isTeamMember = !!membership
-  }
-
-  const isPubliclyVisible =
-    data.is_active &&
-    data.show_in_marketplace !== false &&
-    rawPartner?.is_active !== false &&
-    rawPartner?.erp_disabled !== true
-  if (!isPubliclyVisible && !isOwner && !isTeamMember) {
-    return null
-  }
-
-  // user_id is used only for the ownership decision above and must never be
-  // serialized to a marketplace client.
+  // user_id must never be serialized to a marketplace client.
   if (rawPartner && "user_id" in rawPartner) {
     delete rawPartner.user_id
     delete rawPartner.is_active

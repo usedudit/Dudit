@@ -3,7 +3,7 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { searchMarketplaceDirect, searchMarketplaceDirectFull } from "@/app/actions/marketplace/search"
 import { applySellerDiversity, sortByTrendingScore } from "@/lib/marketplace/ranking"
-import { getCurrentUser } from "@/lib/auth/server-user"
+
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { resolveProduct } from "@/lib/store-products"
 import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
@@ -156,16 +156,6 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
 async function _getMarketplaceProduct(id: string, storeId?: string | null) {
   const data = await _getMarketplaceProductBase(id, storeId)
   if (!data) return null
-
-  const user = await getCurrentUser()
-  const partnerId = data.partners?.id
-  const partnerUserId = data.partners?.user_id
-  const isOwner = user && partnerUserId === user.id
-  const isPubliclyVisible = data.is_active && data.moderation_status === 'approved' && data.show_in_marketplace !== false
-
-  if (!isPubliclyVisible && !isOwner) {
-    return null
-  }
 
   return data
 }

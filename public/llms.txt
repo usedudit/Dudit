@@ -1,0 +1,22 @@
+# Dudit
+
+> Dudit (dudit.com.br) é um marketplace local brasileiro que conecta consumidores a vendedores locais, profissionais autônomos e vitrines de negócios com contato direto via WhatsApp e sem intermediação ou comissão abusiva sobre vendas.
+
+## Sobre a Plataforma
+A Dudit permite que qualquer pessoa ou empresa encontre ou anuncie:
+- **Produtos**: Itens novos e seminovos em diversas categorias (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, etc.).
+- **Serviços**: Profissionais liberais, manutenção, consultorias, serviços de beleza, reformas e serviços do dia a dia.
+- **Vitrines / Lojas**: Catálogo online e perfil completo de negócios locais com localização, horários de atendimento e link direto para WhatsApp.
+
+## Como as URLs são estruturadas
+- **Página Inicial**: `https://dudit.com.br`
+- **Explorar por Cidade**: `https://dudit.com.br/explorar/{cidade-uf}` (ex: `https://dudit.com.br/explorar/sao-paulo-sp`)
+- **Produtos**: `https://dudit.com.br/{cidade-uf}/{slug-produto}/p/{short_id}`
+- **Serviços**: `https://dudit.com.br/{cidade-uf}/{slug-servico}/s/{short_id}`
+- **Vitrines de Lojas**: `https://dudit.com.br/{cidade-uf}/{slug-loja}/v/{short_id}`
+- **Explorar por Categoria Nacional**: `https://dudit.com.br/explorar/brasil/{categoria}`
+
+## Diferenciais
+- **Contato Direto**: Clientes conversam diretamente com o vendedor ou prestador de serviço no WhatsApp.
+- **0% de Comissão por Venda**: O vendedor retém 100% do lucro da venda.
+- **Hiperlocal**: Foco em proximidade, permitindo encontrar o que precisa no próprio bairro ou cidade.

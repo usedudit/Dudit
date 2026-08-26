@@ -17,7 +17,10 @@ import {
 /**
  * Carrega todo o contexto do parceiro e gera a estrutura do Dashboard Inteligente
  */
-export async function getDashboardLayout(partnerId: string): Promise<DashboardLayout> {
+export async function getDashboardLayout(
+  partnerId: string,
+  activeStoreIdOverride?: string | null,
+): Promise<DashboardLayout> {
   const supabase = createAdminClient();
 
   const startOfMonth = new Date();
@@ -26,7 +29,13 @@ export async function getDashboardLayout(partnerId: string): Promise<DashboardLa
   const startOfMonthIso = startOfMonth.toISOString();
 
   // 0. Tenta obter a loja ativa (se o usuário selecionou uma)
-  const activeStoreId = await getActiveStoreId();
+  // When this function is called from an unstable_cache loader, the cookie
+  // value must already have been resolved by the caller. `undefined` keeps
+  // the legacy behavior for uncached callers; `null` is an explicit
+  // "no active store" value and must not read cookies here.
+  const activeStoreId = activeStoreIdOverride !== undefined
+    ? activeStoreIdOverride
+    : await getActiveStoreId();
 
   // Store e queries de fallback
   const STORE_SELECT = "id, short_id, name, slug, logo_url, banner_url, phone, is_showcase_active, partner_id, category_id, opening_hours, addresses!store_id!left(city, state)"

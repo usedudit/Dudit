@@ -88,7 +88,112 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
 };
 
 import { MapPinIcon, XIcon } from "@/lib/icons"
+import { Search, ShoppingBag, MessageCircle, Sparkles, CheckCircle2, ArrowRight } from "lucide-react"
 import type { LocationContext } from "@/lib/utils/location-label"
+
+function HomeValueProps() {
+    const items = [
+        {
+            icon: Search,
+            title: "Encontre o que precisa",
+            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou resolver uma necessidade do dia a dia. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
+        },
+        {
+            icon: ShoppingBag,
+            title: "Produtos & Serviços",
+            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, perto de você.",
+        },
+        {
+            icon: MessageCircle,
+            title: "Contato direto",
+            desc: "Tire dúvidas no WhatsApp de quem vende, compare opções e feche o negócio sem burocracia. Direto com o vendedor.",
+        },
+    ]
+
+    return (
+        <section className="my-6 sm:my-8 border-y border-gray-100 dark:border-dark-border/60 py-6 sm:py-8 bg-gray-50/60 dark:bg-dark-surface/40 rounded-2xl md:rounded-3xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0">
+                {items.map((item, idx) => {
+                    const Icon = item.icon
+                    return (
+                        <div
+                            key={idx}
+                            className={`px-6 md:px-8 flex flex-col justify-start ${
+                                idx < items.length - 1
+                                    ? "md:border-r md:border-dashed md:border-gray-200 dark:md:border-dark-border"
+                                    : ""
+                            }`}
+                        >
+                            <div className="flex items-center gap-3.5 mb-3">
+                                <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm dark:bg-brand-green">
+                                    <Icon className="w-5 h-5 text-white" />
+                                </div>
+                                <h3 className="text-base md:text-lg font-bold text-brand-dark dark:text-dark-heading">
+                                    {item.title}
+                                </h3>
+                            </div>
+                            <p className="text-brand-inactive-text text-sm leading-relaxed dark:text-dark-body">
+                                {item.desc}
+                            </p>
+                        </div>
+                    )
+                })}
+            </div>
+        </section>
+    )
+}
+
+function HomeSellerCTA({ userProfile, router }: { userProfile: any; router: any }) {
+    return (
+        <section className="my-8 md:my-10 relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-brand-dark via-[#094236] to-[#043329] text-white p-6 sm:p-8 md:p-12 shadow-lg">
+            {/* Background ambient accents */}
+            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-brand-green/20 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-1/3 -mb-16 w-80 h-80 rounded-full bg-brand-green/10 blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+                <div className="max-w-2xl">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/20 text-brand-green text-xs font-bold uppercase tracking-wider mb-4 border border-brand-green/30">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        0% de comissão por venda
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight tracking-tight mb-3">
+                        Seu negócio também pode ser encontrado na Dudit
+                    </h3>
+                    <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6">
+                        Você já usa Instagram e WhatsApp? Continue usando. A Dudit é mais uma vitrine para seus produtos e serviços chegarem a mais clientes na sua região, sem taxas abusivas.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs sm:text-sm font-semibold text-gray-200">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                            <span>100% de lucro seu</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                            <span>Contato direto no WhatsApp</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                            <span>Vitrine rápida e profissional</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="w-full lg:w-auto shrink-0">
+                    <button
+                        onClick={() => {
+                            router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
+                        }}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-green text-white font-bold py-4 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl text-base group cursor-pointer"
+                    >
+                        <span>Começar a vender de graça</span>
+                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                </div>
+            </div>
+        </section>
+    )
+}
 
 interface MarketplaceHomeProps {
     sections?: HomeSection[]
@@ -606,7 +711,7 @@ export default function MarketplaceHome({
             <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
                 <HeroBanner />
 
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-10 flex-grow flex flex-col gap-10">
                     <div className="flex justify-center">
                         <IconPlaceholder
                             placeholderType="image"
@@ -623,6 +728,10 @@ export default function MarketplaceHome({
                             }}
                         />
                     </div>
+
+                    <HomeValueProps />
+
+                    <HomeSellerCTA userProfile={userProfile} router={router} />
                 </div>
 
                 {renderAddressModal()}
@@ -630,12 +739,63 @@ export default function MarketplaceHome({
             </div>
         )
     } else {
+        const productSection = sections.find(s => s.id !== "services" && s.id !== "topVitrines")
+        const serviceSection = sections.find(s => s.id === "services")
+        const vitrineSection = sections.find(s => s.id === "topVitrines")
+        const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection)
+
         content = (
             <div className="w-full bg-white flex-grow dark:bg-dark-surface">
                 <HeroBanner />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
-                    {sections.map((section) => {
+                    {/* 1. Value Props Institucionais (3 Cards) */}
+                    <HomeValueProps />
+
+                    {/* 2. Seção de Produtos */}
+                    {productSection && productSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={productSection.id}
+                            title={productSection.title}
+                            subtitle={productSection.subtitle}
+                            items={productSection.items}
+                            onSeeAll={productSection.seeMoreLink ? () => router.push(productSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
+                            itemWidthClass="w-[190px] sm:w-[210px]"
+                        />
+                    )}
+
+                    {/* 3. Banner / Card de Atração para Vendedores */}
+                    <HomeSellerCTA userProfile={userProfile} router={router} />
+
+                    {/* 4. Seção de Serviços */}
+                    {serviceSection && serviceSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={serviceSection.id}
+                            title={serviceSection.title}
+                            subtitle={serviceSection.subtitle}
+                            items={serviceSection.items}
+                            onSeeAll={serviceSection.seeMoreLink ? () => router.push(serviceSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
+                            itemWidthClass="w-[190px] sm:w-[210px]"
+                        />
+                    )}
+
+                    {/* 5. Seção de Lojas e Vitrines */}
+                    {vitrineSection && vitrineSection.items.length > 0 && (
+                        <HorizontalCarousel
+                            key={vitrineSection.id}
+                            title={vitrineSection.title}
+                            subtitle={vitrineSection.subtitle}
+                            items={vitrineSection.items}
+                            onSeeAll={vitrineSection.seeMoreLink ? () => router.push(vitrineSection.seeMoreLink!) : undefined}
+                            renderItem={(item: any) => <VitrineCard vitrine={item} locationContext={locationContext} className="w-full" />}
+                            itemWidthClass="w-[270px] sm:w-[320px]"
+                        />
+                    )}
+
+                    {/* 6. Outras seções eventuais */}
+                    {otherSections.map((section) => {
                         const onSeeAll = section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined
                         if (section.id === "topVitrines") {
                             return (

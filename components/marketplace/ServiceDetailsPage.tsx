@@ -1317,16 +1317,11 @@ export function ServiceDetailsPageClient({
 
             {/* ── Custom Quote Info (Starting at only) ── */}
             {showPrice && isStartingAt && (
-                <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 border border-emerald-200 dark:border-emerald-800/40 space-y-2">
-                    <div className="flex items-center gap-2">
-                        <FileTextIcon size={16} className="text-brand-green" />
-                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                            Orçamento Sob Medida
-                        </span>
-                    </div>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        Este serviço possui valor inicial flexível. Solicite uma proposta para receber preços personalizados e tirar dúvidas diretamente com o prestador.
-                    </p>
+                <div className="mb-6">
+                    <InfoCard
+                        title="Orçamento sob medida"
+                        message="Este serviço possui valor inicial flexível. Solicite uma proposta para receber preços personalizados e tirar dúvidas diretamente com o prestador."
+                    />
                 </div>
             )}
 

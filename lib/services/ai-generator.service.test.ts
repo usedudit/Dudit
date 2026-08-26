@@ -225,7 +225,7 @@ describe("AiGeneratorService", () => {
     expect(result.message).toContain("IA temporariamente indisponível")
     expect(result.data?.specs["Potência"]).toBe("2000W")
     expect(result.data?.specs["Voltagem"]).toBe("220V")
-    expect(result.data?.brand).toBe("")
+    expect(result.data?.brand).toBe("Mondial")
     expect(result.data?.category.id).toBeNull()
     expect(mockFetch).toHaveBeenCalledTimes(3)
   })

@@ -134,6 +134,22 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
       }
     }
 
+    // ─── Filter routine CRUD events (keep only important events) ───────────
+    // Financial, security, billing, recurring events are always kept
+    const entityType = String(input.entityType || "").toLowerCase()
+    const isRoutineCrudEvent = isRoutineCrud(actionType, entityType)
+    const isFinancialEvent = isFinancial(actionType)
+    const isSecurityEvent = entityType === "security" || actionType.includes("invite_") || actionType.includes("auth_") || actionType.includes("role_") || actionType.includes("member_") || actionType.includes("partner_") || actionType.includes("document_") || actionType.includes("account_")
+    const isBillingEvent = entityType === "billing" || actionType.includes("billing_")
+    const isRecurringEvent = actionType.includes("recurring_")
+    const isSubscriptionEvent = actionType.includes("subscription_")
+    const isConversionEvent = actionType === "converted_to_order" || actionType === "quote_conversion"
+
+    // Skip routine CRUD events (but keep important events)
+    if (isRoutineCrudEvent && !isFinancialEvent && !isSecurityEvent && !isBillingEvent && !isRecurringEvent && !isSubscriptionEvent && !isConversionEvent) {
+      return // Routine CRUD events are not stored to reduce DB bloat
+    }
+
     const supabase = getAdminClient()
 
     let changeLines = sanitizeChangeLines(input.changeLines || [])
@@ -354,6 +370,70 @@ export const getUserTimeline = cache(
 )
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Check if an event is a routine CRUD operation that can be safely skipped.
+ * These events generate noise without significant audit value.
+ */
+function isRoutineCrud(actionType: string, entityType: string): boolean {
+  // Entity types where routine CRUD is skipped
+  const routineEntityTypes = new Set([
+    "product", "service", "customer", "appointment",
+    "order", "quote", "transaction", "service_order",
+  ])
+
+  // Action types that are always routine
+  const routineActions = new Set([
+    "created", "deleted", "restored", "duplicated",
+    "attachment_created", "attachment_deleted",
+    "services_added", "products_added", "assigned",
+    "notification_sent",
+    "whatsapp_message_sent", "whatsapp_appointment_confirmed", "whatsapp_appointment_cancelled",
+  ])
+
+  // If entity type is not in routine list, it's not routine
+  if (!routineEntityTypes.has(entityType)) {
+    return false
+  }
+
+  // Check if action type is routine
+  if (routineActions.has(actionType)) {
+    return true
+  }
+
+  // For 'updated' action, only keep orders, quotes, transactions, service_orders
+  if (actionType === "updated") {
+    const keepUpdatedEntities = new Set(["order", "quote", "transaction", "service_order"])
+    return !keepUpdatedEntities.has(entityType)
+  }
+
+  // For 'status_changed', keep only financial/status-critical entities
+  if (actionType === "status_changed") {
+    const keepStatusEntities = new Set(["order", "quote", "transaction", "service_order", "return_request"])
+    return !keepStatusEntities.has(entityType)
+  }
+
+  // For 'cancelled', keep financial cancellations
+  if (actionType === "cancelled") {
+    const keepCancelledEntities = new Set(["order", "quote", "transaction", "return_request"])
+    return !keepCancelledEntities.has(entityType)
+  }
+
+  return false
+}
+
+/**
+ * Check if an event is a financial event that should always be kept.
+ */
+function isFinancial(actionType: string): boolean {
+  const financialActions = new Set([
+    "paid", "received", "refunded",
+    "cash_opened", "cash_closed", "cash_movement", "movement_reversed",
+    "installment_paid", "settled",
+    "sale_created", "withdrawal_created", "deposit_created",
+  ])
+  return financialActions.has(actionType)
+}
 
 export function buildChangeLines(changes: {
   amount?: boolean

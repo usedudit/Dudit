@@ -255,7 +255,7 @@ export async function getUnifiedDashboardAction(partnerId: string) {
                 TAGS.orders(partnerId),
                 TAGS.transactions(partnerId),
             ],
-            () => getDashboardLayout(partnerId),
+            () => getDashboardLayout(partnerId, activeStoreId),
             30,
         )
         return { success: true, data: layout }
@@ -263,4 +263,3 @@ export async function getUnifiedDashboardAction(partnerId: string) {
         return { success: false, error: e.message || "Erro ao carregar o dashboard inteligente" }
     }
 }
-

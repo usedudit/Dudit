@@ -34,6 +34,10 @@ export function extractLocalDataSimple(title: string): SimpleExtractedData {
 
   // 3. Potência (ex: 60W, 1200W)
   const powerMatch = title.match(/(\d+)\s*(W|watts?)/i)
+  if (powerMatch) {
+    specs["Potência"] = `${powerMatch[1]}W`
+  }
+
   // 4. Detecção básica de marcas conhecidas
   let detectedBrand = ""
   const commonBrands = [

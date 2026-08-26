@@ -503,7 +503,7 @@ export default function AvailableDeliveryDetail({
                                                 <div className="space-y-4">
                                                     <div className="divide-y divide-brand-border dark:divide-dark-border">
                                                         {paginatedItems.map((item: any, idx: number) => {
-                                                            const itemImg = getR2ImageUrl(item.product_variants?.images || item.products?.images || item.images || item.image_url || item.image || null, "thumbnail")
+                                                            const itemImg = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.images || item.image_url || item.image || null, "thumbnail")
                                                             const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
                                                             const qty = Number(item.quantity || 1)
                                                             const unit = item.unit || item.products?.unit || "un"

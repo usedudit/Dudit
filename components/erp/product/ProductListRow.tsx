@@ -81,7 +81,7 @@ const ProductListItem = React.memo(
                                     )}
                                 </span>
                                 <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
-                                    {product.sku}
+                                    {hasVariants ? "Múltiplos SKUs" : (product.sku || "-")}
                                 </span>
                             </div>
                         </div>

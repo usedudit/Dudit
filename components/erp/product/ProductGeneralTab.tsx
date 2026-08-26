@@ -423,7 +423,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.sku || "-"}</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{hasVariants ? "Múltiplos SKUs" : (productData.sku || "-")}</span>
                             </div>
 
                             {!isQuickMode && (

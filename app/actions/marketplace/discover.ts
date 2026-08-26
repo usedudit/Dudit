@@ -146,9 +146,9 @@ function sectionDisplay(
 
     const MAP: Record<string, Record<string, [string, string]>> = {
         trending: {
-            country: ["Bombando na Dudit", "Os produtos mais quentes do momento"],
-            state: [`Bombando no ${stateName}`, `Os produtos mais quentes no ${stateName}`],
-            city: [`Bombando em ${cityName}`, `Os produtos mais quentes em ${cityName}`],
+            country: ["Produtos na Dudit", "Encontre produtos de vendedores locais"],
+            state: [`Produtos no ${stateName}`, `Encontre produtos disponíveis no ${stateName}`],
+            city: [`Produtos em ${cityName}`, `Encontre produtos de vendedores perto de você`],
         },
         endingSoon: {
             country: ["Acabando hoje", "Ofertas que terminam em breve"],
@@ -196,14 +196,14 @@ function sectionDisplay(
             city: ["Mais visualizados", "O que todo mundo está de olho"],
         },
         services: {
-            country: ["Serviços em destaque", "Profissionais e serviços para você"],
-            state: ["Serviços em destaque", "Profissionais e serviços para você"],
-            city: ["Serviços próximos", "Profissionais e serviços perto de você"],
+            country: ["Serviços e profissionais", "Encontre os melhores serviços para o seu dia a dia"],
+            state: [`Serviços no ${stateName}`, `Profissionais e serviços disponíveis no ${stateName}`],
+            city: [`Serviços em ${cityName}`, `Profissionais e serviços perto de você`],
         },
         topVitrines: {
-            country: ["Vitrines em destaque", "Lojas para você conhecer"],
-            state: [`Vitrines do ${stateName}`, `Lojas do ${stateName} para você conhecer`],
-            city: ["Negócios e profissionais por perto", "Descubra o que está por perto"],
+            country: ["Lojas e vitrines locais", "Conheça negócios e lojas para você visitar"],
+            state: [`Lojas e vitrines do ${stateName}`, `Conheça negócios e lojas no ${stateName}`],
+            city: [`Lojas e vitrines em ${cityName}`, `Descubra lojas e negócios perto de você`],
         },
         popular: {
             country: ["Populares na Dudit", "O que está bombando por aqui"],
@@ -477,9 +477,16 @@ function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
             if (it._badgeLabel) continue
             if (it.itemType !== "produto") continue
             const stock = Number(it._stock ?? 0)
-            if (stock > 0 && stock <= 5 && hashSeed(seed, `${it.id}-last-items`) % 100 < 40) {
+            const h = hashSeed(seed, `${it.id}-launch-badge`) % 100
+            if (stock > 0 && stock <= 5 && h < 45) {
                 it._badgeLabel = `Últimos ${stock}`
                 it._badgeVariant = "red"
+            } else if (it.originalPrice && it.originalPrice > it.price && h >= 45 && h < 75) {
+                it._badgeLabel = "Promoção"
+                it._badgeVariant = "green"
+            } else if (h >= 75 && h < 90) {
+                it._badgeLabel = "Destaque"
+                it._badgeVariant = "purple"
             }
         }
     }
@@ -592,7 +599,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         gatilho: GATILHOS_MAP.trending,
         items,
         _allItems: scoped.map(item => processProduct(item as RawProduct)),
-        seeMoreLink: `/explorar/${ctx.citySlug}?section=trending`,
+        seeMoreLink: `/explorar/${ctx.citySlug}?type=produtos`,
     }
 }
 
@@ -1610,7 +1617,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
         gatilho: "variedade",
         items,
         _allItems: scoped.map(item => processProduct(item as RawProduct)),
-        seeMoreLink: `/explorar/${ctx.citySlug}`,
+        seeMoreLink: `/explorar/${ctx.citySlug}?type=produtos`,
     }
 }
 
@@ -1627,8 +1634,6 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         return []
     }
 
-    const seed = dailySeed(ctx.userId)
-
     // 1. Core anchors in parallel
     const [trendingRes, vitrinesRes, servicesRes] = await Promise.all([
         fetchTrending(tiers, ctx).catch(() => null),
@@ -1636,41 +1641,7 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         fetchServices(tiers, ctx).catch(() => null),
     ])
 
-    // 2. Thematic sections in parallel (100% in-memory category filtering from cached pool)
-    const themeResults = await Promise.all(
-        THEME_DEFINITIONS.map(theme => fetchThemedSection(theme, tiers, ctx).catch(() => null))
-    )
-    const availableThemes = themeResults.filter((s): s is HomeSection => s !== null && s.items.length > 0)
-    const shuffledThemes = seededShuffle(availableThemes, `${seed}-themes`)
-
-    // 3. Quality & Opportunity candidates (in-memory filtering & ranking)
-    const [topRatedRes, promosRes, recentRes, endingSoonRes, bestSellersRes, gemsRes] = await Promise.all([
-        fetchTopRated(tiers, ctx).catch(() => null),
-        fetchPromos(tiers, ctx).catch(() => null),
-        fetchRecent(tiers, ctx).catch(() => null),
-        fetchEndingSoon(tiers, ctx).catch(() => null),
-        fetchBestSellers(tiers, ctx).catch(() => null),
-        fetchGems(tiers, ctx).catch(() => null),
-    ])
-
-    const availableQuality = [
-        topRatedRes,
-        promosRes,
-        recentRes,
-        endingSoonRes,
-        bestSellersRes,
-        gemsRes,
-    ].filter((s): s is HomeSection => s !== null && s.items.length > 0)
-
-    const shuffledQuality = seededShuffle(availableQuality, `${seed}-quality`)
-
-    // 4. Proximity section (if coords available)
-    let nearbyRes: HomeSection | null = null
-    if (ctx.scope === "city" && ctx.coords) {
-        nearbyRes = await fetchNearby(tiers, ctx).catch(() => null)
-    }
-
-    // 5. Assemble diverse, rich, non-repetitive section layout
+    // 2. Consolidated Launch Section Layout: Produtos, Serviços, Vitrines
     const pool: HomeSection[] = []
     const usedIds = new Set<string>()
 
@@ -1681,53 +1652,37 @@ async function getHomeSectionsUncached(ctx: DiscoverCtx): Promise<HomeSection[]>
         return true
     }
 
-    // Slot 1: Hero Trending
+    // Slot 1: Produtos
     if (trendingRes && trendingRes.items.length > 0) {
         addSection(trendingRes)
+    } else {
+        const fallback = await fetchAllProducts(tiers, ctx).catch(() => null)
+        if (fallback && fallback.items.length > 0) {
+            fallback.seeMoreLink = `/explorar/${ctx.citySlug}?type=produtos`
+            addSection(fallback)
+        }
     }
 
-    // Slot 2: First Thematic Section (e.g. 🍽️ Sabores da região)
-    if (shuffledThemes.length > 0) {
-        addSection(shuffledThemes[0])
-    }
-
-    // Slot 3: Vitrines / Lojas (Negócios da região)
-    if (vitrinesRes && vitrinesRes.items.length > 0) {
-        addSection(vitrinesRes)
-    }
-
-    // Slot 4: Quality / Deals (e.g. ⭐ Melhor avaliados ou 🎯 Promoções)
-    if (nearbyRes && nearbyRes.items.length > 0) {
-        addSection(nearbyRes)
-    } else if (shuffledQuality.length > 0) {
-        addSection(shuffledQuality[0])
-    }
-
-    // Slot 5: Serviços (Profissionais da região)
+    // Slot 2: Serviços
     if (servicesRes && servicesRes.items.length > 0) {
         addSection(servicesRes)
     }
 
-    // Slot 6: Second Thematic Section (or second Quality/Deal)
-    if (shuffledThemes.length > 1) {
-        addSection(shuffledThemes[1])
-    } else if (shuffledQuality.length > 1) {
-        addSection(shuffledQuality[1])
+    // Slot 3: Vitrines / Lojas
+    if (vitrinesRes && vitrinesRes.items.length > 0) {
+        addSection(vitrinesRes)
     }
 
-    // If still < 5 sections, fill with remaining candidates
-    for (const cand of [...shuffledThemes, ...shuffledQuality]) {
-        if (pool.length >= 6) break
-        addSection(cand)
-    }
-
-    // Ultimate fallback if empty
+    // Ultimate fallback if still completely empty
     if (pool.length === 0) {
         const fallback = await fetchAllProducts(tiers, ctx).catch(() => null)
-        if (fallback) addSection(fallback)
+        if (fallback) {
+            fallback.seeMoreLink = `/explorar/${ctx.citySlug}?type=produtos`
+            addSection(fallback)
+        }
     }
 
-    // 6. Global dedup with auto-refill across all sections
+    // 3. Global dedup with auto-refill across all sections
     const globalSeen = new Set<string>()
     let totalRemovedByDedup = 0
     const finalSections: HomeSection[] = []

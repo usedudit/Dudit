@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import type { Metadata } from 'next'
 import { ServiceDetailsPageClient } from "@/components/marketplace/ServiceDetailsPage"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -76,7 +76,7 @@ export default async function ServiceDetailsPage({
     ])
 
     if (!service) {
-        redirect("/")
+        notFound()
     }
 
     const storeId = service.store_id || null

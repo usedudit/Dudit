@@ -1030,7 +1030,7 @@ export default function CreateDeliveryPage({
                                         return (
                                             <div className="space-y-4">
                                                 {filteredItems.map((item: any) => {
-                                                    const itemImage = getR2ImageUrl(item.product_variants?.images || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
+                                                    const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
                                                     const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
                                                     const itemUnit = item.products?.unit || item.unit || "un"
                                                     const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)

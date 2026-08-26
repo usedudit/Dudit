@@ -171,42 +171,48 @@ export class AiGeneratorService {
 
       // 4. Montar o Prompt para interpretação semântica direta pela IA
       const prompt = `
-        Você é um assistente de cadastro de ${isProduct ? "produtos" : "serviços"} preciso e consistente.
-        Sua tarefa é analisar o seguinte título e preencher os dados correspondentes em JSON:
-        Título: "${title}"
+        Você é um assistente especialista em e-commerce e marketplace local para cadastro de ${isProduct ? "produtos" : "serviços"}.
+        Sua tarefa é analisar o título informado e gerar dados comerciais altamente atraentes, profissionais e otimizados para busca (SEO/GEO) em formato JSON.
+
+        Título do ${isProduct ? "Produto" : "Serviço"}: "${title}"
 
         Lista Oficial de Categorias Disponíveis (Selecione o ID mais adequado da lista abaixo):
         ${categoriesContext || "Nenhuma categoria disponível."}
 
-        Regras Cruciais:
-        1. DESCRIÇÃO:
-           - Escreva uma descrição de venda atraente e bem redigida, em português natural, com tom profissional e convidativo.
-           - Estruture em 2 a 3 parágrafos curtos:
-             a) Abertura: apresente o item de forma convidativa, destacando seu principal benefício ou uso.
-             b) Meio: detalhe características relevantes (qualidade, material, funcionalidade, diferenciais, compatibilidade) de forma natural e específica.
-             c) Encerramento: indique para quem é ideal ou qual problema ele resolve.
-           - Máximo de aproximadamente 700 caracteres no total.
-           - Proibido: emojis, exageros ("melhor do mercado", "perfeito", "revolucionário"), promessas falsas, links, jargão técnico excessivo e menção a preço.
-        2. MARCA:
-           - Identifique com precisão a marca comercial ou fabricante mencionado no título (ex: "Nike", "Apple", "Samsung", "Dell", "Sony", "LG", "Adidas", "Motorola", "Xiaomi", "Bosch", "Stanley", "Tramontina", "Natura", "Boticário", "Nestlé", "Lenovo", "Asus", "Mondial", "Philco", "Electrolux", "Brastemp", etc.).
-           - Se for um produto onde o modelo remete diretamente a uma marca (ex: "iPhone 15" -> "Apple", "Galaxy S23" -> "Samsung", "Air Force 1" -> "Nike", "PlayStation 5" -> "Sony", "Xbox Series X" -> "Microsoft"), identifique a respectiva marca ("Apple", "Samsung", "Nike", "Sony", "Microsoft").
-           - Formate o nome da marca com capitalização correta.
-           - Se nenhuma marca for identificada ou se o item for genérico/artesanal sem marca, retorne string vazia "".
-        3. TAGS:
-           - Gere entre 5 e 10 tags. Nunca mais de 10.
-           - Devem ser curtas, minúsculas, sem acentos, sem repetição, relevantes para busca.
-        4. ESPECIFICAÇÕES (Ficha técnica):
-           - Extraia atributos de especificações relevantes contidos no título (ex: Cor, Armazenamento, Capacidade, Voltagem, Potência, Modelo, etc.).
-           - Máximo de 10 atributos.
-           - Não invente nada fora do que o título sugere. Ignore valores vazios.
-        5. CATEGORIA:
-           - Analise o título e selecione exatamente um ID da "Lista Oficial de Categorias Disponíveis".
-           - Retorne um score de confiança (confidence) entre 0.0 e 1.0.
-           - Se nenhuma categoria coincidir ou você tiver dúvidas, retorne o campo id como string vazia "" e a confiança como 0.0.
-           - NUNCA invente novos IDs ou nomes de categorias. Use apenas os IDs da lista.
+        Diretrizes de Geração:
+        1. DESCRIÇÃO COMERCIAL:
+           - Escreva em português do Brasil, com tom profissional, persuasivo e fluido (evite clichês vazios como "o melhor do mercado").
+           ${isProduct ? `
+           - Para PRODUTOS:
+             a) Apresente o produto destacando utilidade prática, conforto, qualidade e diferenciais no dia a dia.
+             b) Use linguagem comercial acolhedora e convidativa (1 a 2 parágrafos curtos e fluidos, máximo 600 caracteres).
+             c) Não invente preço, não use links e evite excesso de jargões técnicos.
+           ` : `
+           - Para SERVIÇOS:
+             a) Foque em confiança, pontualidade, atendimento sem complicação e solução rápida do problema.
+             b) Destaque a facilidade de tirar dúvidas e alinhar detalhes diretamente com o profissional.
+             c) Texto claro e profissional (1 a 2 parágrafos curtos, máximo 600 caracteres).
+           `}
 
-        Response Format:
-        Responda EXCLUSIVAMENTE com o objeto JSON estruturado. Não use blocos de código markdown ou texto livre.
+        2. MARCA:
+           - Identifique a marca comercial ou fabricante com precisão mencionada no título ou modelo (ex: "Apple", "Samsung", "Nike", "Dell", "Sony", "Bosch", "Stanley", "Tramontina", "Natura", etc.).
+           - Se for item genérico, artesanal ou sem marca, retorne string vazia "".
+
+        3. TAGS ESTRATÉGICAS (SEO & IA):
+           - Gere entre 6 e 10 tags relevantes para busca, em minúsculas e sem acentos.
+           - Inclua: sinônimos populares, termos que clientes digitam em buscas (ex: 'celular', 'smartphone', 'troca de oleo', 'manutencao') e palavras de intenção de compra.
+           - PROIBIDO tags genéricas inúteis como 'produto', 'servico', 'loja', 'qualidade', 'novo', 'venda'.
+
+        4. ESPECIFICAÇÕES (Ficha técnica):
+           - Extraia atributos técnicos sugeridos ou informados no título (ex: Cor, Capacidade, Voltagem, Modelo, Material, Tamanho).
+           - Máximo de 8 atributos. Ignore campos vazios ou inventados.
+
+        5. CATEGORIA:
+           - Selecione o ID mais compatível da "Lista Oficial de Categorias Disponíveis" com confiança entre 0.0 e 1.0.
+           - Se não houver correspondência ou tiver dúvida, retorne id "" e confidence 0.0.
+           - NUNCA invente novos IDs. Use apenas os IDs da lista.
+
+        Formato de Resposta (EXCLUSIVAMENTE JSON):
         {
           "description": string,
           "brand": string,
@@ -262,11 +268,12 @@ export class AiGeneratorService {
       const brand = (aiResponseObj.brand || "").trim()
 
       let rawTags = Array.isArray(aiResponseObj.tags) ? aiResponseObj.tags : []
+      const bannedTags = new Set(["produto", "produtos", "servico", "servicos", "loja", "lojas", "qualidade", "novo", "venda", "comprar"])
       const sanitizedTags = Array.from(
         new Set(
           rawTags
             .map((t: any) => removeAccents(String(t).toLowerCase().trim()))
-            .filter((t: any) => t.length > 1 && !t.includes(" "))
+            .filter((t: any) => t.length > 1 && !bannedTags.has(t))
         )
       ).slice(0, 10) as string[]
 

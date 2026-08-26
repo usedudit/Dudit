@@ -589,9 +589,8 @@ async function importProductBatch(
   }
 
   const toInsert: any[] = []
-  const toUpdate: { id: string; data: any; sku: string }[] = []
-  const productProfiles: Record<string, { fiscal: any; logistics: any }> = {}
-  const productVariantsMap = new Map<string, ParsedVariant[]>()
+  const toInsertMetadata: { fiscal: any; logistics: any; variants?: ParsedVariant[] }[] = []
+  const toUpdate: { id: string; data: any; fiscal: any; logistics: any; variants?: ParsedVariant[] }[] = []
 
   for (let i = 0; i < batch.length; i++) {
     const row = batch[i]
@@ -614,11 +613,6 @@ async function importProductBatch(
       warnings++
     }
 
-    let sku = row["sku"]?.trim() || generateSKUBase(name)
-    if (sku.length > 100) {
-      sku = sku.substring(0, 100)
-    }
-
     const price = parseNumber(row["price"])
     if (price === null) {
       errors++
@@ -628,6 +622,29 @@ async function importProductBatch(
         errorMessage: `Preço de venda inválido ("${row["price"] || ""}"). Deve ser numérico.`,
       })
       continue
+    }
+
+    // Parse product variants if specified
+    const variantsRaw = row["variants"]?.trim()
+    const variantTypeRaw = row["variant_type"]?.trim()
+    let parsedVariants: ParsedVariant[] = []
+    let hasVariants = false
+
+    if (variantsRaw) {
+      const baseSkuForVariants = row["sku"]?.trim() || generateSKUBase(name)
+      parsedVariants = parseProductVariants(variantsRaw, variantTypeRaw, {
+        sku: baseSkuForVariants,
+        price,
+        stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
+      })
+      if (parsedVariants.length > 0) {
+        hasVariants = true
+      }
+    }
+
+    let sku = hasVariants ? null : (row["sku"]?.trim() || generateSKUBase(name))
+    if (sku && sku.length > 100) {
+      sku = sku.substring(0, 100)
     }
 
     let status = "ativo"
@@ -650,7 +667,7 @@ async function importProductBatch(
       partner_id: partnerId,
       store_id: storeId || null,
       name,
-      sku,
+      sku: sku || null,
       description: row["description"] || null,
       price,
       stock_quantity: parseNumber(row["stock_quantity"]) ?? 0,
@@ -663,6 +680,14 @@ async function importProductBatch(
       promotional_price: parseNumber(row["promotional_price"]),
       status,
       show_in_marketplace: showInMarketplace,
+    }
+
+    if (hasVariants) {
+      // If variants have stock and the product's main stock is 0, update product stock to sum of variants
+      const totalVariantStock = parsedVariants.reduce((sum, v) => sum + v.stock_quantity, 0)
+      if (totalVariantStock > 0 && productData.stock_quantity === 0) {
+        productData.stock_quantity = totalVariantStock
+      }
     }
 
     if (row["category"]) {
@@ -690,60 +715,40 @@ async function importProductBatch(
       productData.tags = row["tags"].split(",").map((t) => t.trim()).filter(Boolean)
     }
 
-    // Parse product variants if specified
-    const variantsRaw = row["variants"]?.trim()
-    const variantTypeRaw = row["variant_type"]?.trim()
-    if (variantsRaw) {
-      const parsedVariants = parseProductVariants(variantsRaw, variantTypeRaw, {
-        sku,
-        price,
-        stock_quantity: productData.stock_quantity,
-      })
-      if (parsedVariants.length > 0) {
-        // If variants have stock and the product's main stock is 0, update product stock to sum of variants
-        const totalVariantStock = parsedVariants.reduce((sum, v) => sum + v.stock_quantity, 0)
-        if (totalVariantStock > 0 && productData.stock_quantity === 0) {
-          productData.stock_quantity = totalVariantStock
-        }
-        productVariantsMap.set(sku, parsedVariants)
-      }
+    const fiscal = {
+      ncm: row["ncm"] || null,
+      cest: row["cest"] || null,
+      origin: row["origin"] ? parseInt(row["origin"].replace(/\D/g, "")) || 0 : 0,
+      item_type: "00",
+      cfop_internal: "5102",
+      cfop_external: "6102",
+      csosn: "102",
+      pis_cst: "99",
+      pis_rate: 0.0,
+      cofins_cst: "99",
+      cofins_rate: 0.0,
+      ipi_cst: "99",
+    }
+    const logistics = {
+      weight_gross: parseNumber(row["weight_gross"]) ?? 0,
+      weight_net: parseNumber(row["weight_net"]) ?? 0,
+      width: parseNumber(row["width"]) ?? 0,
+      height: parseNumber(row["height"]) ?? 0,
+      length: parseNumber(row["length"]) ?? 0,
+      packaging_type: row["packaging_type"] || "Pacote/Caixa",
+      preparation_days: parseNumber(row["preparation_days"]) ?? 0,
     }
 
-    productProfiles[sku] = {
-      fiscal: {
-        ncm: row["ncm"] || null,
-        cest: row["cest"] || null,
-        origin: row["origin"] ? parseInt(row["origin"].replace(/\D/g, "")) || 0 : 0,
-        item_type: "00",
-        cfop_internal: "5102",
-        cfop_external: "6102",
-        csosn: "102",
-        pis_cst: "99",
-        pis_rate: 0.0,
-        cofins_cst: "99",
-        cofins_rate: 0.0,
-        ipi_cst: "99",
-      },
-      logistics: {
-        weight_gross: parseNumber(row["weight_gross"]) ?? 0,
-        weight_net: parseNumber(row["weight_net"]) ?? 0,
-        width: parseNumber(row["width"]) ?? 0,
-        height: parseNumber(row["height"]) ?? 0,
-        length: parseNumber(row["length"]) ?? 0,
-        packaging_type: row["packaging_type"] || "Pacote/Caixa",
-        preparation_days: parseNumber(row["preparation_days"]) ?? 0,
-      },
-    }
-
-    const existing = existingProductMap.get(sku)
+    const existing = sku ? existingProductMap.get(sku) : null
     if (existing) {
       if (duplicateStrategy === "update") {
-        toUpdate.push({ id: existing.id, data: productData, sku })
+        toUpdate.push({ id: existing.id, data: productData, fiscal, logistics, variants: parsedVariants })
       } else {
         duplicates++
       }
     } else {
       toInsert.push(productData)
+      toInsertMetadata.push({ fiscal, logistics, variants: parsedVariants })
     }
   }
 
@@ -761,22 +766,23 @@ async function importProductBatch(
     } else {
       created += inserted?.length ?? 0
 
-      // Insert fiscal & logistics profiles
+      // Insert fiscal & logistics profiles and variants
       const fiscalToInsert: any[] = []
       const logisticsToInsert: any[] = []
       const variantsToInsert: any[] = []
 
-      for (const item of inserted || []) {
-        if (item.sku && item.id) {
-          const prof = productProfiles[item.sku]
-          if (prof) {
-            fiscalToInsert.push({ product_id: item.id, ...prof.fiscal })
-            logisticsToInsert.push({ product_id: item.id, ...prof.logistics })
+      for (let idx = 0; idx < (inserted?.length ?? 0); idx++) {
+        const item = inserted[idx]
+        const meta = toInsertMetadata[idx]
+        if (item?.id && meta) {
+          if (meta.fiscal) {
+            fiscalToInsert.push({ product_id: item.id, ...meta.fiscal })
           }
-
-          const variants = productVariantsMap.get(item.sku)
-          if (variants && variants.length > 0) {
-            for (const v of variants) {
+          if (meta.logistics) {
+            logisticsToInsert.push({ product_id: item.id, ...meta.logistics })
+          }
+          if (meta.variants && meta.variants.length > 0) {
+            for (const v of meta.variants) {
               variantsToInsert.push({
                 product_id: item.id,
                 ...v,
@@ -799,13 +805,14 @@ async function importProductBatch(
         if (isVariantsAllowed) {
           const { error: variantInsertError } = await supabase
             .from("product_variants")
-            .upsert(variantsToInsert, { onConflict: "sku" })
+            .insert(variantsToInsert)
 
           if (variantInsertError) {
             console.error("[BatchImport] Erro ao inserir variantes:", variantInsertError)
           }
         } else {
-          warnings++
+          warnings += variantsToInsert.length
+          console.warn("[BatchImport] Plano não inclui product_variants, ignorando inserção de variações.")
         }
       }
     }
@@ -827,19 +834,19 @@ async function importProductBatch(
         errorMessage = error.message
       } else {
         updated++
-        const prof = productProfiles[item.sku]
-        if (prof) {
+        if (item.fiscal) {
           await supabase
             .from("product_fiscal_profiles")
-            .upsert({ product_id: item.id, ...prof.fiscal }, { onConflict: "product_id" })
+            .upsert({ product_id: item.id, ...item.fiscal }, { onConflict: "product_id" })
+        }
+        if (item.logistics) {
           await supabase
             .from("product_logistics")
-            .upsert({ product_id: item.id, ...prof.logistics }, { onConflict: "product_id" })
+            .upsert({ product_id: item.id, ...item.logistics }, { onConflict: "product_id" })
         }
 
-        const variants = productVariantsMap.get(item.sku)
-        if (variants && variants.length > 0) {
-          for (const v of variants) {
+        if (item.variants && item.variants.length > 0) {
+          for (const v of item.variants) {
             variantsToUpsert.push({
               product_id: item.id,
               ...v,
