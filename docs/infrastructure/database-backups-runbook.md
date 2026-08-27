@@ -30,14 +30,14 @@ As credenciais `CLOUDFLARE_BACKUP_R2_*` devem ser exclusivas do bucket privado d
 No PowerShell, a partir da raiz do projeto:
 
 ```powershell
-Set-Location "C:\Users\MURILO\Downloads\Dudit"
+Set-Location "C:\Users\MuriloSTR\Downloads\Dudit"
 
 $secret = ((Get-Content .env |
   Where-Object { $_ -match "^BACKUP_CRON_SECRET=" } |
   Select-Object -First 1) -split "=", 2)[1].Trim().Trim('"').Trim("'")
 
 Invoke-RestMethod `
-  -Uri "https://SEU_DOMINIO/api/internal/jobs/backup-database" `
+  -Uri "https://dudit.com.br/api/internal/jobs/backup-database" `
   -Method Post `
   -Headers @{ Authorization = "Bearer $secret" } `
   -ContentType "application/json" `

@@ -8,7 +8,7 @@
         }
       ],
       "commands": [
-        "mkdir -p /opt/postgresql/lib && cp -a /usr/lib/postgresql/17 /opt/postgresql/ && cp -a /usr/lib/x86_64-linux-gnu/libpq.so.5* /opt/postgresql/lib/"
+        "mkdir -p /opt/postgresql/lib && cp -a /usr/lib/postgresql/17 /opt/postgresql/ && cp -a /usr/lib/x86_64-linux-gnu/libpq.so.5* /usr/lib/x86_64-linux-gnu/libldap-2.5.so* /usr/lib/x86_64-linux-gnu/liblber-2.5.so* /usr/lib/x86_64-linux-gnu/libsasl2.so* /opt/postgresql/lib/"
       ],
       "deployOutputs": [
         {
