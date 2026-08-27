@@ -7,64 +7,14 @@ import {
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
   applyCustomerStatusFilter,
-  CUSTOMER_EXPORT_ALL_COLUMNS,
   CUSTOMER_EXPORT_COLUMNS,
   mapCustomerRow,
 } from "../mappers"
 import type { CustomersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
-const CUSTOMER_SELECT = "id, name, email, phone, status, created_at"
-
-const CUSTOMER_SELECT_ALL = `
-  id, name, email, phone, phone_fixed, website, birth_date, status,
-  person_type, cpf, cnpj, inscricao_estadual, country, zip_code, street,
-  number, complement, neighborhood, city, state, store_credit, notes, created_at
-`
-
-async function loadCustomerStats(supabase: SupabaseClient, partnerId: string, customerIds: string[]) {
-  const stats = new Map<string, { orders: number; ltv: number }>()
-  if (!customerIds.length) return stats
-
-  const chunkSize = 200
-  for (let i = 0; i < customerIds.length; i += chunkSize) {
-    const chunk = customerIds.slice(i, i + chunkSize)
-
-    const [ordersRes, salesRes] = await Promise.all([
-      supabase
-        .from("orders")
-        .select("buyer_id, total_amount")
-        .eq("partner_id", partnerId)
-        .in("buyer_id", chunk)
-        .neq("situation", "cancelled"),
-      supabase
-        .from("sales")
-        .select("customer_id, final_amount")
-        .eq("partner_id", partnerId)
-        .in("customer_id", chunk),
-    ])
-
-    for (const o of ordersRes.data || []) {
-      if (!o.buyer_id) continue
-      const id = String(o.buyer_id)
-      const cur = stats.get(id) || { orders: 0, ltv: 0 }
-      cur.orders += 1
-      cur.ltv += Number(o.total_amount || 0)
-      stats.set(id, cur)
-    }
-
-    for (const s of salesRes.data || []) {
-      if (!s.customer_id) continue
-      const id = String(s.customer_id)
-      const cur = stats.get(id) || { orders: 0, ltv: 0 }
-      cur.orders += 1
-      cur.ltv += Number(s.final_amount || 0)
-      stats.set(id, cur)
-    }
-  }
-
-  return stats
-}
+const CUSTOMER_SELECT =
+  "id, name, email, phone, phone_fixed, birth_date, status, person_type, cpf, cnpj, inscricao_estadual, zip_code, street, number, complement, neighborhood, city, state, notes, created_at"
 
 export async function fetchCustomersExport(
   supabase: SupabaseClient,
@@ -78,13 +28,11 @@ export async function fetchCustomersExport(
 
   const search = sanitizeSearchTerm(filters.search)
   const { startIso, endIso } = resolveExportDateBounds(filters.datePeriod)
-  const includeAllColumns = filters.includeAllColumns === true
-  const select = includeAllColumns ? CUSTOMER_SELECT_ALL : CUSTOMER_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query: any = (supabase as any).from("customers").select(select).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("customers").select(CUSTOMER_SELECT).eq("partner_id", partnerId)
 
       const dbStatuses = [...new Set(statusLabels.map(mapCustomerStatusToDb))]
       if (dbStatuses.length === 1) query = query.eq("status", dbStatuses[0])
@@ -116,13 +64,6 @@ export async function fetchCustomersExport(
   })
 
   const filtered = rawRows.filter((row) => applyCustomerStatusFilter(row, statusLabels))
-  const stats = await loadCustomerStats(
-    supabase,
-    partnerId,
-    filtered.map((r) => String(r.id)),
-  )
-
-  const rows = filtered.map((r) => mapCustomerRow(r, stats.get(String(r.id)), includeAllColumns))
-  const columns = includeAllColumns ? CUSTOMER_EXPORT_ALL_COLUMNS : CUSTOMER_EXPORT_COLUMNS
-  return { columns, rows, rowCount: rows.length }
+  const rows = filtered.map((r) => mapCustomerRow(r))
+  return { columns: CUSTOMER_EXPORT_COLUMNS, rows, rowCount: rows.length }
 }

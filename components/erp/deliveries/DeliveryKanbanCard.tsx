@@ -122,8 +122,12 @@ export default function DeliveryKanbanCard({
         {/* Details Section: Driver & Fee */}
         <div className="mt-3.5 space-y-1.5 text-[11px] font-medium text-brand-inactive-text dark:text-dark-body border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
           {delivery.deliveryPersonName ? (
-            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
-              <UserIcon size={12} className="shrink-0" />
+            <div className="flex items-center gap-1.5 text-brand-dark dark:text-dark-heading min-w-0">
+              {delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver ? (
+                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+              ) : (
+                <UserIcon size={12} className="shrink-0 text-brand-inactive-text" />
+              )}
               <span className="truncate">{delivery.deliveryPersonName}</span>
             </div>
           ) : (

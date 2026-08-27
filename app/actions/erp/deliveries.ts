@@ -19,6 +19,7 @@ import { requireActivePartnerContext } from "@/lib/services/authorized-customer-
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { createNotification } from "@/lib/services/notification.service"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -1083,41 +1084,56 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
     }))
 }
 
+async function geocodeWithTimeout(address: string, timeoutMs = 600): Promise<{ lat: number; lng: number } | null> {
+  if (!address || !address.trim()) return null
+  return Promise.race([
+    geocodeAddress(address),
+    new Promise<{ lat: number; lng: number } | null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]).catch(() => null)
+}
+
 export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
   await requireUser()
   const actor = await getDeliveryActorScope(partnerId)
   if (actor.roleId === "delivery") return []
-  const supabase = await getSupabaseServerClient()
 
-  const { data, error } = await supabase
-    .from("partner_users")
-    .select("id, role_id, user_id")
-    .eq("partner_id", partnerId)
-    .eq("role_id", "delivery")
-    .order("created_at", { ascending: true })
+  return getCachedErpPage(
+    ["erp-delivery-people-bucket", partnerId],
+    [TAGS.partner(partnerId)],
+    async () => {
+      const supabase = await getSupabaseServerClient()
+      const { data, error } = await supabase
+        .from("partner_users")
+        .select("id, role_id, user_id")
+        .eq("partner_id", partnerId)
+        .eq("role_id", "delivery")
+        .order("created_at", { ascending: true })
 
-  if (error) {
-    console.error("[fetchDeliveryPeopleBucketAction]", error)
-    return []
-  }
+      if (error) {
+        console.error("[fetchDeliveryPeopleBucketAction]", error)
+        return []
+      }
 
-  const userIds = Array.from(new Set((data || []).map((member: any) => member.user_id).filter(Boolean)))
-  const nameByUserId = new Map<string, string>()
-  if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("user_profiles")
-      .select("user_id, full_name")
-      .in("user_id", userIds)
-    for (const profile of profiles || []) {
-      nameByUserId.set(String(profile.user_id), String(profile.full_name || "Entregador"))
-    }
-  }
+      const userIds = Array.from(new Set((data || []).map((member: any) => member.user_id).filter(Boolean)))
+      const nameByUserId = new Map<string, string>()
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds)
+        for (const profile of profiles || []) {
+          nameByUserId.set(String(profile.user_id), String(profile.full_name || "Entregador"))
+        }
+      }
 
-  return (data || []).map((member: any) => ({
-    id: member.id,
-    userId: member.user_id,
-    fullName: nameByUserId.get(String(member.user_id)) || "Entregador",
-  }))
+      return (data || []).map((member: any) => ({
+        id: member.id,
+        userId: member.user_id,
+        fullName: nameByUserId.get(String(member.user_id)) || "Entregador",
+      }))
+    },
+    30,
+  )
 }
 
 export async function getERPDeliveryPlanAccessAction(partnerId: string) {
@@ -1231,8 +1247,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           .join(" ")
 
         const [originCoords, destinationCoords] = await Promise.all([
-          geocodeAddress(originAddress),
-          geocodeAddress(deliveryAddress),
+          geocodeWithTimeout(originAddress),
+          geocodeWithTimeout(deliveryAddress),
         ])
 
         if (originCoords && destinationCoords) {
@@ -1532,13 +1548,125 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       const rows = data || []
       const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
       const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
+
+      const deliveryIds = rows.map((r: any) => r.id).filter(Boolean)
+      let platformAssignmentsByDeliveryId = new Map<string, any>()
+      let platformDriverUserIds = new Set<string>()
+
+      if (deliveryIds.length > 0) {
+        const { data: assignments } = await getAdminClient()
+          .from("delivery_assignments")
+          .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
+          .in("delivery_id", deliveryIds)
+          .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+          .order("assigned_at", { ascending: false })
+
+        for (const ass of assignments || []) {
+          if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
+            platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+            if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+          }
+        }
+      }
+
+      for (const row of rows) {
+        if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
+          platformDriverUserIds.add(String(row.delivery_person_id))
+        }
+      }
+
+      let driverProfileMap = new Map<string, any>()
+      if (platformDriverUserIds.size > 0) {
+        const driverIdsArray = Array.from(platformDriverUserIds)
+        const [{ data: profiles }, { data: driverRows }] = await Promise.all([
+          getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
+          getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
+        ])
+
+        const driverInfoByUserId = new Map<string, any>()
+        for (const dRow of driverRows || []) {
+          if (dRow?.user_id) driverInfoByUserId.set(String(dRow.user_id), dRow)
+        }
+
+        for (const prof of profiles || []) {
+          if (!prof?.user_id) continue
+          const dInfo = driverInfoByUserId.get(String(prof.user_id))
+          driverProfileMap.set(String(prof.user_id), {
+            id: String(prof.user_id),
+            fullName: prof.full_name || "Entregador Dudit",
+            phone: prof.phone || null,
+            avatarUrl: prof.avatar_url || null,
+            vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
+            vehiclePlate: dInfo?.vehicle_plate || null,
+            city: dInfo?.city || null,
+          })
+        }
+      }
+
       const hasMore = rows.length > limit
-      const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => ({
-        ...row,
-        partner_users: row.delivery_person_id
-          ? { id: row.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador" } }
-          : null,
-      }))
+      const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+        const pAss = platformAssignmentsByDeliveryId.get(row.id)
+        let isPlatformDriver = false
+        let platformDriver: any = null
+        let driverName: string | null = null
+
+        if (pAss) {
+          isPlatformDriver = true
+          if (pAss.driver_id) {
+            const pInfo = driverProfileMap.get(String(pAss.driver_id))
+            platformDriver = {
+              id: String(pAss.driver_id),
+              fullName: pInfo?.fullName || "Entregador Dudit",
+              phone: pInfo?.phone || null,
+              avatarUrl: pInfo?.avatarUrl || null,
+              vehicleType: pInfo?.vehicleType || null,
+              vehiclePlate: pInfo?.vehiclePlate || null,
+              city: pInfo?.city || null,
+              status: pAss.status,
+              isPlatformDriver: true,
+              isPendingAcceptance: false,
+            }
+            driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
+          } else {
+            platformDriver = {
+              id: "dudit_network",
+              fullName: "Rede de Entregadores Dudit",
+              status: pAss.status,
+              isPlatformDriver: true,
+              isPendingAcceptance: true,
+            }
+            driverName = "Rede de Entregadores (Aguardando aceite)"
+          }
+        } else if (row.delivery_person_id && driverProfileMap.has(String(row.delivery_person_id))) {
+          const pInfo = driverProfileMap.get(String(row.delivery_person_id))
+          isPlatformDriver = true
+          platformDriver = {
+            id: String(row.delivery_person_id),
+            fullName: pInfo?.fullName || "Entregador Dudit",
+            phone: pInfo?.phone || null,
+            avatarUrl: pInfo?.avatarUrl || null,
+            vehicleType: pInfo?.vehicleType || null,
+            vehiclePlate: pInfo?.vehiclePlate || null,
+            city: pInfo?.city || null,
+            status: "accepted",
+            isPlatformDriver: true,
+            isPendingAcceptance: false,
+          }
+          driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
+        } else if (row.delivery_person_id) {
+          driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
+        }
+
+        return {
+          ...row,
+          is_platform_driver: isPlatformDriver,
+          platform_driver: platformDriver,
+          delivery_person_name: driverName,
+          partner_users: driverName
+            ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
+            : null,
+        }
+      })
       const last = items[items.length - 1]
       const nextCursor = hasMore && last?.created_at && last?.id
         ? { createdAt: String(last.created_at), id: String(last.id) }
@@ -1643,33 +1771,50 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     if (error) return { success: false as const, error: error.message }
 
     const deliveryOrderIds = (data?.delivery_orders || []).map((doItem: any) => doItem?.order_id).filter(Boolean)
-    let [{ data: platformAssignment }, deliveryPersonNameById] = await Promise.all([
+    const buyerIds = Array.from(new Set((data?.delivery_orders || [])
+      .map((doItem: any) => doItem?.orders?.buyer_id)
+      .filter(Boolean)))
+
+    let assignmentFilter = `delivery_id.eq.${deliveryId}`
+    if (deliveryOrderIds.length > 0) {
+      assignmentFilter += `,order_id.in.(${deliveryOrderIds.join(",")})`
+    }
+
+    const [
+      { data: platformAssignments },
+      deliveryPersonNameById,
+      customerRes,
+      addressRes,
+    ] = await Promise.all([
       getAdminClient()
         .from("delivery_assignments")
         .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
-        .eq("delivery_id", deliveryId)
+        .or(assignmentFilter)
         .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
         .order("assigned_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(1),
       getPartnerUserNameByIdMap(
         supabase,
         partnerId,
         data?.delivery_person_id ? [String(data.delivery_person_id)] : [],
       ),
+      buyerIds.length > 0
+        ? getAdminClient()
+            .from("customers")
+            .select("id, name, email, phone, image_url")
+            .eq("partner_id", partnerId)
+            .in("id", buyerIds)
+        : Promise.resolve({ data: [] }),
+      buyerIds.length > 0
+        ? supabase
+            .from("addresses")
+            .select("customer_id, street, number, complement, neighborhood, city, state, zip_code")
+            .in("customer_id", buyerIds)
+            .eq("address_type", "primary")
+        : Promise.resolve({ data: [] }),
     ])
 
-    if (!platformAssignment && deliveryOrderIds.length > 0) {
-      const { data: orderAssignment } = await getAdminClient()
-        .from("delivery_assignments")
-        .select("id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
-        .in("order_id", deliveryOrderIds)
-        .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
-        .order("assigned_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      platformAssignment = orderAssignment
-    }
+    let platformAssignment = platformAssignments?.[0] || null
 
     let platformDriver: any = null
     let resolvedPlatformDriverId: string | null = null
@@ -1689,12 +1834,12 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         resolvedPlatformDriverId = driverUserId
         const [{ data: profile }, { data: driverRow }, { count: totalDeliveries }] = await Promise.all([
           getAdminClient().from("user_profiles").select("full_name, phone, avatar_url").eq("user_id", driverUserId).maybeSingle(),
-          getAdminClient().from("delivery_drivers").select("vehicle_type, city").eq("user_id", driverUserId).maybeSingle(),
+          getAdminClient().from("delivery_drivers").select("vehicle_type, vehicle_plate, city").eq("user_id", driverUserId).maybeSingle(),
           getAdminClient().from("delivery_assignments").select("id", { count: "exact", head: true }).eq("driver_id", driverUserId).eq("status", "delivered"),
         ])
 
         const fullName = profile?.full_name || "Entregador Dudit"
-        const vehicleType = driverRow?.vehicle_type === "moto" ? "Moto" : driverRow?.vehicle_type === "carro" ? "Carro" : null
+        const vehicleType = driverRow?.vehicle_type === "moto" ? "Moto" : driverRow?.vehicle_type === "carro" ? "Carro" : (driverRow?.vehicle_type || null)
 
         platformDriver = {
           id: driverUserId,
@@ -1702,50 +1847,45 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           phone: profile?.phone || null,
           avatarUrl: profile?.avatar_url || null,
           vehicleType,
+          vehiclePlate: driverRow?.vehicle_plate || null,
+          city: driverRow?.city || null,
           totalDeliveries: totalDeliveries || 0,
           status: platformAssignment.status,
           isPlatformDriver: true,
           isPendingAcceptance: false,
+          acceptedAt: platformAssignment.accepted_at,
+          pickedUpAt: platformAssignment.picked_up_at,
         }
       }
     }
 
-    const buyerIds = Array.from(new Set((data?.delivery_orders || [])
-      .map((doItem: any) => doItem?.orders?.buyer_id)
-      .filter(Boolean)))
+    const customerRows = customerRes?.data || []
+    const addressRows = addressRes?.data || []
 
-    let customerMap = new Map<string, any>()
-    if (buyerIds.length > 0) {
-      const [{ data: customerRows }, { data: addressRows }] = await Promise.all([
-        getAdminClient()
-          .from("customers")
-          .select("id, name, email, phone, image_url")
-          .eq("partner_id", partnerId)
-          .in("id", buyerIds),
-        supabase
-          .from("addresses")
-          .select("customer_id, street, number, complement, neighborhood, city, state, zip_code")
-          .in("customer_id", buyerIds)
-          .eq("address_type", "primary"),
-      ])
+    const addressMap = new Map<string, any>()
+    for (const addr of addressRows || []) {
+      addressMap.set(String(addr.customer_id), addr)
+    }
 
-
-
-      const addressMap = new Map<string, any>()
-      for (const addr of addressRows || []) {
-        addressMap.set(String(addr.customer_id), addr)
-      }
-
-      for (const row of customerRows || []) {
-        const addr = addressMap.get(String(row.id))
-        customerMap.set(String(row.id), { ...row, ...addr })
-      }
+    const customerMap = new Map<string, any>()
+    for (const row of customerRows || []) {
+      const addr = addressMap.get(String(row.id))
+      customerMap.set(String(row.id), { ...row, ...addr })
     }
 
     const hydrated = {
       ...data,
+      delivery_person_id: platformDriver?.isPlatformDriver
+        ? `platform:${resolvedPlatformDriverId}`
+        : (data?.delivery_person_id || null),
+      delivery_person_name: platformDriver?.fullName || deliveryPersonNameById.get(String(data?.delivery_person_id)) || null,
+      delivery_person_phone: platformDriver?.phone || null,
+      delivery_person_avatar: platformDriver?.avatarUrl || null,
+      delivery_person_vehicle: platformDriver?.vehicleType || null,
       platform_driver_id: resolvedPlatformDriverId,
       platform_driver: platformDriver,
+      platform_assignment: platformAssignment,
+      is_platform_driver: Boolean(platformDriver?.isPlatformDriver),
       delivery_orders: (data?.delivery_orders || []).map((doItem: any) => {
         const order = doItem.orders
         if (!order) return doItem
@@ -1778,11 +1918,127 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           }
         }
       }),
-      partner_users: data?.delivery_person_id
-        ? { id: data.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(data.delivery_person_id)) || "Entregador" } }
-        : null,
+      partner_users: platformDriver?.isPlatformDriver
+        ? {
+            id: `platform:${resolvedPlatformDriverId}`,
+            user_profiles: {
+              full_name: platformDriver.fullName,
+              avatar_url: platformDriver.avatarUrl,
+              phone: platformDriver.phone,
+            },
+          }
+        : (data?.delivery_person_id
+          ? { id: data.delivery_person_id, user_profiles: { full_name: deliveryPersonNameById.get(String(data.delivery_person_id)) || "Entregador" } }
+          : null),
     }
     return { success: true as const, data: hydrated }
+  }
+
+  export async function unassignDuditDriverAction(params: {
+    partnerId: string
+    deliveryId: string
+    reason: string
+    notifyDriver?: boolean
+  }) {
+    const user = await requireUser()
+    await requireActivePartnerContext(params.partnerId)
+    await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_update_delivery_status" })
+    const supabase = await getSupabaseServerClient()
+    const admin = getAdminClient()
+
+    const { data: delivery } = await supabase
+      .from("deliveries")
+      .select("id, delivery_number, delivery_person_id, status")
+      .eq("id", params.deliveryId)
+      .eq("partner_id", params.partnerId)
+      .maybeSingle()
+
+    if (!delivery) {
+      return { success: false as const, error: "Entrega não encontrada." }
+    }
+
+    const { data: assignment } = await admin
+      .from("delivery_assignments")
+      .select("id, driver_id, status, delivery_id, order_id")
+      .eq("delivery_id", params.deliveryId)
+      .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery"])
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const reasonText = params.reason?.trim() || "Desatribuído pelo estabelecimento"
+
+    if (assignment) {
+      await admin
+        .from("delivery_assignments")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          failure_reason: reasonText,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("delivery_id", params.deliveryId)
+        .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery"])
+
+      if (assignment.driver_id && params.notifyDriver !== false) {
+        const deliveryNumLabel = delivery.delivery_number ? `#${delivery.delivery_number}` : ""
+        try {
+          await createNotification({
+            userId: String(assignment.driver_id),
+            type: "order_cancelled",
+            title: "Entrega desatribuída pelo estabelecimento",
+            message: `A entrega ${deliveryNumLabel} foi desatribuída pelo estabelecimento. Motivo: ${reasonText}`,
+            entityType: "order",
+            entityId: assignment.order_id || params.deliveryId,
+            idempotencyKey: `unassign-${assignment.id}-${Date.now()}`,
+            data: {
+              deliveryId: params.deliveryId,
+              reason: reasonText,
+              cancelledByPartner: true,
+            },
+          })
+        } catch (notifErr) {
+          console.warn("[unassignDuditDriverAction] notification error:", notifErr)
+        }
+      }
+    }
+
+    await supabase
+      .from("deliveries")
+      .update({
+        delivery_person_id: null,
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", params.deliveryId)
+      .eq("partner_id", params.partnerId)
+
+    try {
+      await logAuditEvent({
+        partnerId: params.partnerId,
+        actorUserId: user.id,
+        entityType: "delivery",
+        entityId: params.deliveryId,
+        actionType: "delivery_driver_unassigned",
+        changeLines: [
+          `Entregador Dudit desatribuído da entrega.`,
+          `Motivo informado: ${reasonText}`,
+        ],
+        metadata: {
+          deliveryId: params.deliveryId,
+          driverId: assignment?.driver_id || null,
+          reason: reasonText,
+        },
+        source: "manual",
+      })
+    } catch (auditErr) {
+      console.warn("[unassignDuditDriverAction] audit error:", auditErr)
+    }
+
+    revalidateDeliveryDashboard(params.partnerId)
+    revalidatePath("/erp/logistica")
+
+    return { success: true as const }
   }
 
   export async function updateERPDeliveryStatusAction(params: {
@@ -1846,80 +2102,91 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     if (nextStatus === "delivered") {
       childPatch.delivered_at = nowIso
     }
-    await supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId)
+
+    const concurrentOps: PromiseLike<any>[] = [
+      supabase.from("delivery_orders").update(childPatch).eq("delivery_id", params.deliveryId),
+    ]
 
     if (nextStatus === "cancelled" || nextStatus === "delivered" || nextStatus === "sent") {
-      await getAdminClient()
-        .from("delivery_assignments")
-        .update({ status: "cancelled", cancelled_at: nowIso })
-        .eq("delivery_id", params.deliveryId)
-        .in("status", ["available", "requested", "assigned"])
+      concurrentOps.push(
+        getAdminClient()
+          .from("delivery_assignments")
+          .update({ status: "cancelled", cancelled_at: nowIso })
+          .eq("delivery_id", params.deliveryId)
+          .in("status", ["available", "requested", "assigned"])
+      )
     }
 
-    // Keep order delivery_status and timestamps in sync (best-effort)
-    try {
-      const { data: links } = await supabase
-        .from("delivery_orders")
-        .select("order_id")
-        .eq("delivery_id", params.deliveryId)
-      const orderIds = (links || []).map((l: any) => l?.order_id).filter(Boolean)
-      if (orderIds.length > 0) {
-        const orderPatch: Record<string, unknown> = {
-          delivery_status: nextStatus,
-        }
-        if (nextStatus === "sent") {
-          orderPatch.delivery_departure_at = nowIso
-        }
-        if (nextStatus === "delivered") {
-          orderPatch.delivery_departure_at = nowIso
-          orderPatch.delivery_arrived_at = nowIso
-          orderPatch.delivery_completed_at = nowIso
-        }
-        await supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
+    const { data: links } = await supabase
+      .from("delivery_orders")
+      .select("order_id")
+      .eq("delivery_id", params.deliveryId)
+    const orderIds = (links || []).map((l: any) => l?.order_id).filter(Boolean)
 
-        for (const oid of orderIds) {
-          const orderStatusMsg = nextStatus === "sent"
-            ? "Pedido saiu para entrega (Em rota)"
-            : nextStatus === "delivered"
-              ? "Pedido entregue ao destinatário com sucesso"
-              : nextStatus === "cancelled"
-                ? "Entrega do pedido cancelada"
-                : `Status de entrega alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
-          const orderChangeLines = [orderStatusMsg]
-          if (params.changeReason?.trim()) {
-            orderChangeLines.push(`Motivo: ${params.changeReason.trim()}`)
-          }
-          await logOrderDeliveryEvent({
-            partnerId: params.partnerId,
-            actorUserId: user?.id || null,
-            orderId: oid,
-            actionType: `delivery_${nextStatus}`,
-            changeLines: orderChangeLines,
-            metadata: { deliveryId: params.deliveryId, status: nextStatus },
-          })
-        }
+    if (orderIds.length > 0) {
+      const orderPatch: Record<string, unknown> = {
+        delivery_status: nextStatus,
       }
-    } catch (err) {
-      console.warn("[updateERPDeliveryStatusAction] order patch failed:", err)
+      if (nextStatus === "sent") {
+        orderPatch.delivery_departure_at = nowIso
+      }
+      if (nextStatus === "delivered") {
+        orderPatch.delivery_departure_at = nowIso
+        orderPatch.delivery_arrived_at = nowIso
+        orderPatch.delivery_completed_at = nowIso
+      }
+      concurrentOps.push(
+        supabase.from("orders").update(orderPatch).in("id", orderIds).eq("partner_id", params.partnerId)
+      )
     }
 
-    await logDeliveryEvent({
-      partnerId: params.partnerId,
-      actorUserId: user?.id || null,
-      deliveryId: params.deliveryId,
-      actionType: "delivery_status_changed",
-      changeLines: [
-        nextStatus === "sent"
-          ? "Entrega iniciada"
-          : nextStatus === "delivered"
-            ? "Entrega concluída"
-            : nextStatus === "cancelled"
-              ? "Entrega cancelada"
-              : "Status da entrega alterado",
-        ...(params.changeReason ? [`Motivo: ${params.changeReason}`] : []),
-      ],
-      metadata: { oldStatus: String(currentDelivery.status || ""), newStatus: nextStatus },
-    })
+    await Promise.all(concurrentOps)
+
+    const logPromises: Promise<any>[] = [
+      logDeliveryEvent({
+        partnerId: params.partnerId,
+        actorUserId: user?.id || null,
+        deliveryId: params.deliveryId,
+        actionType: "delivery_status_changed",
+        changeLines: [
+          nextStatus === "sent"
+            ? "Entrega iniciada"
+            : nextStatus === "delivered"
+              ? "Entrega concluída"
+              : nextStatus === "cancelled"
+                ? "Entrega cancelada"
+                : "Status da entrega alterado",
+          ...(params.changeReason ? [`Motivo: ${params.changeReason}`] : []),
+        ],
+        metadata: { oldStatus: String(currentDelivery.status || ""), newStatus: nextStatus },
+      }),
+    ]
+
+    for (const oid of orderIds) {
+      const orderStatusMsg = nextStatus === "sent"
+        ? "Pedido saiu para entrega (Em rota)"
+        : nextStatus === "delivered"
+          ? "Pedido entregue ao destinatário com sucesso"
+          : nextStatus === "cancelled"
+            ? "Entrega do pedido cancelada"
+            : `Status de entrega alterado para ${getDeliveryStatusHumanLabel(nextStatus)}`
+      const orderChangeLines = [orderStatusMsg]
+      if (params.changeReason?.trim()) {
+        orderChangeLines.push(`Motivo: ${params.changeReason.trim()}`)
+      }
+      logPromises.push(
+        logOrderDeliveryEvent({
+          partnerId: params.partnerId,
+          actorUserId: user?.id || null,
+          orderId: oid,
+          actionType: `delivery_${nextStatus}`,
+          changeLines: orderChangeLines,
+          metadata: { deliveryId: params.deliveryId, status: nextStatus },
+        })
+      )
+    }
+
+    void Promise.allSettled(logPromises).catch(() => {})
 
     import("@/lib/services/whatsapp-automation.service")
       .then(({ onDeliveryStatusChanged }) =>
@@ -2084,8 +2351,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
           .join(" ")
 
         const [originCoords, destinationCoords] = await Promise.all([
-          geocodeAddress(originAddress),
-          geocodeAddress(deliveryAddress),
+          geocodeWithTimeout(originAddress),
+          geocodeWithTimeout(deliveryAddress),
         ])
 
         if (originCoords && destinationCoords) {
@@ -2289,31 +2556,32 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     childPatch.delivered_at = null
   }
 
-  const { error: linkError } = await supabase
-    .from("delivery_orders")
-    .update(childPatch)
-    .eq("delivery_id", params.deliveryId)
-    .eq("order_id", params.orderId)
-
-  if (linkError) return { success: false as const, error: linkError.message }
-
-  // Sync order-level delivery status (best-effort)
-  try {
-    const orderPatch: Record<string, unknown> = {
-      delivery_status: nextStatus,
-    }
-    if (nextStatus === "sent") {
-      orderPatch.delivery_departure_at = nowIso
-    }
-    if (nextStatus === "delivered") {
-      orderPatch.delivery_departure_at = nowIso
-      orderPatch.delivery_arrived_at = nowIso
-      orderPatch.delivery_completed_at = nowIso
-    }
-    await supabase.from("orders").update(orderPatch).eq("id", params.orderId).eq("partner_id", params.partnerId)
-  } catch (err) {
-    console.warn("[updateERPSingleOrderDeliveryStatusAction] order patch failed:", err)
+  const orderPatch: Record<string, unknown> = {
+    delivery_status: nextStatus,
   }
+  if (nextStatus === "sent") {
+    orderPatch.delivery_departure_at = nowIso
+  }
+  if (nextStatus === "delivered") {
+    orderPatch.delivery_departure_at = nowIso
+    orderPatch.delivery_arrived_at = nowIso
+    orderPatch.delivery_completed_at = nowIso
+  }
+
+  const [linkRes] = await Promise.all([
+    supabase
+      .from("delivery_orders")
+      .update(childPatch)
+      .eq("delivery_id", params.deliveryId)
+      .eq("order_id", params.orderId),
+    supabase
+      .from("orders")
+      .update(orderPatch)
+      .eq("id", params.orderId)
+      .eq("partner_id", params.partnerId),
+  ])
+
+  if (linkRes.error) return { success: false as const, error: linkRes.error.message }
 
   const orderLabel = `#${String(params.orderId).slice(0, 8).toUpperCase()}`
   let changeMsg = nextStatus === "delivered"
@@ -2326,25 +2594,25 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
     changeMsg += ` (Motivo: ${params.changeReason.trim()})`
   }
 
-  // Log on delivery audit
-  await logDeliveryEvent({
-    partnerId: params.partnerId,
-    actorUserId: user?.id || null,
-    deliveryId: params.deliveryId,
-    actionType: "order_delivery_status_changed",
-    changeLines: [changeMsg],
-    metadata: { orderId: params.orderId, newStatus: nextStatus },
-  })
-
-  // Log on order timeline & revalidate order history
-  await logOrderDeliveryEvent({
-    partnerId: params.partnerId,
-    actorUserId: user?.id || null,
-    orderId: params.orderId,
-    actionType: `delivery_${nextStatus}`,
-    changeLines: [changeMsg],
-    metadata: { deliveryId: params.deliveryId, status: nextStatus },
-  })
+  // Non-blocking logs
+  void Promise.allSettled([
+    logDeliveryEvent({
+      partnerId: params.partnerId,
+      actorUserId: user?.id || null,
+      deliveryId: params.deliveryId,
+      actionType: "order_delivery_status_changed",
+      changeLines: [changeMsg],
+      metadata: { orderId: params.orderId, newStatus: nextStatus },
+    }),
+    logOrderDeliveryEvent({
+      partnerId: params.partnerId,
+      actorUserId: user?.id || null,
+      orderId: params.orderId,
+      actionType: `delivery_${nextStatus}`,
+      changeLines: [changeMsg],
+      metadata: { deliveryId: params.deliveryId, status: nextStatus },
+    }),
+  ]).catch(() => {})
 
   // Check if all delivery_orders are now completed
   const { data: allLinks } = await supabase

@@ -19,7 +19,9 @@ import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { ArrowUpDownIcon, PrinterIcon, XIcon, ShoppingCartIcon } from "@/lib/icons"
+import { RotateCcw } from "lucide-react"
 import type { PurchaseWithRelations, BillingInvoice, BillingFilters, SortConfig } from "@/lib/billing/types"
+import { BillingRefundModal } from "./BillingRefundModal"
 
 const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"> = {
     pending: "orange",
@@ -123,6 +125,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
 
     const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null)
     const [detailOpen, setDetailOpen] = useState(false)
+    const [refundModalOpen, setRefundModalOpen] = useState(false)
 
     const [invoiceData, setInvoiceData] = useState<any>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
@@ -367,6 +370,29 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                     <Button variant="ghost" leftIcon={<XIcon />} onClick={() => setDetailOpen(false)}>
                         Fechar
                     </Button>
+                    <div className="flex items-center gap-2">
+                        {selectedPurchase.status === "completed" && (
+                            <Button
+                                variant="outline"
+                                leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
+                                onClick={() => setRefundModalOpen(true)}
+                            >
+                                Solicitar Reembolso
+                            </Button>
+                        )}
+                        {selectedPurchase.status === "pending" && (
+                            <Button
+                                variant="destructive"
+                                leftIcon={<XIcon />}
+                                onClick={() => {
+                                    setCancelTarget(selectedPurchase)
+                                    setCancelOpen(true)
+                                }}
+                            >
+                                Cancelar compra
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </footer>
         </div>
@@ -543,6 +569,19 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 confirmText="Sim, cancelar"
                 cancelText="Não, manter"
             />
+
+            {/* ── Refund Modal ── */}
+            {selectedPurchase && (
+                <BillingRefundModal
+                    isOpen={refundModalOpen}
+                    onClose={() => setRefundModalOpen(false)}
+                    purchase={selectedPurchase}
+                    partnerId={selectedPurchase.partner_id}
+                    onSuccess={() => {
+                        loadPage(page)
+                    }}
+                />
+            )}
         </FadeIn>
     )
 }

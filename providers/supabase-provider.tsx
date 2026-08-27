@@ -83,7 +83,7 @@ export function SupabaseProvider({
                 supabase.realtime.connect()
                 for (const channel of supabase.realtime.getChannels()) {
                     if (channel.state === "errored" || channel.state === "closed") {
-                        supabase.realtime.channel(channel.topic).subscribe()
+                        channel.subscribe()
                     }
                 }
             } catch {}

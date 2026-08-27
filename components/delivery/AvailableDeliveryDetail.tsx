@@ -258,13 +258,12 @@ export default function AvailableDeliveryDetail({
 
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {timeLeftSeconds !== null && (
-                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                                                isExpired
-                                                    ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/40"
-                                                    : timeLeftSeconds < 180
-                                                        ? "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/40"
-                                                        : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/40"
-                                            }`}>
+                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${isExpired
+                                                ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/40"
+                                                : timeLeftSeconds < 180
+                                                    ? "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/40"
+                                                    : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/40"
+                                                }`}>
                                                 <ClockIcon size={14} className={timeLeftSeconds < 180 && !isExpired ? "animate-pulse" : ""} />
                                                 {isExpired
                                                     ? "Oferta expirada"
@@ -315,7 +314,7 @@ export default function AvailableDeliveryDetail({
                                                 )}
 
                                                 {/* Local de Coleta */}
-                                                <FormSection title="Local de Coleta (Estabelecimento)">
+                                                <FormSection title="Local de Coleta (Estabelecimento)" hasSeparator>
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
                                                             <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
@@ -367,7 +366,7 @@ export default function AvailableDeliveryDetail({
                                                         : "Local de Entrega (Cliente)"
 
                                                     return (
-                                                        <FormSection key={order.order_id || idx} title={stopTitle}>
+                                                        <FormSection key={order.order_id || idx} title={stopTitle} hasSeparator>
                                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                                 <div className="space-y-1">
                                                                     <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2">
@@ -379,11 +378,10 @@ export default function AvailableDeliveryDetail({
                                                                         )}
                                                                     </h3>
                                                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                        <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
                                                                         <span>{order.delivery_address || "Endereço não informado"}</span>
                                                                     </p>
                                                                     {order.notes && (
-                                                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                                                        <p className="text-xs text-brand-orange mt-1">
                                                                             <strong>Obs:</strong> {order.notes}
                                                                         </p>
                                                                     )}
@@ -422,23 +420,23 @@ export default function AvailableDeliveryDetail({
                                                     />
                                                     <div className="space-y-3 text-xs mt-4">
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Total de Paradas:</span>
-                                                            <span className="font-bold text-sm">{ordersList.length}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total de Paradas:</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{ordersList.length}</span>
                                                         </div>
                                                         <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor Total dos Pedidos:</span>
-                                                            <span className="font-bold text-sm">{formatCurrency(totalRouteAmount)}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total dos Pedidos:</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalRouteAmount)}</span>
                                                         </div>
                                                         {ordersList.length === 1 && (
                                                             <>
                                                                 <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                                    <span className="font-semibold text-right">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento:</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                                         {formatPaymentMethodLabel(offer.payment_method, null) || "Não informada"}
                                                                     </span>
                                                                 </div>
                                                                 <div className="flex items-center justify-between text-brand-dark dark:text-dark-heading">
-                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Situação do Pagamento:</span>
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento:</span>
                                                                     <Badge variant={getPaymentStatusMeta(offer.payment_status).variant}>
                                                                         {getPaymentStatusMeta(offer.payment_status).label}
                                                                     </Badge>
@@ -467,7 +465,7 @@ export default function AvailableDeliveryDetail({
 
                                 {activeTab === "itens" && (
                                     <FadeIn key="itens" className="block">
-                                        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-6">
+                                        <FormSection title={`Itens a serem entregues (${allItems.length})`} description="Confira todos os itens antes de sair do estabelecimento">
                                             <div className="flex items-center justify-between mb-6 pb-4 border-b border-brand-border dark:border-dark-border">
                                                 <div>
                                                     <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
@@ -501,7 +499,7 @@ export default function AvailableDeliveryDetail({
                                                             return (
                                                                 <div key={item.id || idx} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                                                                     <div className="flex items-center gap-4 min-w-0">
-                                                                        <div className="w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                        <div className="w-12 h-12 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
                                                                             <img
                                                                                 src={itemImg}
                                                                                 alt={item.name || item.product_name || "Produto"}
@@ -555,7 +553,7 @@ export default function AvailableDeliveryDetail({
                                                     )}
                                                 </div>
                                             )}
-                                        </div>
+                                        </FormSection>
                                     </FadeIn>
                                 )}
                             </AnimatePresence>

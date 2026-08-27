@@ -45,8 +45,8 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             const [quoteDetailsRes, storeRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
                 storeId
-                    ? supabase.from("stores").select("name, logo_url, phone").eq("id", storeId).maybeSingle()
-                    : supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
+                    ? supabase.from("stores").select("name, logo_url, image_url, phone").eq("id", storeId).maybeSingle()
+                    : supabase.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
                 getPartnerAddressAction(partnerId, storeId),
             ])
 
@@ -58,7 +58,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             const quoteDetails = quoteDetailsRes.data
 
             const partnerName = storeRes.data?.name || "Parceiro"
-            const rawAvatar = storeRes.data?.logo_url || selectedStore?.image_url || undefined
+            const rawAvatar = storeRes.data?.logo_url || storeRes.data?.image_url || selectedStore?.logo_url || selectedStore?.image_url || undefined
             const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
             const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
             const partnerPhone = storeRes.data?.phone || undefined

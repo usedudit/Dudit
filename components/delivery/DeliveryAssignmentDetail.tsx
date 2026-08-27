@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, Button, DefaultModal, FormSection, InfoCard, ActionsDropdown, DropdownItem, Pagination } from "@/components/reusable"
+import { Badge, Button, DefaultModal, FormSection, InfoCard, ActionsDropdown, DropdownItem, Pagination, ListItem } from "@/components/reusable"
+import BottomSheet from "@/components/BottomSheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -80,6 +81,8 @@ export default function DeliveryAssignmentDetail({
     const [loading, setLoading] = useState(false)
     const [failureOpen, setFailureOpen] = useState(false)
     const [failureReason, setFailureReason] = useState("")
+    const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false)
+    const [isOrdersSheetOpen, setIsOrdersSheetOpen] = useState(false)
 
     const [activeTab, setActiveTab] = useState("resumo")
     const [itemsPage, setItemsPage] = useState(1)
@@ -241,6 +244,41 @@ export default function DeliveryAssignmentDetail({
     const isTerminalFailed = ["failed", "cancelled"].includes(assignment.status)
     const totalActiveSteps = isTerminalFailed ? currentStepIndex + 1 : currentStepIndex + 1
 
+    const timelineSteps = React.useMemo(() => {
+        return STEPS.map((step, idx) => {
+            const isPassed = currentStepIndex >= idx
+            const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
+            const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
+            let date: string | undefined
+            let time: string | undefined
+            if (isPassed && !isFailed) {
+                const ts = step.key === "assigned" ? assignment.assigned_at
+                    : step.key === "accepted" ? assignment.accepted_at
+                    : step.key === "picked_up" ? assignment.picked_up_at
+                    : step.key === "out_for_delivery" ? assignment.out_for_delivery_at
+                    : step.key === "delivered" ? assignment.delivered_at
+                    : undefined
+                if (ts) {
+                    const d = new Date(ts)
+                    date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                    time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                }
+            }
+            return {
+                label: step.label,
+                active: isPassed && !isFailed,
+                failed: isLastFailed,
+                date,
+                time,
+            }
+        })
+    }, [assignment, currentStepIndex, isTerminalFailed])
+
+    const currentActiveStep = React.useMemo(() => {
+        const active = timelineSteps.filter((s) => s.active)
+        return active[active.length - 1] || timelineSteps[0]
+    }, [timelineSteps])
+
     // Build history entries explicitly to avoid && operator issues
     const historyEntries: HistoryEntry[] = []
     if (assignment.assigned_at) {
@@ -308,12 +346,12 @@ export default function DeliveryAssignmentDetail({
 
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) && (
-                                            <Button variant="outlinered" size="sm" onClick={() => setFailureOpen(true)} disabled={loading}>
+                                            <Button variant="outlinered" onClick={() => setFailureOpen(true)} disabled={loading}>
                                                 Informar Falha
                                             </Button>
                                         )}
                                         {NEXT_STATUS[assignment.status] && (
-                                            <Button variant="default" size="sm" onClick={advance} disabled={loading} isLoading={loading} className="font-bold">
+                                            <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
                                                 {NEXT_STATUS[assignment.status].label}
                                             </Button>
                                         )}
@@ -338,64 +376,98 @@ export default function DeliveryAssignmentDetail({
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                             {/* LEFT MAIN COLUMN */}
                                             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-6">
-                                                {/* STEPPER PROGRESS - matching OrderDetailView exactly */}
-                                                {!isTerminalFailed ? (
-                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
-                                                        <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-between items-center">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
-                                                                    <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                                        {assignment.store_name || assignment.partner_name || "Loja"}
+                                                {/* STEPPER PROGRESS - Desktop */}
+                                                <div className="hidden lg:block">
+                                                    {!isTerminalFailed ? (
+                                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                            <div className="bg-brand-gray dark:bg-dark-border/50 p-6 border-b border-brand-border dark:border-dark-border">
+                                                                <div className="flex justify-between items-center">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Responsável pela entrega:</span>
+                                                                        <div className="flex items-center gap-1.5 font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                            {assignment.store_name || assignment.partner_name || "Loja"}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                        Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
                                                                     </div>
                                                                 </div>
-                                                                <div className="hidden md:block text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-                                                                    Status: <strong className="text-brand-dark dark:text-dark-heading">{statusMeta.label}</strong>
+                                                            </div>
+                                                            <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
+                                                                <div className="relative px-4">
+                                                                    <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
+                                                                        <div
+                                                                            className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
+                                                                            style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
+                                                                        />
+                                                                        {STEPS.map((step, idx) => {
+                                                                            const isPassed = currentStepIndex >= idx
+                                                                            const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
+                                                                            const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
+                                                                            return (
+                                                                                <div key={step.key} className="relative flex flex-col items-center">
+                                                                                    <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
+                                                                                        <span className={`text-xs font-medium ${isPassed && !isFailed ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                                                            {step.label}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                                                        {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
+                                                                                    </div>
+                                                                                    <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
+                                                                                        {isPassed && !isFailed ? (
+                                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">✓</div>
+                                                                                        ) : (
+                                                                                            <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )
+                                                                        })}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <div className="bg-white dark:bg-dark-surface px-12 pt-12 pb-12">
-                                                            <div className="relative px-4">
-                                                                <div className="relative h-1.5 w-full bg-gray-100 dark:bg-dark-border/50 rounded-full flex items-center justify-between">
-                                                                    <div
-                                                                        className={`absolute left-0 h-full rounded-full transition-all duration-500 ${isTerminalFailed ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-heading"}`}
-                                                                        style={{ width: `${STEPS.length <= 1 ? 0 : ((totalActiveSteps - 1) / (STEPS.length - 1)) * 100}%` }}
-                                                                    />
-                                                                    {STEPS.map((step, idx) => {
-                                                                        const isPassed = currentStepIndex >= idx
-                                                                        const isLastFailed = isTerminalFailed && idx === STEPS.length - 1
-                                                                        const isFailed = isTerminalFailed && idx >= currentStepIndex + 1
-                                                                        return (
-                                                                            <div key={step.key} className="relative flex flex-col items-center">
-                                                                                <div className="absolute bottom-6 whitespace-nowrap flex flex-col items-center">
-                                                                                    <span className={`text-xs font-medium ${isPassed && !isFailed ? (isLastFailed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                                                                        {step.label}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div className={`w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${isPassed && !isFailed ? (isLastFailed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                                                                    {isPassed && !isFailed && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
-                                                                                </div>
-                                                                                <div className="absolute top-6 whitespace-nowrap flex flex-col items-center">
-                                                                                    {isPassed && !isFailed ? (
-                                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">✓</div>
-                                                                                    ) : (
-                                                                                        <div className="text-xs font-medium text-gray-300 dark:text-dark-body/50">-</div>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        )
-                                                                    })}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <InfoCard
-                                                        title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
-                                                        message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
-                                                        color="red"
-                                                    />
-                                                )}
+                                                    ) : (
+                                                        <InfoCard
+                                                            title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
+                                                            message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
+                                                            color="red"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* STEPPER PROGRESS - Mobile/Tablet */}
+                                                <div className="lg:hidden">
+                                                    {!isTerminalFailed ? (
+                                                        <FormSection title="" className="mt-0">
+                                                            <ListItem
+                                                                title={currentActiveStep.label}
+                                                                description={currentActiveStep.date ? `${currentActiveStep.date} às ${currentActiveStep.time}` : undefined}
+                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                showChevron={true}
+                                                                onClick={() => setIsStepsSheetOpen(true)}
+                                                                left={
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${currentActiveStep.failed
+                                                                        ? "bg-brand-red/10 text-brand-red"
+                                                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                                                    }`}>
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${currentActiveStep.failed
+                                                                            ? "bg-brand-red"
+                                                                            : "bg-brand-dark dark:bg-dark-heading"
+                                                                        }`} />
+                                                                    </div>
+                                                                }
+                                                            />
+                                                        </FormSection>
+                                                    ) : (
+                                                        <InfoCard
+                                                            title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
+                                                            message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
+                                                            color="red"
+                                                        />
+                                                    )}
+                                                </div>
 
                                                 {/* Order Instructions */}
                                                 {assignment.notes && (
@@ -442,62 +514,85 @@ export default function DeliveryAssignmentDetail({
                                                     </div>
                                                 </FormSection>
 
-                                                {/* Customer Section(s) / Paradas */}
-                                                {ordersList.map((order: any, idx: number) => {
-                                                    const custMaps = order.delivery_address
-                                                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
-                                                        : null
-                                                    const custWaze = order.delivery_address
-                                                        ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
-                                                        : null
-                                                    const stopTitle = ordersList.length > 1
-                                                        ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
-                                                        : "Local de Entrega (Cliente)"
+                                                {/* Customer Section(s) / Paradas - Desktop */}
+                                                <div className="hidden lg:block">
+                                                    {ordersList.map((order: any, idx: number) => {
+                                                        const custMaps = order.delivery_address
+                                                            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
+                                                            : null
+                                                        const custWaze = order.delivery_address
+                                                            ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
+                                                            : null
+                                                        const stopTitle = ordersList.length > 1
+                                                            ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
+                                                            : "Local de Entrega (Cliente)"
 
-                                                    return (
-                                                        <FormSection key={order.order_id || idx} title={stopTitle}>
-                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                                <div className="space-y-1">
-                                                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                                        <span>{order.customer_name || "Cliente"}</span>
-                                                                        {order.total_amount && (
-                                                                            <span className="text-xs font-normal text-brand-inactive-text">
-                                                                                ({formatCurrency(order.total_amount)})
-                                                                            </span>
-                                                                        )}
-                                                                    </h3>
-                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                        <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
-                                                                        <span>{order.delivery_address || "Endereço não informado"}</span>
-                                                                    </p>
-                                                                    {order.notes && (
-                                                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                                                                            <strong>Obs:</strong> {order.notes}
+                                                        return (
+                                                            <FormSection key={order.order_id || idx} title={stopTitle}>
+                                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                                    <div className="space-y-1">
+                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                                            <span>{order.customer_name || "Cliente"}</span>
+                                                                            {order.total_amount && (
+                                                                                <span className="text-xs font-normal text-brand-inactive-text">
+                                                                                    ({formatCurrency(order.total_amount)})
+                                                                                </span>
+                                                                            )}
+                                                                        </h3>
+                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
+                                                                            <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
+                                                                            <span>{order.delivery_address || "Endereço não informado"}</span>
                                                                         </p>
-                                                                    )}
-                                                                </div>
-                                                                <div className="shrink-0">
-                                                                    <ActionsDropdown
-                                                                        trigger={
-                                                                            <Button variant="outline" size="sm">Rota</Button>
-                                                                        }
-                                                                    >
-                                                                        {custMaps && (
-                                                                            <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
-                                                                                <MapPinIcon size={16} /> Abrir Rota no Maps
-                                                                            </DropdownItem>
+                                                                        {order.notes && (
+                                                                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                                                                <strong>Obs:</strong> {order.notes}
+                                                                            </p>
                                                                         )}
-                                                                        {custWaze && (
-                                                                            <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
-                                                                                <TruckIcon size={16} /> Abrir no Waze
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                    </ActionsDropdown>
+                                                                    </div>
+                                                                    <div className="shrink-0">
+                                                                        <ActionsDropdown
+                                                                            trigger={
+                                                                                <Button variant="outline" size="sm">Rota</Button>
+                                                                            }
+                                                                        >
+                                                                            {custMaps && (
+                                                                                <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
+                                                                                    <MapPinIcon size={16} /> Abrir Rota no Maps
+                                                                                </DropdownItem>
+                                                                            )}
+                                                                            {custWaze && (
+                                                                                <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
+                                                                                    <TruckIcon size={16} /> Abrir no Waze
+                                                                                </DropdownItem>
+                                                                            )}
+                                                                        </ActionsDropdown>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        </FormSection>
-                                                    )
-                                                })}
+                                                            </FormSection>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                {/* Customer Section(s) / Paradas - Mobile/Tablet */}
+                                                <div className="lg:hidden">
+                                                    <FormSection title={`Pedidos Vinculados (${ordersList.length})`} className="mt-0">
+                                                        <ListItem
+                                                            title={`Valor total da entrega: ${formatCurrency(totalRouteAmount)}`}
+                                                            description={ordersList.length === 1
+                                                                ? `${ordersList[0].customer_name || "Cliente"} • ${ordersList[0].total_amount ? formatCurrency(ordersList[0].total_amount) : ""}`
+                                                                : `${ordersList.length} paradas`
+                                                            }
+                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                            showChevron={true}
+                                                            onClick={() => setIsOrdersSheetOpen(true)}
+                                                            left={
+                                                                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
+                                                                    <TruckIcon size={18} />
+                                                                </div>
+                                                            }
+                                                        />
+                                                    </FormSection>
+                                                </div>
                                             </div>
 
                                             {/* RIGHT SIDEBAR COLUMN with divider */}
@@ -692,6 +787,92 @@ export default function DeliveryAssignmentDetail({
                         />
                     </div>
                 </DefaultModal>
+
+                <BottomSheet
+                    isOpen={isStepsSheetOpen}
+                    onClose={() => setIsStepsSheetOpen(false)}
+                    title="Status da Entrega"
+                >
+                    <div className="space-y-0 my-4 px-2">
+                        {timelineSteps.map((step, idx) => (
+                            <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
+                                <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (step.failed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
+                                </div>
+                                <div className="flex flex-col text-left">
+                                    <span className={`text-sm font-semibold ${step.active ? (step.failed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                        {step.label}
+                                    </span>
+                                    {step.date ? (
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                            {step.date} às {step.time}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </BottomSheet>
+
+                <BottomSheet
+                    isOpen={isOrdersSheetOpen}
+                    onClose={() => setIsOrdersSheetOpen(false)}
+                    title="Pedidos Vinculados"
+                >
+                    <div className="space-y-4 my-4 px-2">
+                        {ordersList.map((order: any, idx: number) => {
+                            const custMaps = order.delivery_address
+                                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
+                                : null
+                            const custWaze = order.delivery_address
+                                ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
+                                : null
+                            return (
+                                <div key={order.order_id || idx} className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                Pedido #{order.order_number || String(order.order_id).slice(0, 8)}
+                                            </h4>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                {order.customer_name || "Cliente"} {order.total_amount ? `• ${formatCurrency(order.total_amount)}` : ""}
+                                            </p>
+                                        </div>
+                                        {order.delivery_address && (
+                                            <ActionsDropdown
+                                                trigger={<Button variant="outline" size="sm">Rota</Button>}
+                                            >
+                                                {custMaps && (
+                                                    <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
+                                                        <MapPinIcon size={16} /> Maps
+                                                    </DropdownItem>
+                                                )}
+                                                {custWaze && (
+                                                    <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
+                                                        <TruckIcon size={16} /> Waze
+                                                    </DropdownItem>
+                                                )}
+                                            </ActionsDropdown>
+                                        )}
+                                    </div>
+                                    {order.delivery_address && (
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
+                                            <MapPinIcon size={12} className="shrink-0 text-purple-500 mt-0.5" />
+                                            <span>{order.delivery_address}</span>
+                                        </p>
+                                    )}
+                                    {order.notes && (
+                                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                                            <strong>Obs:</strong> {order.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </BottomSheet>
             </div>
         </FadeIn>
     )

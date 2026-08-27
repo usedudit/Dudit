@@ -3,22 +3,13 @@ import { sanitizeSearchTerm } from "../filters"
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
   mapServiceRow,
-  SERVICE_EXPORT_ALL_COLUMNS,
   SERVICE_EXPORT_COLUMNS,
 } from "../mappers"
 import type { ServicesExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const SERVICE_SELECT =
-  "id, name, category_id, price, is_active, sku, duration_minutes, created_at, service_categories!category_id(name)"
-
-const SERVICE_SELECT_ALL = `
-  id, name, description, category_id, subcategory_id, price, cost_price, is_active, sku,
-  duration_minutes, service_type, unit, price_type, billing_unit,
-  brand, buffer_minutes, notes, created_at,
-  service_categories!category_id(name),
-  subcategory:service_categories!subcategory_id(name)
-`
+  "id, name, category_id, price, cost_price, is_active, sku, duration_minutes, service_type, unit, description, created_at, service_categories!category_id(name)"
 
 export async function fetchServicesExport(
   supabase: SupabaseClient,
@@ -42,13 +33,11 @@ export async function fetchServicesExport(
 
   const statusLabels = filters.status || []
   const search = sanitizeSearchTerm(filters.search)
-  const includeAllColumns = filters.includeAllColumns === true
-  const select = includeAllColumns ? SERVICE_SELECT_ALL : SERVICE_SELECT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query: any = (supabase as any).from("services").select(select).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("services").select(SERVICE_SELECT).eq("partner_id", partnerId)
 
       if (filters.storeId) query = query.or(`store_id.eq.${filters.storeId},store_id.is.null`)
       if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
@@ -83,7 +72,6 @@ export async function fetchServicesExport(
     },
   })
 
-  const rows = rawRows.map((r) => mapServiceRow(r, includeAllColumns))
-  const columns = includeAllColumns ? SERVICE_EXPORT_ALL_COLUMNS : SERVICE_EXPORT_COLUMNS
-  return { columns, rows, rowCount: rows.length }
+  const rows = rawRows.map((r) => mapServiceRow(r))
+  return { columns: SERVICE_EXPORT_COLUMNS, rows, rowCount: rows.length }
 }

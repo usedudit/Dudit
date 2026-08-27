@@ -59,7 +59,7 @@ export function DreA4Preview({
 
   return (
     <div
-      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "dre-a4-print" : "border-l border-brand-border dark:border-dark-border"
+      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "dre-a4-print" : "md:border-l border-brand-border dark:border-dark-border"
         }`}
     >
       <div

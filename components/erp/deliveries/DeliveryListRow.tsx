@@ -52,8 +52,19 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
         return <span className="text-[13px] font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</span>
       case "status":
         return <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
-      case "delivery_person":
-        return <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">{delivery.deliveryPersonName || "Não atribuído"}</span>
+      case "delivery_person": {
+        const isPlatform = Boolean(delivery.is_platform_driver || delivery.isPlatformDriver || delivery.platform_driver || delivery.delivery_person_id?.startsWith?.("platform:"))
+        return (
+          <div className="flex items-center gap-1.5 min-w-0">
+            {isPlatform && (
+              <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+            )}
+            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+              {delivery.deliveryPersonName || "Não atribuído"}
+            </span>
+          </div>
+        )
+      }
       case "estimated_time":
         return <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{delivery.estimatedDurationMinutes ? `${delivery.estimatedDurationMinutes} min` : "-"}</span>
       case "dates":

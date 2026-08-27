@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -85,6 +85,7 @@ export default function AuthView({
     const [canResend, setCanResend] = useState(false)
     const [retryCount, setRetryCount] = useState(0)
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
+    const isSubmittingRef = useRef(false)
 
     // Update mode if initialMode prop changes (e.g. from query params)
     useEffect(() => {
@@ -134,6 +135,8 @@ export default function AuthView({
     }, [nextParam])
 
     const handleGoogleAuth = async () => {
+        if (isSubmittingRef.current || isLoading) return
+        isSubmittingRef.current = true
         setIsLoading(true)
         try {
             const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
@@ -144,12 +147,15 @@ export default function AuthView({
         } catch (e: any) {
             console.error("[AUTH GOOGLE ERROR]", e)
             setError(getErrorMessage(e))
+            isSubmittingRef.current = false
             setIsLoading(false)
         }
     }
 
     const handleAuthSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (isSubmittingRef.current || isLoading) return
+        isSubmittingRef.current = true
         setIsLoading(true)
         setError(null)
 
@@ -259,12 +265,15 @@ export default function AuthView({
             console.error("[AUTH SUBMIT EXCEPTION]", e)
             setError(getErrorMessage(e))
         } finally {
+            isSubmittingRef.current = false
             setIsLoading(false)
         }
     }
 
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (isSubmittingRef.current || isLoading) return
+        isSubmittingRef.current = true
         setIsLoading(true)
         setError(null)
         try {
@@ -286,12 +295,14 @@ export default function AuthView({
             console.error("[AUTH RESET PASSWORD EXCEPTION]", e)
             setError(getErrorMessage(e))
         } finally {
+            isSubmittingRef.current = false
             setIsLoading(false)
         }
     }
 
     const handleResendEmail = async () => {
-        if (!canResend) return
+        if (!canResend || isSubmittingRef.current || isLoading) return
+        isSubmittingRef.current = true
         setIsLoading(true)
         setError(null)
         try {
@@ -307,6 +318,7 @@ export default function AuthView({
         } catch (e: any) {
             setError(getErrorMessage(e))
         } finally {
+            isSubmittingRef.current = false
             setIsLoading(false)
         }
     }

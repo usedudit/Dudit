@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
     getPublicQuoteAction,
     approvePublicQuoteAction,
@@ -22,7 +22,7 @@ import {
 } from "@/components/reusable"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatCurrency } from "@/lib/utils"
+import { maskEmail } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { useSupabase } from "@/providers/supabase-provider"
 
@@ -68,6 +68,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const [showApproveModal, setShowApproveModal] = useState(false)
     const [showRejectModal, setShowRejectModal] = useState(false)
     const [isProcessingAction, setIsProcessingAction] = useState(false)
+
+    // Modal Error States
+    const [approveModalError, setApproveModalError] = useState<string | null>(null)
+    const [rejectModalError, setRejectModalError] = useState<string | null>(null)
 
     // Verification Inputs
     const [approverName, setApproverName] = useState("")
@@ -349,7 +353,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                                         <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
                                                         {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {formatBrazilPhone(customerPhone)}</p>}
-                                                        {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {customerEmail}</p>}
+                                                        {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {maskEmail(customerEmail)}</p>}
                                                     </div>
                                                 )}
                                             </FormSection>
@@ -364,14 +368,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                             {isActionable && (
                                                 <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
                                                     <Button
-                                                        onClick={() => setShowRejectModal(true)}
+                                                        onClick={() => { setShowRejectModal(true); setRejectModalError(null); }}
                                                         variant="outlinered"
                                                         className="flex-1 h-12"
                                                     >
                                                         Recusar proposta
                                                     </Button>
                                                     <Button
-                                                        onClick={() => setShowApproveModal(true)}
+                                                        onClick={() => { setShowApproveModal(true); setApproveModalError(null); }}
                                                         className="flex-1 h-12"
                                                     >
                                                         Aprovar proposta
@@ -387,31 +391,31 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                 <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
                                     <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
-<QuotePreview
-                                                 invoiceNumber={dataQuote.quote_number || "ORC-0000"}
-                                                 quoteDate={dataQuote.issue_date || ""}
-                                                 expiryDate={dataQuote.expiration_date || ""}
-                                                 selectedCustomer={selectedCustomer}
-                                                 quoteItems={mappedPreviewItems}
-                                                 subtotal={Number(dataQuote.subtotal || 0)}
-                                                 shippingNum={Number(dataQuote.shipping_cost || 0)}
-                                                 otherCosts={Number(dataQuote.additional_costs || 0)}
-                                                 discountValue={Number(dataQuote.discount_value || 0)}
-                                                 total={Number(dataQuote.total || 0)}
-                                                 note={dataQuote.notes || undefined}
-                                                 primaryColor={previewMeta.primaryColor}
-                                                 secondaryColor={previewMeta.secondaryColor}
-                                                 quoteTitle={previewMeta.quoteTitle}
-                                                 quoteSubtitle={previewMeta.quoteSubtitle}
-                                                 showDecoration={previewMeta.showDecoration}
-                                                 partnerName={partnerName}
-                                                 partnerAddress={partnerAddress}
-                                                 partnerPhone={partnerPhone}
-                                                 partnerAvatar={partnerLogo || undefined}
-                                                 printMode={false}
-                                                 showCustomerContact={false}
-                                                 salespersonName={dataQuote.seller_name || undefined}
-                                             />
+                                            <QuotePreview
+                                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                                quoteDate={dataQuote.issue_date || ""}
+                                                expiryDate={dataQuote.expiration_date || ""}
+                                                selectedCustomer={selectedCustomer}
+                                                quoteItems={mappedPreviewItems}
+                                                subtotal={Number(dataQuote.subtotal || 0)}
+                                                shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                                otherCosts={Number(dataQuote.additional_costs || 0)}
+                                                discountValue={Number(dataQuote.discount_value || 0)}
+                                                total={Number(dataQuote.total || 0)}
+                                                note={dataQuote.notes || undefined}
+                                                primaryColor={previewMeta.primaryColor}
+                                                secondaryColor={previewMeta.secondaryColor}
+                                                quoteTitle={previewMeta.quoteTitle}
+                                                quoteSubtitle={previewMeta.quoteSubtitle}
+                                                showDecoration={previewMeta.showDecoration}
+                                                partnerName={partnerName}
+                                                partnerAddress={partnerAddress}
+                                                partnerPhone={partnerPhone}
+                                                partnerAvatar={partnerLogo || undefined}
+                                                printMode={false}
+                                                showCustomerContact={false}
+                                                salespersonName={dataQuote.seller_name || undefined}
+                                            />
                                         </div>
                                     </div>
                                 </TabsContent>

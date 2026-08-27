@@ -98,17 +98,7 @@ export default function AvailableDeliveryGridCard({
                             )}
                         </div>
 
-                        {/* Ações */}
-                        <div className="shrink-0 -mt-0.5 -mr-1" onClick={(e) => e.stopPropagation()}>
-                            <ActionsDropdown>
-                                <DropdownItem onClick={() => router.push(`/entregadores/entregas-disponiveis/${assignmentId}`)}>
-                                    <TruckIcon size={16} /> Ver Detalhes da Corrida
-                                </DropdownItem>
-                                <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
-                                    <MapPinIcon size={16} /> Abrir Rota no Maps
-                                </DropdownItem>
-                            </ActionsDropdown>
-                        </div>
+
                     </div>
 
                     {/* Row 2: Estabelecimento */}
@@ -160,6 +150,14 @@ export default function AvailableDeliveryGridCard({
                         )}
                     </div>
                     <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <ActionsDropdown>
+                            <DropdownItem onClick={() => router.push(`/entregadores/entregas-disponiveis/${assignmentId}`)}>
+                                <TruckIcon size={16} /> Ver Detalhes da Corrida
+                            </DropdownItem>
+                            <DropdownItem onClick={() => window.open(mapsUrl, "_blank")}>
+                                <MapPinIcon size={16} /> Abrir Rota no Maps
+                            </DropdownItem>
+                        </ActionsDropdown>
                         <Button
                             variant="default"
                             size="sm"

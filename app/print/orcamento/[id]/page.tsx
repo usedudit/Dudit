@@ -53,13 +53,13 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     // Fetch store logo and address details
     const [storeRes, addressRes] = await Promise.all([
         storeId
-            ? supabase.from("stores").select("name, logo_url, phone").eq("id", storeId).maybeSingle()
-            : supabase.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
+            ? supabase.from("stores").select("name, logo_url, image_url, phone").eq("id", storeId).maybeSingle()
+            : supabase.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         getPartnerAddressAction(quote.partner_id, storeId)
     ])
 
     const partnerName = storeRes.data?.name || "Parceiro"
-    const rawAvatar = storeRes.data?.logo_url || undefined
+    const rawAvatar = storeRes.data?.logo_url || storeRes.data?.image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
     const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
     const partnerPhone = storeRes.data?.phone || undefined

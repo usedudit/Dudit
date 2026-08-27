@@ -24,6 +24,7 @@ import OSPreview from "@/components/erp/service-orders/OSPreview"
 import { r2PublicConfig } from "@/lib/r2/r2-public"
 import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
 import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
+import { maskEmail } from "@/lib/utils"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useSupabase } from "@/providers/supabase-provider"
 import { FileIcon } from "@/lib/icons"
@@ -66,6 +67,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // Canvas drawing states
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isDrawing, setIsDrawing] = useState(false)
+
+    // Modal Error State
+    const [signModalError, setSignModalError] = useState<string | null>(null)
 
     // Notifications & Messages
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -274,7 +278,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             const signRes = await signPublicServiceOrderAction(
                 token,
                 "Cliente",
-                isClientEmailMatched ? "" : signatureCode,
+                (isClientEmailMatched || !!currentUser) ? "" : signatureCode,
                 urlRes.key,
                 ip,
                 userAgent
@@ -283,6 +287,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             if (signRes.success) {
                 setSuccessMessage("Ordem de serviço assinada com sucesso!")
                 setShowSignModal(false)
+                setSignModalError(null)
 
                 // Refresh local data
                 const refreshRes = await getServiceOrderByTokenAction(token)
@@ -294,11 +299,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                     setHistory(refreshRes.data.history)
                 }
             } else {
-                setErrorMessage(signRes.error || "Erro ao verificar código e assinar.")
+                setSignModalError(signRes.error || "Erro ao verificar código e assinar.")
             }
 
         } catch (err: any) {
-            setErrorMessage(err.message || "Ocorreu um erro ao processar a assinatura.")
+            setSignModalError(err.message || "Ocorreu um erro ao processar a assinatura.")
         } finally {
             setIsProcessingSignature(false)
         }
@@ -399,7 +404,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                             {isFinalized && (
                                                 <>
                                                     {order.signature_image_key ? (
-                                                        <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${order.approver_name || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
+                                                        <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${maskEmail(order.approver_name) || "Cliente"} - Data: ${formatDateTime(order.signed_at)}`} color='green' />
                                                     ) : (
                                                         <InfoCard title='Ordem de serviço finalizada ou cancelada' message="" color='red' />
                                                     )}
@@ -672,44 +677,56 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             </Tabs >
 
             {/* ─── MODAL: SIGN SERVICE ORDER ─────────────────────────────────────── */}
-            < DefaultModal
+            <DefaultModal
                 isOpen={showSignModal}
-                onClose={() => setShowSignModal(false)
-                }
+                onClose={() => {
+                    setShowSignModal(false)
+                    setSignModalError(null)
+                }}
                 title="Assinar Ordem de Serviço"
                 maxWidth="md"
                 footer={
-                    < div className="flex gap-3 w-full" >
+                    <div className="flex gap-3 w-full">
                         <Button
                             variant="outline"
-                            onClick={() => setShowSignModal(false)}
+                            onClick={() => {
+                                setShowSignModal(false)
+                                setSignModalError(null)
+                            }}
                             className="flex-1 py-2.5 h-auto"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleSignOS}
-                            disabled={(!isClientEmailMatched && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
+                            disabled={(!isClientEmailMatched && !currentUser && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
                             className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
                         >
                             {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
                         </Button>
-                    </div >
+                    </div>
                 }
             >
                 <div className="space-y-4 text-left">
-                    <InfoCard color="blue" message={isClientEmailMatched
-                        ? `Você está conectado como ${currentUser.email} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
+                    {signModalError && (
+                        <InfoCard message={signModalError} color="red" />
+                    )}
+
+                    <InfoCard color="blue" message={currentUser
+                        ? `Você está conectado como ${maskEmail(currentUser.email)} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
                         : "Preencha o campo de código e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS."
                     } />
 
                     <div className="space-y-3">
-                        {!isClientEmailMatched && (
+                        {!currentUser && (
                             <Input
                                 label="Código de assinatura (4 dígitos)"
                                 maxLength={4}
                                 value={signatureCode}
-                                onChange={(e) => setSignatureCode(e.target.value.replace(/\D/g, ""))}
+                                onChange={(e) => {
+                                    setSignatureCode(e.target.value.replace(/\D/g, ""))
+                                    if (signModalError) setSignModalError(null)
+                                }}
                                 placeholder="0000"
                             />
                         )}
@@ -742,7 +759,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                         </div>
                     </div>
                 </div>
-            </DefaultModal >
+            </DefaultModal>
         </div >
     )
 }

@@ -348,7 +348,6 @@ export default function DeliveryAssignmentsList() {
             `}</style>
 
             <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                {/* DESKTOP HEADER */}
                 <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
                     <div className="flex flex-col gap-2 pt-1">
                         <div className="flex items-center gap-3">
@@ -361,79 +360,15 @@ export default function DeliveryAssignmentsList() {
                         </p>
                     </div>
 
-                    {/* TOP CONTROLS: AVAILABILITY & REFRESH */}
                     <div className="flex items-center gap-3">
-                        {/* AVAILABILITY SELECTOR VIA FORMDROPDOWN */}
-                        <div className="flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
-                            <div className="flex items-center gap-2 pl-2 pr-1">
-                                <span
-                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${isOccupied
-                                        ? "bg-amber-500 animate-pulse"
-                                        : isAvailable
-                                            ? "bg-emerald-500 animate-pulse"
-                                            : "bg-gray-400"
-                                        }`}
-                                />
-                            </div>
-                            <div className="w-36">
-                                <FormDropdown
-                                    value={isOccupied ? "available" : availability}
-                                    setValue={changeAvailability}
-                                    disabled={isAvailabilityLoading || isOccupied}
-                                    options={[
-                                        { value: "available", label: "Disponível" },
-                                        { value: "offline", label: "Offline" },
-                                    ]}
-                                    className="border-0 bg-transparent text-xs font-semibold"
-                                />
-                            </div>
-                        </div>
-
                         <Button
                             variant="outline"
-                            size="sm"
                             onClick={() => loadData(true)}
                             disabled={isRefreshing || isLoading}
-                            className="shrink-0"
-                        >
-                            <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
-                        </Button>
-                    </div>
-                </div>
-
-                {/* MOBILE AVAILABILITY BAR */}
-                <div className="md:hidden flex items-center justify-between gap-2 px-4 mb-3">
-                    <div className="flex-1 flex items-center gap-2 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl p-1 shadow-xs">
-                        <span
-                            className={`h-2.5 w-2.5 rounded-full shrink-0 ml-2 ${isOccupied
-                                ? "bg-amber-500 animate-pulse"
-                                : isAvailable
-                                    ? "bg-emerald-500 animate-pulse"
-                                    : "bg-gray-400"
-                                }`}
+                            className="w-[42px] h-[42px]"
+                            leftIcon={<ReloadIcon size={18} className={isRefreshing ? "animate-spin" : ""} />}
                         />
-                        <div className="flex-1">
-                            <FormDropdown
-                                value={isOccupied ? "available" : availability}
-                                setValue={changeAvailability}
-                                disabled={isAvailabilityLoading || isOccupied}
-                                options={[
-                                    { value: "available", label: "Disponível" },
-                                    { value: "offline", label: "Offline" },
-                                ]}
-                                className="border-0 bg-transparent text-xs font-semibold"
-                            />
-                        </div>
                     </div>
-
-                    <Button
-                        variant="outline"
-                        onClick={() => loadData(true)}
-                        disabled={isRefreshing || isLoading}
-                        className="h-10 px-3 shrink-0"
-                    >
-                        <ReloadIcon size={16} className={isRefreshing ? "animate-spin" : ""} />
-                    </Button>
                 </div>
 
                 {hasAnyDeliveries && (
@@ -536,7 +471,7 @@ export default function DeliveryAssignmentsList() {
                                                         return (
                                                             <th
                                                                 key={col.id}
-                                                                className={`py-3 px-2 pl-6 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                                                                className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
                                                                     } ${col.id !== "actions" ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading" : ""} group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : col.id === "order" ? "rounded-l-lg" : ""
                                                                     }`}
                                                                 style={{ width: col.width }}

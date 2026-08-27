@@ -94,13 +94,13 @@ export default function DeliveryPageControls({
     const filterSections: FilterSectionConfig[] = [
         ...(partnerOptions.length > 0
             ? [
-                  {
-                      id: "partnerNames",
-                      title: "Estabelecimentos",
-                      type: "checkbox-list" as const,
-                      options: partnerOptions,
-                  },
-              ]
+                {
+                    id: "partnerNames",
+                    title: "Estabelecimentos",
+                    type: "checkbox-list" as const,
+                    options: partnerOptions,
+                },
+            ]
             : []),
         {
             id: "paymentMethods",
@@ -280,9 +280,8 @@ export default function DeliveryPageControls({
                 {/* Scrollable Badges Area */}
                 <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
                     <div
-                        className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                            filterScrollState.left ? "opacity-100" : "opacity-0"
-                        }`}
+                        className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.left ? "opacity-100" : "opacity-0"
+                            }`}
                     />
                     <div
                         ref={filtersContainerRef}
@@ -292,9 +291,8 @@ export default function DeliveryPageControls({
                         <BadgeList />
                     </div>
                     <div
-                        className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${
-                            filterScrollState.right ? "opacity-100" : "opacity-0"
-                        }`}
+                        className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.right ? "opacity-100" : "opacity-0"
+                            }`}
                     />
                 </div>
 
@@ -303,11 +301,10 @@ export default function DeliveryPageControls({
                     <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-full p-1 h-[42px] shrink-0">
                         <button
                             onClick={() => onViewModeChange("list")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                                viewMode === "list"
-                                    ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                    : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                            }`}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                }`}
                             title="Visualização em lista/tabela"
                             aria-label="Visualização em lista"
                         >
@@ -315,11 +312,10 @@ export default function DeliveryPageControls({
                         </button>
                         <button
                             onClick={() => onViewModeChange("grid")}
-                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${
-                                viewMode === "grid"
-                                    ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
-                                    : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
-                            }`}
+                            className={`w-8 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                                ? "bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading"
+                                : "text-gray-400 hover:text-gray-600 dark:text-dark-body"
+                                }`}
                             title="Visualização em cards/grid"
                             aria-label="Visualização em grid"
                         >

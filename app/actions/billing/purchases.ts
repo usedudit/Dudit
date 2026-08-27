@@ -293,23 +293,26 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado" }
 
+        if (!subscriptionId) return { success: false, error: "ID da assinatura não fornecido" }
+
         const admin = getAdminClient()
 
-        // 1. Busca por recurring_subscription_id (marketplace recurring subscriptions)
-        const { data: byRecurring } = await admin
+        // 1. Busca prioritária por subscription_id (SaaS ERP platform subscriptions) com status completed
+        const { data: bySaaSCompleted } = await admin
             .from("billing_purchases")
-            .select("id, description, total_amount, status, created_at, partner_id, metadata")
-            .eq("recurring_subscription_id", subscriptionId)
+            .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
+            .eq("subscription_id", subscriptionId)
+            .eq("status", "completed")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle()
 
-        if (byRecurring) return { success: true, data: byRecurring }
+        if (bySaaSCompleted) return { success: true, data: bySaaSCompleted }
 
-        // 2. Busca por subscription_id (SaaS platform subscriptions)
+        // 2. Busca por subscription_id (qualquer status)
         const { data: bySaaS } = await admin
             .from("billing_purchases")
-            .select("id, description, total_amount, status, created_at, partner_id, metadata")
+            .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
             .eq("subscription_id", subscriptionId)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -317,20 +320,20 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
 
         if (bySaaS) return { success: true, data: bySaaS }
 
-        // 3. Fallback: busca a purchase mais recente do mesmo parceiro com tipo subscription
-        // (para quando o sync SQL foi rodado e criou billing_purchases vinculados ao SaaS subscription)
-        const { data: sub } = await admin
-            .from("recurring_subscriptions")
+        // 3. Fallback: Busca se subscriptionId for da tabela SaaS subscriptions mas com partner_id
+        const { data: saasSub } = await admin
+            .from("subscriptions")
             .select("partner_id")
             .eq("id", subscriptionId)
             .maybeSingle()
 
-        if (sub?.partner_id) {
+        if (saasSub?.partner_id) {
             const { data: byPartner } = await admin
                 .from("billing_purchases")
-                .select("id, description, total_amount, status, created_at, partner_id, metadata")
-                .eq("partner_id", sub.partner_id)
+                .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
+                .eq("partner_id", saasSub.partner_id)
                 .eq("purchase_type", "subscription")
+                .eq("status", "completed")
                 .order("created_at", { ascending: false })
                 .limit(1)
                 .maybeSingle()
@@ -338,9 +341,59 @@ export async function getLatestPurchaseForSubscriptionAction(subscriptionId: str
             if (byPartner) return { success: true, data: byPartner }
         }
 
+        // 4. Fallback: Busca por recurring_subscription_id (marketplace customer subscriptions)
+        const { data: byRecurring } = await admin
+            .from("billing_purchases")
+            .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
+            .eq("recurring_subscription_id", subscriptionId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (byRecurring) return { success: true, data: byRecurring }
+
         return { success: false, error: "Nenhuma fatura encontrada para esta assinatura." }
     } catch (error: any) {
         return { success: false, error: error.message }
     }
 }
+
+export async function getLatestCompletedPurchaseForPartnerAction(partnerId: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autenticado" }
+
+        if (!partnerId) return { success: false, error: "ID do parceiro não fornecido" }
+
+        const admin = getAdminClient()
+        const { data: purchase } = await admin
+            .from("billing_purchases")
+            .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
+            .eq("partner_id", partnerId)
+            .eq("purchase_type", "subscription")
+            .eq("status", "completed")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (purchase) return { success: true, data: purchase }
+
+        // Fallback: qualquer compra completada do parceiro
+        const { data: anyCompleted } = await admin
+            .from("billing_purchases")
+            .select("id, description, total_amount, amount, status, created_at, partner_id, metadata")
+            .eq("partner_id", partnerId)
+            .eq("status", "completed")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (anyCompleted) return { success: true, data: anyCompleted }
+
+        return { success: false, error: "Nenhuma fatura paga encontrada." }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
 

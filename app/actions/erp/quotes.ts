@@ -985,12 +985,39 @@ export async function updateQuoteStatusAction(data: {
                 )
             }
 
+            // Get current user profile for audit / approver attribution
+            const { data: userProfile } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", user.id)
+                .maybeSingle()
+
+            const approverDisplayName = userProfile?.full_name?.trim() || user.email?.split("@")[0] || "Operador ERP"
+
+            const updatePayload: Record<string, any> = {
+                status: data.status,
+                updated_at: new Date().toISOString(),
+            }
+
+            if (data.status === "approved") {
+                updatePayload.approved_at = new Date().toISOString()
+                updatePayload.approver_name = approverDisplayName
+                updatePayload.approval_method = "erp_manual"
+            } else if (data.status === "rejected") {
+                updatePayload.rejected_at = new Date().toISOString()
+                updatePayload.approver_name = approverDisplayName
+                updatePayload.approval_method = "erp_manual"
+            } else if (data.status === "draft" || data.status === "sent" || data.status === "pending_client") {
+                updatePayload.approved_at = null
+                updatePayload.rejected_at = null
+                updatePayload.approver_name = null
+                updatePayload.approval_method = null
+                updatePayload.rejection_reason = null
+            }
+
             const { error } = await supabase
                 .from("quotes")
-                .update({
-                    status: data.status,
-                    updated_at: new Date().toISOString(),
-                })
+                .update(updatePayload)
                 .eq("id", data.quoteId)
                 .eq("partner_id", data.partnerId)
 
@@ -1680,7 +1707,7 @@ export async function convertQuoteToOrderAction(data: {
                             id,
                             variant_name,
                             sku,
-                            price,
+                            price_adjustment,
                             stock_available
                         )
                     )
@@ -2382,12 +2409,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             }
 
             // Fetch store details to resolve partner name/logo override
-            const { data: store } = await admin
-                .from("stores")
-                .select("name, logo_url, phone")
-                .eq("partner_id", quote.partner_id)
-                .limit(1)
-                .maybeSingle()
+            const storeQuery = quote.store_id
+                ? admin.from("stores").select("name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
+                : admin.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle()
+            const { data: store } = await storeQuery
+            const storeLogo = store?.logo_url || store?.image_url || null
 
             // 5. Fetch live details and items
             let sellerInfo = null
@@ -2502,7 +2528,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 total: Number(quote.total || 0),
                 partner: {
                     name: store?.name || "Parceiro",
-                    image_url: store?.logo_url || null,
+                    image_url: storeLogo,
                     email: partnerEmail,
                     phone: store?.phone || null,
                     address: partnerAddressFormatted
@@ -2561,6 +2587,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     customers: quote.customers || null,
                     partners: Array.isArray(quote.partners) ? quote.partners[0] : (quote.partners || null),
                     items: formattedItems,
+                    metadata: quote.metadata || {},
                     primary_color: previewMeta.primaryColor || null,
                     secondary_color: previewMeta.secondaryColor || null,
                     quote_title: previewMeta.quoteTitle || null,
@@ -2604,11 +2631,39 @@ export async function approvePublicQuoteAction(
 
             let isAuthorized = false
             let method = "code"
+            let approverDisplayName = approverName?.trim() || "Cliente"
 
             if (currentUser) {
-                if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+                const adminClient = getAdminClient()
+                const { data: partnerUser } = await adminClient
+                    .from("partner_users")
+                    .select("role")
+                    .eq("partner_id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                const { data: partnerOwner } = await adminClient
+                    .from("partners")
+                    .select("id")
+                    .eq("id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                const isErpMember = Boolean(partnerOwner || partnerUser)
+
+                if (isErpMember) {
+                    isAuthorized = true
+                    method = "erp_portal"
+                    const { data: profile } = await adminClient
+                        .from("user_profiles")
+                        .select("full_name")
+                        .eq("user_id", currentUser.id)
+                        .maybeSingle()
+                    approverDisplayName = profile?.full_name?.trim() || currentUser.email?.split("@")[0] || "Lojista"
+                } else if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
                     isAuthorized = true
                     method = "auth"
+                    approverDisplayName = (quote as any).customers?.name || currentUser.email?.split("@")[0] || "Cliente"
                 }
             }
 
@@ -2617,12 +2672,13 @@ export async function approvePublicQuoteAction(
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
                 method = "code"
+                approverDisplayName = (quote as any).customers?.name || approverName.trim().substring(0, 100) || "Cliente"
             }
 
             // 3. Call RPC to approve public quote
             const { data: rpcRes, error: rpcErr } = await supabase.rpc("approve_public_quote", {
                 p_quote_id: quote.id,
-                p_name: currentUser ? (currentUser.email || "Cliente Autenticado") : approverName.trim().substring(0, 100),
+                p_name: approverDisplayName,
                 p_code: method === "code" ? approvalCode.trim() : "",
                 p_ip: ip || null,
                 p_ua: userAgent || null,
@@ -2700,11 +2756,39 @@ export async function rejectPublicQuoteAction(
 
             let isAuthorized = false
             let method = "code"
+            let rejectorDisplayName = rejectorName?.trim() || "Cliente"
 
             if (currentUser) {
-                if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+                const adminClient = getAdminClient()
+                const { data: partnerUser } = await adminClient
+                    .from("partner_users")
+                    .select("role")
+                    .eq("partner_id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                const { data: partnerOwner } = await adminClient
+                    .from("partners")
+                    .select("id")
+                    .eq("id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                const isErpMember = Boolean(partnerOwner || partnerUser)
+
+                if (isErpMember) {
+                    isAuthorized = true
+                    method = "erp_portal"
+                    const { data: profile } = await adminClient
+                        .from("user_profiles")
+                        .select("full_name")
+                        .eq("user_id", currentUser.id)
+                        .maybeSingle()
+                    rejectorDisplayName = profile?.full_name?.trim() || currentUser.email?.split("@")[0] || "Lojista"
+                } else if (customerEmail && currentUser.email && currentUser.email.toLowerCase() === customerEmail.toLowerCase()) {
                     isAuthorized = true
                     method = "auth"
+                    rejectorDisplayName = (quote as any).customers?.name || currentUser.email?.split("@")[0] || "Cliente"
                 }
             }
 
@@ -2713,12 +2797,13 @@ export async function rejectPublicQuoteAction(
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
                 method = "code"
+                rejectorDisplayName = (quote as any).customers?.name || rejectorName.trim().substring(0, 100) || "Cliente"
             }
 
             // 3. Call RPC to reject public quote
             const { data: rpcRes, error: rpcErr } = await supabase.rpc("reject_public_quote", {
                 p_quote_id: quote.id,
-                p_name: currentUser ? (currentUser.email || "Cliente Autenticado") : rejectorName.trim().substring(0, 100),
+                p_name: rejectorDisplayName,
                 p_code: method === "code" ? approvalCode.trim() : "",
                 p_reason: reason.trim().substring(0, 500),
                 p_ip: ip || null,

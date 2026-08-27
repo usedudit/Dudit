@@ -238,6 +238,7 @@ export function beforeSend(event: ErrorEvent, hint?: EventHint): ErrorEvent | nu
     message.includes("ECONNRESET") ||
     message.includes("socket hang up") ||
     message.includes("The user aborted a request") ||
+    message.includes("Connection closed") ||
     name === "AbortError"
   ) {
     return null

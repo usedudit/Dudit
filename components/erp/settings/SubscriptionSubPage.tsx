@@ -22,10 +22,15 @@ import {
     cancelSubscriptionAction,
     upgradeSubscriptionAction,
 } from "@/app/actions/erp/subscriptions"
+import {
+    getLatestPurchaseForSubscriptionAction,
+    getLatestCompletedPurchaseForPartnerAction,
+} from "@/app/actions/billing/purchases"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { BillingPage } from "@/components/billing/BillingPage"
+import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
 
 // ─── Plan Card ─────────────────────────────────────────────────────────────
 
@@ -280,6 +285,46 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const [cancelModal, setCancelModal] = useState(false)
     const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
     const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("annually")
+
+    // Refund Modal State
+    const [refundModalOpen, setRefundModalOpen] = useState(false)
+    const [refundPurchase, setRefundPurchase] = useState<any>(null)
+    const [loadingRefund, setLoadingRefund] = useState(false)
+
+    const handleOpenRefundModal = async () => {
+        const subId = subData?.subscription?.id
+        const pId = effectivePartnerId
+        if (!subId && !pId) {
+            toast.error("Assinatura não encontrada.")
+            return
+        }
+        setLoadingRefund(true)
+        try {
+            let foundPurchase: any = null
+            if (subId) {
+                const res = await getLatestPurchaseForSubscriptionAction(subId)
+                if (res.success && res.data) {
+                    foundPurchase = res.data
+                }
+            }
+            if (!foundPurchase && pId) {
+                const fallbackRes = await getLatestCompletedPurchaseForPartnerAction(pId)
+                if (fallbackRes.success && fallbackRes.data) {
+                    foundPurchase = fallbackRes.data
+                }
+            }
+            if (foundPurchase) {
+                setRefundPurchase(foundPurchase)
+                setRefundModalOpen(true)
+            } else {
+                toast.error("Nenhuma fatura paga encontrada para solicitar reembolso.")
+            }
+        } catch {
+            toast.error("Erro ao buscar dados da fatura para reembolso.")
+        } finally {
+            setLoadingRefund(false)
+        }
+    }
 
     // Manual payment modal for past_due subscriptions
     const [manualPaymentModal, setManualPaymentModal] = useState<{
@@ -740,7 +785,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         )}
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                         {hasActivePaidSub && !isScheduledToCancel && (
                                             <>
                                                 {subData?.subscription?.status === "past_due" && (
@@ -764,6 +809,18 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     </Button>
                                                 )}
                                             </>
+                                        )}
+
+                                        {(hasActivePaidSub || displayPlanPrice > 0 || subData?.subscription) && (
+                                            <Button
+                                                variant="outline"
+                                                className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
+                                                onClick={handleOpenRefundModal}
+                                                disabled={loadingRefund}
+                                                isLoading={loadingRefund}
+                                            >
+                                                Solicitar Reembolso
+                                            </Button>
                                         )}
 
                                         <Button
@@ -1109,6 +1166,20 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                         amount={manualPaymentModal.amount}
                         onVerifyPayment={handleVerifyManualPayment}
                         isVerifying={isVerifyingManualPayment}
+                    />
+                )}
+
+                {/* ─── Refund Request Modal ───────────────────────────────── */}
+                {refundPurchase && (
+                    <BillingRefundModal
+                        isOpen={refundModalOpen}
+                        onClose={() => {
+                            setRefundModalOpen(false)
+                            setRefundPurchase(null)
+                        }}
+                        purchase={refundPurchase}
+                        partnerId={effectivePartnerId || subData?.partner_id || ""}
+                        onSuccess={() => loadData()}
                     />
                 )}
             </div>

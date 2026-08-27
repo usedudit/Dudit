@@ -106,153 +106,69 @@ export function mapOrderRow(
 }
 
 export const PRODUCT_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { header: "Produto", key: "name", width: 32 },
-  { header: "SKU", key: "sku", width: 16 },
-  { header: "Categoria", key: "category", width: 20 },
-  { header: "Estoque", key: "stock", width: 10 },
-  { header: "Custo", key: "cost", width: 14 },
-  { header: "Preço", key: "price", width: 14 },
-  { header: "Visibilidade", key: "visibility", width: 14 },
-  { header: "Status", key: "status", width: 12 },
-]
-
-export const PRODUCT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  { header: "Produto", key: "name", width: 32 },
-  { header: "Descrição", key: "description", width: 40 },
-  { header: "SKU", key: "sku", width: 16 },
-  { header: "GTIN/EAN", key: "gtin", width: 18 },
-  { header: "Categoria", key: "category", width: 20 },
-  { header: "Subcategoria", key: "subcategory", width: 20 },
-  { header: "Marca", key: "brand", width: 20 },
-  { header: "Localização", key: "location", width: 20 },
-  { header: "Tipo de Produto", key: "productType", width: 18 },
-  { header: "Condição", key: "condition", width: 14 },
-  { header: "Unidade", key: "unit", width: 12 },
-  { header: "Estoque", key: "stock", width: 10 },
-  { header: "Estoque Mín.", key: "minStock", width: 12 },
-  { header: "Custo", key: "cost", width: 14 },
-  { header: "Margem Lucro", key: "profitMargin", width: 14 },
-  { header: "Preço", key: "price", width: 14 },
+  { header: "Nome do Produto", key: "name", width: 32 },
+  { header: "SKU / Código", key: "sku", width: 16 },
+  { header: "Código de Barras (GTIN/EAN)", key: "gtin", width: 22 },
+  { header: "Preço de Venda", key: "price", width: 14 },
+  { header: "Preço de Custo", key: "cost", width: 14 },
   { header: "Preço Promocional", key: "promotionalPrice", width: 16 },
-  { header: "Em Promoção", key: "isOnPromotion", width: 14 },
-  { header: "Visibilidade", key: "visibility", width: 14 },
+  { header: "Estoque Atual", key: "stock", width: 12 },
+  { header: "Estoque Mínimo", key: "minStock", width: 14 },
+  { header: "Unidade de Medida", key: "unit", width: 14 },
+  { header: "Marca", key: "brand", width: 20 },
   { header: "Status", key: "status", width: 12 },
-  { header: "Criado em", key: "createdAt", width: 20 },
+  { header: "Visibilidade na Loja", key: "visibility", width: 16 },
+  { header: "Descrição", key: "description", width: 40 },
+  { header: "Tipo de Produto", key: "productType", width: 16 },
+  { header: "Condição", key: "condition", width: 14 },
+  { header: "Categoria", key: "category", width: 20 },
   { header: "NCM", key: "ncm", width: 12 },
   { header: "CEST", key: "cest", width: 12 },
-  { header: "Origem", key: "origin", width: 10 },
-  { header: "CFOP Interno", key: "cfopInternal", width: 14 },
-  { header: "CFOP Externo", key: "cfopExternal", width: 14 },
-  { header: "CSOSN", key: "csosn", width: 10 },
-  { header: "Alíquota (%)", key: "taxPercentage", width: 14 },
-  { header: "PIS CST", key: "pisCst", width: 10 },
-  { header: "PIS %", key: "pisRate", width: 8 },
-  { header: "COFINS CST", key: "cofinsCst", width: 12 },
-  { header: "COFINS %", key: "cofinsRate", width: 10 },
-  { header: "IPI CST", key: "ipiCst", width: 10 },
-  { header: "IPI Código", key: "ipiCode", width: 12 },
-  { header: "Situação Produto", key: "productSituation", width: 16 },
-  { header: "C. Benefício", key: "cBenef", width: 12 },
-  { header: "Inf. Adicional", key: "infAdProd", width: 20 },
   { header: "Peso Bruto (g)", key: "weightGross", width: 14 },
   { header: "Peso Líquido (g)", key: "weightNet", width: 14 },
   { header: "Largura (cm)", key: "width", width: 12 },
   { header: "Altura (cm)", key: "height", width: 12 },
   { header: "Comprimento (cm)", key: "length", width: 14 },
-  { header: "Tipo Embalagem", key: "packagingType", width: 14 },
-  { header: "Dias Preparação", key: "preparationDays", width: 14 },
-  { header: "Vende s/ Estoque", key: "allowSellWithoutStock", width: 16 },
-  { header: "Estoque Máx.", key: "maxStock", width: 12 },
-  { header: "Disponibilidade", key: "availabilityValue", width: 14 },
-  { header: "Unid. Disponib.", key: "availabilityUnit", width: 14 },
-  { header: "Moderação", key: "moderationStatus", width: 14 },
-  { header: "Mostrar Preço", key: "showPriceInStore", width: 14 },
-  { header: "FCI", key: "fciCode", width: 10 },
 ]
 
-export function mapProductRow(row: any, includeAllColumns?: boolean): ExportRow {
-  const stock = Number(row.stock_quantity ?? 0)
-  const base = {
+export function mapProductRow(row: any): ExportRow {
+  return {
     name: row.name || "-",
     sku: row.sku || "-",
-    category: row.category || "-",
-    stock,
-    cost: formatCurrency(Number(row.cost_price ?? 0)),
-    price: formatCurrency(Number(row.price ?? 0)),
-    visibility: row.show_in_marketplace === false ? "Oculto" : "Visível",
-    status: row.is_active ? "Ativo" : "Inativo",
-  }
-
-  if (!includeAllColumns) return base
-
-  return {
-    ...base,
-    description: row.description || "-",
     gtin: row.gtin || "-",
-    subcategory: row.subcategory || "-",
+    price: formatCurrency(Number(row.price ?? 0)),
+    cost: formatCurrency(Number(row.cost_price ?? 0)),
+    promotionalPrice: row.promotional_price !== null && row.promotional_price !== undefined ? formatCurrency(Number(row.promotional_price)) : "-",
+    stock: Number(row.stock_quantity ?? 0),
+    minStock: Number(row.min_stock ?? 0),
+    unit: row.unit || "-",
     brand: row.brand_rel?.name || row.brand || "-",
-    location: row.location_rel?.name || row.location || "-",
+    status: row.is_active ? "Ativo" : "Inativo",
+    visibility: row.show_in_marketplace === false ? "Não" : "Sim",
+    description: row.description || "-",
     productType: row.product_type || "-",
     condition: row.condition || "-",
-    unit: row.unit || "-",
-    minStock: Number(row.min_stock ?? 0),
-    profitMargin:
-      Number(row.cost_price) > 0
-        ? `${(((Number(row.price) - Number(row.cost_price)) / Number(row.cost_price)) * 100).toFixed(2).replace(".", ",")}%`
-        : "-",
-    promotionalPrice: row.promotional_price !== null && row.promotional_price !== undefined ? formatCurrency(Number(row.promotional_price)) : "-",
-    isOnPromotion: row.is_on_promotion ? "Sim" : "Não",
-    createdAt: row.created_at ? formatDate(row.created_at) : "-",
+    category: row.category || "-",
     ncm: row.ncm || "-",
     cest: row.cest || "-",
-    origin: row.origin !== null && row.origin !== undefined ? String(row.origin) : "-",
-    cfopInternal: row.cfop_internal || "-",
-    cfopExternal: row.cfop_external || "-",
-    csosn: row.csosn || "-",
-    taxPercentage: row.tax_percentage !== null && row.tax_percentage !== undefined ? String(row.tax_percentage) : "-",
-    pisCst: row.pis_cst || "-",
-    pisRate: row.pis_rate !== null && row.pis_rate !== undefined ? String(row.pis_rate) : "-",
-    cofinsCst: row.cofins_cst || "-",
-    cofinsRate: row.cofins_rate !== null && row.cofins_rate !== undefined ? String(row.cofins_rate) : "-",
-    ipiCst: row.ipi_cst || "-",
-    ipiCode: row.ipi_code || "-",
-    productSituation: row.product_situation || "-",
-    cBenef: row.c_benef || "-",
-    infAdProd: row.inf_ad_prod || "-",
     weightGross: row.weight_gross !== null && row.weight_gross !== undefined ? String(row.weight_gross) : "-",
     weightNet: row.weight_net !== null && row.weight_net !== undefined ? String(row.weight_net) : "-",
     width: row.width !== null && row.width !== undefined ? String(row.width) : "-",
     height: row.height !== null && row.height !== undefined ? String(row.height) : "-",
     length: row.length !== null && row.length !== undefined ? String(row.length) : "-",
-    packagingType: row.packaging_type || "-",
-    preparationDays: row.preparation_days !== null && row.preparation_days !== undefined ? String(row.preparation_days) : "-",
-    allowSellWithoutStock: row.allow_sell_without_stock ? "Sim" : "Não",
-    maxStock: row.max_stock !== null && row.max_stock !== undefined ? String(row.max_stock) : "-",
-    availabilityValue: row.availability_value !== null && row.availability_value !== undefined ? String(row.availability_value) : "-",
-    availabilityUnit: row.availability_unit || "-",
-    moderationStatus: row.moderation_status || "-",
-    showPriceInStore: row.show_price_in_store ? "Sim" : "Não",
-    fciCode: row.fci_code || "-",
   }
 }
 
 export const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { header: "Nome", key: "name", width: 28 },
-  { header: "E-mail", key: "email", width: 28 },
-  { header: "Telefone", key: "phone", width: 18 },
-  { header: "Criado em", key: "createdAt", width: 20 },
-  { header: "Total Pedidos", key: "totalOrders", width: 14 },
-  { header: "Valor Vitalício", key: "lifetimeValue", width: 16 },
-]
-
-export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  ...CUSTOMER_EXPORT_COLUMNS,
-  { header: "Tipo Pessoa", key: "personType", width: 12 },
+  { header: "Nome / Razão Social", key: "name", width: 30 },
+  { header: "Tipo de Pessoa", key: "personType", width: 14 },
   { header: "CPF", key: "cpf", width: 18 },
   { header: "CNPJ", key: "cnpj", width: 20 },
-  { header: "Status", key: "status", width: 12 },
+  { header: "E-mail", key: "email", width: 28 },
+  { header: "Celular / WhatsApp", key: "phone", width: 18 },
   { header: "Telefone Fixo", key: "phoneFixed", width: 18 },
   { header: "Data de Nascimento", key: "birthDate", width: 16 },
+  { header: "Status", key: "status", width: 12 },
   { header: "CEP", key: "zipCode", width: 12 },
   { header: "Logradouro (Rua/Av)", key: "street", width: 30 },
   { header: "Número", key: "number", width: 10 },
@@ -261,36 +177,23 @@ export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   { header: "Cidade", key: "city", width: 20 },
   { header: "Estado (UF)", key: "state", width: 10 },
   { header: "Inscrição Estadual", key: "stateInscription", width: 18 },
-  { header: "Crédito na Loja", key: "storeCredit", width: 16 },
   { header: "Observações", key: "notes", width: 30 },
 ]
 
-export function mapCustomerRow(
-  row: any,
-  stats?: { orders: number; ltv: number },
-  includeAllColumns?: boolean,
-): ExportRow {
-  const base = {
-    name: row.name || "-",
-    email: row.email || "-",
-    phone: row.phone || "-",
-    createdAt: row.created_at ? formatDate(row.created_at) : "-",
-    totalOrders: stats?.orders ?? 0,
-    lifetimeValue: formatCurrency(stats?.ltv ?? 0),
-  }
-
-  if (!includeAllColumns) return base
-
+export function mapCustomerRow(row: any): ExportRow {
   const isPJ = String(row.person_type || "").toLowerCase() === "pj"
+  const statusMap: Record<string, string> = { ativo: "Ativo", inativo: "Inativo", bloqueado: "Bloqueado" }
 
   return {
-    ...base,
+    name: row.name || "-",
     personType: isPJ ? "Jurídica" : "Física",
     cpf: row.cpf || "-",
     cnpj: row.cnpj || "-",
-    status: row.status === "inativo" ? "Inativo" : row.status === "bloqueado" ? "Bloqueado" : "Ativo",
+    email: row.email || "-",
+    phone: row.phone || "-",
     phoneFixed: row.phone_fixed || "-",
     birthDate: row.birth_date ? formatDate(row.birth_date) : "-",
+    status: statusMap[row.status] || row.status || "Ativo",
     zipCode: row.zip_code || "-",
     street: row.street || "-",
     number: row.number || "-",
@@ -299,33 +202,21 @@ export function mapCustomerRow(
     city: row.city || "-",
     state: row.state || "-",
     stateInscription: row.inscricao_estadual || "-",
-    storeCredit: formatCurrency(Number(row.store_credit ?? 0)),
     notes: row.notes || "-",
   }
 }
 
 export const SERVICE_EXPORT_COLUMNS: ExportColumnDef[] = [
-  { header: "Serviço", key: "name", width: 32 },
-  { header: "Categoria", key: "category", width: 20 },
+  { header: "Nome do Serviço", key: "name", width: 32 },
+  { header: "SKU / Código", key: "sku", width: 16 },
   { header: "Preço", key: "price", width: 14 },
-  { header: "Duração (min)", key: "duration", width: 14 },
+  { header: "Preço de Custo", key: "cost", width: 14 },
+  { header: "Duração (minutos)", key: "duration", width: 16 },
+  { header: "Categoria", key: "category", width: 20 },
+  { header: "Tipo de Atendimento", key: "serviceType", width: 18 },
   { header: "Status", key: "status", width: 12 },
-]
-
-export const SERVICE_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
-  ...SERVICE_EXPORT_COLUMNS,
-  { header: "SKU", key: "sku", width: 16 },
-  { header: "Descrição", key: "description", width: 40 },
-  { header: "Custo", key: "cost", width: 14 },
-  { header: "Tipo de Serviço", key: "serviceType", width: 14 },
-  { header: "Subcategoria", key: "subcategory", width: 18 },
   { header: "Unidade", key: "unit", width: 12 },
-  { header: "Tipo de Preço", key: "priceType", width: 14 },
-  { header: "Cobrança", key: "billingUnit", width: 16 },
-  { header: "Marca", key: "brand", width: 18 },
-  { header: "Buffer (min)", key: "bufferMinutes", width: 14 },
-  { header: "Notas", key: "notes", width: 30 },
-  { header: "Criado em", key: "createdAt", width: 20 },
+  { header: "Descrição", key: "description", width: 40 },
 ]
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
@@ -334,31 +225,18 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
   hybrid: "Híbrido",
 }
 
-export function mapServiceRow(row: any, includeAllColumns?: boolean): ExportRow {
-  const base = {
-    name: row.name || "-",
-    category: row.service_categories?.name || "-",
-    price: formatCurrency(Number(row.price ?? 0)),
-    duration: Number(row.duration_minutes ?? 0),
-    status: row.is_active ? "Ativo" : "Inativo",
-  }
-
-  if (!includeAllColumns) return base
-
+export function mapServiceRow(row: any): ExportRow {
   return {
-    ...base,
+    name: row.name || "-",
     sku: row.sku || "-",
-    description: row.description || "-",
+    price: formatCurrency(Number(row.price ?? 0)),
     cost: formatCurrency(Number(row.cost_price ?? 0)),
+    duration: Number(row.duration_minutes ?? 0),
+    category: row.service_categories?.name || "-",
     serviceType: SERVICE_TYPE_LABELS[row.service_type] || row.service_type || "-",
-    subcategory: row.subcategory?.name || row.subcategory || "-",
+    status: row.is_active ? "Ativo" : "Inativo",
     unit: row.unit || "-",
-    priceType: row.price_type === "starting_at" ? "A partir de" : row.price_type === "free" ? "Grátis" : "Fixo",
-    billingUnit: row.billing_unit || "-",
-    brand: row.brand || "-",
-    bufferMinutes: row.buffer_minutes !== null && row.buffer_minutes !== undefined ? String(row.buffer_minutes) : "-",
-    notes: row.notes || "-",
-    createdAt: row.created_at ? formatDate(row.created_at) : "-",
+    description: row.description || "-",
   }
 }
 

@@ -421,7 +421,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                     <SidebarCard hasTopStrip title="Organização">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                            <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
                                 <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{hasVariants ? "Múltiplos SKUs" : (productData.sku || "-")}</span>
                             </div>

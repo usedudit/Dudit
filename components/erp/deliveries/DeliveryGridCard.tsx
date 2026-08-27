@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
+import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
@@ -30,42 +30,53 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
           <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">{delivery.orderDisplayId}</h3>
           <p className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{delivery.customerName}</p>
         </div>
-        <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)}>{statusMeta.label}</Badge>
+        <Tooltip text={statusMeta.label}>
+          <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} />
+        </Tooltip>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div>
-          <p className="text-xs text-brand-inactive-text">Valor entrega</p>
-          <p className="font-bold text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</p>
+          <p className="text-xs text-brand-inactive-text">Entregador</p>
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            {(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver) && (
+              <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3 h-3 object-contain shrink-0" />
+            )}
+            <p className="font-bold text-xs text-brand-dark dark:text-dark-heading truncate">
+              {delivery.deliveryPersonName || "Não atribuído"}
+            </p>
+          </div>
         </div>
         <div>
-          <p className="text-xs text-brand-inactive-text">Tempo estimado</p>
-          <p className="font-bold text-brand-dark dark:text-dark-heading">{delivery.estimatedDurationMinutes ? `${delivery.estimatedDurationMinutes} min` : "-"}</p>
+          <p className="text-xs text-brand-inactive-text">Taxa entrega</p>
+          <p className="font-bold text-brand-primary text-xs mt-0.5">{formatCurrency(delivery.deliveryFee || 0)}</p>
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between">
-        <div className="min-w-0">
-          <p className="text-xs text-brand-inactive-text">Saída</p>
-          <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{delivery.startedAt ? formatDate(delivery.startedAt) : "-"}</p>
-          <p className={`text-[11px] font-semibold ${delivery.deliveryTimingState === "late" ? "text-brand-red" : "text-brand-green"}`}>
-            {delivery.deliveryTimingLabel || ""}
-          </p>
-          {delivery.deliveryTimingDetail ? (
-            <p className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {delivery.deliveryTimingDetail}
+      <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+        <div className="flex justify-between items-end gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-brand-inactive-text">Saída</p>
+            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{delivery.startedAt ? formatDate(delivery.startedAt) : "-"}</p>
+            <p className={`text-[11px] font-semibold ${delivery.deliveryTimingState === "late" ? "text-brand-red" : "text-brand-green"}`}>
+              {delivery.deliveryTimingLabel || ""}
             </p>
-          ) : null}
-        </div>
-        <div onClick={(e) => e.stopPropagation()}>
-          <ActionsDropdown
-            onView={onDetails}
-            onEdit={canEdit && onEdit ? onEdit : undefined}
-            onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
-            cancelLabel="Cancelar entrega"
-          >
-            <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
-          </ActionsDropdown>
+            {delivery.deliveryTimingDetail ? (
+              <p className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body">
+                {delivery.deliveryTimingDetail}
+              </p>
+            ) : null}
+          </div>
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ActionsDropdown
+              onView={onDetails}
+              onEdit={canEdit && onEdit ? onEdit : undefined}
+              onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
+              cancelLabel="Cancelar entrega"
+            >
+              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
+            </ActionsDropdown>
+          </div>
         </div>
       </div>
     </motion.div>

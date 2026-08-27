@@ -31,6 +31,9 @@ import AlertModal from "@/components/reusable/AlertModal";
 import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
+import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal";
+import { usePermissions } from "@/lib/permission-context";
+import { MessageSquare } from "lucide-react";
 
 interface QuickModeHomeProps {
     data: DashboardLayout;
@@ -165,10 +168,34 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
     );
 }
 
+interface Stage {
+    id: string;
+    title: string;
+    items: DashboardChecklistItem[];
+}
+
+const STAGE_CONFIG = [
+    { id: "stage-1", title: "Produtos e Serviços", itemIds: ["items", "hours"] },
+    { id: "stage-2", title: "Dados da Loja", itemIds: ["business-data", "showcase"] },
+    { id: "stage-3", title: "Pagamento e Entrega", itemIds: ["payments", "logistics"] },
+];
+
+function buildStages(items: DashboardChecklistItem[]): Stage[] {
+    return STAGE_CONFIG
+        .map((cfg) => ({
+            id: cfg.id,
+            title: cfg.title,
+            items: cfg.itemIds
+                .map((id) => items.find((i) => i.id === id))
+                .filter(Boolean) as DashboardChecklistItem[],
+        }))
+        .filter((st) => st.items.length > 0);
+}
+
 function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
     const [copied, setCopied] = useState(false);
-    const [showQrModal, setShowQrModal] = useState(false);
+    const [showOptionsModal, setShowOptionsModal] = useState(false);
     const { toast } = useToast();
 
     const origin = typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br";
@@ -200,32 +227,28 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[220px] h-full flex flex-col justify-between shadow-sm">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
             <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-brand-green/10 text-brand-green border border-brand-green/20">
-                        <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-                        Vitrine Online no Ar
-                    </span>
-                    <button
-                        onClick={() => setShowQrModal(true)}
-                        className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white flex items-center gap-1 transition-colors"
-                        title="Ver QR Code e Poster"
+                <div className="flex items-center justify-between gap-2 mb-2">
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        Sua Vitrine & Catálogo Online
+                    </h3>
+                    <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => setShowOptionsModal(true)}
+                        className="text-xs p-0 h-auto font-semibold text-brand-green hover:underline cursor-pointer"
                     >
-                        <QRCodeIcon size={14} />
-                        QR Code & Poster
-                    </button>
+                        Opções da Vitrine
+                    </Button>
                 </div>
 
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
-                    Sua Vitrine & Catálogo Online
-                </h3>
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
                     Compartilhe seu link exclusivo para clientes navegarem pelo seu catálogo e pedirem no WhatsApp.
                 </p>
 
                 {/* Link Box */}
-                <div className="flex items-center justify-between gap-2 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-xl p-2.5 mb-4">
+                <div className="flex items-center justify-between gap-2 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-xl p-2.5">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                         <LinkIcon size={16} className="text-brand-green shrink-0" />
                         <span className="text-xs font-medium text-brand-dark dark:text-dark-heading truncate font-mono">
@@ -244,63 +267,68 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                 </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-brand-border/60 dark:border-dark-border/60">
-                <Button
-                    variant="default"
-                    size="sm"
-                    className="gap-2 rounded-full font-bold text-xs bg-[#25D366] hover:bg-[#20bd5a] text-white border-0 shadow-sm"
-                    onClick={openWhatsAppShare}
-                >
-                    <WhatsappIcon size={15} />
-                    Testar no WhatsApp
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 rounded-full font-semibold text-xs border-brand-border dark:border-dark-border"
-                    onClick={openStore}
-                >
-                    <EyeIcon size={14} />
-                    Abrir Vitrine
-                </Button>
-                <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
-            </div>
-
-            {/* Modal de QR Code */}
-            {showQrModal && (
+            {/* Modal de Opções da Vitrine & QR Code */}
+            {showOptionsModal && (
                 <DefaultModal
-                    isOpen={showQrModal}
-                    onClose={() => setShowQrModal(false)}
-                    title="QR Code da sua Loja"
-                    description="Imprima para colocar no balcão ou compartilhe nas redes sociais"
+                    isOpen={showOptionsModal}
+                    onClose={() => setShowOptionsModal(false)}
+                    title="Opções da Vitrine Online"
+                    description="Compartilhe seu link, divulgue no WhatsApp ou baixe o poster para o balcão"
                     maxWidth="sm"
                 >
-                    <div className="flex flex-col items-center justify-center p-4 gap-4">
-                        <div className="p-4 bg-white rounded-2xl border border-brand-border shadow-sm">
+                    <div className="flex flex-col items-center justify-center p-2 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-brand-border">
                             {qrCodeUrl ? (
                                 <img
                                     src={qrCodeUrl}
                                     alt="QR Code da Loja"
-                                    className="w-48 h-48 object-contain rounded-lg"
+                                    className="w-44 h-44 object-contain rounded-lg"
                                 />
                             ) : (
-                                <div className="w-48 h-48 bg-brand-gray animate-pulse rounded-lg" />
+                                <div className="w-44 h-44 bg-brand-gray animate-pulse rounded-lg" />
                             )}
                         </div>
-                        <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body max-w-xs font-mono">
+
+                        <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body max-w-xs font-mono break-all">
                             {profileUrl}
                         </p>
-                        <div className="flex items-center gap-2 w-full">
+
+                        <div className="flex flex-col gap-2 w-full pt-1">
                             <Button
-                                variant="outline"
-                                className="flex-1 rounded-full text-xs font-bold"
-                                onClick={copyLink}
+                                variant="default"
+                                size="sm"
+                                className="w-full gap-2 rounded-full font-bold text-xs bg-[#25D366] hover:bg-[#20bd5a] text-white border-0"
+                                onClick={openWhatsAppShare}
                             >
-                                <CopyIcon size={14} className="mr-1.5" />
-                                Copiar Link
+                                <WhatsappIcon size={15} />
+                                Testar no WhatsApp
                             </Button>
-                            <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
+
+                            <div className="flex items-center gap-2 w-full">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 rounded-full font-semibold text-xs border-brand-border dark:border-dark-border"
+                                    onClick={openStore}
+                                >
+                                    <EyeIcon size={14} className="mr-1.5" />
+                                    Abrir Vitrine
+                                </Button>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 rounded-full text-xs font-bold"
+                                    onClick={copyLink}
+                                >
+                                    <CopyIcon size={14} className="mr-1.5" />
+                                    {copied ? "Copiado!" : "Copiar Link"}
+                                </Button>
+                            </div>
+
+                            <div className="w-full flex justify-center pt-1">
+                                <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
+                            </div>
                         </div>
                     </div>
                 </DefaultModal>
@@ -327,7 +355,7 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[220px] h-full flex flex-col justify-between shadow-sm">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
             <div>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
                     Ajuda e Suporte
@@ -363,127 +391,99 @@ function ProgressCard({
     onItemClick: (item: DashboardChecklistItem) => void;
     onImportClick: () => void;
 }) {
+    const [currentStageIdx, setCurrentStageIdx] = useState(0);
+
     if (!checklist || checklist.items.length === 0) return null;
 
+    const stages = buildStages(checklist.items);
+    const currentStage = stages[currentStageIdx] || stages[0];
     const totalItems = checklist.items.length;
     const completedItems = checklist.items.filter(i => i.completed).length;
     const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-    const remainingCount = totalItems - completedItems;
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 lg:p-7 flex flex-col gap-6 shadow-sm">
-            {/* Header com Progresso */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-brand-border/60 dark:border-dark-border/60">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[200px] h-full flex flex-col md:flex-row overflow-hidden">
+            {/* Lado Esquerdo - Cinza */}
+            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
                 <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 border border-brand-green/20 px-2.5 py-0.5 rounded-full">
-                            🔥 Quase lá!
-                        </span>
-                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                            {remainingCount === 1 ? "Falta apenas 1 passo" : `Faltam ${remainingCount} passos`}
-                        </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                        {progressPercent >= 70
-                            ? "Sua loja está a 1 passo de decolar! 🚀"
-                            : "Configure os detalhes finais para começar a vender"}
+                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
+                        Configurações iniciais
                     </h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                        Você já fez a parte difícil no cadastro. Complete os itens abaixo para receber pedidos e encantar seus clientes.
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                        Conclua as configurações para deixar sua vitrine pronta para receber pedidos e clientes.
                     </p>
+
+                    {/* Barra de progresso geral */}
+                    <div className="mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                Progresso geral
+                            </span>
+                            <span className="text-xs font-bold text-brand-green">
+                                {completedItems}/{totalItems} ({progressPercent}%)
+                            </span>
+                        </div>
+                        <div className="w-full h-2 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-brand-green rounded-full transition-all duration-500"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Barra de Progresso em Destaque */}
-                <div className="md:w-64 shrink-0 bg-brand-gray dark:bg-dark-border/30 p-3.5 rounded-2xl border border-brand-border dark:border-dark-border">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                            Progresso da Loja
-                        </span>
-                        <span className="text-xs font-bold text-brand-green">
-                            {completedItems}/{totalItems} ({progressPercent}%)
-                        </span>
-                    </div>
-                    <div className="w-full h-2.5 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-gradient-to-r from-brand-green to-emerald-400 rounded-full transition-all duration-500"
-                            style={{ width: `${progressPercent}%` }}
-                        />
+                <div className="flex items-center gap-3 mt-4">
+                    <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                        Etapa {currentStageIdx + 1} de {stages.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
+                            disabled={currentStageIdx === 0}
+                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors cursor-pointer"
+                            aria-label="Etapa anterior"
+                        >
+                            <ChevronLeftIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
+                        <button
+                            onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
+                            disabled={currentStageIdx >= stages.length - 1}
+                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors cursor-pointer"
+                            aria-label="Próxima etapa"
+                        >
+                            <ChevronRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* Checklist Items */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {checklist.items.map((item, idx) => {
-                    const isDone = item.completed;
-                    return (
-                        <div
-                            key={item.id}
-                            onClick={() => onItemClick(item)}
-                            className={`group flex items-start gap-3.5 p-4 rounded-2xl border transition-all cursor-pointer ${
-                                isDone
-                                    ? "border-brand-green/25 bg-brand-green/[0.03] dark:bg-brand-green/[0.02]"
-                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-white/20 hover:shadow-sm"
-                            }`}
-                        >
-                            {/* Number or Checkmark */}
-                            <div className="mt-0.5 shrink-0">
-                                {isDone ? (
-                                    <div className="w-7 h-7 rounded-full bg-brand-green/10 dark:bg-brand-green/20 flex items-center justify-center">
-                                        <CheckCircleIcon size={18} className="text-brand-green" />
-                                    </div>
-                                ) : (
-                                    <div className="w-7 h-7 rounded-full bg-brand-gray dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs font-bold text-brand-dark dark:text-dark-heading group-hover:bg-brand-dark group-hover:text-white dark:group-hover:bg-brand-green dark:group-hover:text-white transition-colors">
-                                        {idx + 1}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Text Info */}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                                    <h4 className={`text-sm font-bold ${isDone ? "text-brand-dark/70 dark:text-dark-heading/70" : "text-brand-dark dark:text-dark-heading"}`}>
-                                        {item.title}
-                                    </h4>
-                                    {item.badgeText && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                            isDone
-                                                ? "bg-brand-green/10 text-brand-green"
-                                                : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text dark:text-dark-body"
-                                        }`}>
-                                            {item.badgeText}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed line-clamp-2">
-                                    {item.description}
-                                </p>
-                            </div>
-
-                            {/* Action Indicator / Button */}
-                            <div className="shrink-0 self-center">
-                                {isDone ? (
-                                    <span className="text-xs font-semibold text-brand-green flex items-center gap-0.5">
-                                        Pronto
-                                    </span>
-                                ) : (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 px-3 rounded-full text-xs font-bold text-brand-dark dark:text-dark-heading group-hover:bg-brand-dark group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-brand-dark transition-all gap-1"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onItemClick(item);
-                                        }}
-                                    >
-                                        {item.actionText || "Configurar"}
-                                        <ChevronRightIcon size={12} />
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
+            {/* Lado Direito - Itens com ListItem */}
+            <div className="flex-1 min-w-0 p-6 flex flex-col justify-center gap-2">
+                {currentStage?.items.map((item, idx) => (
+                    <ListItem
+                        key={item.id}
+                        onClick={() => onItemClick(item)}
+                        title={item.title}
+                        description={item.description}
+                        left={
+                            <span className={`text-xs font-bold w-6 text-center shrink-0 ${item.completed ? "text-brand-green" : "text-brand-inactive-text dark:text-dark-body"}`}>
+                                {String(idx + 1).padStart(2, "0")}
+                            </span>
+                        }
+                        right={
+                            item.completed ? (
+                                <CheckCircleIcon size={18} className="text-brand-green shrink-0" />
+                            ) : (
+                                <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
+                            )
+                        }
+                        className={`border rounded-2xl transition-all cursor-pointer p-3 ${
+                            item.completed
+                                ? "border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5"
+                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                        }`}
+                    />
+                ))}
             </div>
         </div>
     );
@@ -769,6 +769,33 @@ function TipsCard() {
 }
 
 // ============================================
+// FEEDBACK CARD
+// ============================================
+
+function FeedbackCard({ onOpen }: { onOpen: () => void }) {
+    return (
+        <div
+            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-brand-green/40 dark:hover:border-brand-green/30 transition-colors"
+            onClick={onOpen}
+        >
+            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                <MessageSquare size={20} className="text-brand-green" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Feedback
+                    </span>
+                    <p className="text-sm text-brand-dark dark:text-dark-heading">
+                        Sua opinião nos ajuda a melhorar. Sugestões, elogios ou bugs — tudo bem-vindo!
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -776,9 +803,11 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     const router = useRouter();
     const { toast } = useToast();
     const { openPlanUpgrade } = usePlanUpgrade();
+    const { partnerId: permPartnerId, planSlug: permPlanSlug, role: permRole } = usePermissions();
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState<any>(null);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [currentImportOptions, setCurrentImportOptions] = useState<DashboardChecklistItem["importOptions"] | null>(null);
 
     const handleDelete = async () => {
@@ -887,13 +916,14 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         <HelpCard />
                     </div>
 
-                    {/* Plano + Modo ERP + Dicas - 2 columns banners */}
+                    {/* Plano + Modo ERP + Dicas + Feedback - 2 columns banners */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
                         {data.isQuickMode && (
                             <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
                         )}
                         <TipsCard />
+                        <FeedbackCard onOpen={() => setShowFeedbackModal(true)} />
                     </div>
                 </div>
 
@@ -916,6 +946,14 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     confirmText={isDeleting ? "Excluindo..." : "Sim, excluir"}
                     cancelText="Cancelar"
                     variant="danger"
+                />
+
+                <GeneralFeedbackModal
+                    isOpen={showFeedbackModal}
+                    onClose={() => setShowFeedbackModal(false)}
+                    partnerId={permPartnerId}
+                    partnerPlan={permPlanSlug}
+                    userRole={permRole}
                 />
             </div>
         </>

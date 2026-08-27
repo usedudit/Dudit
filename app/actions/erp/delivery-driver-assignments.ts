@@ -4,30 +4,40 @@ import { revalidatePath } from "next/cache"
 import { requirePartnerRouteAccess, requireUser } from "@/lib/auth/authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { getCachedErpPage } from "@/lib/data/erp-page-cache"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 export async function fetchAvailablePlatformDeliveryDriversAction(partnerId: string, deliveryId?: string) {
   await requireUser()
   await requirePartnerRouteAccess(partnerId, "logistics", { specificPermission: "can_assign_driver" })
-  const admin = getAdminClient()
-  const [{ data: drivers }, { data: links }] = await Promise.all([
-    admin.from("delivery_drivers").select("user_id, city, neighborhood, vehicle_type, availability_status").eq("is_active", true).eq("availability_status", "available").order("created_at", { ascending: true }),
-    admin.from("delivery_driver_partners").select("driver_id").eq("partner_id", partnerId).eq("is_active", true),
-  ])
-  const driverIds = (drivers || []).map((driver: any) => String(driver.user_id)).filter(Boolean)
-  if (driverIds.length === 0) return []
-  let occupiedQuery = admin.from("delivery_assignments").select("driver_id").in("driver_id", driverIds).in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
-  if (deliveryId) occupiedQuery = occupiedQuery.neq("delivery_id", deliveryId)
-  const [{ data: occupied }, { data: allLinked }] = await Promise.all([
-    occupiedQuery,
-    admin.from("delivery_driver_partners").select("driver_id").in("driver_id", driverIds),
-  ])
-  const linkedIds = new Set((links || []).map((row: any) => String(row.driver_id)))
-  const occupiedIds = new Set((occupied || []).map((row: any) => String(row.driver_id)))
-  const restrictedIds = new Set((allLinked || []).map((row: any) => String(row.driver_id)))
-  const eligible = (drivers || []).filter((driver: any) => !occupiedIds.has(String(driver.user_id)) && (!restrictedIds.has(String(driver.user_id)) || linkedIds.has(String(driver.user_id))))
-  const profiles = eligible.length ? (await admin.from("user_profiles").select("user_id, full_name").in("user_id", eligible.map((row: any) => row.user_id))).data || [] : []
-  const nameById = new Map((profiles as any[]).map((row) => [String(row.user_id), String(row.full_name || "Entregador")]))
-  return eligible.map((driver: any) => ({ id: String(driver.user_id), userId: String(driver.user_id), fullName: nameById.get(String(driver.user_id)) || "Entregador", vehicleType: driver.vehicle_type }))
+
+  return getCachedErpPage(
+    ["erp-available-platform-drivers", partnerId, deliveryId || "all"],
+    [TAGS.partner(partnerId)],
+    async () => {
+      const admin = getAdminClient()
+      const [{ data: drivers }, { data: links }] = await Promise.all([
+        admin.from("delivery_drivers").select("user_id, city, neighborhood, vehicle_type, availability_status").eq("is_active", true).eq("availability_status", "available").order("created_at", { ascending: true }),
+        admin.from("delivery_driver_partners").select("driver_id").eq("partner_id", partnerId).eq("is_active", true),
+      ])
+      const driverIds = (drivers || []).map((driver: any) => String(driver.user_id)).filter(Boolean)
+      if (driverIds.length === 0) return []
+      let occupiedQuery = admin.from("delivery_assignments").select("driver_id").in("driver_id", driverIds).in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+      if (deliveryId) occupiedQuery = occupiedQuery.neq("delivery_id", deliveryId)
+      const [{ data: occupied }, { data: allLinked }] = await Promise.all([
+        occupiedQuery,
+        admin.from("delivery_driver_partners").select("driver_id").in("driver_id", driverIds),
+      ])
+      const linkedIds = new Set((links || []).map((row: any) => String(row.driver_id)))
+      const occupiedIds = new Set((occupied || []).map((row: any) => String(row.driver_id)))
+      const restrictedIds = new Set((allLinked || []).map((row: any) => String(row.driver_id)))
+      const eligible = (drivers || []).filter((driver: any) => !occupiedIds.has(String(driver.user_id)) && (!restrictedIds.has(String(driver.user_id)) || linkedIds.has(String(driver.user_id))))
+      const profiles = eligible.length ? (await admin.from("user_profiles").select("user_id, full_name").in("user_id", eligible.map((row: any) => row.user_id))).data || [] : []
+      const nameById = new Map((profiles as any[]).map((row) => [String(row.user_id), String(row.full_name || "Entregador")]))
+      return eligible.map((driver: any) => ({ id: String(driver.user_id), userId: String(driver.user_id), fullName: nameById.get(String(driver.user_id)) || "Entregador", vehicleType: driver.vehicle_type }))
+    },
+    15,
+  )
 }
 
 export async function assignPlatformDriverToDeliveryAction(input: {

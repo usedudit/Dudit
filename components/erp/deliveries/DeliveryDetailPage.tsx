@@ -7,7 +7,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -20,6 +20,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "../orders/CreateOrder"
 import PaymentStatusModal from "../orders/PaymentStatusModal"
+import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
 
 const CHANGE_STATUS_REASONS = [
     { value: "operational_error", label: "Erro operacional / Clique acidental" },
@@ -71,7 +72,6 @@ export default function DeliveryDetailPage({
     const [route, setRoute] = useState<any | null>(null)
     const [routeError, setRouteError] = useState<string | null>(null)
     const [routeLoading, setRouteLoading] = useState(false)
-    const isEscalar = planSlug === "escalar"
     const [isScrolled, setIsScrolled] = useState(false)
     const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
     const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
@@ -98,9 +98,11 @@ export default function DeliveryDetailPage({
         }
     }, [selectedLink])
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+    const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
     const isMobile = useMediaQuery("(max-width: 768px)")
+    const [activeTab, setActiveTab] = useState<string>("dados_gerais")
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const mounted = useRef(true)
 
@@ -145,7 +147,6 @@ export default function DeliveryDetailPage({
     }, [loadDeliveryDetails])
 
     useEffect(() => {
-        if (!isEscalar) return
         let alive = true
         const run = async () => {
             setRouteLoading(true)
@@ -162,7 +163,7 @@ export default function DeliveryDetailPage({
         }
         run()
         return () => { alive = false }
-    }, [deliveryId, partnerId, isEscalar])
+    }, [deliveryId, partnerId])
 
     const confirmDeliveryWarningStatusChange = async () => {
         if (!deliveryWarningModal) return
@@ -200,6 +201,28 @@ export default function DeliveryDetailPage({
             }
         }
 
+        const prevDelivery = delivery
+        const prevSelectedLink = selectedLink
+
+        setDelivery((current: any) => {
+            if (!current) return current
+            return {
+                ...current,
+                delivery_orders: (current.delivery_orders || []).map((item: any) =>
+                    item?.orders?.id === orderId
+                        ? {
+                            ...item,
+                            status: nextStatus,
+                            orders: { ...item.orders, delivery_status: nextStatus },
+                        }
+                        : item,
+                ),
+            }
+        })
+        setSelectedLink((current: any) => current?.orders?.id === orderId
+            ? { ...current, status: nextStatus, orders: { ...current.orders, delivery_status: nextStatus } }
+            : current)
+
         setUpdatingOrderId(orderId)
         try {
             const res = await updateERPSingleOrderDeliveryStatusAction({
@@ -211,31 +234,17 @@ export default function DeliveryDetailPage({
             })
             if (res.success) {
                 toast.success("Status do pedido atualizado com sucesso!")
-                // O servidor já persistiu a alteração. Atualiza apenas o pedido afetado
-                // para evitar recarregar itens, clientes, endereços e a rota inteira.
-                setDelivery((current: any) => {
-                    if (!current) return current
-                    return {
-                        ...current,
-                        status: res.deliveryStatus || current.status,
-                        delivery_orders: (current.delivery_orders || []).map((item: any) =>
-                            item?.orders?.id === orderId
-                                ? {
-                                    ...item,
-                                    status: nextStatus,
-                                    orders: { ...item.orders, delivery_status: nextStatus },
-                                }
-                                : item,
-                        ),
-                    }
-                })
-                setSelectedLink((current: any) => current?.orders?.id === orderId
-                    ? { ...current, status: nextStatus, orders: { ...current.orders, delivery_status: nextStatus } }
-                    : current)
+                if (res.deliveryStatus) {
+                    setDelivery((current: any) => current ? { ...current, status: res.deliveryStatus } : current)
+                }
             } else {
+                setDelivery(prevDelivery)
+                setSelectedLink(prevSelectedLink)
                 toast.error(res.error || "Erro ao atualizar status do pedido.")
             }
         } catch (err: any) {
+            setDelivery(prevDelivery)
+            setSelectedLink(prevSelectedLink)
             toast.error(err?.message || "Erro inesperado ao atualizar status.")
         } finally {
             setUpdatingOrderId(null)
@@ -260,6 +269,9 @@ export default function DeliveryDetailPage({
             : CHANGE_STATUS_REASONS.find(r => r.value === cancelDeliveryModal.reasonDropdownValue)?.label || ""
 
         setCancelDeliveryModal(null)
+        const prevDelivery = delivery
+        setDelivery((current: any) => current ? { ...current, status: "cancelled" } : current)
+
         const res = await updateERPDeliveryStatusAction({
             deliveryId: delivery.id,
             partnerId,
@@ -269,8 +281,8 @@ export default function DeliveryDetailPage({
 
         if (res.success) {
             toast.success("Entrega cancelada com sucesso!")
-            loadDeliveryDetails()
         } else {
+            setDelivery(prevDelivery)
             toast.error(res.error || "Erro ao cancelar entrega.")
         }
     }
@@ -316,7 +328,9 @@ export default function DeliveryDetailPage({
 
     const totalDeliveryFee = links.reduce((sum: number, link: any) => sum + Number(link.orders?.delivery_fee || 0), 0)
 
-    const driverName = delivery.partner_users?.user_profiles?.full_name || "Entrega própria"
+    const isPlatformDriver = Boolean(delivery.platform_driver || delivery.is_platform_driver || delivery.delivery_person_id?.startsWith?.("platform:"))
+    const platformDriver = delivery.platform_driver || null
+    const driverName = platformDriver?.fullName || delivery.delivery_person_name || delivery.partner_users?.user_profiles?.full_name || (delivery.delivery_person_id ? "Entregador" : "Entrega própria")
 
     const linkedOrdersCard = (
         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
@@ -327,7 +341,21 @@ export default function DeliveryDetailPage({
                 </div>
                 <div className="text-right shrink-0">
                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Entregador</span>
-                    <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">{driverName}</p>
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                        {isPlatformDriver && (
+                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-4 h-4 object-contain shrink-0" />
+                        )}
+                        <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">{driverName}</p>
+                    </div>
+                    {platformDriver && !platformDriver.isPendingAcceptance && (
+                        <Button
+                            onClick={() => setIsDriverModalOpen(true)}
+                            variant="link"
+                            className="text-sm block mt-0.5 ml-auto"
+                        >
+                            Ver detalhes do entregador
+                        </Button>
+                    )}
                 </div>
             </div>
             <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
@@ -411,91 +439,107 @@ export default function DeliveryDetailPage({
     )
 
     const pageHeader = (
-        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 flex items-center justify-between gap-3">
-            {/* Back button - desktop only */}
-            <div className="absolute -left-12 top-1/2 -translate-y-1/2 hidden xl:flex">
-                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                </Button>
-            </div>
-
-            <div className="flex items-center gap-3 min-w-0">
-                {/* Back button - mobile/tablet only */}
-                <div className="xl:hidden shrink-0">
+        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+            {/* Desktop header with title, back, edit, actions */}
+            <div className="hidden lg:flex items-center justify-between gap-3 py-2">
+                <div className="absolute -left-12 top-1/2 -translate-y-1/2">
                     <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                     </Button>
                 </div>
-                <div className="min-w-0">
-                    <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
-                        Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
-                    </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1 truncate">
-                        Criado em {formatDateTime(delivery.created_at)} • {driverName}
-                    </p>
+
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="min-w-0">
+                        <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
+                            Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
+                        </h1>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1 truncate flex items-center gap-1.5">
+                            <span>Criado em {formatDateTime(delivery.created_at)} • </span>
+                            {isPlatformDriver && (
+                                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain inline-block shrink-0" />
+                            )}
+                            <span>{driverName}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                    {canEdit && onEdit && (
+                        <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
+                            Editar
+                        </Button>
+                    )}
+                    <ActionsDropdown
+                        onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                        onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                        cancelLabel="Cancelar entrega"
+                    />
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                {canEdit && onEdit && (
-                    <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
-                        Editar
-                    </Button>
-                )}
-                <ActionsDropdown
-                    onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
-                    onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
-                    cancelLabel="Cancelar entrega"
-                />
+            {/* Tabs - visible on all screen sizes */}
+            <div className="w-full border-b border-brand-border dark:border-dark-border">
+                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 max-w-[1300px] mx-auto px-4 md:px-6">
+                    <TabsTrigger value="dados_gerais">
+                        Dados Gerais
+                        <RouteIcon className="w-4 h-4" />
+                    </TabsTrigger>
+                    <TabsTrigger value="mapa_rota">
+                        Mapa da Rota
+                    </TabsTrigger>
+                </TabsList>
             </div>
         </div>
     )
 
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
-            {isEscalar ? (
-                <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
-                    {/* LEFT SIDE - CONTENT */}
-                    <div className="w-full lg:w-1/2 flex flex-col flex-1 min-h-0 lg:flex-none lg:shrink-0 lg:h-full border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
-                        {/* Header now inside the left column */}
-                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
-                            {pageHeader}
-                        </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Sticky Header with Tabs */}
+                    <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
+                        {pageHeader}
+                    </div>
 
-                        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto no-scrollbar relative">
-                            <div className="flex-1 pt-4 pb-12 px-4 md:px-6 space-y-8">
+                    {/* Tab Content */}
+                    <div className="flex-1 overflow-hidden relative">
+                        {/* DADOS GERAIS TAB */}
+                        <TabsContent value="dados_gerais" className="flex-1 h-full overflow-y-auto no-scrollbar custom-scrollbar">
+                            <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative">
                                 {linkedOrdersCard}
                                 {deliveryInfoMetrics}
                                 {notesSection}
                             </div>
-                        </div>
-                    </div>
+                        </TabsContent>
 
-                    {/* RIGHT SIDE - ROUTE MAP (preview area) */}
-                    <div className="w-full lg:w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar">
-                        <div className="p-4 md:p-6 flex flex-col h-full">
-                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Mapa da Rota</h3>
-                            <div className="flex-1 min-h-[300px] w-full">
-                                {mapContent}
+                        {/* MAPA DA ROTA TAB */}
+                        <TabsContent value="mapa_rota" className="flex-1 h-full overflow-hidden">
+                            <div className="h-full w-full p-4 md:p-6">
+                                <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+                                    {mapContent}
+                                </div>
                             </div>
-                        </div>
+                        </TabsContent>
                     </div>
                 </div>
-            ) : (
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-10 custom-scrollbar">
-                    {/* Sticky Header */}
-                    <div className={`sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
-                        {pageHeader}
-                    </div>
 
-                    {/* Content */}
-                    <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative mt-4">
-                        {linkedOrdersCard}
-                        {deliveryInfoMetrics}
-                        {notesSection}
-                    </div>
+                {/* Mobile Bottom Action Bar */}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                    <Button variant="filled" onClick={handleBack} className="flex-1 h-12">
+                        <ChevronLeftIcon className="w-5 h-5" />
+                    </Button>
+                    <ActionsDropdown
+                        onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                        onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                        cancelLabel="Cancelar entrega"
+                        trigger={
+                            <Button variant="outline" className="flex-1 h-12" leftIcon={<ThreeDotsIcon className="w-5 h-5" />}>
+                                Opções
+                            </Button>
+                        }
+                    />
                 </div>
-            )}
+            </Tabs>
 
             <AlertModal
                 isOpen={cancelDeliveryModal?.isOpen ?? false}
@@ -1051,6 +1095,13 @@ export default function DeliveryDetailPage({
                     />
                 )
             }
+
+            <DuditDriverDetailsModal
+                isOpen={isDriverModalOpen}
+                onClose={() => setIsDriverModalOpen(false)}
+                driver={platformDriver}
+                deliveryNumber={delivery?.delivery_number}
+            />
         </FadeIn >
     )
 }

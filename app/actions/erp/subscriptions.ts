@@ -125,19 +125,17 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
       }
     }
 
-    // ── Fetch the NEXT cycle purchase (the "Próxima Fatura") from billing ──
-    // Only applies if the subscription is active, paying, and NOT scheduled to cancel
+    // ── Fetch the overdue/pending invoice from billing if subscription is past_due ──
     let nextInvoice: any = null
     if (
       subscriptionPayload &&
       subscription &&
-      ["active", "trialing"].includes(subscription.status) &&
-      !subscription.cancel_at_period_end &&
+      subscription.status === "past_due" &&
       plan.slug !== "free"
     ) {
       try {
         const admin = getAdminClient()
-        const { data: nextPurchase } = await admin
+        const { data: pendingPurchase } = await admin
           .from("billing_purchases")
           .select("*, billing_invoices(*)")
           .eq("subscription_id", subscription.id)
@@ -146,22 +144,23 @@ export async function getSubscriptionStatusAction(): Promise<ActionResponse<any>
           .limit(1)
           .maybeSingle()
 
-        if (nextPurchase) {
-          const invoice = (nextPurchase as any).billing_invoices?.[0] || null
+        if (pendingPurchase) {
+          const invoice = (pendingPurchase as any).billing_invoices?.[0] || null
           nextInvoice = {
-            purchase_id: nextPurchase.id,
-            invoice_id: invoice?.id || nextPurchase.invoice_id || null,
+            purchase_id: pendingPurchase.id,
+            invoice_id: invoice?.id || pendingPurchase.invoice_id || null,
             invoice_number: invoice?.invoice_number || null,
-            due_date: nextPurchase.billing_period_start
-              || (nextPurchase.metadata?.due_date || null),
-            period_start: nextPurchase.billing_period_start || null,
-            period_end: nextPurchase.billing_period_end || null,
-            amount: Number(nextPurchase.total_amount),
-            status: nextPurchase.status,
+            due_date: pendingPurchase.billing_period_start
+              || (pendingPurchase.metadata?.due_date || null)
+              || subscription.current_period_start,
+            period_start: pendingPurchase.billing_period_start || null,
+            period_end: pendingPurchase.billing_period_end || null,
+            amount: Number(pendingPurchase.total_amount || plan.price),
+            status: pendingPurchase.status,
           }
         }
       } catch (err: any) {
-        console.error("[Subscriptions] Error fetching next invoice:", err?.message)
+        console.error("[Subscriptions] Error fetching pending invoice:", err?.message)
       }
     }
 

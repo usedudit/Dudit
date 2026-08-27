@@ -38,8 +38,10 @@ import {
     fetchDeliveryOrderBucketAction,
     fetchDeliveryPeopleBucketAction,
     getERPDeliveryPlanAccessAction,
+    unassignDuditDriverAction,
 } from "@/app/actions/erp/deliveries"
 import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction } from "@/app/actions/erp/delivery-driver-assignments"
+import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
 import {
     CalendarIcon,
     ChevronLeftIcon,
@@ -207,6 +209,21 @@ export default function CreateDeliveryPage({
     const searchRef = useRef<HTMLDivElement>(null)
     const [deliveryPeople, setDeliveryPeople] = useState<DeliveryPerson[]>([])
     const [platformDriver, setPlatformDriver] = useState<any>(null)
+    const initialPlatformDriverRef = useRef<any>(null)
+    const [isDuditDriverDetailsOpen, setIsDuditDriverDetailsOpen] = useState(false)
+    const [unassignModal, setUnassignModal] = useState<{
+        isOpen: boolean
+        pendingPersonId: string | null
+        isConfirmed: boolean
+        reason: string
+        isSubmitting: boolean
+    }>({
+        isOpen: false,
+        pendingPersonId: null,
+        isConfirmed: false,
+        reason: "",
+        isSubmitting: false,
+    })
     const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false)
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -243,9 +260,6 @@ export default function CreateDeliveryPage({
             let mounted = true
             const run = async () => {
                 setIsLoadingDelivery(true)
-                // A lista de pedidos é independente do cabeçalho da entrega.
-                // Inicia as duas consultas juntas para o editor não ficar bloqueado
-                // pelo detalhe completo da entrega.
                 void orderPicker.loadBucket()
                 try {
                     const res = await getERPDeliveryDetailsAction(editDeliveryId, partnerId)
@@ -258,8 +272,14 @@ export default function CreateDeliveryPage({
                     const del = res.data
                     const orderIds = (del.delivery_orders || []).map((l: any) => l.order_id || l.orders?.id).filter(Boolean)
                     setSelectedOrderIds(orderIds)
-                    if (del.platform_driver) setPlatformDriver(del.platform_driver)
-                    setSelectedDeliveryPersonId(del.delivery_person_id || (del.platform_driver_id ? `platform:${del.platform_driver_id}` : ""))
+                    if (del.platform_driver) {
+                        setPlatformDriver(del.platform_driver)
+                        initialPlatformDriverRef.current = del.platform_driver
+                    }
+                    const resolvedPersonId = del.platform_driver
+                        ? (del.delivery_person_id || `platform:${del.platform_driver_id || del.platform_driver.id}`)
+                        : (del.delivery_person_id || "")
+                    setSelectedDeliveryPersonId(resolvedPersonId)
                     setStatus(del.status || "pending")
                     const startedDate = del.started_at || del.departure_time || del.created_at
                     let initialDate = initialDateTime.date
@@ -279,7 +299,7 @@ export default function CreateDeliveryPage({
                     setDeliveryNumber(del.delivery_number || null)
                     initialLoadedRef.current = {
                         orderIds,
-                        deliveryPersonId: del.delivery_person_id || (del.platform_driver_id ? `platform:${del.platform_driver_id}` : ""),
+                        deliveryPersonId: resolvedPersonId,
                         status: del.status || "pending",
                         date: initialDate,
                         time: initialTime,
@@ -393,11 +413,14 @@ export default function CreateDeliveryPage({
             })),
         ]
 
-        if (selectedDeliveryPersonId?.startsWith("platform:")) {
-            const rawId = selectedDeliveryPersonId.slice("platform:".length)
-            const exists = baseOptions.some(opt => opt.value === selectedDeliveryPersonId)
+        if (selectedDeliveryPersonId?.startsWith("platform:") || platformDriver) {
+            const rawId = selectedDeliveryPersonId?.startsWith("platform:")
+                ? selectedDeliveryPersonId.slice("platform:".length)
+                : platformDriver?.id
+
+            const exists = baseOptions.some(opt => opt.value === (selectedDeliveryPersonId || `platform:${rawId}`))
             if (!exists) {
-                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network") {
+                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network" || platformDriver?.isPendingAcceptance) {
                     baseOptions.push({
                         value: "platform:dudit_network",
                         label: "Dudit · Rede de Entregadores (Aguardando aceite)",
@@ -406,7 +429,7 @@ export default function CreateDeliveryPage({
                     const driverName = platformDriver?.fullName || "Entregador Parceiro"
                     const vehicleType = platformDriver?.vehicleType ? ` (${platformDriver.vehicleType})` : ""
                     baseOptions.push({
-                        value: selectedDeliveryPersonId,
+                        value: selectedDeliveryPersonId || `platform:${platformDriver?.id}`,
                         label: `Dudit · ${driverName}${vehicleType}`,
                     })
                 }
@@ -414,6 +437,59 @@ export default function CreateDeliveryPage({
         }
         return baseOptions
     }, [deliveryPeople, selectedDeliveryPersonId, platformDriver])
+
+    const handleDriverSelectionChange = (newPersonId: string) => {
+        const targetId = newPersonId === "none" ? "" : newPersonId
+        const activeDriver = initialPlatformDriverRef.current
+        const isAcceptedPlatformDriver = activeDriver && !activeDriver.isPendingAcceptance && activeDriver.id !== "dudit_network"
+        const isChangingAway = isAcceptedPlatformDriver && targetId !== `platform:${activeDriver.id}`
+
+        if (isChangingAway) {
+            setUnassignModal({
+                isOpen: true,
+                pendingPersonId: targetId,
+                isConfirmed: false,
+                reason: "",
+                isSubmitting: false,
+            })
+            return
+        }
+
+        setSelectedDeliveryPersonId(targetId)
+    }
+
+    const handleConfirmUnassign = async () => {
+        if (!unassignModal.isConfirmed || !unassignModal.reason.trim() || !editDeliveryId) return
+        setUnassignModal(prev => ({ ...prev, isSubmitting: true }))
+        try {
+            const res = await unassignDuditDriverAction({
+                partnerId,
+                deliveryId: editDeliveryId,
+                reason: unassignModal.reason.trim(),
+                notifyDriver: true,
+            })
+            if (!res.success) {
+                toast.error(res.error || "Não foi possível desatribuir o entregador.")
+                setUnassignModal(prev => ({ ...prev, isSubmitting: false }))
+                return
+            }
+
+            toast.success("Entregador desatribuído com sucesso.")
+            initialPlatformDriverRef.current = null
+            setPlatformDriver(null)
+            setSelectedDeliveryPersonId(unassignModal.pendingPersonId || "")
+            setUnassignModal({
+                isOpen: false,
+                pendingPersonId: null,
+                isConfirmed: false,
+                reason: "",
+                isSubmitting: false,
+            })
+        } catch (err: any) {
+            toast.error(err?.message || "Erro ao desatribuir entregador.")
+            setUnassignModal(prev => ({ ...prev, isSubmitting: false }))
+        }
+    }
 
     const handleSave = async () => {
         if (selectedOrderIds.length === 0 || !date || !time) return
@@ -747,7 +823,7 @@ export default function CreateDeliveryPage({
                                                                 <FormDropdown
                                                                     label="Entregador"
                                                                     value={selectedDeliveryPersonId || "none"}
-                                                                    setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
+                                                                    setValue={handleDriverSelectionChange}
                                                                     options={deliveryPeopleOptions}
                                                                     onFocus={() => {
                                                                         void loadDeliveryPeople()
@@ -758,6 +834,22 @@ export default function CreateDeliveryPage({
                                                                         onClick: () => setIsDriverSheetOpen(true),
                                                                     }}
                                                                 />
+
+                                                                {platformDriver && !platformDriver.isPendingAcceptance && (
+                                                                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
+                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                                                            <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">{platformDriver.fullName}</span>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setIsDuditDriverDetailsOpen(true)}
+                                                                            className="text-[11px] font-bold text-brand-green hover:underline shrink-0"
+                                                                        >
+                                                                            Ver detalhes
+                                                                        </button>
+                                                                    </div>
+                                                                )}
 
                                                                 <FormDropdown
                                                                     label="Status"
@@ -799,7 +891,7 @@ export default function CreateDeliveryPage({
                                                         <FormDropdown
                                                             label="Entregador"
                                                             value={selectedDeliveryPersonId || "none"}
-                                                            setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
+                                                            setValue={handleDriverSelectionChange}
                                                             options={deliveryPeopleOptions}
                                                             onFocus={() => {
                                                                 void loadDeliveryPeople()
@@ -810,6 +902,22 @@ export default function CreateDeliveryPage({
                                                                 onClick: () => setIsDriverSheetOpen(true),
                                                             }}
                                                         />
+
+                                                        {platformDriver && !platformDriver.isPendingAcceptance && (
+                                                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-gray/50 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border">
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                                                    <span className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">{platformDriver.fullName}</span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setIsDuditDriverDetailsOpen(true)}
+                                                                    className="text-[11px] font-bold text-brand-green hover:underline shrink-0"
+                                                                >
+                                                                    Ver detalhes
+                                                                </button>
+                                                            </div>
+                                                        )}
 
                                                         <FormDropdown
                                                             label="Status"
@@ -851,11 +959,8 @@ export default function CreateDeliveryPage({
                                             <FormDropdown
                                                 label="Entregador"
                                                 value={selectedDeliveryPersonId || "none"}
-                                                setValue={(value) => setSelectedDeliveryPersonId(value === "none" ? "" : value)}
-                                                options={[
-                                                    { value: "none", label: "Sem entregador (não atribuído)" },
-                                                    ...deliveryPeople.map((person) => ({ value: person.id, label: `${person.fullName}${person.source === "platform" ? " · Dudit" : ""}` })),
-                                                ]}
+                                                setValue={handleDriverSelectionChange}
+                                                options={deliveryPeopleOptions}
                                                 onFocus={() => { void loadDeliveryPeople() }}
                                                 actionItem={{
                                                     label: "Entregadores Dudit",
@@ -1133,6 +1238,56 @@ export default function CreateDeliveryPage({
                         setOrderToRemove(null)
                     }
                 }}
+                variant="danger"
+                isDestructive
+            />
+
+            <DuditDriverDetailsModal
+                isOpen={isDuditDriverDetailsOpen}
+                onClose={() => setIsDuditDriverDetailsOpen(false)}
+                driver={platformDriver}
+                deliveryNumber={deliveryNumber}
+            />
+
+            <AlertModal
+                isOpen={unassignModal.isOpen}
+                onClose={() => setUnassignModal(prev => ({ ...prev, isOpen: false, isSubmitting: false }))}
+                onConfirm={handleConfirmUnassign}
+                title="Atenção: Desatribuir Entregador Dudit"
+                message={
+                    <div className="space-y-4 text-left">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            O entregador Dudit <strong className="text-brand-dark dark:text-dark-heading">{initialPlatformDriverRef.current?.fullName || "Parceiro"}</strong> já aceitou esta corrida e pode estar a caminho do estabelecimento.
+                        </p>
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                            Para trocar ou remover o entregador, confirme que está ciente e informe a justificativa abaixo. O entregador receberá esta mensagem via notificação.
+                        </p>
+                        <div className="space-y-2 pt-1">
+                            <FormTextarea
+                                label="Motivo da desatribuição (obrigatório)"
+                                placeholder="Ex: Pedido cancelado pelo cliente, alteração no horário de preparo, etc."
+                                value={unassignModal.reason}
+                                onChange={(e: any) => setUnassignModal(prev => ({ ...prev, reason: e.target.value }))}
+                                rows={3}
+                            />
+                        </div>
+                        <label className="flex items-start gap-2.5 pt-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={unassignModal.isConfirmed}
+                                onChange={(e) => setUnassignModal(prev => ({ ...prev, isConfirmed: e.target.checked }))}
+                                className="mt-0.5 h-4 w-4 rounded border-brand-border text-brand-green focus:ring-brand-green"
+                            />
+                            <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                Estou ciente e confirmo a desatribuição deste entregador.
+                            </span>
+                        </label>
+                    </div>
+                }
+                confirmText="Confirmar e Desatribuir"
+                cancelText="Voltar"
+                disabled={!unassignModal.isConfirmed || !unassignModal.reason.trim() || unassignModal.isSubmitting}
+                isLoading={unassignModal.isSubmitting}
                 variant="danger"
                 isDestructive
             />

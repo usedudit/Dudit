@@ -33,6 +33,7 @@ import QuotePreview from './QuotePreview';
 import QuotePrintModal from './QuotePrintModal';
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { ShareModal } from "@/components/marketplace/ShareModal";
+import BottomSheet from "@/components/BottomSheet";
 
 interface QuoteDetailProps {
     quoteId: string;
@@ -109,6 +110,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [showUnapprovedConvertModal, setShowUnapprovedConvertModal] = useState(false);
+    const [isStepsSheetOpen, setIsStepsSheetOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isConverting, setIsConverting] = useState(false);
     const [historyEntries, setHistoryEntries] = useState<QuoteHistoryEntryRow[]>([]);
@@ -123,24 +125,30 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
     const { selectedStore } = useStore();
     const partnerName = selectedStore?.name || 'Sua Loja';
-    const [partnerImage, setPartnerImage] = useState(selectedStore?.image_url || '');
+    const [partnerImage, setPartnerImage] = useState(selectedStore?.logo_url || selectedStore?.image_url || '');
     const [partnerAddress, setPartnerAddress] = useState('Endereço não informado');
     const [partnerPhone, setPartnerPhone] = useState('');
 
     useEffect(() => {
-        if (selectedStore?.image_url) setPartnerImage(selectedStore.image_url);
-    }, [selectedStore?.image_url]);
+        const logo = selectedStore?.logo_url || selectedStore?.image_url;
+        if (logo) setPartnerImage(logo);
+    }, [selectedStore?.logo_url, selectedStore?.image_url]);
 
     useEffect(() => {
         if (!partnerImage && partnerId) {
             const fetchPartnerImage = async () => {
                 const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
-                const { data } = await supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle();
-                if (data?.logo_url) setPartnerImage(data.logo_url);
+                const storeId = selectedStore?.id || quote?.store_id;
+                const storeQuery = storeId
+                    ? supabase.from("stores").select("logo_url, image_url").eq("id", storeId).maybeSingle()
+                    : supabase.from("stores").select("logo_url, image_url").eq("partner_id", partnerId).limit(1).maybeSingle();
+                const { data } = await storeQuery;
+                const foundLogo = data?.logo_url || data?.image_url;
+                if (foundLogo) setPartnerImage(foundLogo);
             };
             fetchPartnerImage();
         }
-    }, [partnerImage, partnerId]);
+    }, [partnerImage, partnerId, selectedStore?.id, quote?.store_id]);
 
     const partnerAvatar = partnerImage ? getR2ImageUrl(partnerImage) : '';
 
@@ -530,8 +538,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                     <FadeIn className="grid grid-cols-12 gap-y-8 md:gap-y-0 relative">
                                         {/* LEFT COLUMN */}
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
-                                            {/* Quote Status Card */}
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
+                                            {/* Quote Status Card - Desktop */}
+                                            <div className="hidden lg:block border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
                                                 <div className={`p-6 border-b text-left ${quote.converted ? 'bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800' :
                                                     quote.status === 'approved' ? 'bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20' :
                                                         quote.status === 'rejected' ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20' :
@@ -630,6 +638,56 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
+
+                                            {/* Quote Status Card - Mobile/Tablet */}
+                                            <div className="lg:hidden mb-8">
+                                                <FormSection title="" className="mt-0">
+                                                    {(() => {
+                                                        const activeSteps = timelineSteps.filter(s => s.active);
+                                                        const currentStep = activeSteps[activeSteps.length - 1] || timelineSteps[0];
+                                                        const isRejected = quote.status === 'rejected';
+                                                        return (
+                                                            <ListItem
+                                                                title={statusInfo.label}
+                                                                description={currentStep.date ? `${currentStep.date} ${currentStep.time || ""}`.trim() : undefined}
+                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                                showChevron={true}
+                                                                onClick={() => setIsStepsSheetOpen(true)}
+                                                                left={
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isRejected
+                                                                        ? "bg-brand-red/10 text-brand-red"
+                                                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                                                    }`}>
+                                                                        <div className={`w-2.5 h-2.5 rounded-full ${isRejected
+                                                                            ? "bg-brand-red"
+                                                                            : "bg-brand-dark dark:bg-dark-heading"
+                                                                        }`} />
+                                                                    </div>
+                                                                }
+                                                            />
+                                                        );
+                                                    })()}
+                                                </FormSection>
+
+                                                {canConvertToOrder && (
+                                                    <Button
+                                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 mt-3"
+                                                        disabled={isConverting}
+                                                        onClick={handleConvertClick}
+                                                    >
+                                                        {isConverting ? "Convertendo…" : "Converter em Pedido"} <ArrowRightIcon size={14} className="ml-1" />
+                                                    </Button>
+                                                )}
+                                                {quote.converted && quote.converted_order_id && (
+                                                    <Button
+                                                        variant="outline"
+                                                        className="w-full h-12 mt-3"
+                                                        onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
+                                                    >
+                                                        Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
+                                                    </Button>
+                                                )}
                                             </div>
 
                                             {/* Customer - Mobile/Tablet only */}
@@ -805,9 +863,15 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     {quote.status === "approved" && (
                                                         <div className="mt-3 bg-emerald-50 dark:bg-emerald-950/10 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/20 space-y-2">
                                                             <div className="font-bold text-emerald-800 dark:text-emerald-300">Detalhes da Aprovação:</div>
-                                                            <div>Aprovador: <span className="font-semibold">{quote.approver_name || "Cliente"}</span></div>
-                                                            <div>Data: <span className="font-semibold">{quote.approved_at ? formatDate(quote.approved_at) : "-"}</span></div>
-                                                            <div>Método: <span className="font-semibold">{quote.approval_method === "code" ? "Código 4-dígitos" : "Cliente Autenticado"}</span></div>
+                                                            <div>Aprovador: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
+                                                            <div>Data: <span className="font-semibold">{quote.approved_at ? `${formatDate(quote.approved_at)} às ${formatTime(new Date(quote.approved_at))}` : "-"}</span></div>
+                                                            <div>Método: <span className="font-semibold">
+                                                                {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
+                                                                    quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
+                                                                        quote.approval_method === "code" ? "Código 4-dígitos" :
+                                                                            quote.approval_method === "auth" ? "Cliente Autenticado" :
+                                                                                quote.approval_method || "Manual pelo ERP"}
+                                                            </span></div>
                                                         </div>
                                                     )}
 
@@ -815,8 +879,15 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     {quote.status === "rejected" && (
                                                         <div className="mt-3 bg-red-50 dark:bg-red-950/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20 space-y-2">
                                                             <div className="font-bold text-red-800 dark:text-red-300">Detalhes da Recusa:</div>
-                                                            <div>Recusado por: <span className="font-semibold">{quote.approver_name || "Cliente"}</span></div>
-                                                            <div>Data: <span className="font-semibold">{quote.rejected_at ? formatDate(quote.rejected_at) : "-"}</span></div>
+                                                            <div>Recusado por: <span className="font-semibold">{quote.approver_name || "Lojista"}</span></div>
+                                                            <div>Data: <span className="font-semibold">{quote.rejected_at ? `${formatDate(quote.rejected_at)} às ${formatTime(new Date(quote.rejected_at))}` : "-"}</span></div>
+                                                            <div>Método: <span className="font-semibold">
+                                                                {quote.approval_method === "erp_manual" ? "Manual pelo ERP" :
+                                                                    quote.approval_method === "erp_portal" ? "Lojista (Portal)" :
+                                                                        quote.approval_method === "code" ? "Código 4-dígitos" :
+                                                                            quote.approval_method === "auth" ? "Cliente Autenticado" :
+                                                                                quote.approval_method || "Manual pelo ERP"}
+                                                            </span></div>
                                                             {quote.rejection_reason && (
                                                                 <div>Motivo: <span className="font-semibold text-red-600 dark:text-red-400 italic">"{quote.rejection_reason}"</span></div>
                                                             )}
@@ -985,6 +1056,37 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                             shareMessage={`Confira a proposta comercial de ${partnerName}`}
                             label="Link do orçamento"
                         />
+
+                        <BottomSheet
+                            isOpen={isStepsSheetOpen}
+                            onClose={() => setIsStepsSheetOpen(false)}
+                            title="Status do Orçamento"
+                        >
+                            <div className="space-y-0 my-4 px-2">
+                                {timelineSteps.map((step, idx) => {
+                                    const isRejectedStep = quote.status === 'rejected' && idx === 2;
+                                    return (
+                                        <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
+                                            <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (isRejectedStep ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
+                                                {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full"></div>}
+                                            </div>
+                                            <div className="flex flex-col text-left">
+                                                <span className={`text-sm font-semibold ${step.active ? (isRejectedStep ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
+                                                    {step.label}
+                                                </span>
+                                                {step.date ? (
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                        {step.date} {step.time || ""}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </BottomSheet>
                     </Tabs>
                 </div>
             </FadeIn>

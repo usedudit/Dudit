@@ -382,3 +382,79 @@ export function formatUnitPriceWithUnit(price: number | string, unit?: string | 
   return `${formattedPrice} / ${cleanUnit}`
 }
 
+/**
+ * Anonimiza um endereço de e-mail (ex: joao.silva@gmail.com -> j****a@gmail.com).
+ */
+export function maskEmail(email: string | null | undefined): string {
+  if (!email || typeof email !== "string") return ""
+  const parts = email.trim().split("@")
+  if (parts.length !== 2) return email
+  const [name, domain] = parts
+  if (!name) return email
+  const maskedName = name.length > 2
+    ? `${name[0]}****${name[name.length - 1]}`
+    : `${name[0]}****`
+  return `${maskedName}@${domain}`
+}
+
+const KNOWN_STATUS_LABELS: Record<string, string> = {
+  // Service orders
+  aberta: "Aberta",
+  aguardando_aprovacao: "Aguardando Aprovação",
+  aprovada: "Aprovada",
+  em_andamento: "Em Andamento",
+  aguardando_peca: "Aguardando Peça",
+  concluida: "Concluída",
+  entregue: "Entregue",
+  cancelada: "Cancelada",
+  // Quotes
+  draft: "Rascunho",
+  sent: "Enviado",
+  pending_client: "Pendente do Cliente",
+  viewed: "Visualizado",
+  approved: "Aprovado",
+  rejected: "Recusado",
+  expired: "Expirado",
+  converted_to_order: "Convertido em Pedido",
+  // Orders
+  pending: "Pendente",
+  processing: "Em Processamento",
+  completed: "Concluído",
+  shipped: "Enviado",
+  delivered: "Entregue",
+}
+
+/**
+ * Converte linhas de log técnicas em texto legível em português.
+ * Trata padrões como:
+ * - 'Status alterado: aguardando_aprovacao → concluida' -> 'Status alterado de "Aguardando Aprovação" para "Concluída"'
+ * - 'Status: "aguardando_aprovacao" -> "concluida"' -> 'Status alterado de "Aguardando Aprovação" para "Concluída"'
+ */
+export function humanizeTimelineChangeLine(line: string): string {
+  if (!line || typeof line !== "string") return ""
+
+  // Pattern: Status alterado: old -> new OR Status: old -> new OR status: "old" → "new"
+  const statusTransitionRegex = /(?:status(?:\s+alterado)?[:\s]+)(?:["']?([a-zA-Z0-9_-]+)["']?)\s*(?:→|->|para)\s*(?:["']?([a-zA-Z0-9_-]+)["']?)/i
+  const match = line.match(statusTransitionRegex)
+
+  if (match) {
+    const rawOld = match[1]?.toLowerCase()
+    const rawNew = match[2]?.toLowerCase()
+    const oldLabel = KNOWN_STATUS_LABELS[rawOld] || rawOld
+    const newLabel = KNOWN_STATUS_LABELS[rawNew] || rawNew
+    return `Status alterado de "${oldLabel}" para "${newLabel}"`
+  }
+
+  // Pattern: Status alterado para [status]
+  const statusToRegex = /status\s+alterado\s+para:?\s*["']?([a-zA-Z0-9_-]+)["']?/i
+  const matchTo = line.match(statusToRegex)
+  if (matchTo) {
+    const rawNew = matchTo[1]?.toLowerCase()
+    const newLabel = KNOWN_STATUS_LABELS[rawNew] || rawNew
+    return `Status alterado para "${newLabel}"`
+  }
+
+  return line
+}
+
+

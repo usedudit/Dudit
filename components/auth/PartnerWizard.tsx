@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { Upload, Briefcase, Home, CheckCircle, ShoppingBag, Store, Tag, ChevronRight } from "lucide-react"
+import { Upload, Briefcase, Tag, ChevronRight, Store } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-notification"
@@ -28,7 +28,7 @@ const initialPartnerData = {
     categoryId: "",
     subcategoryId: "",
     categoryName: "",
-    businessInfo: { mode: "" as BusinessMode | "", activeResources: [] as string[] },
+    businessInfo: { mode: "desapego" as BusinessMode, activeResources: [] as string[] },
     storeName: "",
     phone: "",
     address: {
@@ -66,20 +66,6 @@ const MODE_OPTIONS: Array<{
         },
     ]
 
-const STEP_TITLES: Record<number, string> = {
-    1: "Crie sua conta",
-    2: "Sobre seu negócio",
-    3: "Como seu negócio funciona?",
-    4: "Onde fica seu negócio?",
-}
-
-const STEP_SUBTITLES: Record<number, string> = {
-    1: "Comece gratuitamente e expanda seu negócio.",
-    2: "Algumas informações básicas para seus clientes te encontrarem.",
-    3: "Assim conseguimos deixar a Dudit pronta para você.",
-    4: "Informe onde seu negócio está localizado.",
-}
-
 const variants = {
     enter: (d: number) => ({ x: d > 0 ? 20 : -20, opacity: 0 }),
     center: { x: 0, opacity: 1 },
@@ -87,10 +73,11 @@ const variants = {
 }
 
 export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; isUserLoggedIn: boolean }) => {
-    const { user, supabase: contextSupabase } = useSupabase()
+    const { user } = useSupabase()
     const router = useRouter()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // Step 1: Conta (se não logado). Step 2: Escolha de Modo.
     const [step, setStep] = useState(isUserLoggedIn ? 2 : 1)
     const [direction, setDirection] = useState(0)
     const [email, setEmail] = useState("")
@@ -104,10 +91,45 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const [tempImageFile, setTempImageFile] = useState<File | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const isSubmittingRef = useRef(false)
     const [imageUploading, setImageUploading] = useState(false)
 
+    const isDesapego = partnerData.businessInfo.mode === "desapego"
+    const maxStep = isDesapego ? 3 : 5
     const actualStep = isUserLoggedIn ? step - 1 : step
-    const totalSteps = isUserLoggedIn ? 3 : 4
+    const totalSteps = isUserLoggedIn ? (isDesapego ? 2 : 4) : (isDesapego ? 3 : 5)
+
+    const loggedInUserName = user?.user_metadata?.full_name || user?.user_metadata?.name || (user?.email ? generateNameFromEmail(user.email) : "")
+
+    React.useEffect(() => {
+        if (isUserLoggedIn && loggedInUserName && !partnerData.storeName) {
+            setPartnerData(p => ({ ...p, storeName: loggedInUserName }))
+        }
+    }, [isUserLoggedIn, loggedInUserName])
+
+    const getStepTitle = () => {
+        if (step === 1) return "Crie sua conta"
+        if (step === 2) return "Como você quer começar?"
+        if (isDesapego) {
+            return isUserLoggedIn ? "Seus dados de contato e localização" : "Seus dados de contato e localização"
+        }
+        if (step === 3) return "Sobre seu negócio"
+        if (step === 4) return "Qual a categoria do seu negócio?"
+        if (step === 5) return "Onde fica seu negócio?"
+        return ""
+    }
+
+    const getStepSubtitle = () => {
+        if (step === 1) return "Comece gratuitamente e anuncie na Dudit."
+        if (step === 2) return "Escolha a opção ideal para seu objetivo hoje."
+        if (isDesapego) {
+            return "Informe seu WhatsApp e cidade para os compradores te encontrarem."
+        }
+        if (step === 3) return "Algumas informações básicas para seus clientes te encontrarem."
+        if (step === 4) return "Escolha a categoria principal da sua loja."
+        if (step === 5) return "Informe onde seu negócio está localizado."
+        return ""
+    }
 
     const setMode = (mode: BusinessMode) => {
         const defaultResources = getDefaultResourcesForModeAndCategory(mode, partnerData.categoryName)
@@ -142,7 +164,6 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const handleGoogleAuth = async () => {
         setIsLoading(true)
         try {
-            // supabase imported as singleton
             await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
@@ -211,40 +232,73 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             const { calculatePasswordScore } = await import("@/lib/utils")
             if (calculatePasswordScore(password) < 2) return "A senha deve ser média ou forte."
         }
-        if (step === 2 && (!partnerData.storeName || !partnerData.phone)) return "Preencha os dados do negócio"
-        if (step === 3 && (!partnerData.categoryId || !partnerData.businessInfo.mode))
-            return "Selecione a categoria do negócio e como quer usar a Dudit."
-        if (step === 4) {
-            if (imageUploading) return "Aguarde o upload da imagem"
-            const { cep, street, number, noNumber, neighborhood, city, state } = partnerData.address
-            if (!cep || !street || (!noNumber && !number) || !neighborhood || !city || !state)
-                return "Preencha todo o endereço para continuar"
+
+        if (step === 2 && !partnerData.businessInfo.mode) {
+            return "Selecione como quer usar a Dudit"
+        }
+
+        if (isDesapego && step === 3) {
+            const sellerName = isUserLoggedIn
+                ? (partnerData.storeName || loggedInUserName || "Vendedor")
+                : partnerData.storeName
+            if (!sellerName) return "Informe seu nome de vendedor"
+            if (!partnerData.phone) return "Informe seu WhatsApp para contato"
+            if (!partnerData.address.city || !partnerData.address.state) return "Informe sua cidade e estado"
+        }
+
+        if (!isDesapego) {
+            if (step === 3 && (!partnerData.storeName || !partnerData.phone)) return "Preencha o nome do negócio e WhatsApp"
+            if (step === 4 && !partnerData.categoryId) return "Selecione a categoria do negócio"
+            if (step === 5) {
+                if (imageUploading) return "Aguarde o upload da imagem"
+                const { cep, street, number, noNumber, neighborhood, city, state } = partnerData.address
+                if (!cep || !street || (!noNumber && !number) || !neighborhood || !city || !state)
+                    return "Preencha todo o endereço para continuar"
+            }
         }
         return null
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (isSubmittingRef.current || isSubmitting) return
         setError(null)
         const err = await validate()
         if (err) return setError(err)
-        if (step < 4) { setDirection(1); setStep(s => s + 1); return }
 
+        if (step < maxStep) {
+            setDirection(1)
+            setStep(s => s + 1)
+            return
+        }
+
+        isSubmittingRef.current = true
         setIsSubmitting(true)
         try {
-            // supabase imported as singleton
+            const sellerName = isUserLoggedIn
+                ? (partnerData.storeName || loggedInUserName || "Vendedor")
+                : (partnerData.storeName || generateNameFromEmail(email))
+
             let userId = ""
+            let createdSession = false
 
             if (!isUserLoggedIn) {
+                const cleanEmail = email.trim().toLowerCase()
                 const { data: signUp, error: signErr } = await supabase.auth.signUp({
-                    email, password,
-                    options: { data: { full_name: generateNameFromEmail(email) }, emailRedirectTo: `${window.location.origin}/auth/callback?next=/erp/inicio` },
+                    email: cleanEmail,
+                    password,
+                    options: {
+                        data: { full_name: sellerName },
+                        emailRedirectTo: `${window.location.origin}/auth/callback?next=/erp/inicio`,
+                    },
                 })
                 if (signErr) throw signErr
-                if (signUp.user?.identities?.length === 0) throw new Error("Este email já está cadastrado.")
+                if (signUp.user && signUp.user.identities && signUp.user.identities.length === 0) {
+                    throw new Error("Este email já está cadastrado.")
+                }
                 userId = signUp.user!.id
+                createdSession = !!signUp.session
 
-                // LEGAL: registra o aceite dos documentos legais no cadastro
                 try {
                     await Promise.all(
                         CURRENT_LEGAL_DOCUMENTS.map((doc) =>
@@ -260,18 +314,20 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
             const { registerPartner } = await import("@/app/actions/marketplace/partners")
             const res = await registerPartner({
-                email: isUserLoggedIn ? "" : email,
-                fullName: isUserLoggedIn ? "" : generateNameFromEmail(email),
+                signupUserId: isUserLoggedIn ? undefined : userId,
+                email: isUserLoggedIn ? (user?.email || "") : email.trim().toLowerCase(),
+                fullName: sellerName,
                 ...partnerData,
-                categoryId: partnerData.categoryId,
+                storeName: sellerName,
+                categoryId: partnerData.categoryId || null as any,
                 subcategoryId: partnerData.subcategoryId || null,
                 businessInfo: partnerData.businessInfo,
                 cnpj: null, cpf: null, personType: "pf",
                 zipCode: partnerData.address.cep,
-                street: partnerData.address.street,
-                number: partnerData.address.noNumber ? "S/N" : partnerData.address.number,
+                street: partnerData.address.street || "Endereço não informado",
+                number: partnerData.address.noNumber ? "S/N" : partnerData.address.number || "S/N",
                 complement: partnerData.address.complement,
-                neighborhood: partnerData.address.neighborhood,
+                neighborhood: partnerData.address.neighborhood || "Centro",
                 city: partnerData.address.city,
                 state: partnerData.address.state,
                 municipioCodigoIbge: partnerData.address.ibge || undefined,
@@ -282,11 +338,17 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             })
 
             if (!res.success) throw new Error(res.error)
-            router.push(isUserLoggedIn ? "/erp/inicio" : `/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
+
+            if (isUserLoggedIn || createdSession) {
+                router.push("/erp/inicio")
+            } else {
+                router.push(`/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
+            }
         } catch (e: any) {
             console.error("[PARTNER-WIZARD SUBMIT ERROR]", e)
             setError(getErrorMessage(e))
         } finally {
+            isSubmittingRef.current = false
             setIsSubmitting(false)
         }
     }
@@ -301,18 +363,19 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
         <div className="w-full">
             <div className="flex gap-2 mb-6">
                 {Array.from({ length: totalSteps }).map((_, i) => (
-                    <motion.div key={i} layout className={cn("h-1 flex-1 rounded-full transition-colors duration-500", i + 1 <= actualStep ? "bg-brand-green" : "bg-gray-100")} />
+                    <motion.div key={i} layout className={cn("h-1 flex-1 rounded-full transition-colors duration-500", i + 1 <= actualStep ? "bg-brand-green" : "bg-gray-100 dark:bg-dark-border")} />
                 ))}
             </div>
 
             <AnimatePresence mode="wait" custom={direction}>
                 <motion.div key={step} custom={direction} variants={variants} initial="enter" animate="center" exit="exit" transition={{ type: "tween", duration: 0.2 }} className="w-full">
                     <div className="mb-6">
-                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{STEP_TITLES[step]}</h1>
-                        <p className="text-md text-brand-inactive-text mt-1">{STEP_SUBTITLES[step]}</p>
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{getStepTitle()}</h1>
+                        <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{getStepSubtitle()}</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* STEP 1: CONTA (se não logado) */}
                         {step === 1 && !isUserLoggedIn && (
                             <>
                                 <EmailInput name="email" label="Email" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -323,12 +386,12 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                 <div className="pt-1">
                                     <div className="pt-1 flex items-center gap-2">
                                         <Checkbox id="termsAgreement" checked={acceptedTerms} onChange={setAcceptedTerms} />
-                                        <label htmlFor="termsAgreement" className="text-sm text-brand-inactive-text cursor-pointer">
-                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark">Termos de uso</Link>
+                                        <label htmlFor="termsAgreement" className="text-sm text-brand-inactive-text dark:text-dark-body cursor-pointer">
+                                            Aceito os <Link href="/institucional/termos" prefetch={false} className="underline text-brand-dark dark:text-dark-heading">Termos de uso</Link>
                                         </label>
                                     </div>
                                 </div>
-                                <div className="pt-2 border-t">
+                                <div className="pt-2 border-t border-brand-border dark:border-dark-border">
                                     <Button variant="outline" onClick={handleGoogleAuth} disabled={isLoading} className="w-full gap-3 pl-4 bg-transparent">
                                         <svg width="20" height="20" viewBox="0 0 18 18" fill="none" className="shrink-0">
                                             <path d="M17.64 9.20443C17.64 8.56625 17.5827 7.95262 17.4764 7.36353H9V10.8449H13.8436C13.635 11.9699 13.0009 12.9231 12.0477 13.5613V15.8194H14.9564C16.6582 14.2526 17.64 11.9453 17.64 9.20443Z" fill="#4285F4" />
@@ -342,78 +405,155 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                             </>
                         )}
 
+                        {/* STEP 2: ESCOLHA DO MODO (Como você quer começar) */}
                         {step === 2 && (
+                            <div className="space-y-3">
+                                {MODE_OPTIONS.map(opt => (
+                                    <ListItem
+                                        key={opt.value}
+                                        icon={opt.icon}
+                                        title={opt.title}
+                                        description={opt.description}
+                                        className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                        onClick={() => setMode(opt.value)}
+                                        left={
+                                            <RadioButton
+                                                name="businessMode"
+                                                value={opt.value}
+                                                checked={partnerData.businessInfo.mode === opt.value}
+                                                onChange={() => setMode(opt.value)}
+                                            />
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* STEP 3 (DESAPEGO): DADOS DE CONTATO E CIDADE RÁPIDOS */}
+                        {isDesapego && step === 3 && (
+                            <div className="space-y-4">
+                                {!isUserLoggedIn ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <Input
+                                            name="storeName"
+                                            label="Seu Nome de Vendedor"
+                                            placeholder="Ex: Murilo Silva"
+                                            value={partnerData.storeName}
+                                            onChange={e => setPartnerData(p => ({ ...p, storeName: e.target.value }))}
+                                            required
+                                        />
+                                        <PhoneInput
+                                            name="phone"
+                                            label="WhatsApp para Contato"
+                                            value={partnerData.phone}
+                                            onChange={e => setPartnerData(p => ({ ...p, phone: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <PhoneInput
+                                            name="phone"
+                                            label="WhatsApp para Contato"
+                                            value={partnerData.phone}
+                                            onChange={e => setPartnerData(p => ({ ...p, phone: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="space-y-3 pt-2 border-t border-brand-border dark:border-dark-border">
+                                    <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                        Sua Localização (para os compradores da sua região te encontrarem)
+                                    </p>
+                                    <CepInput
+                                        value={partnerData.address.cep}
+                                        onChange={(value: string) => patchAddress({ cep: value })}
+                                        onAddressFetched={(addr) => patchAddress({
+                                            city: addr.city || partnerData.address.city,
+                                            state: addr.state || partnerData.address.state,
+                                            neighborhood: addr.neighborhood || partnerData.address.neighborhood,
+                                            street: addr.street || partnerData.address.street,
+                                            ibge: addr.ibge || partnerData.address.ibge,
+                                            latitude: typeof addr.latitude === "number" ? addr.latitude : partnerData.address.latitude,
+                                            longitude: typeof addr.longitude === "number" ? addr.longitude : partnerData.address.longitude,
+                                        })}
+                                    />
+                                    <div className="grid grid-cols-2 gap-3 items-end">
+                                        <Input
+                                            name="city"
+                                            label="Cidade"
+                                            placeholder="Nome da cidade"
+                                            value={partnerData.address.city}
+                                            onChange={e => patchAddress({ city: e.target.value })}
+                                            required
+                                        />
+                                        <StateComboBox
+                                            value={partnerData.address.state}
+                                            onChange={v => patchAddress({ state: v })}
+                                            className="w-full"
+                                        />
+                                    </div>
+                                    <Input
+                                        name="neighborhood"
+                                        label="Bairro (Opcional)"
+                                        placeholder="Nome do bairro"
+                                        value={partnerData.address.neighborhood}
+                                        onChange={e => patchAddress({ neighborhood: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* STEP 3 (QUICK / ERP): SOBRE SEU NEGÓCIO */}
+                        {!isDesapego && step === 3 && (
                             <div className="space-y-5">
                                 <div className="flex items-center gap-4 dark:bg-dark-background/50">
-                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray  dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                    <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer">
                                         {imagePreview ? <img src={imagePreview} alt="Logo" className="object-cover w-full h-full rounded-full" /> : <Upload className="text-brand-inactive-text w-5 h-5" />}
                                     </div>
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Selecione uma imagem</p>
+                                        <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo ou Imagem de Perfil (Opcional)</p>
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
                                     </div>
                                     <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Input name="storeName" label="Nome da Loja" value={partnerData.storeName} onChange={e => setPartnerData(p => ({ ...p, storeName: e.target.value }))} required />
-                                    <PhoneInput name="phone" label="WhatsApp" value={partnerData.phone} onChange={e => setPartnerData(p => ({ ...p, phone: e.target.value }))} required />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <Input name="storeName" label="Nome da Loja ou Marca" placeholder="Ex: Doce Sabor Confeitaria" value={partnerData.storeName} onChange={e => setPartnerData(p => ({ ...p, storeName: e.target.value }))} required />
+                                    <PhoneInput name="phone" label="WhatsApp Comercial" value={partnerData.phone} onChange={e => setPartnerData(p => ({ ...p, phone: e.target.value }))} required />
                                 </div>
-                                <Input name="description" label="Descrição" type="textarea" value={partnerData.description} onChange={e => setPartnerData(p => ({ ...p, description: e.target.value }))} rows={2} />
+                                <Input name="description" label="Descrição / Bio da Loja" placeholder="Ex: Bolos artesanais, doces para festas e encomendas." type="textarea" value={partnerData.description} onChange={e => setPartnerData(p => ({ ...p, description: e.target.value }))} rows={2} />
                             </div>
                         )}
 
-                        {step === 3 && (
-                            <div className="space-y-6">
-                                <div>
-                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">Qual a categoria do seu negócio?</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setCategoryModalOpen(true)}
-                                        className="w-full flex items-center justify-between p-3.5 border border-brand-border rounded-xl hover:border-brand-green bg-white dark:bg-dark-background text-left transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-brand-green shrink-0">
-                                                <Tag className="w-5 h-5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
-                                                    {partnerData.categoryName || "Selecionar categoria do negócio"}
-                                                </p>
-                                                <p className="text-xs text-brand-inactive-text truncate">
-                                                    {partnerData.categoryName ? "Clique para alterar" : "Escolha a categoria principal e subcategoria"}
-                                                </p>
-                                            </div>
+                        {/* STEP 4 (QUICK / ERP): CATEGORIA */}
+                        {!isDesapego && step === 4 && (
+                            <div className="space-y-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setCategoryModalOpen(true)}
+                                    className="w-full flex items-center justify-between p-4 border border-brand-border dark:border-dark-border rounded-2xl hover:border-brand-green bg-white dark:bg-dark-background text-left transition-colors cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
+                                            <Tag className="w-5 h-5" />
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-brand-inactive-text shrink-0" />
-                                    </button>
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-brand-dark mb-3">Como você quer usar a Dudit?</h3>
-                                    <div className="grid gap-3">
-                                        {MODE_OPTIONS.map(opt => (
-                                            <ListItem
-                                                key={opt.value}
-                                                icon={opt.icon}
-                                                title={opt.title}
-                                                description={opt.description}
-                                                className="px-4 py-3 gap-4"
-                                                onClick={() => setMode(opt.value)}
-                                                left={
-                                                    <RadioButton
-                                                        name="businessMode"
-                                                        value={opt.value}
-                                                        checked={partnerData.businessInfo.mode === opt.value}
-                                                        onChange={() => setMode(opt.value)}
-                                                    />
-                                                }
-                                            />
-                                        ))}
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading truncate">
+                                                {partnerData.categoryName || "Selecionar categoria do negócio"}
+                                            </p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                {partnerData.categoryName ? "Clique para alterar" : "Escolha a categoria principal e subcategoria"}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                    <ChevronRight className="w-5 h-5 text-brand-inactive-text shrink-0" />
+                                </button>
                             </div>
                         )}
 
-                        {step === 4 && (
+                        {/* STEP 5 (QUICK / ERP): ENDEREÇO COMPLETO */}
+                        {!isDesapego && step === 5 && (
                             <div className="space-y-4">
                                 <CepInput
                                     value={partnerData.address.cep}
@@ -457,7 +597,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                 <Button type="button" variant="outline" onClick={prevStep} className="flex-1 bg-transparent">Voltar</Button>
                             )}
                             <Button type="submit" disabled={isLoading || isSubmitting} className="flex-1">
-                                {isLoading || isSubmitting ? <Spinner size={20} /> : step < 4 ? "Continuar" : "Finalizar Cadastro"}
+                                {isLoading || isSubmitting ? <Spinner size={20} /> : step < maxStep ? "Continuar" : "Finalizar Cadastro"}
                             </Button>
                         </div>
                     </form>
@@ -479,3 +619,4 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
         </div>
     )
 }
+

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { SuspendedStoreRecord } from "@/lib/auth/partner-context"
 import { AlertCircleIcon, StoreIcon } from "@/lib/icons"
-import { Button, Badge, FormSection } from "@/components/reusable"
+import { Button, Badge, FormSection, IconPlaceholder } from "@/components/reusable"
 import { EnforcementAppealModal } from "./EnforcementAppealModal"
 
 interface SelectErpSuspendedSectionProps {
@@ -31,20 +31,14 @@ export function SelectErpSuspendedSection({
     return (
         <div className="flex flex-col gap-4 w-full">
             {onlySuspended ? (
-                <div className="text-center space-y-2 mb-2">
-                    <div className="mx-auto h-16 w-16 bg-brand-red/10 text-brand-red rounded-full flex items-center justify-center">
-                        <AlertCircleIcon size={32} />
-                    </div>
-                    <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                        Acesso Suspenso
-                    </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-sm max-w-md mx-auto">
-                        Sua conta de parceiro ou loja está temporariamente suspensa ou com acesso restrito pela moderação da Dudit.
-                    </p>
-                </div>
+                <IconPlaceholder
+                    icon={AlertCircleIcon}
+                    title="Acesso Suspenso"
+                    subtitle="Sua conta de parceiro ou loja está temporariamente suspensa ou com acesso restrito pela moderação da Dudit."
+                />
             ) : (
                 <FormSection title={`Lojas / Acessos Suspensos (${suspendedStores.length})`}>
-                    <div className="space-y-4">
+                    <div className="space-y-4 p-4 rounded-xl border border-brand-red">
                         {suspendedStores.map((item) => {
                             const fallbackCaseId = `CAS-${item.storeId.replace(/-/g, "").slice(0, 8).toUpperCase()}`
                             const caseId = item.caseId || fallbackCaseId
@@ -81,8 +75,8 @@ export function SelectErpSuspendedSection({
                                     </div>
 
                                     {/* Protocol & Reason Box */}
-                                    <div className="bg-red-50/60 dark:bg-red-950/20 rounded-xl p-3.5 border border-red-100 dark:border-red-900/30 space-y-2 text-xs">
-                                        <div className="flex items-center justify-between">
+                                    <div className="border-t border-brand-border dark:border-dark-border space-y-2 text-xs">
+                                        <div className="flex items-center justify-between pt-2">
                                             <span className="font-bold text-red-900 dark:text-red-300">
                                                 Protocolo do Caso:
                                             </span>

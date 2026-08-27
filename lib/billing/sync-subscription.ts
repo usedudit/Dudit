@@ -373,16 +373,18 @@ export async function syncSubscriptionToBilling(
         }
     }
 
-    // ── 6. NEXT cycle purchase (upcoming invoice to pay) ──
-    // NOTE: Next-cycle purchase is NOT pre-generated here.
-    // It will be created when the next payment webhook fires (approved → completed, failed → past_due).
-    // This avoids stale "Próxima Fatura" entries with wrong dates.
-    const isRenewing = isActiveOrTrialing && !sub.cancel_at_period_end && planPrice > 0
-
-    // Cancel any stale pending "next" purchases if subscription is no longer renewing
-    if (!isRenewing) {
-        for (const p of allPurchases) {
-            if (p.status === "pending" && p.id !== currentPurchase.id) {
+    // ── 6. Clean up stale pre-generated "next" purchases from previous sync runs ──
+    // The next invoice is NOT pre-generated in advance. It is created when the
+    // actual payment/charge occurs (approved → completed, failed → past_due/pending).
+    for (const p of allPurchases) {
+        if (p.status === "pending" && p.id !== currentPurchase.id) {
+            try {
+                if (p.invoice_id) {
+                    await supabase.from("billing_invoices").delete().eq("purchase_id", p.id)
+                }
+                await supabase.from("billing_purchases").delete().eq("id", p.id)
+            } catch (cleanupErr) {
+                console.warn(`[BillingSync] Failed to remove pending purchase ${p.id}:`, cleanupErr)
                 await supabase.from("billing_purchases").update({ status: "cancelled", updated_at: nowIso }).eq("id", p.id)
             }
         }

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useTransition } from "react"
-import { DefaultModal, Button, Input, FormTextarea, Badge, Checkbox, InfoCard, ListItem } from "@/components/reusable"
+import { DefaultModal, Button, Input, FormTextarea, Badge, Checkbox, InfoCard, ListItem, PhoneInput, EmailInput, IconPlaceholder, ThreeDotsLoader, FormSection } from "@/components/reusable"
 import {
     StoreIcon,
     AlertCircleIcon,
@@ -160,50 +160,43 @@ export function EnforcementAppealModal({
             title={isSubmittedSuccess || existingAppeal ? "Acompanhamento do Recurso" : "Recorrer da Decisão"}
             maxWidth="xl"
             description={`Protocolo oficial: #${caseId}`}
+            footer={
+                <div className="flex items-center justify-end gap-3 pt-2">
+                    <Button variant="outline" onClick={onClose} disabled={isPending}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleSubmitAppeal}
+                        disabled={isPending || !truthConfirmed || appealStatement.trim().length < 15}
+                    >
+                        {isPending ? "Enviando Recurso..." : "Enviar Recurso para Análise"}
+                    </Button>
+                </div>
+            }
         >
             <div className="space-y-5 pt-2">
                 {/* Header Info */}
-                <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/70 dark:bg-dark-surface/50 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full bg-brand-orange/10 text-brand-orange flex items-center justify-center shrink-0">
-                            <StoreIcon size={20} />
-                        </div>
-                        <div className="min-w-0">
-                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                {entityName}
-                            </h4>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Escopo: <span className="font-semibold text-brand-dark dark:text-white">{scopeLabel}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <Badge variant="orange" className="shrink-0 font-mono text-xs">
-                        {caseId}
-                    </Badge>
-                </div>
+                <ListItem
+                    title={entityName}
+                    description={`ID do caso: #${caseId}`}
+                    icon={StoreIcon}
+                />
 
                 {/* Loading status */}
                 {isCheckingStatus && (
-                    <div className="py-8 text-center text-xs text-brand-inactive-text flex items-center justify-center gap-2">
-                        <ClockIcon size={16} className="animate-spin" />
-                        <span>Consultando status do caso...</span>
+                    <div className="flex items-center justify-center">
+                        <ThreeDotsLoader />
                     </div>
                 )}
 
                 {/* State 1: Just Submitted Successfully */}
                 {!isCheckingStatus && isSubmittedSuccess && (
-                    <div className="space-y-4 text-center py-4">
-                        <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
-                            <CheckCircleIcon size={32} />
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">
-                                Recurso Enviado com Sucesso!
-                            </h3>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body max-w-md mx-auto">
-                                Seus esclarecimentos foram recebidos e encaminhados para a equipe de moderação e auditoria. Um e-mail de confirmação com o protocolo foi enviado para <strong>{contactEmail}</strong>.
-                            </p>
-                        </div>
+                    <>
+                        <IconPlaceholder
+                            title="Recurso Enviado com Sucesso!"
+                            subtitle={`Seus esclarecimentos foram recebidos e encaminhados para a equipe de moderação e auditoria.Um e-mail de confirmação com o protocolo foi enviado para <strong>${contactEmail}</strong>.`}
+                            icon={CheckCircleIcon}
+                        />
 
                         <InfoCard
                             color="green"
@@ -212,11 +205,11 @@ export function EnforcementAppealModal({
                         />
 
                         <div className="pt-2">
-                            <Button onClick={onClose} className="w-full text-xs font-bold">
-                                Entendido, Concluir
+                            <Button onClick={onClose} className="w-full">
+                                Concluir
                             </Button>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {/* State 2: Already Pending (Anti-Spam State) */}
@@ -243,21 +236,18 @@ export function EnforcementAppealModal({
                             }
                         />
 
-                        <div className="p-4 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-dark-surface text-xs space-y-1.5">
-                            <span className="font-bold text-brand-dark dark:text-dark-heading block">
-                                Esclarecimentos enviados:
-                            </span>
-                            <p className="text-brand-inactive-text dark:text-dark-body italic whitespace-pre-wrap">
+                        <FormSection title="Esclarecimentos enviados" hasSeparator>
+                            <div className="text-brand-inactive-text dark:text-dark-body italic whitespace-pre-wrap">
                                 &ldquo;{existingAppeal.appealStatement}&rdquo;
-                            </p>
-                        </div>
+                            </div>
+                        </FormSection>
 
-                        <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/30 text-xs text-blue-900 dark:text-blue-200">
+                        <div className="text-brand-inactive-text dark:text-dark-body mt-2">
                             <strong>Status Atual:</strong> Em análise. Para evitar duplicidades na fila, novos envios ficam bloqueados até a conclusão da análise deste recurso.
                         </div>
 
-                        <div className="pt-2 flex justify-end">
-                            <Button onClick={onClose} variant="outline" className="text-xs">
+                        <div className="pt-2 flex w-full">
+                            <Button onClick={onClose} className="h-12">
                                 Fechar
                             </Button>
                         </div>
@@ -269,69 +259,56 @@ export function EnforcementAppealModal({
                     <div className="space-y-4">
                         {/* Motivo registrado */}
                         {reason && (
-                            <div className="p-3 bg-red-50/60 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl text-xs space-y-1">
-                                <span className="font-bold text-red-900 dark:text-red-300 flex items-center gap-1.5">
-                                    <AlertTriangleIcon size={14} className="text-brand-red shrink-0" />
-                                    Motivo Registrado da Medida Administrativa:
-                                </span>
-                                <p className="text-red-950 dark:text-red-200">
-                                    {reason}
-                                </p>
-                            </div>
+                            <InfoCard
+                                color="red"
+                                title="Motivo Registrado da Medida Administrativa"
+                                message={reason}
+                            />
                         )}
 
                         {/* Responsible name */}
                         <div className="space-y-1.5">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                Nome do Responsável *
-                            </label>
                             <Input
+                                label="Nome do Responsável"
                                 value={contactName}
                                 onChange={(e) => setContactName(e.target.value)}
                                 placeholder="Nome completo do titular ou administrador"
-                                className="w-full text-xs"
+                                className="w-full"
+                                required
                             />
                         </div>
 
                         {/* Contact details */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    E-mail para Retorno *
-                                </label>
-                                <Input
-                                    type="email"
+                                <EmailInput
+                                    label="E-mail para Retorno"
                                     value={contactEmail}
                                     onChange={(e) => setContactEmail(e.target.value)}
-                                    placeholder="seu-email@exemplo.com"
-                                    className="w-full text-xs"
+                                    className="w-full"
                                 />
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Telefone / WhatsApp (Opcional)
-                                </label>
-                                <Input
+                                <PhoneInput
+                                    label="Telefone / WhatsApp (Opcional)"
                                     value={contactPhone}
                                     onChange={(e) => setContactPhone(e.target.value)}
-                                    placeholder="(11) 99999-9999"
-                                    className="w-full text-xs"
+                                    className="w-full"
                                 />
                             </div>
                         </div>
 
                         {/* Justification / Clarifications */}
                         <div className="space-y-1.5">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                Esclarecimentos & Justificativa do Recurso *
-                            </label>
                             <FormTextarea
+                                label="Esclarecimentos & Justificativa do Recurso"
                                 rows={4}
                                 value={appealStatement}
                                 onChange={(e) => setAppealStatement(e.target.value)}
                                 placeholder="Apresente seus esclarecimentos, contexto, regularizações efetuadas ou links comprobatórios..."
-                                className="w-full text-xs"
+                                className="w-full"
+                                required
                             />
                             <span className="text-[11px] text-brand-inactive-text block">
                                 Mínimo de 15 caracteres. Seja claro e objetivo nos argumentos.
@@ -351,23 +328,9 @@ export function EnforcementAppealModal({
                         {errorMessage && (
                             <InfoCard color="red" message={errorMessage} />
                         )}
-
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <Button type="button" variant="outline" onClick={onClose} disabled={isPending} className="text-xs">
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleSubmitAppeal}
-                                disabled={isPending || !truthConfirmed || appealStatement.trim().length < 15}
-                                className="text-xs font-bold"
-                            >
-                                {isPending ? "Enviando Recurso..." : "Enviar Recurso para Análise"}
-                            </Button>
-                        </div>
                     </div>
                 )}
             </div>
-        </DefaultModal>
+        </DefaultModal >
     )
 }

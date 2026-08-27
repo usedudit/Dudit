@@ -15,8 +15,10 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 
 export interface DeliveryAssignmentItem {
     assignment_id: string
+    delivery_id?: string
     order_id: string
     order_number?: string | number
+    order_count?: number
     partner_name?: string
     partner_id?: string
     customer_name: string
@@ -121,9 +123,16 @@ export default function DeliveryAssignmentListRow({
             {/* PEDIDO */}
             <td className="py-2.5 pl-6 pr-2 border-b border-brand-border dark:border-dark-border w-[180px]">
                 <div className="flex flex-col">
-                    <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
-                        {orderNumberDisplay}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
+                            {orderNumberDisplay}
+                        </span>
+                        {Number(assignment.order_count || 1) > 1 && (
+                            <span className="bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                                +{Number(assignment.order_count) - 1} ped.
+                            </span>
+                        )}
+                    </div>
                     {assignment.assigned_at && (
                         <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                             {formatDate(assignment.assigned_at)}

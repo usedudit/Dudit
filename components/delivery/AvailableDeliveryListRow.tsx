@@ -90,10 +90,10 @@ export default function AvailableDeliveryListRow({
             className="group hover:bg-brand-gray/60 dark:hover:bg-dark-border/20 transition-colors bg-white dark:bg-dark-background cursor-pointer"
         >
             {/* PEDIDO / ROTA */}
-            <td className="py-2.5 pl-6 pr-2 border-b border-brand-border dark:border-dark-border w-[180px]">
+            <td className="py-2.5 pr-2 border-b border-brand-border dark:border-dark-border w-[180px]">
                 <div className="flex flex-col">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors font-mono">
+                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading group-hover:text-brand-green transition-colors">
                             {orderNumberDisplay}
                         </span>
                         {orderCount > 1 && (
@@ -103,9 +103,8 @@ export default function AvailableDeliveryListRow({
                         )}
                     </div>
                     {timeLeftSeconds !== null && (
-                        <span className={`text-[11px] font-semibold flex items-center gap-1 mt-0.5 ${
-                            timeLeftSeconds < 180 ? "text-amber-600 dark:text-amber-400 animate-pulse" : "text-brand-inactive-text dark:text-dark-body"
-                        }`}>
+                        <span className={`text-[11px] font-semibold flex items-center gap-1 mt-0.5 ${timeLeftSeconds < 180 ? "text-amber-600 dark:text-amber-400 animate-pulse" : "text-brand-inactive-text dark:text-dark-body"
+                            }`}>
                             <ClockIcon size={11} />
                             {Math.floor(timeLeftSeconds / 60)}:{String(timeLeftSeconds % 60).padStart(2, "0")} restante
                         </span>

@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MoneyIcon, ClockIcon, FileIcon, BlockedIcon, InfoIcon, CheckCircleIcon, RouteIcon } from "@/lib/icons"
-import { formatDateTime, cn } from "@/lib/utils"
+import { formatDateTime, cn, humanizeTimelineChangeLine } from "@/lib/utils"
 import { IconPlaceholder } from "@/components/reusable"
 
 export interface HistoryEntry {
@@ -146,7 +146,7 @@ export function HistoryTimeline({
                                             key={`${entry.id}-line-${lIdx}`}
                                             className="text-[14px] leading-relaxed text-brand-dark/90 dark:text-dark-body"
                                         >
-                                            {line}
+                                            {humanizeTimelineChangeLine(line)}
                                         </p>
                                     ))}
                                 </div>

@@ -13,7 +13,6 @@ export function useNotificationsRealtime(params: {
   const { supabase } = useSupabase()
   const onChangeRef = useRef(params.onChange)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const connectedRef = useRef(false)
 
   onChangeRef.current = params.onChange
 
@@ -26,8 +25,6 @@ export function useNotificationsRealtime(params: {
 
   useEffect(() => {
     if (!params.enabled || !params.userId) return
-
-    connectedRef.current = false
 
     const channel = supabase
       .channel(`notifications:${params.userId}`)
@@ -43,24 +40,11 @@ export function useNotificationsRealtime(params: {
           debouncedChange()
         },
       )
-      .subscribe((status: string) => {
-        if (status === "SUBSCRIBED") {
-          connectedRef.current = true
-        }
-      })
+      .subscribe()
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
-
-      if (connectedRef.current) {
-        supabase.removeChannel(channel)
-      } else {
-        channel.subscribe((status: string) => {
-          if (status === "SUBSCRIBED" || status === "CLOSED" || status === "CHANNEL_ERROR") {
-            supabase.removeChannel(channel)
-          }
-        })
-      }
+      supabase.removeChannel(channel)
     }
   }, [supabase, params.userId, params.enabled, debouncedChange])
 }

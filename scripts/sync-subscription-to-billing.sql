@@ -195,17 +195,13 @@ DECLARE
     purchase_status TEXT;
     target_sub_status TEXT;
     v_purchase_id UUID;
-    next_purchase_id UUID;
     v_now TIMESTAMPTZ := now();
     period_start TIMESTAMPTZ;
     period_end TIMESTAMPTZ;
-    next_start TIMESTAMPTZ;
-    next_end TIMESTAMPTZ;
     plan_price NUMERIC;
     descr TEXT;
     mp_sub_id TEXT;
     current_inv TEXT;
-    next_inv TEXT;
 BEGIN
     SELECT s.*, p.id AS plan_id, p.name AS plan_name, p.price AS plan_price, p.slug AS plan_slug
     INTO sub_record
@@ -235,15 +231,24 @@ BEGIN
             ELSE lower(trim(p_status_override))
         END;
 
-        -- Atualizar a assinatura no banco com o status requisitado
+        -- Atualizar a assinatura no banco com o status e períodos atualizados
         UPDATE subscriptions
         SET status = target_sub_status::subscription_status,
-            current_period_start = COALESCE(p_period_start, current_period_start, v_now),
-            current_period_end = COALESCE(p_period_end, current_period_end, v_now + interval '1 month'),
+            current_period_start = CASE
+                WHEN p_period_start IS NOT NULL THEN p_period_start
+                WHEN target_sub_status = 'active' AND (current_period_end IS NULL OR current_period_end <= v_now) THEN v_now
+                ELSE COALESCE(current_period_start, v_now)
+            END,
+            current_period_end = CASE
+                WHEN p_period_end IS NOT NULL THEN p_period_end
+                WHEN target_sub_status = 'active' AND (current_period_end IS NULL OR current_period_end <= v_now) THEN v_now + interval '1 month'
+                ELSE COALESCE(current_period_end, v_now + interval '1 month')
+            END,
             past_due_at = CASE WHEN target_sub_status = 'past_due' THEN COALESCE(past_due_at, v_now) ELSE NULL END,
             trial_end = CASE WHEN target_sub_status = 'trialing' THEN COALESCE(p_period_end, current_period_end, v_now + interval '14 days') ELSE trial_end END,
-            cancelled_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(cancelled_at, v_now) ELSE cancelled_at END,
-            ended_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(ended_at, v_now) ELSE ended_at END,
+            cancelled_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(cancelled_at, v_now) ELSE NULL END,
+            ended_at = CASE WHEN target_sub_status = 'cancelled' THEN COALESCE(ended_at, v_now) ELSE NULL END,
+            cancel_at_period_end = CASE WHEN target_sub_status IN ('active', 'trialing') THEN false ELSE cancel_at_period_end END,
             updated_at = v_now
         WHERE id = sub_id;
 
@@ -274,19 +279,9 @@ BEGIN
         ELSE 'pending'
     END;
 
-    -- Computa os períodos (a próxima cobrança nunca fica no passado)
+    -- Computa os períodos do ciclo vigente
     period_start := COALESCE(p_period_start, sub_record.current_period_start, sub_record.created_at, v_now);
     period_end := COALESCE(p_period_end, sub_record.current_period_end, period_start + interval '1 month');
-    IF period_end <= v_now AND sub_record.status IN ('active', 'trialing') THEN
-        next_start := period_start + interval '1 month';
-        WHILE next_start <= v_now LOOP
-            next_start := next_start + interval '1 month';
-        END LOOP;
-        period_end := next_start;
-    ELSE
-        next_start := period_end;
-    END IF;
-    next_end := next_start + interval '1 month';
 
     -- ── 2. PURCHASE do ciclo ATUAL (upsert) ──
     SELECT bp.* INTO existing
@@ -406,79 +401,24 @@ BEGIN
         PERFORM billing_generate_invoice_for_purchase(v_purchase_id);
     END IF;
 
-    -- ── 5. PURCHASE do próximo ciclo ("Próxima Fatura") ──
-    next_purchase_id := NULL;
-    IF sub_record.status IN ('active', 'trialing') AND plan_price > 0 THEN
-        SELECT bp.id INTO next_purchase_id
-        FROM billing_purchases bp
-        WHERE bp.subscription_id = sub_id
-          AND bp.status = 'pending'
-          AND bp.billing_period_start IS NOT NULL
-          AND bp.billing_period_start::date = next_start::date
-        ORDER BY bp.created_at DESC LIMIT 1;
+    -- ── 5. Limpar purchases/faturas "next" pendentes geradas indevidamente por syncs antigos ──
+    -- A próxima fatura NÃO deve ser pré-gerada no futuro. Ela só existirá quando
+    -- a cobrança for efetivada ou processada (approved -> completed, failed -> pending/rejected).
+    DELETE FROM billing_invoices
+    WHERE purchase_id IN (
+        SELECT id FROM billing_purchases
+        WHERE subscription_id = sub_id
+          AND status = 'pending'
+          AND id <> v_purchase_id
+    );
 
-        IF next_purchase_id IS NULL THEN
-            SELECT bp.id INTO next_purchase_id
-            FROM billing_purchases bp
-            WHERE bp.subscription_id = sub_id AND bp.status = 'pending'
-            ORDER BY bp.created_at DESC LIMIT 1;
-        END IF;
+    DELETE FROM billing_purchases
+    WHERE subscription_id = sub_id
+      AND status = 'pending'
+      AND id <> v_purchase_id;
 
-        IF next_purchase_id IS NOT NULL THEN
-            UPDATE billing_purchases
-            SET amount = plan_price,
-                total_amount = plan_price,
-                description = descr,
-                billing_period_start = next_start,
-                billing_period_end = next_end,
-                metadata = metadata || jsonb_build_object(
-                    'billing_cycle', 'next',
-                    'due_date', next_start,
-                    'subscription_status', sub_record.status,
-                    'synced_via', 'sql',
-                    'synced_at', v_now
-                ),
-                updated_at = v_now
-            WHERE id = next_purchase_id;
-        ELSE
-            INSERT INTO billing_purchases (
-                partner_id, user_id, purchase_type, purchaseable_type, purchaseable_id,
-                amount, total_amount, discount_amount, currency, status, gateway,
-                gateway_payment_id, gateway_status, subscription_id, description,
-                billing_period_start, billing_period_end, metadata
-            ) VALUES (
-                sub_record.partner_id, partner_record.user_id, 'subscription', 'plan', sub_record.plan_id,
-                plan_price, plan_price, 0, 'BRL', 'pending', 'mercado_pago',
-                mp_sub_id, sub_record.status, sub_id, descr,
-                next_start, next_end,
-                jsonb_build_object(
-                    'plan_name', sub_record.plan_name,
-                    'plan_slug', sub_record.plan_slug,
-                    'billing_cycle', 'next',
-                    'due_date', next_start,
-                    'subscription_status', sub_record.status,
-                    'synced_via', 'sql',
-                    'synced_at', v_now
-                )
-            )
-            RETURNING id INTO next_purchase_id;
-        END IF;
-
-        IF next_purchase_id IS NOT NULL THEN
-            PERFORM billing_generate_invoice_for_purchase(next_purchase_id);
-        END IF;
-    ELSE
-        -- Assinatura não fatura mais (ou está atrasada/cancelada) → cancela purchases "next" pendentes
-        UPDATE billing_purchases
-        SET status = 'cancelled', updated_at = v_now
-        WHERE subscription_id = sub_id AND status = 'pending' AND id <> v_purchase_id;
-    END IF;
-
-    -- Obter números de fatura para o retorno
+    -- Obter número de fatura atual para o retorno
     SELECT invoice_number INTO current_inv FROM billing_invoices WHERE purchase_id = v_purchase_id LIMIT 1;
-    IF next_purchase_id IS NOT NULL THEN
-        SELECT invoice_number INTO next_inv FROM billing_invoices WHERE purchase_id = next_purchase_id LIMIT 1;
-    END IF;
 
     RETURN jsonb_build_object(
         'success', true,
@@ -492,9 +432,9 @@ BEGIN
         'current_period_start', period_start,
         'current_period_end', period_end,
         'current_invoice_number', current_inv,
-        'next_purchase_id', next_purchase_id,
-        'next_due_date', CASE WHEN next_purchase_id IS NOT NULL THEN next_start ELSE NULL END,
-        'next_invoice_number', next_inv
+        'next_purchase_id', null,
+        'next_due_date', period_end,
+        'next_invoice_number', null
     );
 END;
 $$;

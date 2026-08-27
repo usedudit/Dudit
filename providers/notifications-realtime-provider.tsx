@@ -15,7 +15,6 @@ export function NotificationsRealtimeProvider({ children }: { children: React.Re
     onChange: () => {
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count", user.id] })
-        queryClient.invalidateQueries({ queryKey: ["notifications", "list", user.id] })
       }
     },
   })

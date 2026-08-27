@@ -5,16 +5,12 @@ import {
   applyProductStockFilter,
   mapProductRow,
   PRODUCT_EXPORT_COLUMNS,
-  PRODUCT_EXPORT_ALL_COLUMNS,
 } from "../mappers"
 import type { ProductsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
-const PRODUCT_SELECT_DEFAULT =
-  "id, name, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name)"
-
-const PRODUCT_SELECT_ALL =
-  "id, name, description, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name), brand, brand_id, brand_rel:brands!brand_id(name), location, location_id, location_rel:storage_locations!location_id(name), product_type, condition, gtin, unit, allow_sell_without_stock, max_stock, promotional_price, is_on_promotion, availability_value, availability_unit, moderation_status, show_price_in_store, subcategory_id, subcategory:product_categories!subcategory_id(name), product_fiscal_profiles(ncm, cest, origin, item_type, cfop_internal, cfop_external, csosn, tax_percentage, pis_cst, pis_rate, cofins_cst, cofins_rate, ipi_cst, ipi_code, product_situation, c_benef, inf_ad_prod, fci_code), product_logistics(weight_gross, weight_net, width, height, length, packaging_type, preparation_days)"
+const PRODUCT_SELECT =
+  "id, name, description, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name), brand, brand_id, brand_rel:brands!brand_id(name), product_type, condition, gtin, unit, promotional_price, product_fiscal_profiles(ncm, cest), product_logistics(weight_gross, weight_net, width, height, length)"
 
 const TAB_STOCK: Record<string, string> = {
   normal: "Normal",
@@ -27,7 +23,6 @@ export async function fetchProductsExport(
   partnerId: string,
   filters: ProductsExportFilters,
 ): Promise<import("../types").ExportResult> {
-  const includeAllColumns = filters.includeAllColumns === true
   const categoryNames = (filters.categories || []).filter(Boolean)
   let categoryIds: string[] = []
 
@@ -39,8 +34,7 @@ export async function fetchProductsExport(
       .in("name", categoryNames)
     categoryIds = (cats || []).map((c) => c.id)
     if (!categoryIds.length) {
-      const columns = includeAllColumns ? PRODUCT_EXPORT_ALL_COLUMNS : PRODUCT_EXPORT_COLUMNS
-      return { columns, rows: [], rowCount: 0 }
+      return { columns: PRODUCT_EXPORT_COLUMNS, rows: [], rowCount: 0 }
     }
   }
 
@@ -52,12 +46,11 @@ export async function fetchProductsExport(
 
   const statusLabels = filters.status || []
   const search = sanitizeSearchTerm(filters.search)
-  const selectFields = includeAllColumns ? PRODUCT_SELECT_ALL : PRODUCT_SELECT_DEFAULT
 
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query: any = (supabase as any).from("products").select(selectFields).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("products").select(PRODUCT_SELECT).eq("partner_id", partnerId)
 
       if (filters.storeId) query = query.or(`store_id.eq.${filters.storeId},store_id.is.null`)
       if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
@@ -86,9 +79,7 @@ export async function fetchProductsExport(
         ...(p.product_fiscal_profiles || {}),
         ...(p.product_logistics || {}),
         category: p.category?.name || null,
-        subcategory: p.subcategory?.name || null,
-        brand: p.brand?.name || null,
-        location: p.location?.name || null,
+        brand: p.brand_rel?.name || p.brand || null,
       }))
       const last = rows[rows.length - 1]
       return {
@@ -99,7 +90,6 @@ export async function fetchProductsExport(
   })
 
   const filtered = rawRows.filter((row) => applyProductStockFilter(row, stockLabels))
-  const rows = filtered.map((row) => mapProductRow(row, includeAllColumns))
-  const columns = includeAllColumns ? PRODUCT_EXPORT_ALL_COLUMNS : PRODUCT_EXPORT_COLUMNS
-  return { columns, rows, rowCount: rows.length }
+  const rows = filtered.map((row) => mapProductRow(row))
+  return { columns: PRODUCT_EXPORT_COLUMNS, rows, rowCount: rows.length }
 }

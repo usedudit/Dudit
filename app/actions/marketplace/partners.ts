@@ -14,7 +14,7 @@ import { normalizePhoneToE164 } from "@/lib/utils/phone-utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { decryptCPF } from "@/lib/crypto"
 import { normalizeBusinessInfo } from "@/lib/business-info"
-import { geocodeAddress, enrichAddressData } from "@/lib/services/location.service"
+import { enrichAddressData } from "@/lib/services/location.service"
 import { syncPartnerItemsToExploreRedis, syncToExploreRedis } from "@/lib/redis-sync"
 import { getRandomDefaultBanner } from "@/lib/utils/banner"
 
@@ -610,7 +610,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
         phoneToValidate = digits.slice(2)
       }
-      
+
       if (!validateBrazilMobile(phoneToValidate)) {
         return { error: "Número de telefone inválido" }
       }
@@ -637,7 +637,7 @@ export async function updatePartnerAction(partnerId: string, data: any) {
       mode: existingInfo.mode // Never trust the frontend for mode changes on update
     }
   }
-  
+
   if (data.categoryId !== undefined) updateData.category_id = data.categoryId
   if (data.subcategoryId !== undefined) updateData.subcategory_id = data.subcategoryId
 
@@ -697,14 +697,24 @@ export async function updatePartnerAction(partnerId: string, data: any) {
 export async function registerPartner(data: any) {
   await requireRateLimit(RateLimitCategory.PARTNER_REGISTER)
 
-  // SECURITY FIX (HIGH-01): userId derived from session, NEVER from client input
-  const currentUser = await requireUser()
-  if (!currentUser) {
-    return { success: false, error: "Não autorizado" }
-  }
-  const userId = currentUser.id
-
   const supabaseAdmin = getAdminClient()
+  let userId: string | null = null
+
+  // 1. Usuário autenticado na sessão
+  const currentUser = await getCurrentUser()
+  if (currentUser?.id) {
+    userId = currentUser.id
+  } else if (data.signupUserId && data.email) {
+    // 2. Fluxo de cadastro direto (PartnerWizard): valida ID e email correspondente em auth.users
+    const { data: authUser, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(data.signupUserId)
+    if (!authUserErr && authUser?.user && authUser.user.email?.toLowerCase() === data.email.trim().toLowerCase()) {
+      userId = authUser.user.id
+    }
+  }
+
+  if (!userId) {
+    return { success: false, error: "Não autorizado ou sessão não encontrada. Faça login para continuar." }
+  }
 
   try {
     const sanitizedPhone = typeof data.phone === "string" ? sanitizeInput(data.phone, 20) : ""
