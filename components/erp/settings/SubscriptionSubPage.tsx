@@ -26,11 +26,13 @@ import {
     getLatestPurchaseForSubscriptionAction,
     getLatestCompletedPurchaseForPartnerAction,
 } from "@/app/actions/billing/purchases"
+import { getActiveRefundForPartnerAction } from "@/app/actions/billing/refunds"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { BillingPage } from "@/components/billing/BillingPage"
 import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
+import Link from "next/link"
 
 // ─── Plan Card ─────────────────────────────────────────────────────────────
 
@@ -290,6 +292,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const [refundModalOpen, setRefundModalOpen] = useState(false)
     const [refundPurchase, setRefundPurchase] = useState<any>(null)
     const [loadingRefund, setLoadingRefund] = useState(false)
+    const [activeRefund, setActiveRefund] = useState<any | null>(null)
 
     const handleOpenRefundModal = async () => {
         const subId = subData?.subscription?.id
@@ -383,13 +386,24 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 if (statusRes.data.subscription?.billing_email) {
                     setBillingEmail(statusRes.data.subscription.billing_email)
                 }
+
+                // Buscar se há solicitação de reembolso ativa
+                const pId = partnerId || statusRes.data.partner_id
+                if (pId) {
+                    const refundRes = await getActiveRefundForPartnerAction(pId, statusRes.data.subscription?.id)
+                    if (refundRes.success && refundRes.data) {
+                        setActiveRefund(refundRes.data)
+                    } else {
+                        setActiveRefund(null)
+                    }
+                }
             }
         } catch {
             toast.error("Erro ao carregar dados do plano")
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [partnerId])
 
     useEffect(() => {
         loadData()
@@ -811,7 +825,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             </>
                                         )}
 
-                                        {(hasActivePaidSub || displayPlanPrice > 0 || subData?.subscription) && (
+                                        {activeRefund ? (
+                                            <Link href={`/reembolso/${activeRefund.token}`} target="_blank">
+                                                <Button
+                                                    variant="outline"
+                                                    className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
+                                                >
+                                                    Acompanhar Reembolso
+                                                </Button>
+                                            </Link>
+                                        ) : hasActivePaidSub && displayPlanPrice > 0 && displayPlanSlug !== "free" ? (
                                             <Button
                                                 variant="outline"
                                                 className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
@@ -821,7 +844,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             >
                                                 Solicitar Reembolso
                                             </Button>
-                                        )}
+                                        ) : null}
 
                                         <Button
                                             variant="default"

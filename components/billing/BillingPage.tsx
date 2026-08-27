@@ -371,7 +371,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                         Fechar
                     </Button>
                     <div className="flex items-center gap-2">
-                        {selectedPurchase.status === "completed" && (
+                        {selectedPurchase.status === "completed" && Number(selectedPurchase.total_amount || selectedPurchase.amount || 0) > 0 && (
                             <Button
                                 variant="outline"
                                 leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}

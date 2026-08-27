@@ -1,9 +1,21 @@
 "use client"
 
 import React, { useState } from "react"
-import { DefaultModal, Button, Badge, FormTextarea, Input } from "@/components/reusable"
+import {
+    DefaultModal,
+    Button,
+    Badge,
+    FormTextarea,
+    Input,
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+    FormSection,
+} from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { adminProcessRefundAction, adminRejectRefundAction } from "@/app/actions/billing/refunds"
+import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import {
     ShieldCheck,
     AlertTriangle,
@@ -13,9 +25,7 @@ import {
     KeyRound,
     FileText,
     ExternalLink,
-    CreditCard,
     Store,
-    RotateCcw,
     Eye,
 } from "lucide-react"
 
@@ -44,6 +54,7 @@ const getReasonLabel = (cat: string) => {
 }
 
 export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: AdminRefundReviewModalProps) {
+    const [activeTab, setActiveTab] = useState("Dados Gerais")
     const [actionType, setActionType] = useState<"approve" | "reject">("approve")
     const [refundAmount, setRefundAmount] = useState<string>(String(refund?.amount || 0))
     const [refundConfirmation, setRefundConfirmation] = useState("")
@@ -58,6 +69,7 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
 
     const images: string[] = Array.isArray(refund.images) ? refund.images : []
     const documents: string[] = Array.isArray(refund.documents) ? refund.documents : []
+    const totalAttachments = images.length + documents.length
     const partner = refund.partner || {}
     const stores = partner.stores || []
     const hqStore = stores.find((s: any) => s.is_headquarters) || stores[0] || {}
@@ -149,11 +161,11 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
             title="Análise de Reembolso (Step-Up Security)"
             maxWidth="3xl"
         >
-            <div className="space-y-6 pt-2 pb-2">
+            <div className="space-y-4 pt-1 pb-1">
                 {/* Header com dados do parceiro e CDC */}
                 <div className="p-4 bg-brand-gray dark:bg-dark-border/40 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green flex-shrink-0">
+                        <div className="w-12 h-12 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
                             {hqStore.logo_url ? (
                                 <img src={hqStore.logo_url} alt="" className="w-full h-full object-cover rounded-xl" />
                             ) : (
@@ -185,213 +197,243 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                     </div>
                 </div>
 
-                {/* Justificativa e Motivo do Lojista */}
-                <div className="space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                        <span className="text-brand-inactive-text font-medium">
-                            Motivo: <strong className="text-brand-dark dark:text-dark-heading">{getReasonLabel(refund.reason_category)}</strong>
-                        </span>
-                        <span className="text-brand-inactive-text">
-                            Solicitado em: {formatDate(refund.requested_at || refund.created_at)}
-                        </span>
-                    </div>
-                    <div className="p-3 bg-brand-gray/60 dark:bg-dark-border/20 rounded-xl text-xs text-gray-800 dark:text-dark-body border border-brand-border/60">
-                        {refund.reason_description}
-                    </div>
-                </div>
+                {/* Tabs */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="w-full justify-start border-b border-brand-border dark:border-dark-border gap-6 bg-transparent p-0">
+                        <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
+                        <TabsTrigger value="Anexos" className="flex items-center gap-2">
+                            <span>Anexos</span>
+                            {totalAttachments > 0 && (
+                                <Badge variant="green" className="px-1.5 py-0.2 text-[10px]">
+                                    {totalAttachments}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                    </TabsList>
 
-                {/* Evidências (Imagens e PDFs) */}
-                {(images.length > 0 || documents.length > 0) && (
-                    <div className="space-y-2 border-t border-brand-border dark:border-dark-border pt-3">
-                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading block">
-                            Evidências Anexadas ({images.length} fotos, {documents.length} PDFs):
-                        </span>
-                        {images.length > 0 && (
-                            <div className="grid grid-cols-5 gap-2">
-                                {images.map((img, idx) => (
-                                    <div
-                                        key={idx}
-                                        onClick={() => setPreviewImage(img)}
-                                        className="relative aspect-square rounded-lg border border-brand-border overflow-hidden bg-brand-gray cursor-pointer hover:opacity-80"
-                                    >
-                                        <img src={img} alt="" className="w-full h-full object-cover" />
+                    {/* ─── TAB 1: DADOS GERAIS ─── */}
+                    <TabsContent value="Dados Gerais" className="pt-4 space-y-5 focus-visible:outline-none">
+                        {/* Justificativa e Motivo do Lojista */}
+                        <FormSection title="Justificativa do Lojista">
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-brand-inactive-text font-medium">
+                                        Motivo: <strong className="text-brand-dark dark:text-dark-heading">{getReasonLabel(refund.reason_category)}</strong>
+                                    </span>
+                                    <span className="text-brand-inactive-text">
+                                        Solicitado em: {formatDate(refund.requested_at || refund.created_at)}
+                                    </span>
+                                </div>
+                                <div className="p-3.5 bg-brand-gray/60 dark:bg-dark-border/20 rounded-xl text-xs text-gray-800 dark:text-dark-body border border-brand-border/60">
+                                    {refund.reason_description}
+                                </div>
+                            </div>
+                        </FormSection>
+
+                        {/* Alternância de Ação: Aprovar ou Recusar */}
+                        <div className="flex border-b border-brand-border dark:border-dark-border pt-1">
+                            <button
+                                type="button"
+                                onClick={() => { setActionType("approve"); setErrorMessage(null) }}
+                                className={`pb-2.5 px-4 text-xs font-bold transition-colors border-b-2 ${actionType === "approve" ? "border-brand-green text-brand-green" : "border-transparent text-gray-500 hover:text-gray-900"}`}
+                            >
+                                Aprovar & Estornar no Mercado Pago
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setActionType("reject"); setErrorMessage(null) }}
+                                className={`pb-2.5 px-4 text-xs font-bold transition-colors border-b-2 ${actionType === "reject" ? "border-red-500 text-red-500" : "border-transparent text-gray-500 hover:text-gray-900"}`}
+                            >
+                                Recusar Solicitação
+                            </button>
+                        </div>
+
+                        {/* Formulário de Aprovação com Step-Up Security */}
+                        {actionType === "approve" ? (
+                            <form onSubmit={handleApprove} className="space-y-4">
+                                <div className="p-3.5 bg-brand-green/10 border border-brand-green/20 rounded-xl text-xs text-gray-700 dark:text-dark-body space-y-1">
+                                    <p className="font-bold text-brand-green flex items-center gap-1.5">
+                                        <Lock size={14} />
+                                        <span>Ação Financeira Irreversível com Step-Up Auth</span>
+                                    </p>
+                                    <p>
+                                        Ao confirmar, o Mercado Pago efetuará a devolução imediata do dinheiro, a assinatura será cancelada e o cliente terá <strong>24h de carência</strong> para salvar seus dados antes de ser rebaixado para o Plano Gratuito.
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                            Valor do Estorno (R$)
+                                        </label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            value={refundAmount}
+                                            onChange={(e) => setRefundAmount(e.target.value)}
+                                            placeholder="Valor a estornar"
+                                        />
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                        {documents.length > 0 && (
-                            <div className="space-y-1 pt-1">
-                                {documents.map((doc, idx) => (
-                                    <a
-                                        key={idx}
-                                        href={doc}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-between p-2 bg-brand-gray rounded-lg text-xs hover:bg-gray-200 transition-colors"
+
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                            Digite <span className="text-brand-green">ESTORNAR</span> para confirmar
+                                        </label>
+                                        <Input
+                                            type="text"
+                                            value={refundConfirmation}
+                                            onChange={(e) => setRefundConfirmation(e.target.value)}
+                                            placeholder="ESTORNAR"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                        <KeyRound size={14} className="text-brand-orange" />
+                                        <span>Sua Senha de Administrador <span className="text-brand-red">*</span></span>
+                                    </label>
+                                    <Input
+                                        type="password"
+                                        value={refundPassword}
+                                        onChange={(e) => setRefundPassword(e.target.value)}
+                                        placeholder="Digite sua senha para autorizar"
+                                        autoComplete="off"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                        Mensagem de Parecer para o Lojista (Opcional)
+                                    </label>
+                                    <FormTextarea
+                                        value={adminResponse}
+                                        onChange={(e) => setAdminResponse(e.target.value)}
+                                        placeholder="Ex: Reembolso aprovado conforme garantia legal. Carência de 24h ativada..."
+                                        rows={2}
+                                    />
+                                </div>
+
+                                {errorMessage && (
+                                    <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 rounded-xl text-xs text-red-600">
+                                        {errorMessage}
+                                    </div>
+                                )}
+                                {successMessage && (
+                                    <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 rounded-xl text-xs text-green-600 font-bold">
+                                        {successMessage}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
+                                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        variant="default"
+                                        className="bg-brand-green text-white hover:bg-brand-green/90 font-bold"
+                                        disabled={isSubmitting || refundConfirmation !== "ESTORNAR" || !refundPassword}
+                                        isLoading={isSubmitting}
                                     >
-                                        <div className="flex items-center gap-1.5 truncate">
-                                            <FileText size={14} className="text-brand-orange" />
-                                            <span className="truncate">Documento Anexo {idx + 1}</span>
-                                        </div>
-                                        <ExternalLink size={12} className="text-brand-green" />
-                                    </a>
-                                ))}
-                            </div>
+                                        Aprovar & Estornar
+                                    </Button>
+                                </div>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleReject} className="space-y-4">
+                                <div className="p-3.5 bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl text-xs text-red-800 dark:text-red-300">
+                                    Ao recusar, o lojista será notificado e o plano continuará ativo normalmente até o fim do período.
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
+                                        Motivo da Recusa (Obrigatório) <span className="text-brand-red">*</span>
+                                    </label>
+                                    <FormTextarea
+                                        value={adminResponse}
+                                        onChange={(e) => setAdminResponse(e.target.value)}
+                                        placeholder="Explique o motivo pelo qual o reembolso não pôde ser concedido..."
+                                        rows={3}
+                                    />
+                                </div>
+
+                                {errorMessage && (
+                                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+                                        {errorMessage}
+                                    </div>
+                                )}
+                                {successMessage && (
+                                    <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-600 font-bold">
+                                        {successMessage}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
+                                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        variant="destructive"
+                                        disabled={isSubmitting || !adminResponse || adminResponse.trim().length < 5}
+                                        isLoading={isSubmitting}
+                                    >
+                                        Recusar Solicitação
+                                    </Button>
+                                </div>
+                            </form>
                         )}
-                    </div>
-                )}
+                    </TabsContent>
 
-                {/* Alternância de Ação: Aprovar ou Recusar */}
-                <div className="flex border-b border-brand-border dark:border-dark-border">
-                    <button
-                        type="button"
-                        onClick={() => { setActionType("approve"); setErrorMessage(null) }}
-                        className={`pb-2.5 px-4 text-xs font-bold transition-colors border-b-2 ${actionType === "approve" ? "border-brand-green text-brand-green" : "border-transparent text-gray-500 hover:text-gray-900"}`}
-                    >
-                        Aprovar & Estornar no Mercado Pago
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => { setActionType("reject"); setErrorMessage(null) }}
-                        className={`pb-2.5 px-4 text-xs font-bold transition-colors border-b-2 ${actionType === "reject" ? "border-red-500 text-red-500" : "border-transparent text-gray-500 hover:text-gray-900"}`}
-                    >
-                        Recusar Solicitação
-                    </button>
-                </div>
-
-                {/* Formulário de Aprovação com Step-Up Security */}
-                {actionType === "approve" ? (
-                    <form onSubmit={handleApprove} className="space-y-4">
-                        <div className="p-3 bg-brand-green/10 border border-brand-green/20 rounded-xl text-xs text-gray-700 dark:text-dark-body space-y-1">
-                            <p className="font-bold text-brand-green flex items-center gap-1.5">
-                                <Lock size={14} />
-                                <span>Ação Financeira Irreversível com Step-Up Auth</span>
-                            </p>
-                            <p>
-                                Ao confirmar, o Mercado Pago efetuará a devolução imediata do dinheiro, a assinatura será cancelada e o cliente terá <strong>24h de carência</strong> para salvar seus dados antes de ser rebaixado para o Plano Gratuito.
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Valor do Estorno (R$)
-                                </label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={refundAmount}
-                                    onChange={(e) => setRefundAmount(e.target.value)}
-                                    placeholder="Valor a estornar"
+                    {/* ─── TAB 2: ANEXOS ─── */}
+                    <TabsContent value="Anexos" className="pt-4 space-y-6 focus-visible:outline-none">
+                        {images.length > 0 && (
+                            <FormSection title="Imagens de Evidência">
+                                <ProductImagesSection
+                                    images={images}
+                                    onImageUpload={() => {}}
+                                    onRemoveImage={() => {}}
+                                    onSetPrimaryImage={() => {}}
+                                    isEditing={false}
                                 />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Digite <span className="text-brand-green">ESTORNAR</span> para confirmar
-                                </label>
-                                <Input
-                                    type="text"
-                                    value={refundConfirmation}
-                                    onChange={(e) => setRefundConfirmation(e.target.value)}
-                                    placeholder="ESTORNAR"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
-                                <KeyRound size={14} className="text-brand-orange" />
-                                <span>Sua Senha de Administrador <span className="text-brand-red">*</span></span>
-                            </label>
-                            <Input
-                                type="password"
-                                value={refundPassword}
-                                onChange={(e) => setRefundPassword(e.target.value)}
-                                placeholder="Digite sua senha para autorizar"
-                                autoComplete="off"
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                Mensagem de Parecer para o Lojista (Opcional)
-                            </label>
-                            <FormTextarea
-                                value={adminResponse}
-                                onChange={(e) => setAdminResponse(e.target.value)}
-                                placeholder="Ex: Reembolso aprovado conforme garantia legal. Carência de 24h ativada..."
-                                rows={2}
-                            />
-                        </div>
-
-                        {errorMessage && (
-                            <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 rounded-lg text-xs text-red-600">
-                                {errorMessage}
-                            </div>
-                        )}
-                        {successMessage && (
-                            <div className="p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 rounded-lg text-xs text-green-600 font-bold">
-                                {successMessage}
-                            </div>
+                            </FormSection>
                         )}
 
-                        <div className="flex justify-end gap-3 pt-3 border-t border-brand-border">
-                            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="filled"
-                                disabled={isSubmitting || refundConfirmation !== "ESTORNAR" || !refundPassword}
-                            >
-                                {isSubmitting ? "Estornando no Mercado Pago..." : "Aprovar & Estornar"}
-                            </Button>
-                        </div>
-                    </form>
-                ) : (
-                    <form onSubmit={handleReject} className="space-y-4">
-                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl text-xs text-red-800 dark:text-red-300">
-                            Ao recusar, o lojista será notificado e o plano continuará ativo normalmente até o fim do período.
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                Motivo da Recusa (Obrigatório) <span className="text-brand-red">*</span>
-                            </label>
-                            <FormTextarea
-                                value={adminResponse}
-                                onChange={(e) => setAdminResponse(e.target.value)}
-                                placeholder="Explique o motivo pelo qual o reembolso não pôde ser concedido..."
-                                rows={3}
-                            />
-                        </div>
-
-                        {errorMessage && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
-                                {errorMessage}
-                            </div>
-                        )}
-                        {successMessage && (
-                            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-600 font-bold">
-                                {successMessage}
-                            </div>
+                        {documents.length > 0 && (
+                            <FormSection title="Documentos PDF" hasSeparator={images.length > 0}>
+                                <div className="space-y-2">
+                                    {documents.map((doc, idx) => (
+                                        <a
+                                            key={idx}
+                                            href={doc}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-between p-3 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs border border-brand-border dark:border-dark-border hover:bg-gray-200 dark:hover:bg-dark-border/60 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                <FileText size={16} className="text-brand-orange shrink-0" />
+                                                <span className="truncate font-medium text-brand-dark dark:text-dark-heading">
+                                                    Documento Anexo {idx + 1} (PDF)
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-brand-green font-bold">
+                                                <span>Abrir</span>
+                                                <ExternalLink size={13} />
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            </FormSection>
                         )}
 
-                        <div className="flex justify-end gap-3 pt-3 border-t border-brand-border">
-                            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="destructive"
-                                disabled={isSubmitting || !adminResponse || adminResponse.trim().length < 5}
-                            >
-                                {isSubmitting ? "Recusando..." : "Recusar Solicitação"}
-                            </Button>
-                        </div>
-                    </form>
-                )}
+                        {images.length === 0 && documents.length === 0 && (
+                            <div className="p-8 text-center border border-dashed border-brand-border dark:border-dark-border rounded-2xl text-xs text-brand-inactive-text">
+                                Nenhum anexo ou evidência foi enviado pelo lojista nesta solicitação.
+                            </div>
+                        )}
+                    </TabsContent>
+                </Tabs>
             </div>
 
             {/* Lightbox */}
@@ -410,3 +452,4 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
         </DefaultModal>
     )
 }
+

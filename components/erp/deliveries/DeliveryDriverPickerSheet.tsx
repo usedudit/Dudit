@@ -309,10 +309,7 @@ export default function DeliveryDriverPickerSheet({
                         </div>
 
                         {!orderId && (
-                            <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300 text-xs">
-                                <AlertCircleIcon size={16} className="shrink-0" />
-                                <span>Salve o pedido primeiro para poder disparar a solicitação para a rede.</span>
-                            </div>
+                            <InfoCard message="Salve o pedido primeiro para poder disparar a solicitação para a rede." color="orange" />
                         )}
                     </div>
                 )}

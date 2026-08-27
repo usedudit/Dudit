@@ -96,7 +96,12 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
             return { error: "Apenas faturas pagas e concluídas podem receber solicitação de reembolso." }
         }
 
-        // 3. Verificar se já existe solicitação aberta para esta compra
+        const purchaseAmount = Number(purchase.total_amount || purchase.amount || 0)
+        if (purchaseAmount <= 0) {
+            return { error: "Não é possível solicitar reembolso de assinaturas ou faturas gratuitas." }
+        }
+
+        // 3. Verificar se já existe solicitação aberta para esta compra ou parceiro
         const { data: existingRequest } = await supabase
             .from("billing_refund_requests")
             .select("id, status, token")
@@ -130,7 +135,7 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
                 subscription_id: purchase.subscription_id || null,
                 purchase_id: data.purchaseId,
                 payment_id: approvedPayment?.id || null,
-                amount: Number(purchase.total_amount || purchase.amount || 0),
+                amount: purchaseAmount,
                 reason_category: data.reasonCategory,
                 reason_description: data.reasonDescription,
                 images: data.images,
@@ -175,6 +180,44 @@ export async function requestSubscriptionRefundAction(input: z.input<typeof requ
     } catch (error: any) {
         console.error("[requestSubscriptionRefundAction] Unexpected error:", error)
         return { error: error?.message || "Erro inesperado ao solicitar reembolso." }
+    }
+}
+
+// ─── 1.1 BUSCAR REEMBOLSO ATIVO (PARCEIRO / ASSINATURA) ──────────────────────
+
+export async function getActiveRefundForPartnerAction(partnerId: string, subscriptionId?: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autenticado." }
+
+        const supabase = createAdminClient()
+
+        let query = supabase
+            .from("billing_refund_requests")
+            .select(`
+                id, token, status, amount, refunded_amount, reason_category,
+                reason_description, requested_at, created_at, grace_period_ends_at,
+                is_within_7_days, purchase_id, subscription_id
+            `)
+            .eq("partner_id", partnerId)
+            .in("status", ["pending", "under_review", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+
+        if (subscriptionId) {
+            query = query.eq("subscription_id", subscriptionId)
+        }
+
+        const { data, error } = await query.maybeSingle()
+        if (error) {
+            console.error("[getActiveRefundForPartnerAction] Error:", error)
+            return { success: false, error: error.message }
+        }
+
+        return { success: true, data: data || null }
+    } catch (err: any) {
+        console.error("[getActiveRefundForPartnerAction] Unexpected error:", err)
+        return { success: false, error: err.message }
     }
 }
 
