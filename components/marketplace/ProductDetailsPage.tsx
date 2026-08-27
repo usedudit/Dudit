@@ -569,6 +569,61 @@ export function ProductDetailsPageClient({
         setDeliveryLoading(false)
     }
 
+    const pricing = useMemo(() => {
+        const base = Number(product.price) || 0
+        const promo = Number(product.promotional_price) || 0
+        const hasPromo = promo > 0 && promo < base
+        const variantPrice = selectedVariant ? (Number(selectedVariant.price_adjustment) || base) : null
+        const displayOriginal = variantPrice !== null ? variantPrice : base
+        const effective = variantPrice !== null ? variantPrice : (hasPromo ? promo : base)
+
+        const pricingUnitPrice = variantPrice !== null ? variantPrice : base
+        const pricingPromo = variantPrice !== null ? null : (hasPromo ? promo : null)
+        const campaignPricingResult = computeItemDisplayPrice(
+            pricingUnitPrice, pricingPromo,
+            activePromotions,
+            { productId: product.id, categoryId: product.category_id || undefined },
+        )
+
+        const bestPrice = campaignPricingResult.bestPrice
+        const discountSource = campaignPricingResult.discountSource
+        const hasCampaignDiscount = discountSource === "campaign"
+        const hasManualPromo = discountSource === "manual"
+        const unitWithAddons = bestPrice + addonsUnitPrice
+        const total = unitWithAddons * quantity
+
+        // Real Pix Discount from Partner's payment methods
+        const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
+        const pixDiscountPercent = pixMethod?.discount_percent || 0
+        const pixTotal = unitWithAddons * quantity * (1 - (pixDiscountPercent / 100))
+
+        // Real Installments from Partner's credit card method
+        const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
+        const hasCC = !!ccMethod
+        const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
+        const installmentPrice = unitWithAddons / maxInstallments
+
+        const totalDiscountPercent = displayOriginal > 0 ? Math.round(((displayOriginal - bestPrice) / displayOriginal) * 100) : 0
+
+        const campaignDiscountLabel = hasCampaignDiscount && activePromo
+            ? activePromo.discountType === "percentage"
+                ? `${activePromo.discountValue}%`
+                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
+            : `${totalDiscountPercent}%`
+
+        return {
+            current: effective, bestPrice, original: displayOriginal,
+            hasCampaignDiscount, hasManualPromo, total,
+            addonsUnitPrice,
+            pix: pixTotal,
+            pixDiscountPercent,
+            hasCC, maxInstallments, installment: installmentPrice,
+            discountPercent: displayOriginal > 0 ? Math.round(((displayOriginal - promo) / displayOriginal) * 100) : 0,
+            totalDiscountPercent,
+            campaignDiscountLabel,
+        }
+    }, [product, selectedVariant, quantity, partner, activePromo, activePromotions, addonsUnitPrice])
+
     // Automatically calculate delivery when selectedAddress changes (for logged in users)
     useEffect(() => {
         if (!selectedAddress || !partner.id) return
@@ -611,7 +666,7 @@ export function ProductDetailsPageClient({
 
         calculateForAddress()
         return () => { active = false }
-    }, [selectedAddress, partner.id])
+    }, [selectedAddress, partner.id, pricing.total])
 
     // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
     useEffect(() => {
@@ -675,7 +730,7 @@ export function ProductDetailsPageClient({
 
         calculateForCep()
         return () => { active = false }
-    }, [cep, partner.id, userId])
+    }, [cep, partner.id, userId, pricing.total])
 
     const galleryContainerRef = useRef<HTMLDivElement>(null)
     const reviewsRef = useRef<HTMLDivElement>(null)
@@ -759,61 +814,6 @@ export function ProductDetailsPageClient({
         })
         return map
     }, [processedVariants])
-
-    const pricing = useMemo(() => {
-        const base = Number(product.price) || 0
-        const promo = Number(product.promotional_price) || 0
-        const hasPromo = promo > 0 && promo < base
-        const variantPrice = selectedVariant ? (Number(selectedVariant.price_adjustment) || base) : null
-        const displayOriginal = variantPrice !== null ? variantPrice : base
-        const effective = variantPrice !== null ? variantPrice : (hasPromo ? promo : base)
-
-        const pricingUnitPrice = variantPrice !== null ? variantPrice : base
-        const pricingPromo = variantPrice !== null ? null : (hasPromo ? promo : null)
-        const campaignPricingResult = computeItemDisplayPrice(
-            pricingUnitPrice, pricingPromo,
-            activePromotions,
-            { productId: product.id, categoryId: product.category_id || undefined },
-        )
-
-        const bestPrice = campaignPricingResult.bestPrice
-        const discountSource = campaignPricingResult.discountSource
-        const hasCampaignDiscount = discountSource === "campaign"
-        const hasManualPromo = discountSource === "manual"
-        const unitWithAddons = bestPrice + addonsUnitPrice
-        const total = unitWithAddons * quantity
-
-        // Real Pix Discount from Partner's payment methods
-        const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
-        const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = unitWithAddons * quantity * (1 - (pixDiscountPercent / 100))
-
-        // Real Installments from Partner's credit card method
-        const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
-        const hasCC = !!ccMethod
-        const maxInstallments = ccMethod?.max_installments || partner.max_installments || 1
-        const installmentPrice = unitWithAddons / maxInstallments
-
-        const totalDiscountPercent = displayOriginal > 0 ? Math.round(((displayOriginal - bestPrice) / displayOriginal) * 100) : 0
-
-        const campaignDiscountLabel = hasCampaignDiscount && activePromo
-            ? activePromo.discountType === "percentage"
-                ? `${activePromo.discountValue}%`
-                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
-            : `${totalDiscountPercent}%`
-
-        return {
-            current: effective, bestPrice, original: displayOriginal,
-            hasCampaignDiscount, hasManualPromo, total,
-            addonsUnitPrice,
-            pix: pixTotal,
-            pixDiscountPercent,
-            hasCC, maxInstallments, installment: installmentPrice,
-            discountPercent: displayOriginal > 0 ? Math.round(((displayOriginal - promo) / displayOriginal) * 100) : 0,
-            totalDiscountPercent,
-            campaignDiscountLabel,
-        }
-    }, [product, selectedVariant, quantity, partner, activePromo, activePromotions, addonsUnitPrice])
 
     const avgRating = useMemo(() =>
         reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0,

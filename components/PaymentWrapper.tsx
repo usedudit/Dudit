@@ -426,43 +426,41 @@ export function PaymentWrapper({
         }
     }, [paymentConfirmed])
 
+    const lastCheckRef = useRef(0)
+
     const checkPaymentStatus = async () => {
-        const lastCheckRef = useRef(0)
+        const now = Date.now()
 
-        const checkPaymentStatus = async () => {
-            const now = Date.now()
+        if (now - lastCheckRef.current < 3000) return // trava 3s
+        lastCheckRef.current = now
 
-            if (now - lastCheckRef.current < 3000) return // trava 3s
-            lastCheckRef.current = now
+        if (isChecking) return
+        setIsChecking(true)
+        try {
+            const response = await fetch("/api/orders/sync-payment-status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId }),
+            })
 
-            if (isChecking) return
-            setIsChecking(true)
-            try {
-                const response = await fetch("/api/orders/sync-payment-status", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ orderId }),
-                })
-
-                if (response.ok) {
-                    const data = await response.json()
-                    // Se o status for pago (novo ou já vindo de webhook), confirma o pagamento
-                    if (data.newStatus === "paid" || data.paymentStatus === "approved") {
-                        if (data.orderNumber) setActualOrderNumber(data.orderNumber)
-                        setPaymentConfirmed(true)
-                    } else {
-                        // Notifica que ainda está pendente
-                        notification.info("Aguardando Aprovação", "Seu pagamento ainda não foi confirmado pelo banco. Se você já pagou, aguarde uns instantes e tente novamente.")
-                    }
+            if (response.ok) {
+                const data = await response.json()
+                // Se o status for pago (novo ou já vindo de webhook), confirma o pagamento
+                if (data.newStatus === "paid" || data.paymentStatus === "approved") {
+                    if (data.orderNumber) setActualOrderNumber(data.orderNumber)
+                    setPaymentConfirmed(true)
                 } else {
-                    notification.error("Erro ao verificar", "Não conseguimos verificar o status do pagamento. Tente novamente em instantes.")
+                    // Notifica que ainda está pendente
+                    notification.info("Aguardando Aprovação", "Seu pagamento ainda não foi confirmado pelo banco. Se você já pagou, aguarde uns instantes e tente novamente.")
                 }
-            } catch (error) {
-                console.error("Error checking payment status:", error)
-                notification.error("Erro de conexão", "Falha ao se comunicar com o servidor. Verifique sua rede e tente novamente.")
-            } finally {
-                setIsChecking(false)
+            } else {
+                notification.error("Erro ao verificar", "Não conseguimos verificar o status do pagamento. Tente novamente em instantes.")
             }
+        } catch (error) {
+            console.error("Error checking payment status:", error)
+            notification.error("Erro de conexão", "Falha ao se comunicar com o servidor. Verifique sua rede e tente novamente.")
+        } finally {
+            setIsChecking(false)
         }
     }
 

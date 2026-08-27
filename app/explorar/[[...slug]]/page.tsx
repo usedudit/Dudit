@@ -431,13 +431,28 @@ export default async function ExplorarPage({
 
     // Para estados, passa apenas o slug do estado; a função searchMarketplaceByCity filtrará por estado
     const searchSlug = stateSlug ? stateSlug : cidade
-    const { items: exploreItems, moreDistantSellers, moreDistantItems } = await getCachedExploreProducts(query, serverFetchType, searchSlug, section)
+    let exploreItems: any[] = []
+    let moreDistantSellers: any[] = []
+    let moreDistantItems: any[] = []
+
+    try {
+        const fetched = await getCachedExploreProducts(query, serverFetchType, searchSlug, section)
+        exploreItems = fetched.items || []
+        moreDistantSellers = fetched.moreDistantSellers || []
+        moreDistantItems = fetched.moreDistantItems || []
+    } catch (err) {
+        console.error("[ExplorarPage] Error fetching explore products:", err)
+    }
 
     let resolvedCityName: string | null = null
     if (cidade && cidade !== "brasil" && !cidade.startsWith("estado-")) {
-        const resolved = await resolveCityAndStateFromSlug(cidade)
-        if (resolved) {
-            resolvedCityName = `${resolved.city} - ${resolved.state}`
+        try {
+            const resolved = await resolveCityAndStateFromSlug(cidade)
+            if (resolved) {
+                resolvedCityName = `${resolved.city} - ${resolved.state}`
+            }
+        } catch (err) {
+            console.error("[ExplorarPage] Error resolving city:", err)
         }
     }
 
@@ -445,12 +460,24 @@ export default async function ExplorarPage({
         ? { lat: userProfile.latitude, lng: userProfile.longitude }
         : null
     if (!refCoords && searchSlug) {
-        refCoords = await resolveCityCoordsFromSlug(searchSlug)
+        try {
+            refCoords = await resolveCityCoordsFromSlug(searchSlug)
+        } catch (err) {
+            console.error("[ExplorarPage] Error resolving coords:", err)
+        }
     }
 
-    const productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
-    const moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
-    const moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
+    let productsWithDistance = exploreItems
+    let moreDistantSellersWithDistance = moreDistantSellers
+    let moreDistantItemsWithDistance = moreDistantItems
+
+    try {
+        productsWithDistance = enrichMarketplaceDistance(exploreItems || [], refCoords)
+        moreDistantSellersWithDistance = enrichMarketplaceDistance(moreDistantSellers || [], refCoords)
+        moreDistantItemsWithDistance = enrichMarketplaceDistance(moreDistantItems || [], refCoords)
+    } catch (err) {
+        console.error("[ExplorarPage] Error enriching distances:", err)
+    }
 
 
     // Resolução de localização para anúncios:

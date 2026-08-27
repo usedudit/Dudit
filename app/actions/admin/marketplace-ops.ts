@@ -249,15 +249,23 @@ export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<a
                 let courierAvatar = null
 
                 if (storeDelivery.delivery_person_id) {
-                    const { data: partnerUserProf } = await admin
-                        .from("user_profiles")
-                        .select("full_name, phone, avatar_url")
-                        .eq("user_id", storeDelivery.delivery_person_id)
+                    const { data: partnerUser } = await admin
+                        .from("partner_users")
+                        .select("user_id")
+                        .eq("id", storeDelivery.delivery_person_id)
                         .maybeSingle()
-                    if (partnerUserProf) {
-                        courierName = partnerUserProf.full_name || courierName
-                        courierPhone = partnerUserProf.phone || courierPhone
-                        courierAvatar = partnerUserProf.avatar_url
+
+                    if (partnerUser?.user_id) {
+                        const { data: partnerUserProf } = await admin
+                            .from("user_profiles")
+                            .select("full_name, phone, avatar_url")
+                            .eq("user_id", partnerUser.user_id)
+                            .maybeSingle()
+                        if (partnerUserProf) {
+                            courierName = partnerUserProf.full_name || courierName
+                            courierPhone = partnerUserProf.phone || courierPhone
+                            courierAvatar = partnerUserProf.avatar_url
+                        }
                     }
                 }
 

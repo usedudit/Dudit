@@ -20,10 +20,10 @@ import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/mar
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
-import { getProductDisplayImages } from "@/lib/utils/product-display-images"
-import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
+import { getProductDisplayImages, getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { StarIcon } from "@/lib/icons"
+import { StarIcon, ClockIcon } from "@/lib/icons"
+import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateDeliveryFeeLabel } from "@/lib/services/location.service"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
@@ -1187,6 +1187,35 @@ export function ExplorarPageClient({
         const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw) : null
         const locationLabel = getLocationLabel(partner, locationContext)
 
+        // Resolve distance & delivery estimates
+        const storeLat = partner?.latitude ?? item.latitude ?? (item as any).addresses?.[0]?.latitude ?? null
+        const storeLng = partner?.longitude ?? item.longitude ?? (item as any).addresses?.[0]?.longitude ?? null
+
+        let distanceKm: number | null = null
+        if (partner?.distance_km != null && typeof partner.distance_km === "number") {
+            distanceKm = partner.distance_km
+        } else if (item.distance_km != null && typeof item.distance_km === "number") {
+            distanceKm = item.distance_km
+        } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
+            distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+        }
+
+        const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || item.distance_km_formatted || null)
+        const deliveryTime = distanceKm != null ? estimateDeliveryTimeRange(distanceKm) : (partner?.delivery_time_formatted || item.delivery_time_formatted || null)
+
+        const deliverySettings = partner?.delivery_settings || item.delivery_settings || null
+        const deliveryFeeLabel = estimateDeliveryFeeLabel({
+            distanceKm,
+            baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
+            includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
+            extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
+            maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
+            isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+            deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
+        }) || partner?.delivery_fee_formatted || item.delivery_fee_formatted || (deliverySettings?.is_delivery_enabled === false ? "Retirada grátis" : null)
+
+        const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
+
         const imageUrl = isStore
             ? (sellerLogoUrl || partner?.banner_url || "https://img.dudit.com.br/static/Placeholder.png")
             : getPrimaryProductDisplayImage(item)
@@ -1220,9 +1249,32 @@ export function ExplorarPageClient({
                                     {item.subcategoryName && <span className="truncate text-brand-green">{item.subcategoryName}</span>}
                                 </div>
                             )}
-                            {locationLabel && (
+                            {(deliveryTime || distanceLabel || deliveryFeeLabel) ? (
+                                <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400 truncate">
+                                    {deliveryTime && (
+                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0 flex items-center gap-1">
+                                            <ClockIcon size={12} className="text-brand-inactive-text dark:text-dark-body" />
+                                            {deliveryTime}
+                                        </span>
+                                    )}
+                                    {deliveryTime && (distanceLabel || deliveryFeeLabel) && (
+                                        <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                                    )}
+                                    {distanceLabel && (
+                                        <span className="font-medium shrink-0">{distanceLabel}</span>
+                                    )}
+                                    {distanceLabel && deliveryFeeLabel && (
+                                        <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                                    )}
+                                    {deliveryFeeLabel && (
+                                        <span className={`font-semibold shrink-0 ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
+                                            {deliveryFeeLabel}
+                                        </span>
+                                    )}
+                                </div>
+                            ) : locationLabel ? (
                                 <p className="mt-1.5 text-[11px] text-gray-500 dark:text-dark-body font-normal truncate">{locationLabel}</p>
-                            )}
+                            ) : null}
                         </>
                     ) : (
                         <>
@@ -1248,18 +1300,50 @@ export function ExplorarPageClient({
                             {sellerName && (
                                 <>
                                     <div className="border-t border-gray-100 dark:border-dark-border my-2" />
-                                    <div className="flex items-start gap-2 pt-0.5">
+                                    <div className="flex items-center gap-2 pt-0.5">
                                         <UserProfileImage
                                             fullName={sellerName}
                                             imageUrl={sellerLogoUrl}
-                                            className="w-8 h-8 shrink-0"
+                                            className="w-7 h-7 shrink-0"
                                         />
-                                        <div className="flex flex-col min-w-0">
-                                            <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-medium truncate leading-tight">
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            <p className="text-[11px] md:text-xs text-brand-dark dark:text-dark-heading font-semibold truncate leading-tight">
                                                 {sellerName}
                                             </p>
-                                            {locationLabel && (
-                                                <p className="text-[11px] text-gray-500 dark:text-dark-body font-normal truncate">{locationLabel}</p>
+                                            {item.itemType === "servico" ? (
+                                                <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                                    {distanceLabel ? (
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading">{distanceLabel}</span>
+                                                    ) : locationLabel ? (
+                                                        <span className="font-medium">{locationLabel}</span>
+                                                    ) : (
+                                                        <span>Serviço local</span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                                    {deliveryTime && (
+                                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
+                                                    )}
+                                                    {deliveryTime && (distanceLabel || deliveryFeeLabel || locationLabel) && (
+                                                        <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                                    )}
+                                                    {distanceLabel ? (
+                                                        <span className="shrink-0">{distanceLabel}</span>
+                                                    ) : locationLabel ? (
+                                                        <span className="shrink-0">{locationLabel}</span>
+                                                    ) : null}
+                                                    {(distanceLabel || (!deliveryTime && locationLabel)) && deliveryFeeLabel && (
+                                                        <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                                    )}
+                                                    {deliveryFeeLabel ? (
+                                                        <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
+                                                            {deliveryFeeLabel}
+                                                        </span>
+                                                    ) : !deliveryTime && !distanceLabel && !locationLabel ? (
+                                                        <span>Pronta entrega</span>
+                                                    ) : null}
+                                                </div>
                                             )}
                                         </div>
                                     </div>

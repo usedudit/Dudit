@@ -350,6 +350,35 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     const sellerLabel = sellerSubcategory || sellerCategory || null
     const locationLabel = getLocationLabel(partner, locationContext)
 
+    // Resolve distance & delivery estimates
+    const storeLat = partner?.latitude ?? (product as any).latitude ?? (product as any).partners?.latitude ?? null
+    const storeLng = partner?.longitude ?? (product as any).longitude ?? (product as any).partners?.longitude ?? null
+
+    let distanceKm: number | null = null
+    if (partner?.distance_km != null && typeof partner.distance_km === "number") {
+        distanceKm = partner.distance_km
+    } else if ((product as any).distance_km != null && typeof (product as any).distance_km === "number") {
+        distanceKm = (product as any).distance_km
+    } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
+        distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+    }
+
+    const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null)
+    const deliveryTime = distanceKm != null ? estimateDeliveryTimeRange(distanceKm) : (partner?.delivery_time_formatted || (product as any).delivery_time_formatted || null)
+
+    const deliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
+    const deliveryFeeLabel = estimateDeliveryFeeLabel({
+        distanceKm,
+        baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
+        includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
+        extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
+        maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
+        isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+        deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
+    }) || partner?.delivery_fee_formatted || (product as any).delivery_fee_formatted || (deliverySettings?.is_delivery_enabled === false ? "Retirada grátis" : null)
+
+    const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
+
     const preloadedPromos = (product as any)._promotions || preloadedPromotions
 
     const [activePromotions, setActivePromotions] = useState<any[]>(() => {
@@ -557,31 +586,57 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
 
                     {showSeller && <div className="border-t border-gray-100 my-2 dark:border-dark-border" />}
 
-                    {showSeller && <div className="flex items-start gap-2 pt-1">
-                        <UserProfileImage
-                            fullName={sellerName}
-                            imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
-                            className="w-8 h-8 border border-brand-gray shrink-0 dark:border-dark-border"
-                        />
-                        <div className="flex flex-col min-w-0">
-                            <p className="text-[11px] md:text-xs text-brand-dark font-medium truncate leading-tight dark:text-dark-heading">
-                                {sellerName}
-                            </p>
-                            {(locationContext ? locationLabel : (sellerLabel || distance)) && (
-                                <p className="text-[11px] text-gray-500 font-normal truncate dark:text-dark-body">
-                                    {locationContext ? (
-                                        locationLabel && <span>{locationLabel}</span>
-                                    ) : (
-                                        <>
-                                            {sellerLabel && <span>{sellerLabel}</span>}
-                                            {sellerLabel && distance && <span className="w-1 h-1 rounded-full bg-brand-inactive-text inline-block mx-1 align-middle" />}
-                                            {distance && <span>{distance}</span>}
-                                        </>
-                                    )}
+                    {showSeller && (
+                        <div className="flex items-center gap-2 pt-0.5">
+                            <UserProfileImage
+                                fullName={sellerName}
+                                imageUrl={partnerImageUrl && !partnerImageUrl.includes("Placeholder.png") ? partnerImageUrl : null}
+                                className="w-7 h-7 border border-brand-gray shrink-0 dark:border-dark-border"
+                            />
+                            <div className="flex flex-col min-w-0 flex-1">
+                                <p className="text-[11px] md:text-xs text-brand-dark font-semibold truncate leading-tight dark:text-dark-heading">
+                                    {sellerName}
                                 </p>
-                            )}
+                                {itemType === "servico" ? (
+                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        {distanceLabel ? (
+                                            <span className="font-medium text-brand-dark dark:text-dark-heading">{distanceLabel}</span>
+                                        ) : locationLabel ? (
+                                            <span className="font-medium">{locationLabel}</span>
+                                        ) : sellerLabel ? (
+                                            <span className="font-medium">{sellerLabel}</span>
+                                        ) : (
+                                            <span>Serviço local</span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        {deliveryTime && (
+                                            <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
+                                        )}
+                                        {deliveryTime && (distanceLabel || deliveryFeeLabel || locationLabel) && (
+                                            <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                        )}
+                                        {distanceLabel ? (
+                                            <span className="shrink-0">{distanceLabel}</span>
+                                        ) : locationLabel ? (
+                                            <span className="shrink-0">{locationLabel}</span>
+                                        ) : null}
+                                        {(distanceLabel || (!deliveryTime && locationLabel)) && deliveryFeeLabel && (
+                                            <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                        )}
+                                        {deliveryFeeLabel ? (
+                                            <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
+                                                {deliveryFeeLabel}
+                                            </span>
+                                        ) : !deliveryTime && !distanceLabel && !locationLabel ? (
+                                            <span>{sellerLabel || "Pronta entrega"}</span>
+                                        ) : null}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>}
+                    )}
                 </div>
             </Link>
         </div>

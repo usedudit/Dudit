@@ -1370,10 +1370,92 @@ async function browseMarketplaceByScore(
         p_cursor_score: null,
         p_cursor_id: null,
         p_partner_ids: limits.partnerIds?.length ? limits.partnerIds : null,
+        p_store_ids: null,
     })
 
     if (error || !hits?.length) {
-        console.error("[browseMarketplaceByScore]", error?.message)
+        if (error) {
+            console.error("[browseMarketplaceByScore] RPC error, falling back to direct table query:", error.message)
+            try {
+                const fallbackHits: MarketplaceSearchHit[] = []
+                const fetchProducts = type === 'tudo' || type === 'produtos'
+                const fetchServices = type === 'tudo' || type === 'servicos'
+                const fetchStores = type === 'tudo' || type === 'vitrines'
+                const fetchPlans = type === 'tudo' || type === 'planos'
+
+                const promises: Promise<any>[] = []
+
+                if (fetchProducts) {
+                    let pq = supabase
+                        .from("products")
+                        .select("id, marketplace_score, created_at")
+                        .eq("is_active", true)
+                        .eq("show_in_marketplace", true)
+                        .order("marketplace_score", { ascending: false, nullsFirst: false })
+                        .limit(type === 'produtos' ? limitCount : Math.min(limitCount, 20))
+                    if (limits.partnerIds?.length) {
+                        pq = pq.in("partner_id", limits.partnerIds)
+                    }
+                    promises.push(pq.then((r: any) => (r.data || []).map((p: any) => ({ item_type: "produto", id: p.id, rank: p.marketplace_score || 0, created_at: p.created_at }))))
+                }
+
+                if (fetchServices) {
+                    let sq = supabase
+                        .from("services")
+                        .select("id, marketplace_score, created_at")
+                        .eq("is_active", true)
+                        .is("deleted_at", null)
+                        .eq("show_in_marketplace", true)
+                        .order("marketplace_score", { ascending: false, nullsFirst: false })
+                        .limit(type === 'servicos' ? limitCount : Math.min(limitCount, 20))
+                    if (limits.partnerIds?.length) {
+                        sq = sq.in("partner_id", limits.partnerIds)
+                    }
+                    promises.push(sq.then((r: any) => (r.data || []).map((s: any) => ({ item_type: "servico", id: s.id, rank: s.marketplace_score || 0, created_at: s.created_at }))))
+                }
+
+                if (fetchStores) {
+                    let stq = supabase
+                        .from("stores")
+                        .select("id, marketplace_reputation, created_at")
+                        .eq("is_active", true)
+                        .order("marketplace_reputation", { ascending: false, nullsFirst: false })
+                        .limit(type === 'vitrines' ? limitCount : Math.min(limitCount, 10))
+                    if (limits.partnerIds?.length) {
+                        stq = stq.in("partner_id", limits.partnerIds)
+                    }
+                    promises.push(stq.then((r: any) => (r.data || []).map((st: any) => ({ item_type: "loja", id: st.id, rank: st.marketplace_reputation || 0, created_at: st.created_at }))))
+                }
+
+                if (fetchPlans) {
+                    let plq = supabase
+                        .from("recurring_plans")
+                        .select("id, marketplace_score, created_at")
+                        .eq("status", "active")
+                        .eq("show_in_marketplace", true)
+                        .order("marketplace_score", { ascending: false, nullsFirst: false })
+                        .limit(type === 'planos' ? limitCount : Math.min(limitCount, 10))
+                    if (limits.partnerIds?.length) {
+                        plq = plq.in("partner_id", limits.partnerIds)
+                    }
+                    promises.push(plq.then((r: any) => (r.data || []).map((pl: any) => ({ item_type: "plano", id: pl.id, rank: pl.marketplace_score || 0, created_at: pl.created_at }))))
+                }
+
+                const resolvedArrays = await Promise.all(promises)
+                resolvedArrays.forEach(arr => fallbackHits.push(...arr))
+                fallbackHits.sort((a, b) => (Number(b.rank) || 0) - (Number(a.rank) || 0))
+
+                if (fallbackHits.length > 0) {
+                    const sliced = fallbackHits.slice(0, limitCount)
+                    const results = await hydrateMarketplaceSearchHits(sliced, supabase)
+                    const diversified = applySellerDiversity(results)
+                    const finalIds = diversified.map((r) => `${r.itemType}:${r.id}`)
+                    return { results: diversified, filteredIds: finalIds }
+                }
+            } catch (fallbackErr) {
+                console.error("[browseMarketplaceByScore] Table fallback error:", fallbackErr)
+            }
+        }
         return { results: [], filteredIds: [] }
     }
 

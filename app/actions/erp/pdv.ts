@@ -482,7 +482,7 @@ async function syncPosSaleToOrders(params: {
             ? admin.from("products").select("id, name, cost_price").eq("partner_id", params.partnerId).in("id", productIds)
             : Promise.resolve({ data: [] as any[] }),
         variantIds.length > 0
-            ? admin.from("product_variants").select("id, variant_name, cost_price").in("id", variantIds)
+            ? admin.from("product_variants").select("id, variant_name, product_id").in("id", variantIds)
             : Promise.resolve({ data: [] as any[] }),
         serviceIds.length > 0
             ? admin.from("services").select("id, name, service_name, cost_price").eq("partner_id", params.partnerId).in("id", serviceIds)
@@ -490,7 +490,7 @@ async function syncPosSaleToOrders(params: {
     ])
 
     const productCostMap = new Map<string, number>((products || []).map((p: { id: string; cost_price: number | null }) => [p.id, Number(p.cost_price || 0)]))
-    const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; cost_price: number | null }) => [v.id, Number(v.cost_price || 0)]))
+    const variantCostMap = new Map<string, number>((variants || []).map((v: { id: string; product_id: string }) => [v.id, Number(productCostMap.get(v.product_id) || 0)]))
     const serviceCostMap = new Map<string, number>((services || []).map((s: { id: string; cost_price: number | null }) => [s.id, Number(s.cost_price || 0)]))
 
     const productNameMap = new Map<string, string>((products || []).map((p: any) => [p.id, String(p.name || "").trim()]))

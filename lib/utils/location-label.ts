@@ -24,12 +24,16 @@ export function normalizeStateUf(value: string | null | undefined): string {
 }
 
 /**
- * Rótulo de localização exibido abaixo do nome do vendedor nos cards:
- * - Contexto cidade + mesma cidade → bairro (ou distância como fallback)
- * - Contexto cidade + outra cidade do mesmo estado → nome da cidade
- * - Contexto cidade + outro estado → "Cidade, UF"
- * - Contexto estado → nome da cidade
- * - Contexto país → "Cidade, UF"
+ * Rótulo de localização inteligente exibido nos cards:
+ * - Se estiver no escopo da cidade (scope === "city"):
+ *   - Mesma cidade: NÃO exibe "Bairro, Cidade" para não poluir a interface. Retorna null (pois o usuário já sabe em qual cidade está e os cards mostram tempo/distância/frete).
+ *   - Cidade vizinha / outra cidade do mesmo estado: exibe o nome da cidade de origem (ex: "Maringá") para o usuário saber que vem de fora.
+ *   - Outro estado: exibe "Cidade, UF" (ex: "São Paulo, SP").
+ * - Se estiver no escopo de estado (scope === "state"):
+ *   - Mesmo estado: exibe o nome da cidade (ex: "Londrina").
+ *   - Outro estado: exibe "Cidade, UF" (ex: "São Paulo, SP").
+ * - Se estiver no escopo nacional (scope === "country"):
+ *   - Exibe "Cidade, UF" (ex: "Londrina, PR").
  */
 export function getLocationLabel(partner: LocationPartner | null | undefined, context: LocationContext | null | undefined): string | null {
     if (!partner || !context) return null
@@ -52,11 +56,9 @@ export function getLocationLabel(partner: LocationPartner | null | undefined, co
 
     // scope === "city"
     if (sellerCity && ctxCity && sellerCity === ctxCity) {
-        const neighborhood = String(partner.neighborhood || "").trim()
-        if (neighborhood) return `${neighborhood}, ${partner.city}`
-        const distance = partner.distance_km_formatted
-        if (distance) return distance
-        return partner.city || null
+        // Na mesma cidade onde o usuário está navegando, não repetimos a cidade nem o bairro,
+        // pois a informação útil agora é tempo de entrega, distância e frete!
+        return null
     }
 
     if (sellerCity && ctxState && sellerState === ctxState) return partner.city || null

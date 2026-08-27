@@ -44,15 +44,7 @@ function formatOrderId(id: string): string {
 }
 
 export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
-    if (!customer) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Cliente não encontrado.</p>
-                <Button variant="outline" className="mt-4" onClick={onBack}>Voltar</Button>
-            </div>
-        )
-    }
-    const realCustomerId = customer.originalId || customer.id;
+    const realCustomerId = customer?.originalId || customer?.id;
     const { success: notifySuccess, error: notifyError } = useNotification();
     const { openPlanUpgrade } = usePlanUpgrade();
     const { planSlug } = usePermissions();
@@ -353,7 +345,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             };
         }
 
-        if (customer.orders != null && customer.totalOrderValue != null) {
+        if (customer?.orders != null && customer?.totalOrderValue != null) {
             const totalOrders = customer.orders;
             const totalSpent = customer.totalOrderValue;
             const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
@@ -361,7 +353,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             return { totalOrders, totalSpent, avgOrder, lastOrderDate };
         }
 
-        if (customer.orders_count != null) {
+        if (customer?.orders_count != null) {
             const totalOrders = customer.orders_count;
             const totalSpent = customer.total_spent || 0;
             const avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
@@ -377,7 +369,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
             ? formatDate(nonCancelledOrders[0].createdAt)
             : '-';
         return { totalOrders, totalSpent, avgOrder, lastOrderDate };
-    }, [fetchedOrders, customer.orders, customer.totalOrderValue, customer.lastOrderDate, customer.orders_count, customer.total_spent, customer.last_order_at, orderStats]);
+    }, [fetchedOrders, customer?.orders, customer?.totalOrderValue, customer?.lastOrderDate, customer?.orders_count, customer?.total_spent, customer?.last_order_at, orderStats]);
 
     const formattedOrders = useMemo(() => {
         let result = fetchedOrders.map((o: any) => ({
@@ -408,16 +400,18 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                 switch (sortConfig.key) {
                     case "order_id": aVal = a.displayId; bVal = b.displayId; break
-                    case "total": aVal = a.total_amount; bVal = b.total_amount; break
-                    case "status": aVal = a.statusLabel; bVal = b.statusLabel; break
-                    case "channel": aVal = a.order_source; bVal = b.order_source; break
+                    case "items_count": aVal = a.items_count; bVal = b.items_count; break
+                    case "delivery_status": aVal = a.deliveryStatusLabel; bVal = b.deliveryStatusLabel; break
+                    case "payment_status": aVal = a.statusLabel; bVal = b.statusLabel; break
+                    case "order_source": aVal = a.order_source; bVal = b.order_source; break
                     case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
+                    case "total_amount": aVal = a.total_amount; bVal = b.total_amount; break
                     default: return 0
                 }
 
-                if (aVal === bVal) return 0
-                const comparison = aVal < bVal ? -1 : 1
-                return sortConfig.direction === "asc" ? comparison : -comparison
+                if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1
+                if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1
+                return 0
             })
         }
         return result
@@ -433,8 +427,7 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
     const handleDelete = async () => {
         try {
             setIsDeleting(true)
-            const token = await fetchCSRFTokenSingleton() || ""
-            const res = await deleteCustomerAction(realCustomerId, token)
+            const res = await deleteCustomerAction(realCustomerId)
             if (res?.error) {
                 notifyError("Erro ao excluir: " + res.error)
             } else {
@@ -485,6 +478,15 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
         } finally {
             setIsDeleting(false)
         }
+    }
+
+    if (!customer) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body">Cliente não encontrado.</p>
+                <Button variant="outline" className="mt-4" onClick={onBack}>Voltar</Button>
+            </div>
+        )
     }
 
     return (

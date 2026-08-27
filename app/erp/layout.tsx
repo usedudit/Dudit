@@ -54,7 +54,10 @@ export default async function ERPLayout({
       .select("avatar_url")
       .eq("user_id", user.id)
       .maybeSingle()
-      .catch(() => ({ data: null })),
+      .then(
+        (res: any) => res,
+        () => ({ data: null, error: null })
+      ),
     getAllUserPartnerAccess(user),
   ])
 
