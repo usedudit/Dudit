@@ -13,7 +13,7 @@ export default function PrivacyPage() {
         else if (page === 'pricing') router.push('/institucional/planos');
         else if (page === 'terms') router.push('/institucional/termos');
         else if (page === 'privacidade') router.push('/institucional/privacidade');
-        else if (page === 'start-selling') router.push('/erp/trocar-erp');
+        else if (page === 'start-selling') router.push('/erp/inicio');
         else console.log('Navigating to:', page);
     };
 

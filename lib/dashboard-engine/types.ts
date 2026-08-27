@@ -46,6 +46,8 @@ export interface DashboardChecklistItem {
   completed: boolean;
   href?: string;
   tabTarget?: string;
+  actionText?: string;
+  badgeText?: string;
   importOptions?: {
     sellsProducts: boolean;
     sellsServices: boolean;

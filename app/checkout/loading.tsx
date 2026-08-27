@@ -35,9 +35,9 @@ export default function CheckoutLoading() {
         <div className="min-h-screen flex flex-col bg-white dark:bg-dark-background">
 
             {/* Header */}
-            <header className="w-full h-[68px] bg-gray-900 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-50">
-                <SkeletonLoader width={112} height={32} className="rounded bg-gray-700" />
-                <SkeletonLoader width={144} height={16} className="rounded bg-gray-700" />
+            <header className="w-full h-[68px] bg-gray-900 dark:bg-dark-background flex items-center justify-between px-4 lg:px-8 sticky top-0 z-50">
+                <SkeletonLoader width={112} height={32} className="rounded" />
+                <SkeletonLoader width={144} height={16} className="rounded" />
             </header>
 
             <div className="container mx-auto px-4 lg:px-6 max-w-[1300px] w-full pt-6 md:pt-10 pb-32 md:pb-20">

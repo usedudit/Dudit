@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     // Buscar itens modificados recentemente dos 3 tipos
     const [prodRes, servRes, partRes] = await Promise.all([
       supabase.from("products").select("id, updated_at").eq("status", "ativo").eq("is_active", true).eq("moderation_status", "approved").is("deleted_at", null).eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(100),
-      supabase.from("services").select("id, updated_at").eq("status", "ativo").eq("is_active", true).eq("moderation_status", "approved").is("deleted_at", null).eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(50),
+      supabase.from("services").select("id, updated_at").in("status", ["ativo", "active"]).is("deleted_at", null).eq("show_in_marketplace", true).order("updated_at", { ascending: false }).limit(50),
       supabase.from("partners").select("id, updated_at").eq("is_active", true).order("updated_at", { ascending: false }).limit(50)
     ])
 

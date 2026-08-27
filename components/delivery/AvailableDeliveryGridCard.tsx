@@ -35,7 +35,7 @@ export default function AvailableDeliveryGridCard({
             setTimeLeftSeconds(diff)
         }
         calc()
-        const interval = setInterval(calc, 1000)
+        const interval = setInterval(calc, 30000)
         return () => clearInterval(interval)
     }, [offer.assigned_at])
 

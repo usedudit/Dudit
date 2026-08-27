@@ -140,9 +140,9 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl space-y-4 animate-pulse">
-              <SkeletonLoader height={20} width="40%" />
-              <SkeletonLoader height={16} width="60%" />
+            <div key={idx} className="p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl space-y-4">
+              <SkeletonLoader height={20} width="40%" className="rounded" />
+              <SkeletonLoader height={16} width="60%" className="rounded" />
             </div>
           ))}
         </div>

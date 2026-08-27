@@ -93,6 +93,88 @@ export function estimateDeliveryTime(distanceKm: number | null | undefined): num
     return Math.max(10, Math.round(baseMinutes + travelMinutes))
 }
 
+/**
+ * Estima a faixa de tempo de entrega no formato padrão de delivery (ex: "20-30 min", "25-35 min", "35-50 min")
+ */
+export function estimateDeliveryTimeRange(distanceKm: number | null | undefined): string | null {
+    if (!isFiniteNumber(distanceKm) || distanceKm <= 0) return null
+
+    // Base de preparo/expedição: ~15 min
+    // Velocidade média urbana com trânsito e semáforos: ~22 km/h (~2.7 min por km)
+    const basePrepMin = 15
+    const travelMin = (distanceKm / 22) * 60
+    const totalMin = basePrepMin + travelMin
+
+    if (distanceKm < 1.5) {
+        return "20-30 min"
+    } else if (distanceKm <= 3.5) {
+        return "25-35 min"
+    } else if (distanceKm <= 6) {
+        return "30-40 min"
+    } else if (distanceKm <= 10) {
+        return "35-50 min"
+    } else if (distanceKm <= 16) {
+        return "45-60 min"
+    } else {
+        const roundedMin = Math.max(20, Math.floor((totalMin - 5) / 5) * 5)
+        const roundedMax = roundedMin + 15
+        return `${roundedMin}-${roundedMax} min`
+    }
+}
+
+export interface DeliveryFeeEstimateParams {
+    distanceKm?: number | null
+    baseFee?: number | null
+    includedKm?: number | null
+    extraKmPrice?: number | null
+    maxDeliveryKm?: number | null
+    isDeliveryEnabled?: boolean | null
+    deliveryPayer?: "customer" | "seller" | string | null
+    freeDeliveryThreshold?: number | null
+}
+
+/**
+ * Estima o rótulo de taxa de entrega para cards (ex: "Grátis", "R$ 4,99", "Apenas retirada")
+ */
+export function estimateDeliveryFeeLabel(params?: DeliveryFeeEstimateParams | null): string | null {
+    if (!params) return null
+
+    if (params.isDeliveryEnabled === false) {
+        return "Apenas retirada"
+    }
+
+    if (params.deliveryPayer === "seller") {
+        return "Grátis"
+    }
+
+    const baseFee = Number(params.baseFee ?? 0)
+    const includedKm = Number(params.includedKm ?? 0)
+    const extraKmPrice = Number(params.extraKmPrice ?? 0)
+    const maxDeliveryKm = params.maxDeliveryKm != null ? Number(params.maxDeliveryKm) : null
+    const distanceKm = params.distanceKm != null ? Number(params.distanceKm) : null
+
+    if (distanceKm != null && maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm) {
+        return null // Fora do raio de entrega
+    }
+
+    if (baseFee === 0 && extraKmPrice === 0) {
+        return "Grátis"
+    }
+
+    if (distanceKm != null && isFiniteNumber(distanceKm)) {
+        const extraKm = Math.max(0, distanceKm - includedKm)
+        const totalFee = baseFee + (extraKm * extraKmPrice)
+        if (totalFee === 0) return "Grátis"
+        return `R$ ${totalFee.toFixed(2).replace(".", ",")}`
+    }
+
+    if (baseFee > 0) {
+        return `R$ ${baseFee.toFixed(2).replace(".", ",")}`
+    }
+
+    return null
+}
+
 export function buildBoundingBox(center: LocationPoint, radiusKm: number) {
     const normalizedCenter = normalizePoint(center)
     if (!normalizedCenter) return null
@@ -289,18 +371,35 @@ export function enrichMarketplaceDistance<T extends { partners?: any }>(
     return items.map((item) => {
         const partner = item?.partners
         const normalizedPartner = normalizePoint({
-            lat: partner?.latitude,
-            lng: partner?.longitude,
+            lat: partner?.latitude ?? (item as any)?.latitude,
+            lng: partner?.longitude ?? (item as any)?.longitude,
         })
         if (!normalizedPartner) return item
 
         const distanceKm = Number(calculateDistance(normalizedUser, normalizedPartner).toFixed(1))
+        const deliverySettings = partner?.delivery_settings || (item as any)?.delivery_settings || null
+        
+        const deliveryFeeFormatted = estimateDeliveryFeeLabel({
+            distanceKm,
+            baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
+            includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
+            extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
+            maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
+            isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+            deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
+        })
+
+        const distanceFormatted = formatDistanceLabel(distanceKm)
+        const deliveryTimeFormatted = estimateDeliveryTimeRange(distanceKm)
+
         return {
             ...item,
             partners: {
                 ...partner,
                 distance_km: distanceKm,
-                distance_km_formatted: formatDistanceLabel(distanceKm),
+                distance_km_formatted: distanceFormatted,
+                delivery_time_formatted: deliveryTimeFormatted,
+                delivery_fee_formatted: deliveryFeeFormatted,
             },
         }
     })

@@ -226,9 +226,53 @@ export function normalizeActiveResources(value: unknown): SystemResourceId[] {
   return Array.from(new Set(normalized))
 }
 
-export function getDefaultResourcesForCategory(categorySlugOrName?: string): SystemResourceId[] {
+export function getDefaultResourcesForModeAndCategory(mode?: string, categorySlugOrName?: string): SystemResourceId[] {
   const slug = (categorySlugOrName || "").toLowerCase().trim()
+  const normalizedMode = String(mode || "erp").toLowerCase().trim()
 
+  const isFoodOrRetail = slug.includes("alimentacao") || slug.includes("alimentação") || slug.includes("varejo") || slug.includes("mercado")
+  const isServicesCategory = slug.includes("servicos") || slug.includes("serviços") || slug.includes("profissional") || slug.includes("consultoria") || slug.includes("educacao") || slug.includes("educação") || slug.includes("beleza") || slug.includes("estetica") || slug.includes("estética") || slug.includes("saude") || slug.includes("saúde")
+
+  // 1. Modo Desapego / Anúncio Rápido (recursos mínimos)
+  if (normalizedMode === "desapego") {
+    if (isServicesCategory) {
+      return ["services", "showcase"]
+    }
+    return ["products", "showcase"]
+  }
+
+  // 2. Modo Vitrine Rápida / Showcase (recursos comerciais essenciais, sem complexidade de ERP)
+  if (normalizedMode === "quick" || normalizedMode === "showcase") {
+    const quickDefaults: SystemResourceId[] = [
+      "orders",
+      "quotes",
+      "products",
+      "productCadastros",
+      "services",
+      "appointments",
+      "serviceCadastros",
+      "deliveries",
+      "showcase",
+      "customers",
+      "coupons",
+      "campaigns",
+      "communityVideos",
+    ]
+
+    if (isFoodOrRetail) {
+      return quickDefaults.filter(
+        r => r !== "services" && r !== "appointments" && r !== "serviceCadastros"
+      )
+    }
+
+    if (isServicesCategory) {
+      return quickDefaults.filter(r => r !== "deliveries")
+    }
+
+    return quickDefaults
+  }
+
+  // 3. Modo ERP (Gestão Completa - todos os módulos)
   const allDefaults: SystemResourceId[] = [
     "orders",
     "products",
@@ -256,62 +300,32 @@ export function getDefaultResourcesForCategory(categorySlugOrName?: string): Sys
   ]
 
   // Alimentação & Varejo: esconde serviços e agendamentos por padrão
-  if (
-    slug.includes("alimentacao") ||
-    slug.includes("alimentação") ||
-    slug.includes("varejo") ||
-    slug.includes("mercado")
-  ) {
+  if (isFoodOrRetail) {
     return allDefaults.filter(
       r => r !== "services" && r !== "appointments" && r !== "serviceOrders" && r !== "serviceCadastros"
     )
   }
 
-  // Serviços, Profissional / Consultoria & Educação: esconde entregas por padrão
-  if (
-    slug.includes("servicos") ||
-    slug.includes("serviços") ||
-    slug.includes("profissional") ||
-    slug.includes("consultoria") ||
-    slug.includes("educacao") ||
-    slug.includes("educação")
-  ) {
-    return allDefaults.filter(r => r !== "deliveries")
-  }
-
-  // Beleza e Estética & Saúde: esconde entregas por padrão
-  if (
-    slug.includes("beleza") ||
-    slug.includes("estetica") ||
-    slug.includes("estética") ||
-    slug.includes("saude") ||
-    slug.includes("saúde")
-  ) {
+  // Serviços, Profissional / Consultoria, Saúde e Estética: esconde entregas por padrão
+  if (isServicesCategory) {
     return allDefaults.filter(r => r !== "deliveries")
   }
 
   return allDefaults
 }
 
-export function defaultActiveResourcesForBusinessInfo(businessInfo?: { activeResources?: unknown }): SystemResourceId[] {
-  return getDefaultResourcesForCategory()
+export function getDefaultResourcesForCategory(categorySlugOrName?: string): SystemResourceId[] {
+  return getDefaultResourcesForModeAndCategory("erp", categorySlugOrName)
 }
 
-export function resolveActiveResources(businessInfo: { activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
+export function defaultActiveResourcesForBusinessInfo(businessInfo?: { mode?: unknown; activeResources?: unknown }): SystemResourceId[] {
+  const mode = typeof businessInfo?.mode === "string" ? businessInfo.mode : "erp"
+  return getDefaultResourcesForModeAndCategory(mode)
+}
+
+export function resolveActiveResources(businessInfo: { mode?: unknown; activeResources?: unknown; resourcesVersion?: number }): SystemResourceId[] {
   if (Array.isArray(businessInfo?.activeResources)) {
     const current = normalizeActiveResources(businessInfo.activeResources)
-
-    const version = (businessInfo as any).resourcesVersion || 0
-    if (version < 8) {
-      // Se não versionado ou versão anterior, assegura que todos os recursos padrão estejam ativos
-      // para evitar que registros legados com ["orders", "products", "services"] desativem financial, pos, etc.
-      const allDefaults = getDefaultResourcesForCategory()
-      for (const r of allDefaults) {
-        if (!current.includes(r)) {
-          current.push(r)
-        }
-      }
-    }
     return current
   }
   return defaultActiveResourcesForBusinessInfo(businessInfo)

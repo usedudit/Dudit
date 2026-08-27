@@ -20,6 +20,8 @@ import {
     XIcon,
     TelegramIcon,
     LinkedinIcon,
+    QRCodeIcon,
+    EyeIcon,
 } from "@/lib/icons";
 import { Button, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
 import { useToast } from "@/hooks/use-toast";
@@ -163,152 +165,152 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
     );
 }
 
-function QRCodeCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
+function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeName: string }) {
     const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
     const [copied, setCopied] = useState(false);
-    const [showShareOptions, setShowShareOptions] = useState(false);
+    const [showQrModal, setShowQrModal] = useState(false);
     const { toast } = useToast();
 
     const origin = typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br";
     const profileUrl = `${origin}${partnerUrl}`;
 
     React.useEffect(() => {
-        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(profileUrl)}`);
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(profileUrl)}`);
     }, [profileUrl]);
 
     const copyLink = async () => {
         try {
             await navigator.clipboard.writeText(profileUrl);
             setCopied(true);
-            toast({ title: "Link copiado!", description: "O link do seu perfil foi copiado para a área de transferência." });
+            toast({ title: "Link copiado! 📋", description: "O link da sua vitrine foi copiado para a área de transferência." });
             setTimeout(() => setCopied(false), 2000);
         } catch {
             toast({ title: "Erro ao copiar", variant: "destructive" });
         }
     };
 
-    const shareProfile = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: storeName,
-                    text: `Confira meu perfil na Dudit: ${storeName}`,
-                    url: profileUrl,
-                });
-                setShowShareOptions(false);
-            } catch (e) {
-                if ((e as Error).name !== "AbortError") copyLink();
-            }
-        } else {
-            setShowShareOptions(!showShareOptions);
-        }
+    const openWhatsAppShare = () => {
+        const message = `Olá! Conheça nossa vitrine e faça seu pedido online: ${profileUrl}`;
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    };
+
+    const openStore = () => {
+        window.open(profileUrl, "_blank", "noopener,noreferrer");
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[220px] h-full flex flex-col justify-between shadow-sm">
             <div>
-                <div className="flex items-start gap-4">
-                    <div className="bg-brand-gray dark:bg-dark-border/50 rounded-md shrink-0 p-1">
-                        {qrCodeUrl ? (
-                            <img
-                                src={qrCodeUrl}
-                                alt="QR Code do perfil"
-                                className="w-16 h-16 object-contain rounded-md"
-                            />
-                        ) : (
-                            <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border rounded-lg animate-pulse" />
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1 leading-snug">
-                            Seu Perfil de Vendedor
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                            Compartilhe seu perfil com clientes e receba pedidos direto pela sua vitrine.
-                        </p>
-                    </div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-brand-green/10 text-brand-green border border-brand-green/20">
+                        <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                        Vitrine Online no Ar
+                    </span>
+                    <button
+                        onClick={() => setShowQrModal(true)}
+                        className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white flex items-center gap-1 transition-colors"
+                        title="Ver QR Code e Poster"
+                    >
+                        <QRCodeIcon size={14} />
+                        QR Code & Poster
+                    </button>
                 </div>
-            </div>
 
-            <div className="mt-4">
-                <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
+                    Sua Vitrine & Catálogo Online
+                </h3>
+                <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
+                    Compartilhe seu link exclusivo para clientes navegarem pelo seu catálogo e pedirem no WhatsApp.
+                </p>
+
+                {/* Link Box */}
+                <div className="flex items-center justify-between gap-2 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-xl p-2.5 mb-4">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <LinkIcon size={16} className="text-brand-green shrink-0" />
+                        <span className="text-xs font-medium text-brand-dark dark:text-dark-heading truncate font-mono">
+                            {profileUrl}
+                        </span>
+                    </div>
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="gap-2 rounded-full font-semibold text-xs"
+                        className="h-7 px-3 text-xs font-bold text-brand-dark dark:text-dark-heading hover:bg-white dark:hover:bg-dark-surface shrink-0 rounded-lg gap-1.5"
                         onClick={copyLink}
                     >
-                        <CopyIcon className="w-3.5 h-3.5" />
-                        {copied ? "Copiado!" : "Copiar Link"}
+                        <CopyIcon size={13} />
+                        {copied ? "Copiado!" : "Copiar"}
                     </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 rounded-full font-semibold text-xs"
-                        onClick={shareProfile}
-                    >
-                        <ShareIcon className="w-3.5 h-3.5" />
-                        Compartilhar
-                    </Button>
-                    <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
                 </div>
+            </div>
 
-                {showShareOptions && (
-                    <div className="mt-3 p-3 bg-brand-gray/30 dark:bg-dark-border/30 rounded-xl border border-brand-border dark:border-dark-border">
-                        <p className="text-xs font-medium text-brand-dark dark:text-dark-heading mb-2">Compartilhar via:</p>
-                        <div className="flex gap-2 flex-wrap">
-                            <a
-                                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Confira meu perfil na Dudit: ${storeName} ${profileUrl}`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-8 h-8 rounded-full bg-[#25D366] hover:bg-[#25D366]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                title="WhatsApp"
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-brand-border/60 dark:border-dark-border/60">
+                <Button
+                    variant="default"
+                    size="sm"
+                    className="gap-2 rounded-full font-bold text-xs bg-[#25D366] hover:bg-[#20bd5a] text-white border-0 shadow-sm"
+                    onClick={openWhatsAppShare}
+                >
+                    <WhatsappIcon size={15} />
+                    Testar no WhatsApp
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 rounded-full font-semibold text-xs border-brand-border dark:border-dark-border"
+                    onClick={openStore}
+                >
+                    <EyeIcon size={14} />
+                    Abrir Vitrine
+                </Button>
+                <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
+            </div>
+
+            {/* Modal de QR Code */}
+            {showQrModal && (
+                <DefaultModal
+                    isOpen={showQrModal}
+                    onClose={() => setShowQrModal(false)}
+                    title="QR Code da sua Loja"
+                    description="Imprima para colocar no balcão ou compartilhe nas redes sociais"
+                    maxWidth="sm"
+                >
+                    <div className="flex flex-col items-center justify-center p-4 gap-4">
+                        <div className="p-4 bg-white rounded-2xl border border-brand-border shadow-sm">
+                            {qrCodeUrl ? (
+                                <img
+                                    src={qrCodeUrl}
+                                    alt="QR Code da Loja"
+                                    className="w-48 h-48 object-contain rounded-lg"
+                                />
+                            ) : (
+                                <div className="w-48 h-48 bg-brand-gray animate-pulse rounded-lg" />
+                            )}
+                        </div>
+                        <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body max-w-xs font-mono">
+                            {profileUrl}
+                        </p>
+                        <div className="flex items-center gap-2 w-full">
+                            <Button
+                                variant="outline"
+                                className="flex-1 rounded-full text-xs font-bold"
+                                onClick={copyLink}
                             >
-                                <WhatsappIcon size={16} className="text-white" />
-                            </a>
-                            <a
-                                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-8 h-8 rounded-full bg-[#1877F2] hover:bg-[#1877F2]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                title="Facebook"
-                            >
-                                <FacebookIcon size={16} className="text-white" />
-                            </a>
-                            <a
-                                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(storeName)}&url=${encodeURIComponent(profileUrl)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-8 h-8 rounded-full bg-black hover:bg-black/90 flex items-center justify-center transition-transform hover:scale-105"
-                                title="X"
-                            >
-                                <XIcon size={16} className="text-white" />
-                            </a>
-                            <a
-                                href={`https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encodeURIComponent(storeName)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-8 h-8 rounded-full bg-[#26A5E4] hover:bg-[#26A5E4]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                title="Telegram"
-                            >
-                                <TelegramIcon size={16} className="text-white" />
-                            </a>
-                            <a
-                                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-8 h-8 rounded-full bg-[#0A66C2] hover:bg-[#0A66C2]/90 flex items-center justify-center transition-transform hover:scale-105"
-                                title="LinkedIn"
-                            >
-                                <LinkedinIcon size={16} className="text-white" />
-                            </a>
+                                <CopyIcon size={14} className="mr-1.5" />
+                                Copiar Link
+                            </Button>
+                            <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
                         </div>
                     </div>
-                )}
-            </div>
+                </DefaultModal>
+            )}
         </div>
     );
 }
+
+// Alias for backwards compatibility
+const QRCodeCard = VitrineHeroCard;
 
 const helpIconMap: Record<string, React.ComponentType<any>> = {
     HelpCircleIcon,
@@ -325,16 +327,16 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[220px] h-full flex flex-col justify-between shadow-sm">
             <div>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
                     Ajuda e Suporte
                 </h3>
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                    Conte conosco para tirar suas dúvidas.
+                    Estamos aqui para ajudar sua empresa a crescer e vender mais.
                 </p>
 
-                <div className="space-y-1.5 grid grid-cols-1 md:grid-cols-2">
+                <div className="space-y-2 grid grid-cols-1 md:grid-cols-2">
                     {helpItems.map((item) => (
                         <ListItem
                             key={item.label}
@@ -343,37 +345,13 @@ function HelpCard() {
                             description={item.description}
                             right={<ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
                             onClick={() => router.push(item.href)}
-                            className="border-0 bg-transparent hover:bg-brand-gray/40 dark:hover:bg-dark-border/50 p-2 rounded-xl"
+                            className="border-0 bg-brand-gray/50 dark:bg-dark-border/40 hover:bg-brand-gray dark:hover:bg-dark-border/70 p-3 rounded-xl transition-colors"
                         />
                     ))}
                 </div>
             </div>
         </div>
     );
-}
-
-interface Stage {
-    id: string;
-    title: string;
-    items: DashboardChecklistItem[];
-}
-
-const STAGE_CONFIG: { id: string; title: string; itemIds: string[] }[] = [
-    { id: "stage-1", title: "Produtos e Serviços", itemIds: ["items"] },
-    { id: "stage-2", title: "Dados da Loja", itemIds: ["business-data", "showcase"] },
-    { id: "stage-3", title: "Pagamento e Entrega", itemIds: ["payments", "logistics"] },
-];
-
-function buildStages(items: DashboardChecklistItem[]): Stage[] {
-    return STAGE_CONFIG
-        .map((cfg) => ({
-            id: cfg.id,
-            title: cfg.title,
-            items: cfg.itemIds
-                .map((id) => items.find((i) => i.id === id))
-                .filter(Boolean) as DashboardChecklistItem[],
-        }))
-        .filter((st) => st.items.length > 0);
 }
 
 function ProgressCard({
@@ -385,97 +363,127 @@ function ProgressCard({
     onItemClick: (item: DashboardChecklistItem) => void;
     onImportClick: () => void;
 }) {
-    const [currentStageIdx, setCurrentStageIdx] = useState(0);
-
     if (!checklist || checklist.items.length === 0) return null;
 
-    const stages = buildStages(checklist.items);
-    const currentStage = stages[currentStageIdx] || stages[0];
     const totalItems = checklist.items.length;
     const completedItems = checklist.items.filter(i => i.completed).length;
     const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    const remainingCount = totalItems - completedItems;
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-0 min-h-[200px] h-full flex flex-col md:flex-row overflow-hidden">
-            <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 lg:p-7 flex flex-col gap-6 shadow-sm">
+            {/* Header com Progresso */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-brand-border/60 dark:border-dark-border/60">
                 <div>
-                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
-                        Configurações iniciais
-                    </h3>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                        Hora de dar o primeiro passo! Conclua as configurações obrigatórias para começar a usar o ERP.
-                    </p>
-
-                    {/* Barra de progresso geral */}
-                    <div className="mb-2">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                                Progresso geral
-                            </span>
-                            <span className="text-xs font-bold text-brand-green">
-                                {completedItems}/{totalItems} ({progressPercent}%)
-                            </span>
-                        </div>
-                        <div className="w-full h-2 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-brand-green rounded-full transition-all duration-500"
-                                style={{ width: `${progressPercent}%` }}
-                            />
-                        </div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 border border-brand-green/20 px-2.5 py-0.5 rounded-full">
+                            🔥 Quase lá!
+                        </span>
+                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                            {remainingCount === 1 ? "Falta apenas 1 passo" : `Faltam ${remainingCount} passos`}
+                        </span>
                     </div>
+                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                        {progressPercent >= 70
+                            ? "Sua loja está a 1 passo de decolar! 🚀"
+                            : "Configure os detalhes finais para começar a vender"}
+                    </h3>
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                        Você já fez a parte difícil no cadastro. Complete os itens abaixo para receber pedidos e encantar seus clientes.
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-3 mt-4">
-                    <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
-                        Etapa {currentStageIdx + 1} de {stages.length}
-                    </span>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setCurrentStageIdx((p) => Math.max(0, p - 1))}
-                            disabled={currentStageIdx === 0}
-                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                            aria-label="Etapa anterior"
-                        >
-                            <ChevronLeftIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
-                        <button
-                            onClick={() => setCurrentStageIdx((p) => Math.min(stages.length - 1, p + 1))}
-                            disabled={currentStageIdx === stages.length - 1}
-                            className="w-8 h-8 rounded-full flex items-center justify-center border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface disabled:opacity-30 hover:bg-brand-gray/70 dark:hover:bg-dark-border/70 transition-colors"
-                            aria-label="Próxima etapa"
-                        >
-                            <ChevronRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                        </button>
+                {/* Barra de Progresso em Destaque */}
+                <div className="md:w-64 shrink-0 bg-brand-gray dark:bg-dark-border/30 p-3.5 rounded-2xl border border-brand-border dark:border-dark-border">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                            Progresso da Loja
+                        </span>
+                        <span className="text-xs font-bold text-brand-green">
+                            {completedItems}/{totalItems} ({progressPercent}%)
+                        </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-brand-border dark:bg-dark-border rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-brand-green to-emerald-400 rounded-full transition-all duration-500"
+                            style={{ width: `${progressPercent}%` }}
+                        />
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 min-w-0 p-6 flex flex-col gap-2">
-                {currentStage.items.map((item, idx) => (
-                    <div
-                        key={item.id}
-                        onClick={() => onItemClick(item)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all cursor-pointer ${item.completed
-                            ? 'border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5'
-                            : 'border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30'
+            {/* Checklist Items */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {checklist.items.map((item, idx) => {
+                    const isDone = item.completed;
+                    return (
+                        <div
+                            key={item.id}
+                            onClick={() => onItemClick(item)}
+                            className={`group flex items-start gap-3.5 p-4 rounded-2xl border transition-all cursor-pointer ${
+                                isDone
+                                    ? "border-brand-green/25 bg-brand-green/[0.03] dark:bg-brand-green/[0.02]"
+                                    : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-white/20 hover:shadow-sm"
                             }`}
-                    >
-                        <span className={`text-sm font-bold w-6 text-center shrink-0 ${item.completed ? 'text-brand-green' : 'text-brand-inactive-text dark:text-dark-body'
-                            }`}>
-                            {String(idx + 1).padStart(2, "0")}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold truncate ${item.completed ? 'line-through text-brand-inactive-text dark:text-dark-body' : 'text-brand-dark dark:text-dark-heading'}`}>
-                                {item.title}
-                            </p>
+                        >
+                            {/* Number or Checkmark */}
+                            <div className="mt-0.5 shrink-0">
+                                {isDone ? (
+                                    <div className="w-7 h-7 rounded-full bg-brand-green/10 dark:bg-brand-green/20 flex items-center justify-center">
+                                        <CheckCircleIcon size={18} className="text-brand-green" />
+                                    </div>
+                                ) : (
+                                    <div className="w-7 h-7 rounded-full bg-brand-gray dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs font-bold text-brand-dark dark:text-dark-heading group-hover:bg-brand-dark group-hover:text-white dark:group-hover:bg-brand-green dark:group-hover:text-white transition-colors">
+                                        {idx + 1}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Text Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <h4 className={`text-sm font-bold ${isDone ? "text-brand-dark/70 dark:text-dark-heading/70" : "text-brand-dark dark:text-dark-heading"}`}>
+                                        {item.title}
+                                    </h4>
+                                    {item.badgeText && (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            isDone
+                                                ? "bg-brand-green/10 text-brand-green"
+                                                : "bg-brand-gray dark:bg-dark-border text-brand-inactive-text dark:text-dark-body"
+                                        }`}>
+                                            {item.badgeText}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed line-clamp-2">
+                                    {item.description}
+                                </p>
+                            </div>
+
+                            {/* Action Indicator / Button */}
+                            <div className="shrink-0 self-center">
+                                {isDone ? (
+                                    <span className="text-xs font-semibold text-brand-green flex items-center gap-0.5">
+                                        Pronto
+                                    </span>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 px-3 rounded-full text-xs font-bold text-brand-dark dark:text-dark-heading group-hover:bg-brand-dark group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-brand-dark transition-all gap-1"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onItemClick(item);
+                                        }}
+                                    >
+                                        {item.actionText || "Configurar"}
+                                        <ChevronRightIcon size={12} />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-                        {item.completed ? (
-                            <CheckCircleIcon size={18} className="text-brand-green shrink-0" />
-                        ) : (
-                            <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
-                        )}
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

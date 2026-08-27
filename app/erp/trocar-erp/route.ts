@@ -11,15 +11,12 @@ import { clearActivePartner, getAllUserPartnerAccess, setActivePartner } from "@
 export async function GET(request: Request) {
     const allAccess = await getAllUserPartnerAccess()
 
-    // Força a base URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
-
     // Only auto-select if the single ERP belongs to the user
     if (allAccess.length === 1 && allAccess[0].roleId === "owner") {
         await setActivePartner(allAccess[0].partnerId)
-        return NextResponse.redirect(`${baseUrl}/erp/inicio`)
+        return NextResponse.redirect(new URL("/erp/inicio", request.url))
     }
 
     await clearActivePartner()
-    return NextResponse.redirect(`${baseUrl}/select-erp`)
+    return NextResponse.redirect(new URL("/select-erp", request.url))
 }

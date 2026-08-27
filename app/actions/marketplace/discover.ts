@@ -515,8 +515,9 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const supabase = getAdminClient()
     const { data, error } = await supabase
         .from("services")
-        .select(`id, short_id, name, price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
-        .eq("is_active", true)
+        .select(`id, short_id, name, price, promotional_price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+        .in("status", ["ativo", "active"])
+        .is("deleted_at", null)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .order("created_at", { ascending: false })
@@ -539,6 +540,7 @@ const getSharedHomeStoresPool = cache(async (allIdsKey: string, allIds: string[]
             id, short_id, name, slug, description, logo_url, banner_url,
             phone, rating, is_showcase_active, partner_id,
             addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+            delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer),
             partners!inner(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
         .eq("is_active", true)
@@ -1462,17 +1464,25 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const categoryName = rawCategory?.parent?.name || rawCategory?.name || null
         const subcategoryName = rawCategory?.parent ? rawCategory?.name : null
 
+        const basePrice = Number(item.promotional_price || item.price || 0)
+        const originalPrice = item.promotional_price && Number(item.price) > Number(item.promotional_price)
+            ? Number(item.price)
+            : undefined
+
         return {
             id: item.id,
             short_id: item.short_id || null,
             name: item.name,
-            price: Number(item.price || 0),
+            price: basePrice,
+            originalPrice,
             images: item.images || [],
             rating: item.rating,
             category: categoryName,
             subcategoryName,
             partners: partner,
             itemType: "servico" as const,
+            created_at: item.created_at,
+            show_price_in_store: item.show_price_in_store !== false,
         }
     }
 
@@ -1533,6 +1543,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     const vitrineMapper = (store: any) => {
         const p = store.partners
         const addr = Array.isArray(store.addresses) ? store.addresses[0] : store.addresses
+        const rawDelivery = Array.isArray(store.delivery_settings) ? store.delivery_settings[0] : store.delivery_settings
         const storeName = store.name || p?.store_name || "Vendedor"
         const storeImage = store.logo_url || p?.store_image_url
         const categoryName = p?.category?.parent?.name || p?.category?.name || null
@@ -1549,6 +1560,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             rating: store.rating,
             reviewsCount,
             category: categoryName,
+            delivery_settings: rawDelivery || null,
             partners: {
                 id: store.id,
                 store_id: store.id,
@@ -1563,6 +1575,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 city: addr?.city || "",
                 state: addr?.state || "",
                 neighborhood: addr?.neighborhood || null,
+                delivery_settings: rawDelivery || null,
             },
             itemType: "vitrine" as const,
         }

@@ -293,11 +293,14 @@ export async function getDashboardLayout(
 
   // 6. Gera saudação e mensagens baseadas no modo e preenchimento
   const storeName = store?.name?.trim() || "Sua Loja";
+  const remainingCount = totalCount - completedCount;
   const greeting = {
     title: `Olá, ${storeName}! 👋`,
     subtitle: checklist
-      ? "Complete o onboarding para começar a vender na Dudit."
-      : "Veja como está seu negócio hoje no Marketplace."
+      ? (remainingCount === 1
+        ? `🔥 Falta apenas 1 passo para sua vitrine ficar 100% pronta para vender!`
+        : `🔥 Você já concluiu ${percentComplete}% da sua loja! Faltam apenas ${remainingCount} passos para começar a vender.`)
+      : "Veja como está o desempenho do seu negócio hoje e turbine suas vendas."
   };
 
   // 7. Gera a URL pública do perfil do vendedor (baseada na loja ativa)

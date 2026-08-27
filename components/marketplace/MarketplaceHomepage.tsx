@@ -88,7 +88,7 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
 };
 
 import { MapPinIcon, XIcon } from "@/lib/icons"
-import { Search, ShoppingBag, MessageCircle, Sparkles, CheckCircle2, ArrowRight } from "lucide-react"
+import { Search, ShoppingBag, MessageCircle } from "lucide-react"
 import type { LocationContext } from "@/lib/utils/location-label"
 
 function HomeValueProps() {
@@ -118,11 +118,10 @@ function HomeValueProps() {
                     return (
                         <div
                             key={idx}
-                            className={`px-6 md:px-8 flex flex-col justify-start ${
-                                idx < items.length - 1
-                                    ? "md:border-r md:border-dashed md:border-gray-200 dark:md:border-dark-border"
-                                    : ""
-                            }`}
+                            className={`px-6 md:px-8 flex flex-col justify-start ${idx < items.length - 1
+                                ? "md:border-r md:border-dashed md:border-gray-200 dark:md:border-dark-border"
+                                : ""
+                                }`}
                         >
                             <div className="flex items-center gap-3.5 mb-3">
                                 <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm dark:bg-brand-green">
@@ -143,53 +142,34 @@ function HomeValueProps() {
     )
 }
 
-function HomeSellerCTA({ userProfile, router }: { userProfile: any; router: any }) {
+import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
+
+function HomeSellerCTA({ userProfile, router, onAnnounceClick }: { userProfile: any; router: any; onAnnounceClick?: () => void }) {
     return (
-        <section className="my-8 md:my-10 relative overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-brand-dark via-[#094236] to-[#043329] text-white p-6 sm:p-8 md:p-12 shadow-lg">
-            {/* Background ambient accents */}
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-brand-green/20 blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-1/3 -mb-16 w-80 h-80 rounded-full bg-brand-green/10 blur-3xl pointer-events-none" />
+        <section className="my-6 sm:my-8 rounded-2xl md:rounded-3xl bg-[#82e15b] text-[#083b28] p-6 sm:p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="max-w-2xl space-y-2">
+                <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
+                    Nós crescemos<br className="hidden sm:inline" /> com quem cresce junto.
+                </h3>
+                <p className="text-[#083b28]/90 text-sm sm:text-base leading-relaxed">
+                    Venda produtos ou serviços com 0% de comissão.<br className="hidden sm:inline" />
+                    A Dudit se torna melhor com mais pessoas por aqui.
+                </p>
+            </div>
 
-            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
-                <div className="max-w-2xl">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-green/20 text-brand-green text-xs font-bold uppercase tracking-wider mb-4 border border-brand-green/30">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        0% de comissão por venda
-                    </div>
-                    <h3 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight tracking-tight mb-3">
-                        Seu negócio também pode ser encontrado na Dudit
-                    </h3>
-                    <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6">
-                        Você já usa Instagram e WhatsApp? Continue usando. A Dudit é mais uma vitrine para seus produtos e serviços chegarem a mais clientes na sua região, sem taxas abusivas.
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs sm:text-sm font-semibold text-gray-200">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
-                            <span>100% de lucro seu</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
-                            <span>Contato direto no WhatsApp</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
-                            <span>Vitrine rápida e profissional</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="w-full lg:w-auto shrink-0">
-                    <button
-                        onClick={() => {
+            <div className="shrink-0 w-full sm:w-auto">
+                <Button
+                    onClick={() => {
+                        if (onAnnounceClick) {
+                            onAnnounceClick()
+                        } else {
                             router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
-                        }}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-green text-white font-bold py-4 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl text-base group cursor-pointer"
-                    >
-                        <span>Começar a vender de graça</span>
-                        <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                </div>
+                        }
+                    }}
+                    className="w-full sm:w-auto bg-[#083b28] text-white hover:bg-[#063020] px-6 py-3 font-bold text-sm sm:text-base rounded-full cursor-pointer"
+                >
+                    Anunciar na Dudit
+                </Button>
             </div>
         </section>
     )
@@ -231,6 +211,7 @@ export default function MarketplaceHome({
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     const [activeTrend, setActiveTrend] = useState(TRENDS[0])
+    const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
     const [isSavingAddress, setIsSavingAddress] = useState(false)
     const [addressError, setAddressError] = useState<string | null>(null)
@@ -749,10 +730,7 @@ export default function MarketplaceHome({
                 <HeroBanner />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">
-                    {/* 1. Value Props Institucionais (3 Cards) */}
-                    <HomeValueProps />
-
-                    {/* 2. Seção de Produtos */}
+                    {/* 1. Seção de Produtos */}
                     {productSection && productSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={productSection.id}
@@ -765,10 +743,14 @@ export default function MarketplaceHome({
                         />
                     )}
 
-                    {/* 3. Banner / Card de Atração para Vendedores */}
-                    <HomeSellerCTA userProfile={userProfile} router={router} />
+                    {/* 2. Banner / Card de Atração para Vendedores */}
+                    <HomeSellerCTA
+                        userProfile={userProfile}
+                        router={router}
+                        onAnnounceClick={() => setIsAnnounceModalOpen(true)}
+                    />
 
-                    {/* 4. Seção de Serviços */}
+                    {/* 3. Seção de Serviços */}
                     {serviceSection && serviceSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={serviceSection.id}
@@ -781,7 +763,7 @@ export default function MarketplaceHome({
                         />
                     )}
 
-                    {/* 5. Seção de Lojas e Vitrines */}
+                    {/* 4. Seção de Lojas e Vitrines */}
                     {vitrineSection && vitrineSection.items.length > 0 && (
                         <HorizontalCarousel
                             key={vitrineSection.id}
@@ -789,12 +771,15 @@ export default function MarketplaceHome({
                             subtitle={vitrineSection.subtitle}
                             items={vitrineSection.items}
                             onSeeAll={vitrineSection.seeMoreLink ? () => router.push(vitrineSection.seeMoreLink!) : undefined}
-                            renderItem={(item: any) => <VitrineCard vitrine={item} locationContext={locationContext} className="w-full" />}
+                            renderItem={(item: any) => <VitrineCard vitrine={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                             itemWidthClass="w-[270px] sm:w-[320px]"
                         />
                     )}
 
-                    {/* 6. Outras seções eventuais */}
+                    {/* 6. Value Props Institucionais (3 Cards) */}
+                    <HomeValueProps />
+
+                    {/* 7. Outras seções eventuais */}
                     {otherSections.map((section) => {
                         const onSeeAll = section.seeMoreLink ? () => router.push(section.seeMoreLink!) : undefined
                         if (section.id === "topVitrines") {
@@ -805,7 +790,7 @@ export default function MarketplaceHome({
                                     subtitle={section.subtitle}
                                     items={section.items}
                                     onSeeAll={onSeeAll}
-                                    renderItem={(item: any) => <VitrineCard vitrine={item} locationContext={locationContext} className="w-full" />}
+                                    renderItem={(item: any) => <VitrineCard vitrine={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                                     itemWidthClass="w-[270px] sm:w-[320px]"
                                 />
                             )
@@ -825,6 +810,12 @@ export default function MarketplaceHome({
                 </div>
 
                 <SponsoredAdsCarousel ads={homeAds || []} slot="home" title="Patrocinados na sua região" />
+
+                <QuickAnnounceModal
+                    isOpen={isAnnounceModalOpen}
+                    onClose={() => setIsAnnounceModalOpen(false)}
+                    userProfile={userProfile}
+                />
 
                 {renderAddressModal()}
                 {renderVisitorModal()}

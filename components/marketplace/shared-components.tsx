@@ -16,6 +16,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
+import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateDeliveryFeeLabel } from "@/lib/services/location.service"
 import Button from "../reusable/Button"
 
 const HOME_BANNERS = [
@@ -52,9 +53,10 @@ interface VitrineCardProps {
     hideCity?: boolean
     className?: string
     locationContext?: LocationContext | null
+    userCoords?: { lat: number; lng: number } | null
 }
 
-export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null }) => {
+export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity = false, className = "w-[280px] md:w-[320px]", locationContext = null, userCoords = null }) => {
     // Resolve partner object (handle array or object)
     const rawPartner = Array.isArray(vitrine.partners) ? vitrine.partners[0] : vitrine.partners
     const partner = rawPartner || {}
@@ -81,6 +83,35 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const showRating = (vitrine.rating ?? partner.rating ?? 0) > 0
     const locationLabel = getLocationLabel(partner, locationContext)
 
+    // Resolve distance (O(1) in-memory calculation)
+    const storeLat = partner.latitude ?? vitrine.latitude ?? vitrine.addresses?.[0]?.latitude ?? null
+    const storeLng = partner.longitude ?? vitrine.longitude ?? vitrine.addresses?.[0]?.longitude ?? null
+
+    let distanceKm: number | null = null
+    if (partner.distance_km != null && typeof partner.distance_km === "number") {
+        distanceKm = partner.distance_km
+    } else if (vitrine.distance_km != null && typeof vitrine.distance_km === "number") {
+        distanceKm = vitrine.distance_km
+    } else if (userCoords?.lat && userCoords?.lng && storeLat != null && storeLng != null) {
+        distanceKm = Number(calculateDistance(userCoords, { lat: storeLat, lng: storeLng }).toFixed(1))
+    }
+
+    const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null)
+    const deliveryTime = distanceKm != null ? estimateDeliveryTimeRange(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted || null)
+
+    const deliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
+    const deliveryFeeLabel = estimateDeliveryFeeLabel({
+        distanceKm,
+        baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
+        includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
+        extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
+        maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
+        isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+        deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
+    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || null
+
+    const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
+
     return (
         <Link
             href={getStoreUrl({ ...partner, ...vitrine })}
@@ -91,7 +122,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                 <img
                     src={bannerImage}
                     alt={storeName}
-                    className="w-full h-full object-cover object-center"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
                 />
                 <div className="absolute inset-0" />
@@ -104,21 +135,21 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                     className="w-12 h-12 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <h3 className="font-bold text-brand-dark text-base truncate dark:text-dark-heading">
+                    <div className="flex items-center justify-between gap-1 min-w-0">
+                        <h3 className="font-bold text-brand-dark text-base truncate dark:text-dark-heading group-hover:text-brand-green transition-colors">
                             {storeName}
                         </h3>
                         {showRating && (
-                            <div className="flex items-center gap-0.5 shrink-0 ml-0.5">
-                                <StarIcon size={10} className="text-brand-green fill-brand-green" />
+                            <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                                <StarIcon size={10} className="text-amber-500 fill-amber-500" />
                                 <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{Number(vitrine.rating ?? partner.rating).toFixed(1)}</span>
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5 dark:text-dark-body">
+                    <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5 dark:text-dark-body truncate">
                         {category && (
                             <>
-                                <span className="font-medium truncate">{category}</span>
+                                <span className="font-medium shrink-0 truncate">{category}</span>
                                 {locationLabel && (
                                     <span className="w-1 h-1 rounded-full bg-brand-inactive-text shrink-0" />
                                 )}
@@ -128,6 +159,30 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                             <span className="font-medium truncate">{locationLabel}</span>
                         )}
                     </div>
+                    {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                        <div className="flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400 mt-1 truncate">
+                            {deliveryTime && (
+                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0 flex items-center gap-1">
+                                    <ClockIcon size={12} className="text-brand-inactive-text dark:text-dark-body" />
+                                    {deliveryTime}
+                                </span>
+                            )}
+                            {deliveryTime && (distanceLabel || deliveryFeeLabel) && (
+                                <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                            )}
+                            {distanceLabel && (
+                                <span className="font-medium shrink-0">{distanceLabel}</span>
+                            )}
+                            {distanceLabel && deliveryFeeLabel && (
+                                <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                            )}
+                            {deliveryFeeLabel && (
+                                <span className={`font-semibold shrink-0 ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
+                                    {deliveryFeeLabel}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </Link>

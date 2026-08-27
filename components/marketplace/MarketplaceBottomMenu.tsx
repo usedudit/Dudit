@@ -231,7 +231,7 @@ export function MarketplaceBottomMenu() {
                                 <MenuItem label="Início" href="/" icon={HomeIcon} onClose={() => setIsMenuOpen(false)} />
                                 <MenuItem
                                     label="Central de Vendedores"
-                                    href={user ? "/erp/trocar-erp" : "/auth/login?mode=partner"}
+                                    href={user ? "/erp/inicio" : "/auth/login?mode=partner"}
                                     icon={StoreIcon}
                                     onClose={() => setIsMenuOpen(false)}
                                 />

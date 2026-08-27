@@ -8,6 +8,7 @@ import { Button } from "@/components/reusable"
 import { InfoCard } from "@/components/reusable"
 import MarketplaceFooter from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { EnforcementAppealModal } from "@/components/erp/EnforcementAppealModal"
 
 // ─── Background ──────────────────────────────────────────────────────────────
 const WavesBackground = React.memo(() => (
@@ -63,6 +64,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 export default function BannedView({ profile, user }: { profile: any; user?: any }) {
     const [copied, setCopied] = React.useState(false)
     const [copiedAll, setCopiedAll] = React.useState(false)
+    const [isAppealModalOpen, setIsAppealModalOpen] = React.useState(false)
 
     // Determina o ID do caso (se não existir, gera um determinístico baseado no ID do usuário)
     const rawCaseId = profile?.banned_case_id
@@ -191,10 +193,12 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
 
             {/* Ações de Recurso */}
             <div className="w-full space-y-2.5">
-                <Button asChild className="w-full h-[46px] text-[15px] font-bold">
-                    <a href={appealMailUrl}>
-                        Solicitar Recurso por E-mail
-                    </a>
+                <Button
+                    type="button"
+                    onClick={() => setIsAppealModalOpen(true)}
+                    className="w-full h-[46px] text-[15px] font-bold"
+                >
+                    Recorrer da Decisão
                 </Button>
 
                 <Button
@@ -211,6 +215,18 @@ export default function BannedView({ profile, user }: { profile: any; user?: any
                     ← Sair da conta
                 </button>
             </form>
+
+            <EnforcementAppealModal
+                isOpen={isAppealModalOpen}
+                onClose={() => setIsAppealModalOpen(false)}
+                caseId={caseId}
+                entityId={profile?.user_id || user?.id || "user"}
+                entityName={profile?.full_name || user?.email || "Usuário"}
+                entityType="user"
+                reason={reasonText}
+                userEmail={user?.email}
+                userName={profile?.full_name}
+            />
         </Shell>
     )
 }

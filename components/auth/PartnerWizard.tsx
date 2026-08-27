@@ -18,7 +18,7 @@ import { CepInput, PasswordInput, StateComboBox, PasswordStrengthMeter } from "@
 import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { useSupabase } from "@/providers/supabase-provider"
 import type { BusinessMode } from "@/lib/business-info"
-import { getDefaultResourcesForCategory } from "@/lib/system-resources"
+import { getDefaultResourcesForModeAndCategory } from "@/lib/system-resources"
 import { isGifFile } from "@/lib/security/file-validator"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
@@ -47,16 +47,22 @@ const MODE_OPTIONS: Array<{
     description: string
 }> = [
         {
+            value: "desapego",
+            icon: Tag,
+            title: "Anúncio Rápido / Desapego",
+            description: "Vender itens pontuais, desapegos ou serviços simples sem burocracia",
+        },
+        {
             value: "quick",
             icon: Store,
-            title: "Anunciar rápido",
-            description: "Só quero divulgar e vender meus produtos ou serviços na minha cidade",
+            title: "Vitrine Online & WhatsApp",
+            description: "Catálogo e vitrine profissional com minha marca para vender no WhatsApp e Marketplace",
         },
         {
             value: "erp",
             icon: Briefcase,
-            title: "Gerenciar meu negócio",
-            description: "Quero organizar pedidos, clientes e tudo do meu negócio",
+            title: "Gerenciar meu negócio (ERP)",
+            description: "Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios",
         },
     ]
 
@@ -103,17 +109,21 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const actualStep = isUserLoggedIn ? step - 1 : step
     const totalSteps = isUserLoggedIn ? 3 : 4
 
-    const setMode = (mode: BusinessMode) =>
+    const setMode = (mode: BusinessMode) => {
+        const defaultResources = getDefaultResourcesForModeAndCategory(mode, partnerData.categoryName)
         setPartnerData(prev => ({
             ...prev,
             businessInfo: {
                 ...prev.businessInfo,
                 mode,
+                activeResources: defaultResources,
             },
         }))
+    }
 
     const handleCategorySelect = (selected: { categoryId: string; subcategoryId: string | null; name: string; path: string }) => {
-        const defaultResources = getDefaultResourcesForCategory(selected.path)
+        const mode = partnerData.businessInfo.mode || "quick"
+        const defaultResources = getDefaultResourcesForModeAndCategory(mode, selected.path)
         setPartnerData(prev => ({
             ...prev,
             categoryId: selected.categoryId,

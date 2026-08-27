@@ -1,11 +1,17 @@
 import { createClient } from "@/lib/supabase/client"
 
+let cachedRootProductCategories: { id?: string; name: string; icon_url: string | null; parent_id?: string | null }[] | null = null
+let cachedRootServiceCategories: { id?: string; name: string; icon_url: string | null; parent_id?: string | null }[] | null = null
+let cachedRootPartnerCategories: { id?: string; name: string; icon_url: string | null; parent_id?: string | null }[] | null = null
+
 /**
- * Client-side fetcher for marketplace categories.
- * Uses direct Supabase GET requests via the browser client.
- * This avoids the overhead and POST requests of Server Actions.
+ * Client-side fetcher for marketplace product categories with in-memory caching.
  */
 export async function getMarketplaceCategoriesClient(parentId: string | null = null) {
+  if (parentId === null && cachedRootProductCategories) {
+    return cachedRootProductCategories
+  }
+
   const supabase = createClient()
   
   let query = supabase
@@ -22,10 +28,14 @@ export async function getMarketplaceCategoriesClient(parentId: string | null = n
   const { data, error } = await query
   if (error) {
     console.error("Error fetching marketplace categories:", error)
-    return []
+    return cachedRootProductCategories || []
   }
 
-  return data || []
+  const result = data || []
+  if (parentId === null) {
+    cachedRootProductCategories = result
+  }
+  return result
 }
 
 /**
@@ -52,9 +62,13 @@ export async function getCategoryPathClient(categoryId: string) {
 }
 
 /**
- * Client-side fetcher for marketplace service categories.
+ * Client-side fetcher for marketplace service categories with in-memory caching.
  */
 export async function getMarketplaceServiceCategoriesClient(parentId: string | null = null) {
+  if (parentId === null && cachedRootServiceCategories) {
+    return cachedRootServiceCategories
+  }
+
   const supabase = createClient()
 
   let query = supabase
@@ -71,16 +85,24 @@ export async function getMarketplaceServiceCategoriesClient(parentId: string | n
   const { data, error } = await query
   if (error) {
     console.error("Error fetching marketplace service categories:", error)
-    return []
+    return cachedRootServiceCategories || []
   }
 
-  return data || []
+  const result = data || []
+  if (parentId === null) {
+    cachedRootServiceCategories = result
+  }
+  return result
 }
 
 /**
- * Client-side fetcher for marketplace partner (store) categories.
+ * Client-side fetcher for marketplace partner (store) categories with in-memory caching.
  */
 export async function getMarketplacePartnerCategoriesClient(parentId: string | null = null) {
+  if (parentId === null && cachedRootPartnerCategories) {
+    return cachedRootPartnerCategories
+  }
+
   const supabase = createClient()
 
   let query = supabase
@@ -97,8 +119,24 @@ export async function getMarketplacePartnerCategoriesClient(parentId: string | n
   const { data, error } = await query
   if (error) {
     console.error("Error fetching marketplace partner categories:", error)
-    return []
+    return cachedRootPartnerCategories || []
   }
 
-  return data || []
+  const result = data || []
+  if (parentId === null) {
+    cachedRootPartnerCategories = result
+  }
+  return result
+}
+
+/**
+ * Parallel fetcher for all 3 category types.
+ */
+export async function fetchAllMarketplaceCategoriesClient() {
+  const [products, services, partners] = await Promise.all([
+    getMarketplaceCategoriesClient(null),
+    getMarketplaceServiceCategoriesClient(null),
+    getMarketplacePartnerCategoriesClient(null),
+  ])
+  return { products, services, partners }
 }

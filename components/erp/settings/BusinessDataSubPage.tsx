@@ -25,7 +25,7 @@ import {
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { updateStoreAction } from "@/app/actions/erp/stores"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon, UserIcon, StoreIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon, UserIcon, StoreIcon, TagIcon, BriefcaseIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
@@ -34,10 +34,9 @@ import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { validateBrazilMobile, validateCPF, validateCNPJ } from "@/lib/input-validator"
+import { normalizeBusinessInfo, type BusinessMode } from "@/lib/business-info"
 import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import type { BusinessMode } from "@/lib/business-info"
-import { normalizeBusinessInfo } from "@/lib/business-info"
 import { consultarCNPJ } from "@/lib/fiscal"
 
 const MODE_OPTIONS: Array<{
@@ -47,16 +46,22 @@ const MODE_OPTIONS: Array<{
     description: string
 }> = [
         {
+            value: "desapego",
+            icon: TagIcon,
+            title: "Anúncio Rápido / Desapego",
+            description: "Vender itens pontuais, desapegos ou serviços simples sem burocracia",
+        },
+        {
             value: "quick",
             icon: Store,
-            title: "Anunciar rápido",
-            description: "Só quero divulgar e vender meus produtos ou serviços na minha cidade",
+            title: "Vitrine Online & WhatsApp",
+            description: "Catálogo e vitrine profissional com minha marca para vender no WhatsApp e Marketplace",
         },
         {
             value: "erp",
-            icon: HomeIcon,
-            title: "Gerenciar meu negócio",
-            description: "Quero organizar pedidos, clientes e tudo do meu negócio",
+            icon: BriefcaseIcon,
+            title: "Gerenciar meu negócio (ERP)",
+            description: "Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios",
         },
     ]
 

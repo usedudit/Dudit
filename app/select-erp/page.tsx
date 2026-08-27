@@ -107,17 +107,17 @@ export default async function SelectErpPage() {
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="truncate">{access.storeName}</span>
                                                         {isOwn ? (
-                                                            <p className="text-xs font-bold text-brand-green">Sua loja · Matriz</p>
+                                                            <span className="text-xs font-bold text-brand-green">Sua loja · Matriz</span>
                                                         ) : (
-                                                            <p className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</p>
+                                                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body">{roleLabel}</span>
                                                         )}
                                                     </div>
                                                 }
                                                 description={
                                                     isOwn
-                                                        ? `${access.partnerName} - você pode alternar entre matriz e filiais depois de entrar`
+                                                        ? "Você pode alternar entre matriz e filiais depois de entrar"
                                                         : access.ownerName
-                                                            ? `${access.partnerName} · Proprietário: ${access.ownerName}`
+                                                            ? `Proprietário: ${access.ownerName}`
                                                             : access.partnerName
                                                 }
                                                 showChevron={true}

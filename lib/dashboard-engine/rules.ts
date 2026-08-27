@@ -9,43 +9,52 @@ import {
 } from "./types";
 
 /**
- * Retorna os itens do checklist de onboarding dinâmico
+ * Retorna os itens do checklist de onboarding dinâmico e inteligente
  */
 export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem[] {
   const items: DashboardChecklistItem[] = [];
 
-  // 1. Dados do Negócio (combina: Dados Gerais + Endereço + Horários)
-  const dadosNegocioCompleted = ctx.hasPhone && ctx.hasCategory && ctx.hasAddress && ctx.hasHours;
+  // 1. Dados Básicos da Loja (Nome + WhatsApp + Categoria + Endereço)
+  // O usuário já preenche isso no cadastro, então já nasce completo como vitória inicial (Endowed Progress)
+  const dadosNegocioCompleted = ctx.hasPhone && ctx.hasCategory && ctx.hasAddress;
   items.push({
     id: "business-data",
-    title: "Dados do Negócio",
-    description: "Complete o nome da loja, categoria, WhatsApp, endereço e horários de funcionamento.",
+    title: "Dados da sua Loja",
+    description: "Nome, WhatsApp, categoria e endereço comercial já foram configurados.",
     completed: dadosNegocioCompleted,
+    actionText: "Revisar Dados",
+    badgeText: "Concluído no cadastro",
     tabTarget: "dados-do-negocio"
   });
 
-  // 2. Itens (Produtos/Serviços) - com accordion para importação
-  const itemTitle = ctx.sellsProducts && ctx.sellsServices
-    ? "Cadastrar Produtos ou Serviços"
-    : ctx.sellsServices
-      ? "Cadastrar Serviços"
-      : "Cadastrar Produtos";
+  // 2. Catálogo de Itens (Produtos e/ou Serviços)
+  const isHybrid = ctx.sellsProducts && ctx.sellsServices;
+  const isServicesOnly = ctx.sellsServices && !ctx.sellsProducts;
 
-  const itemDescription = ctx.sellsProducts && ctx.sellsServices
-    ? "Adicione itens ao catálogo: cadastre manualmente, importe via planilha ou XML (NF-e)."
-    : ctx.sellsServices
-      ? "Adicione serviços: cadastre manualmente ou importe via planilha."
-      : "Adicione produtos: cadastre manualmente, importe via planilha ou XML (NF-e).";
+  let itemTitle = "Publicar seu 1º produto";
+  let itemDesc = "Adicione foto, nome e preço. Você também pode importar direto via XML de NF-e ou planilha!";
+  let itemAction = "Adicionar Produto";
+
+  if (isHybrid) {
+    itemTitle = "Cadastrar produtos ou serviços";
+    itemDesc = "Adicione seus primeiros itens ao catálogo para começar a vender online e no balcão.";
+    itemAction = "Adicionar Itens";
+  } else if (isServicesOnly) {
+    itemTitle = "Cadastrar seu 1º serviço";
+    itemDesc = "Defina o nome do serviço, duração média e preço para receber agendamentos e pedidos.";
+    itemAction = "Adicionar Serviço";
+  }
 
   const itemHref = ctx.sellsProducts ? "/erp/produtos?create=true" : "/erp/servicos?create=true";
 
   items.push({
     id: "items",
     title: itemTitle,
-    description: itemDescription,
+    description: itemDesc,
     completed: ctx.hasItems,
     href: ctx.hasItems ? undefined : itemHref,
-    // Novos campos para o accordion de importação
+    actionText: itemAction,
+    badgeText: "⚡ 1 minuto",
     importOptions: {
       sellsProducts: ctx.sellsProducts,
       sellsServices: ctx.sellsServices,
@@ -54,34 +63,59 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
     }
   });
 
-  // 3. Forma de Recebimento (apenas planos Crescer/Escalar)
+  // 3. Horários de Atendimento (Especialmente importante para prestadores de serviços / atendimento local)
+  if (isServicesOnly) {
+    items.push({
+      id: "hours",
+      title: "Definir horários de atendimento",
+      description: "Informe os dias e horários em que você está disponível para atender clientes.",
+      completed: ctx.hasHours,
+      actionText: "Ajustar Horários",
+      tabTarget: "dados-do-negocio"
+    });
+  }
+
+  // 4. Formas de Recebimento
   if (ctx.planSlug === "crescer" || ctx.planSlug === "escalar") {
     items.push({
       id: "payments",
-      title: "Forma de Recebimento",
-      description: "Configure Pix, Mercado Pago e outras formas de pagamento para receber online.",
+      title: "Ativar recebimento online (Mercado Pago)",
+      description: "Conecte sua conta para receber no Pix automático e cartão com aprovação imediata.",
       completed: ctx.hasPix || ctx.isMercadoPagoConnected,
+      actionText: "Conectar Pagamento",
+      badgeText: "Pix Automático",
+      tabTarget: "formas-de-pagamento"
+    });
+  } else {
+    items.push({
+      id: "payments",
+      title: "Definir chave Pix para recebimento",
+      description: "Cadastre sua chave Pix para seus clientes transferirem direto para você.",
+      completed: ctx.hasPix,
+      actionText: "Definir Pix",
       tabTarget: "formas-de-pagamento"
     });
   }
 
-  // 4. Entregas/Logística (apenas se tem endereço e plano Crescer/Escalar)
-  if ((ctx.planSlug === "crescer" || ctx.planSlug === "escalar") && ctx.hasAddress) {
+  // 5. Entregas e Logística (Apenas para quem vende PRODUTOS físicos e tem plano Crescer/Escalar com endereço)
+  if (ctx.sellsProducts && (ctx.planSlug === "crescer" || ctx.planSlug === "escalar") && ctx.hasAddress) {
     items.push({
       id: "logistics",
-      title: "Entregas e Logística",
-      description: "Configure áreas de entrega, taxas, transportadoras e prazos para seus pedidos.",
+      title: "Configurar taxas de entrega",
+      description: "Defina sua taxa fixa ou valor por km para o cálculo automático no checkout.",
       completed: ctx.hasDeliveryConfig,
+      actionText: "Configurar Frete",
       tabTarget: "entregas"
     });
   }
 
-  // 5. Visual da Vitrine
+  // 6. Visual da Vitrine Online & Marca
   items.push({
     id: "showcase",
-    title: "Visual da sua Vitrine",
-    description: "Personalize sua logo e banner para atrair clientes.",
+    title: "Personalizar sua Vitrine Online",
+    description: "Adicione sua logo e banner para deixar seu catálogo público com a cara da sua marca.",
     completed: ctx.hasLogoAndBanner,
+    actionText: "Personalizar Vitrine",
     tabTarget: "vitrine"
   });
 
@@ -109,7 +143,7 @@ export function getCards(ctx: DashboardContext): DashboardCard[] {
       id: "active-services",
       title: "Serviços Ativos",
       value: ctx.stats.activeServicesCount,
-      subtitle: "Serviços publicados",
+      subtitle: "Serviços publicados no catálogo",
       icon: "WrenchIcon",
       href: "/erp/servicos"
     });
@@ -118,7 +152,7 @@ export function getCards(ctx: DashboardContext): DashboardCard[] {
       id: "active-products",
       title: "Produtos Ativos",
       value: ctx.stats.activeProductsCount,
-      subtitle: "Produtos publicados",
+      subtitle: "Produtos publicados no catálogo",
       icon: "Package",
       href: "/erp/produtos"
     });
@@ -146,8 +180,8 @@ export function getShortcuts(ctx: DashboardContext): DashboardShortcut[] {
   if (ctx.sellsProducts) {
     shortcuts.push({
       id: "add-product",
-      label: "Anunciar Produto",
-      description: "Crie um novo anúncio no marketplace",
+      label: "Novo Produto",
+      description: "Cadastre ou importe um produto",
       icon: "PlusIcon",
       href: "/erp/produtos?create=true"
     });
@@ -156,8 +190,8 @@ export function getShortcuts(ctx: DashboardContext): DashboardShortcut[] {
   if (ctx.sellsServices) {
     shortcuts.push({
       id: "add-service",
-      label: "Anunciar Serviço",
-      description: "Ofereça um novo serviço aos clientes",
+      label: "Novo Serviço",
+      description: "Cadastre um novo serviço ou procedimento",
       icon: "WrenchIcon",
       href: "/erp/servicos?create=true"
     });
@@ -176,11 +210,11 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
   if (ctx.planSlug === "free" && ctx.sellsProducts && ctx.stats.activeProductsCount >= 15) {
     alerts.push({
       id: "alert-product-limit",
-      title: "Limite de produtos atingido",
-      description: "Você atingiu o limite de 15 produtos do plano grátis. Faça upgrade para continuar cadastrando.",
+      title: "Você atingiu o limite de 15 produtos!",
+      description: "Para continuar cadastrando mais produtos e expandir sua vitrine, migre para o Plano Crescer.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
-      actionHref: "/erp/configuracoes" // Direciona para a aba de planos
+      actionHref: "/erp/configuracoes"
     });
   }
 
@@ -188,8 +222,8 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
   if (ctx.planSlug === "free" && ctx.stats.monthlyOrdersCount >= 25) {
     alerts.push({
       id: "alert-orders-limit",
-      title: "Limite de pedidos atingido",
-      description: "Você atingiu o limite de 25 pedidos mensais do plano grátis. Faça upgrade para continuar vendendo.",
+      title: "Limite de 25 pedidos mensais atingido!",
+      description: "Seu negócio está crescendo! Faça o upgrade para continuar recebendo pedidos sem interrupções.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
       actionHref: "/erp/configuracoes"
@@ -200,8 +234,8 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
   if (ctx.planSlug !== "free" && !ctx.isMercadoPagoConnected) {
     alerts.push({
       id: "alert-mp-missing",
-      title: "Pagamento Online Desativado",
-      description: "Você está em um plano pago, mas ainda não conectou o Mercado Pago para receber pagamentos de forma integrada.",
+      title: "Pagamento online pendente",
+      description: "Seu plano permite checkout transparente e Pix automático. Conecte sua conta do Mercado Pago para ativar.",
       type: "warning",
       actionLabel: "Conectar Mercado Pago",
       actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
@@ -219,14 +253,14 @@ export function getIntegrations(ctx: DashboardContext): DashboardIntegration[] {
     {
       id: "whatsapp",
       name: "WhatsApp",
-      description: "Receba pedidos e envie atualizações automáticas via WhatsApp.",
+      description: "Receba pedidos e envie atualizações automáticas direto no WhatsApp dos clientes.",
       status: ctx.isWhatsAppConnected ? "connected" : "disconnected",
       actionHref: "/erp/integracoes/whatsapp"
     },
     {
       id: "mercadopago",
       name: "Mercado Pago",
-      description: "Habilite pagamentos online via Pix, boleto e cartão no checkout da sua vitrine.",
+      description: "Receba no Pix automático, boleto e cartão no checkout da sua vitrine.",
       status: ctx.isMercadoPagoConnected ? "connected" : "disconnected",
       actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
     }
@@ -243,10 +277,10 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
   if (ctx.planSlug === "free") {
     recs.push({
       id: "upgrade-crescer",
-      title: "Ative o Plano Crescer",
-      description: "Aumente seu limite de catálogo para 100 itens, receba pagamentos via Mercado Pago e ative cupons promocionais para vender mais.",
-      badge: "RECURSO PREMIUM",
-      actionLabel: "Ver Planos",
+      title: "Turbine seu negócio com o Plano Crescer",
+      description: "Aumente seu catálogo para 100 itens, receba no Pix automático com Mercado Pago e crie cupons de desconto para fidelizar clientes.",
+      badge: "RECOMENDADO",
+      actionLabel: "Conhecer Plano Crescer",
       actionHref: "/erp/configuracoes",
       variant: "upgrade"
     });
@@ -256,10 +290,10 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
   if (ctx.planSlug === "crescer") {
     recs.push({
       id: "upgrade-escalar",
-      title: "Migre para o Plano Escalar",
-      description: "Tenha itens e pedidos ilimitados, financeiro avançado com fluxo de caixa, DRE simplificado e gestão completa de devoluções.",
+      title: "Escale suas operações com o Plano Escalar",
+      description: "Tenha produtos e pedidos ilimitados, fluxo de caixa avançado, DRE simplificado e gestão completa de devoluções.",
       badge: "GESTÃO COMPLETA",
-      actionLabel: "Ver Planos",
+      actionLabel: "Conhecer Plano Escalar",
       actionHref: "/erp/configuracoes",
       variant: "upgrade"
     });
@@ -270,7 +304,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
     recs.push({
       id: "connect-whatsapp-tip",
       title: "Venda mais com o WhatsApp",
-      description: "Conecte seu número de WhatsApp corporativo para receber pedidos e agendamentos diretos de forma totalmente integrada.",
+      description: "Conecte seu WhatsApp para responder clientes em 1 clique e enviar status dos pedidos automaticamente.",
       actionLabel: "Conectar Agora",
       actionHref: "/erp/integracoes/whatsapp",
       variant: "tip"
@@ -279,3 +313,4 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
 
   return recs;
 }
+

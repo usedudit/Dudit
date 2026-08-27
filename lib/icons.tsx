@@ -232,6 +232,7 @@ export const UploadSheetIcon = CreateIcon(Xls01Icon)
 export const TrendingUpIcon = CreateIcon(AnalyticsUpIcon)
 export const ShieldIcon = CreateIcon(Shield01Icon)
 export const VideoIcon = CreateIcon(Video01Icon)
+export const BellIcon = CreateIcon(Notification01Icon)
 
 // ============================
 // STATUS / FEEDBACK

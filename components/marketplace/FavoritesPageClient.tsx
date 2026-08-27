@@ -288,14 +288,14 @@ function FavoritesSkeleton() {
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
             {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="animate-pulse">
-                    <div className="aspect-square rounded-[16px] bg-gray-100 dark:bg-dark-border/50 mb-3" />
+                <div key={i}>
+                    <SkeletonLoader height={170} className="rounded-[16px] mb-3" />
                     <div className="px-1 space-y-2">
-                        <SkeletonLoader height={14} width="80%" />
-                        <SkeletonLoader height={18} width="60%" />
+                        <SkeletonLoader height={14} width="80%" className="rounded" />
+                        <SkeletonLoader height={18} width="60%" className="rounded" />
                         <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-dark-border mt-2">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50" />
-                            <SkeletonLoader height={12} width="50%" />
+                            <SkeletonLoader width={32} height={32} circle />
+                            <SkeletonLoader height={12} width="50%" className="rounded" />
                         </div>
                     </div>
                 </div>

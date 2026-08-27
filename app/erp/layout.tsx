@@ -45,42 +45,27 @@ export default async function ERPLayout({
 }: {
   children: React.ReactNode
 }) {
-  await requireUser() // Ensure authenticated - single auth call for the entire ERP tree
-  const user = await getCurrentUser()
+  const user = await requireUser() // Ensure authenticated - single auth call for the entire ERP tree
 
-  let userProfile: {
-    fullName: string
-    email: string
-    initials: string
-    avatarColor: string
-    imageUrl?: string | null
-  } | undefined = undefined
+  // Stage 1: Parallel fetch profile avatar & partner access
+  const [profileDataRes, allAccess] = await Promise.all([
+    createAdminClient()
+      .from("user_profiles")
+      .select("avatar_url")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .catch(() => ({ data: null })),
+    getAllUserPartnerAccess(user),
+  ])
 
-  if (user) {
-    let avatarUrl: string | null = null
-    try {
-      const admin = createAdminClient()
-      const { data: profileData } = await admin
-        .from("user_profiles")
-        .select("avatar_url")
-        .eq("user_id", user.id)
-        .maybeSingle()
-      avatarUrl = profileData?.avatar_url || null
-    } catch {
-      // ignore - avatar_url is optional
-    }
-
-    userProfile = {
-      fullName: user.email?.split("@")[0] || "Usuário",
-      email: user.email || "",
-      initials: (user.email?.[0] || "U").toUpperCase(),
-      avatarColor: "bg-brand-primary",
-      imageUrl: avatarUrl
-    }
+  const userProfile = {
+    fullName: user.email?.split("@")[0] || "Usuário",
+    email: user.email || "",
+    initials: (user.email?.[0] || "U").toUpperCase(),
+    avatarColor: "bg-brand-primary",
+    imageUrl: profileDataRes?.data?.avatar_url || null,
   }
 
-  // Single call to get all partner access (cached for child pages via React cache)
-  const allAccess = await getAllUserPartnerAccess()
   const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.roleId === "owner")
 
   // No ERP access at all → redirect to partner login/registration
@@ -127,20 +112,20 @@ export default async function ERPLayout({
   const routePermissions: PartnerRoutePermissions =
     context.roleId === "owner" ? normalizeToRoutePermissions(role, null) : normalizeToRoutePermissions(role, context.permissions)
 
-  // Read sidebar cookie
-  const cookieStore = await cookies()
+  // Stage 2: Parallel fetch partner plan, initial stores, store cookie, and sidebar cookie
+  const [partnerPlan, initialStoresRes, activeStoreId, cookieStore] = await Promise.all([
+    getPartnerPlan(context.partnerId),
+    listStoresAction(context.partnerId).catch(e => {
+      console.error("Error pre-fetching stores in layout:", e)
+      return []
+    }),
+    getActiveStoreId(),
+    cookies(),
+  ])
+
+  const initialStores = initialStoresRes || []
   const sidebarCookie = cookieStore.get("dudit_sidebar_state")
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
-
-  const partnerPlan = await getPartnerPlan(context.partnerId)
-  const activeStoreId = await getActiveStoreId()
-
-  let initialStores: any[] = []
-  try {
-    initialStores = await listStoresAction(context.partnerId)
-  } catch (e) {
-    console.error("Error pre-fetching stores in layout:", e)
-  }
 
   const effectiveActiveStoreId = (activeStoreId && initialStores.some(s => s.id === activeStoreId))
     ? activeStoreId

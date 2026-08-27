@@ -135,16 +135,16 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
             {isLoading ? (
                 <div className="space-y-4">
                     {Array.from({ length: 3 }).map((_, idx) => (
-                        <div key={idx} className="p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl space-y-4 animate-pulse">
+                        <div key={idx} className="p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl space-y-4">
                             <div className="flex gap-4">
-                                <div className="w-16 h-16 bg-gray-100 dark:bg-zinc-800 rounded-lg shrink-0" />
+                                <SkeletonLoader width={64} height={64} className="rounded-lg shrink-0" />
                                 <div className="flex-1 space-y-2">
-                                    <SkeletonLoader height={16} width="40%" />
-                                    <SkeletonLoader height={14} width="25%" />
-                                    <SkeletonLoader height={14} width="15%" />
+                                    <SkeletonLoader height={16} width="40%" className="rounded" />
+                                    <SkeletonLoader height={14} width="25%" className="rounded" />
+                                    <SkeletonLoader height={14} width="15%" className="rounded" />
                                 </div>
                             </div>
-                            <SkeletonLoader height={32} width="100%" />
+                            <SkeletonLoader height={32} width="100%" className="rounded" />
                         </div>
                     ))}
                 </div>

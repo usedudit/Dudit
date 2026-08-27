@@ -133,7 +133,7 @@ export default function DeliveryAssignmentsList() {
             }
         }
         void fetchDetails()
-    }, [viewedId, allItems])
+    }, [viewedId])
 
     useEffect(() => {
         void loadData()

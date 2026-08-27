@@ -91,7 +91,8 @@ export default function AvailableDeliveriesList() {
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [acceptingId, setAcceptingId] = useState<string | null>(null)
-    const [refreshCooldown, setRefreshCooldown] = useState(false)
+    const refreshCooldownRef = useRef(false)
+    const [isCooldown, setIsCooldown] = useState(false)
     const knownOfferIdsRef = useRef<Set<string>>(new Set())
 
     const openView = (id: string) => {
@@ -121,10 +122,11 @@ export default function AvailableDeliveriesList() {
 
     const loadOffers = useCallback(async (isRefresh = false) => {
         if (isRefresh) {
-            if (refreshCooldown) return
+            if (refreshCooldownRef.current) return
             setIsRefreshing(true)
-            setRefreshCooldown(true)
-            setTimeout(() => setRefreshCooldown(false), 5000)
+            refreshCooldownRef.current = true
+            setIsCooldown(true)
+            setTimeout(() => { refreshCooldownRef.current = false; setIsCooldown(false) }, 5000)
         } else setIsLoading(true)
 
         try {
@@ -157,7 +159,7 @@ export default function AvailableDeliveriesList() {
             setIsLoading(false)
             setIsRefreshing(false)
         }
-    }, [refreshCooldown])
+    }, [])
 
     useEffect(() => {
         if (!viewedId) {
@@ -184,7 +186,7 @@ export default function AvailableDeliveriesList() {
             }
         }
         void fetchDetails()
-    }, [viewedId, offers])
+    }, [viewedId])
 
     useEffect(() => {
         void loadOffers()
@@ -339,7 +341,7 @@ export default function AvailableDeliveriesList() {
                             variant="outline"
                             size="sm"
                             onClick={() => loadOffers(true)}
-                            disabled={isRefreshing || isLoading || refreshCooldown}
+                            disabled={isRefreshing || isLoading || isCooldown}
                             className="shrink-0"
                         >
                             <ReloadIcon size={15} className={isRefreshing ? "animate-spin" : ""} />
@@ -378,7 +380,7 @@ export default function AvailableDeliveriesList() {
                         <Button
                             variant="outline"
                             onClick={() => loadOffers(true)}
-                            disabled={isRefreshing || isLoading || refreshCooldown}
+                            disabled={isRefreshing || isLoading || isCooldown}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center shrink-0"
                             aria-label="Atualizar ofertas"
                         >

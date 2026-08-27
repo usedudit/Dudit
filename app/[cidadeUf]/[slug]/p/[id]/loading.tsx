@@ -4,7 +4,7 @@ import { SkeletonLoader } from "@/components/reusable"
 
 export default function ProductDetailsLoading() {
     return (
-        <div className="flex flex-col min-h-screen bg-white">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-background transition-colors duration-300">
             <MarketplaceHeader />
 
             <div className="container mx-auto px-4 max-w-[1300px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
@@ -207,7 +207,7 @@ export default function ProductDetailsLoading() {
                 </div>
 
                 {/* MOBILE BOTTOM BAR */}
-                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex gap-3 z-50">
+                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-dark-surface border-t border-gray-100 dark:border-dark-border p-4 flex gap-3 z-50">
                     <SkeletonLoader className="w-12 h-12 rounded-full" />
                     <SkeletonLoader className="flex-1 h-12 rounded-full" />
                 </div>

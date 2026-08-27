@@ -914,12 +914,12 @@ const Header: React.FC<HeaderProps> = ({
                                 { label: "Meus Favoritos", href: "/favoritos" },
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                 { label: "Minhas Coleções", href: "/colecoes" },
-                                { label: "Central do Vendedor", href: "/erp/trocar-erp" },
+                                { label: "Central do Vendedor", href: "/erp/inicio" },
                                 { label: "Enviar Feedback", action: () => { setIsMobileUserMenuOpen(false); setIsFeedbackOpen(true); } },
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
                                 const wrapProps = item.href
-                                    ? { href: item.href, prefetch: false }
+                                    ? { href: item.href }
                                     : { onClick: item.action || item.onClick };
 
                                 return (
@@ -1113,12 +1113,12 @@ const Header: React.FC<HeaderProps> = ({
                                             { label: "Meus Favoritos", href: "/favoritos" },
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
                                             { label: "Minhas Coleções", href: "/colecoes" },
-                                            { label: "Central do Vendedor", href: "/erp/trocar-erp" },
+                                            { label: "Central do Vendedor", href: "/erp/inicio" },
                                             { label: "Enviar Feedback", action: () => { setIsUserMenuOpen(false); setIsFeedbackOpen(true); } },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
-                                                ? { href: item.href, prefetch: false }
+                                                ? { href: item.href, prefetch: true }
                                                 : { onClick: item.action || item.onClick };
 
                                             return (

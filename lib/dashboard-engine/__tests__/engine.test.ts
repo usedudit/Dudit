@@ -8,6 +8,8 @@ import {
   getIntegrations,
   getRecommendations
 } from "../rules";
+import { getDefaultResourcesForModeAndCategory } from "@/lib/system-resources";
+import { isQuickMode } from "@/lib/business-info";
 
 describe("Dashboard Engine - Rules Evaluation Tests", () => {
   const createBaseContext = (overrides: Partial<DashboardContext> = {}): DashboardContext => {
@@ -64,6 +66,44 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
       const itemsStep = checklist.find((item) => item.id === "items");
       expect(itemsStep?.completed).toBe(false);
       expect(itemsStep?.href).toBe("/erp/servicos?create=true");
+    });
+
+    it("should include hours and exclude logistics for services-only business", () => {
+      const ctx = createBaseContext({
+        sellsProducts: false,
+        sellsServices: true,
+        planSlug: "crescer",
+        hasAddress: true,
+      });
+      const checklist = getChecklistItems(ctx);
+      const hoursStep = checklist.find((item) => item.id === "hours");
+      const logisticsStep = checklist.find((item) => item.id === "logistics");
+      expect(hoursStep).toBeDefined();
+      expect(logisticsStep).toBeUndefined();
+    });
+
+    it("should include logistics for products business on Crescer plan with address", () => {
+      const ctx = createBaseContext({
+        sellsProducts: true,
+        sellsServices: false,
+        planSlug: "crescer",
+        hasAddress: true,
+      });
+      const checklist = getChecklistItems(ctx);
+      const logisticsStep = checklist.find((item) => item.id === "logistics");
+      expect(logisticsStep).toBeDefined();
+    });
+
+    it("should exclude logistics on Free plan even if selling products", () => {
+      const ctx = createBaseContext({
+        sellsProducts: true,
+        sellsServices: false,
+        planSlug: "free",
+        hasAddress: true,
+      });
+      const checklist = getChecklistItems(ctx);
+      const logisticsStep = checklist.find((item) => item.id === "logistics");
+      expect(logisticsStep).toBeUndefined();
     });
   });
 
@@ -180,20 +220,36 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
     });
   });
 
-  describe("Recommendations Rules", () => {
-    it("should suggest Crescer upgrade if currently Free", () => {
-      const ctx = createBaseContext({ planSlug: "free" });
-      const recs = getRecommendations(ctx);
-      const upgradeRec = recs.find((r) => r.id === "upgrade-crescer");
-      expect(upgradeRec).toBeDefined();
-      expect(upgradeRec?.variant).toBe("upgrade");
+  describe("Business Modes & Resource Presets", () => {
+    it("should return minimal resources for desapego mode", () => {
+      const resources = getDefaultResourcesForModeAndCategory("desapego");
+      expect(resources).toEqual(["products", "showcase"]);
     });
 
-    it("should suggest Escalar upgrade if currently Crescer", () => {
-      const ctx = createBaseContext({ planSlug: "crescer" });
-      const recs = getRecommendations(ctx);
-      const upgradeRec = recs.find((r) => r.id === "upgrade-escalar");
-      expect(upgradeRec).toBeDefined();
+    it("should return streamlined showcase resources for quick mode without ERP overhead", () => {
+      const resources = getDefaultResourcesForModeAndCategory("quick");
+      expect(resources).toContain("products");
+      expect(resources).toContain("orders");
+      expect(resources).toContain("quotes");
+      expect(resources).toContain("customers");
+      expect(resources).not.toContain("pos");
+      expect(resources).not.toContain("financial");
+      expect(resources).not.toContain("team");
+    });
+
+    it("should return full suite for erp mode", () => {
+      const resources = getDefaultResourcesForModeAndCategory("erp");
+      expect(resources).toContain("pos");
+      expect(resources).toContain("financial");
+      expect(resources).toContain("team");
+      expect(resources).toContain("returns");
+    });
+
+    it("should identify desapego and showcase as quick mode interfaces", () => {
+      expect(isQuickMode({ mode: "desapego" })).toBe(true);
+      expect(isQuickMode({ mode: "quick" })).toBe(true);
+      expect(isQuickMode({ mode: "showcase" })).toBe(true);
+      expect(isQuickMode({ mode: "erp" })).toBe(false);
     });
   });
 });

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { Button, FormTextarea, ThreeDotsLoader, Badge } from "@/components/reusable"
+import { Button, FormTextarea, ThreeDotsLoader, Badge, InfoCard } from "@/components/reusable"
 import {
     TruckIcon,
     XIcon,
@@ -171,70 +171,34 @@ export default function DeliveryDriverPickerSheet({
                     /* ACTIVE REQUEST STATE */
                     <div className="space-y-5">
                         {activeRequest.status === "available" || activeRequest.status === "requested" ? (
-                            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 dark:border-amber-900/30 dark:bg-amber-950/10">
-                                <div className="flex items-center gap-3">
-                                    <div className="relative flex h-4 w-4">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"></span>
-                                        <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500"></span>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-sm text-amber-900 dark:text-amber-300">
-                                            Procurando entregadores...
-                                        </h3>
-                                        <p className="text-xs text-amber-700 dark:text-amber-400/80 mt-0.5">
-                                            Sua solicitação está disponível para os entregadores da sua região.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Procurando entregadores..."
+                                message="Sua solicitação está disponível para os entregadores da sua região."
+                            />
                         ) : activeRequest.status === "accepted" ? (
-                            <div className="rounded-2xl border border-green-200 bg-green-50/50 p-5 dark:border-green-900/30 dark:bg-green-950/10">
-                                <div className="flex items-center gap-3">
-                                    <CheckCircleIcon className="w-5 h-5 text-brand-green" />
-                                    <div>
-                                        <h3 className="font-bold text-sm text-green-900 dark:text-green-300">
-                                            Entregador a caminho da loja!
-                                        </h3>
-                                        <p className="text-xs text-green-700 dark:text-green-400/80 mt-0.5">
-                                            {activeRequest.driver?.name || "Entregador"} aceitou a entrega.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Entregador a caminho da loja!"
+                                message={`${activeRequest.driver?.name || "Entregador"} aceitou a entrega.`}
+                                color="green"
+                            />
                         ) : activeRequest.status === "picked_up" ? (
-                            <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 dark:border-blue-900/30 dark:bg-blue-950/10">
-                                <div className="flex items-center gap-3">
-                                    <Package className="w-5 h-5 text-blue-500" />
-                                    <div>
-                                        <h3 className="font-bold text-sm text-blue-900 dark:text-blue-300">
-                                            Pedido retirado na loja
-                                        </h3>
-                                        <p className="text-xs text-blue-700 dark:text-blue-400/80 mt-0.5">
-                                            O entregador retirou o pacote no estabelecimento.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Pedido retirado na loja"
+                                message="O entregador retirou o pacote no estabelecimento."
+                                color="blue"
+                            />
                         ) : activeRequest.status === "out_for_delivery" ? (
-                            <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-5 dark:border-purple-900/30 dark:bg-purple-950/10">
-                                <div className="flex items-center gap-3">
-                                    <TruckIcon className="w-5 h-5 text-purple-500" />
-                                    <div>
-                                        <h3 className="font-bold text-sm text-purple-900 dark:text-purple-300">
-                                            Em rota para o cliente
-                                        </h3>
-                                        <p className="text-xs text-purple-700 dark:text-purple-400/80 mt-0.5">
-                                            O entregador está se deslocando até o endereço de entrega.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            <InfoCard
+                                title="Em rota para o cliente"
+                                message="O entregador está se deslocando até o endereço de entrega."
+                                color="purple"
+                            />
                         ) : (
-                            <div className="rounded-2xl border border-brand-border p-5 dark:border-dark-border bg-gray-50 dark:bg-dark-border/20">
-                                <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                    Status atual: {activeRequest.status}
-                                </p>
-                            </div>
+                            <InfoCard
+                                title="Status atual"
+                                message={`Status atual: ${activeRequest.status}`}
+                                color="gray"
+                            />
                         )}
 
                         {/* DRIVER INFO IF ACCEPTED */}
@@ -355,19 +319,21 @@ export default function DeliveryDriverPickerSheet({
             </div>
 
             {/* FOOTER */}
-            {!activeRequest || activeRequest.status === "cancelled" ? (
-                <footer className="border-t border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
-                    <Button
-                        variant="default"
-                        className="w-full h-11"
-                        onClick={handleRequestDelivery}
-                        disabled={isSubmitting || !orderId}
-                    >
-                        {isSubmitting ? "Solicitando..." : "Solicitar Entregador Dudit"}
-                    </Button>
-                </footer>
-            ) : null}
-        </div>
+            {
+                !activeRequest || activeRequest.status === "cancelled" ? (
+                    <footer className="border-t border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
+                        <Button
+                            variant="default"
+                            className="w-full h-11"
+                            onClick={handleRequestDelivery}
+                            disabled={isSubmitting || !orderId}
+                        >
+                            {isSubmitting ? "Solicitando..." : "Solicitar Entregador Dudit"}
+                        </Button>
+                    </footer>
+                ) : null
+            }
+        </div >
     )
 
     if (isMobile) {

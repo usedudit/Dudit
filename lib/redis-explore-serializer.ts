@@ -37,11 +37,15 @@ export function isExploreProductPublic(row: Record<string, any> | null | undefin
 }
 
 export function isExploreServicePublic(row: Record<string, any> | null | undefined): boolean {
+  const isStatusActive = row?.status === "ativo" || row?.status === "active" || row?.is_active === true
+  const isNotArchivedOrDeleted = row?.status !== "inativo" && row?.status !== "arquivado" && row?.status !== "deleted" && row?.status !== "excluido"
+  const isApproved = row?.moderation_status === "approved" || !row?.moderation_status
+
   return Boolean(
     row &&
-    row.is_active === true &&
-    row.status === "ativo" &&
-    row.moderation_status === "approved" &&
+    isStatusActive &&
+    isNotArchivedOrDeleted &&
+    isApproved &&
     row.deleted_at == null &&
     row.show_in_marketplace === true,
   )

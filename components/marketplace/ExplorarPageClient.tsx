@@ -19,6 +19,7 @@ import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace
 import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
@@ -28,8 +29,7 @@ import { formatCurrency } from "@/lib/utils"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
 import citiesData from "@/lib/data/cities.json"
-import { useLocationRedirect } from "@/hooks/use-location-redirect"
-import { getMarketplaceCategoriesClient, getMarketplaceServiceCategoriesClient, getMarketplacePartnerCategoriesClient } from "@/lib/data/marketplace-categories-client"
+import { fetchAllMarketplaceCategoriesClient } from "@/lib/data/marketplace-categories-client"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarHeaderSection } from "./ExplorarHeaderSection"
 import { ExplorarViewControls } from "./ExplorarViewControls"
@@ -179,6 +179,12 @@ export function ExplorarPageClient({
         return { scope: "city", city, state }
     }, [selectedCitySlug, pathCity, cidade, resolvedCityName, formatCitySlug])
 
+    const userCoords = useMemo(() => {
+        return userProfile?.latitude && userProfile?.longitude
+            ? { lat: userProfile.latitude, lng: userProfile.longitude }
+            : null
+    }, [userProfile?.latitude, userProfile?.longitude])
+
     const resolveCategoryName = useCallback((value: string) => {
         const normalize = (s: string) => s
             .toLowerCase()
@@ -200,20 +206,10 @@ export function ExplorarPageClient({
         if (categoriesLoadedRef.current) return
         categoriesLoadedRef.current = true
 
-        getMarketplaceCategoriesClient(null).then(cats => {
-            if (cats && cats.length > 0) {
-                setDbCategories(cats)
-            }
-        })
-        getMarketplaceServiceCategoriesClient(null).then(cats => {
-            if (cats && cats.length > 0) {
-                setDbServiceCategories(cats)
-            }
-        })
-        getMarketplacePartnerCategoriesClient(null).then(cats => {
-            if (cats && cats.length > 0) {
-                setDbPartnerCategories(cats)
-            }
+        fetchAllMarketplaceCategoriesClient().then(({ products, services, partners }) => {
+            if (products && products.length > 0) setDbCategories(products)
+            if (services && services.length > 0) setDbServiceCategories(services)
+            if (partners && partners.length > 0) setDbPartnerCategories(partners)
         })
     }, [])
 
@@ -259,11 +255,12 @@ export function ExplorarPageClient({
         searchQ: string,
         typeStr: string,
         radiusVal?: number | null,
-        sectionVal?: string | null
+        sectionVal?: string | null,
+        forceFullNavigation = false
     ) => {
         const queryParams = new URLSearchParams()
         if (searchQ) queryParams.set("q", searchQ)
-        if (typeStr !== "tudo") queryParams.set("type", typeStr)
+        if (typeStr && typeStr !== "tudo") queryParams.set("type", typeStr)
 
         const rVal = radiusVal !== undefined ? radiusVal : selectedRadius
         const isCity = city && city !== "brasil" && !city.startsWith("estado-")
@@ -281,15 +278,22 @@ export function ExplorarPageClient({
 
         const catSlug = categories.length > 0 ? categoryToSlug(categories[0]) : ""
 
+        let targetUrl = ""
         if (city && catSlug) {
-            router.push(`/explorar/${city}/${catSlug}${queryPart}`)
+            targetUrl = `/explorar/${city}/${catSlug}${queryPart}`
         } else if (city) {
-            router.push(`/explorar/${city}${queryPart}`)
+            targetUrl = `/explorar/${city}${queryPart}`
         } else if (catSlug) {
             queryParams.set("categoria", catSlug)
-            router.push(`/explorar?${queryParams.toString()}`)
+            targetUrl = `/explorar?${queryParams.toString()}`
         } else {
-            router.push(`/explorar${queryPart}`)
+            targetUrl = `/explorar${queryPart}`
+        }
+
+        if (forceFullNavigation) {
+            router.push(targetUrl)
+        } else if (typeof window !== "undefined") {
+            window.history.pushState(null, "", targetUrl)
         }
     }
 
@@ -305,8 +309,6 @@ export function ExplorarPageClient({
                 setSelectedCitySlug(urlCity)
             }
         } else if (cidade && cidade !== selectedCitySlug) {
-            // Sem cidade na URL (ex: /explorar?q=...): mantém o escopo resolvido
-            // pelo servidor (cidade do usuário/cookie ou Brasil) em vez de zerar.
             setSelectedCitySlug(cidade)
         }
 
@@ -331,6 +333,39 @@ export function ExplorarPageClient({
 
         setSelectedCategories(nextCats)
     }, [searchParams, params])
+
+    // Popstate listener to guarantee 0ms responsive Back/Forward sync with window.history.pushState
+    useEffect(() => {
+        const onPopState = () => {
+            if (typeof window === "undefined") return
+            const url = new URL(window.location.href)
+            const pathnameParts = url.pathname.replace(/^\/explorar\/?/, "").split("/").filter(Boolean)
+            const pCity = pathnameParts[0] || null
+            const pCatSlug = pathnameParts[1] || null
+            const pCat = pCatSlug ? (CATEGORY_SLUG_MAP[pCatSlug] || pCatSlug) : null
+
+            const typeParam = url.searchParams.get("type") || "tudo"
+            const radiusParam = url.searchParams.get("radius")
+            const sectionParam = url.searchParams.get("section")
+            const catParam = url.searchParams.get("categoria")
+
+            setCurrentType(typeParam as any)
+            setSelectedRadius(radiusParam ? Number(radiusParam) : null)
+            setSelectedSection(sectionParam || null)
+            if (pCity) setSelectedCitySlug(pCity)
+
+            if (pCat) {
+                setSelectedCategories([pCat])
+            } else if (catParam) {
+                setSelectedCategories(catParam.split(",").map(c => CATEGORY_SLUG_MAP[c.toLowerCase()] || c))
+            } else {
+                setSelectedCategories([])
+            }
+        }
+
+        window.addEventListener("popstate", onPopState)
+        return () => window.removeEventListener("popstate", onPopState)
+    }, [])
 
 
 
@@ -837,7 +872,7 @@ export function ExplorarPageClient({
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
-        updateUrl(citySlug, selectedCategories, query, currentType)
+        updateUrl(citySlug, selectedCategories, query, currentType, selectedRadius, selectedSection, true)
     }
 
     // Filter cities list by search input
@@ -1246,14 +1281,10 @@ export function ExplorarPageClient({
     }, [pageMode, selectedSection])
 
     const renderListingItem = (item: any) => {
-        const userCoords = userProfile?.latitude && userProfile?.longitude
-            ? { lat: userProfile.latitude, lng: userProfile.longitude }
-            : null
-
         if (viewMode === "list") return renderListRow(item)
 
         if (item.itemType === 'loja') {
-            return <VitrineCard key={`loja-${item.id}`} vitrine={item} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
+            return <VitrineCard key={`loja-${item.id}`} vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
         }
         return <ItemCard key={`${item.itemType}-${item.id}`} product={item as any} userCoords={userCoords} locationContext={locationContext} className="w-full" />
     }
@@ -1286,7 +1317,7 @@ export function ExplorarPageClient({
                         title="🎯 Em promoção"
                         subtitle={`Ofertas especiais em ${categoryName}`}
                         items={categoryPromos}
-                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[190px] sm:w-[210px]"
                     />
                 )}
@@ -1295,7 +1326,7 @@ export function ExplorarPageClient({
                         title="⭐ Melhor avaliados"
                         subtitle={`Os favoritos em ${categoryName}`}
                         items={categoryTopRated}
-                        renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
+                        renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[190px] sm:w-[210px]"
                     />
                 )}
@@ -1304,7 +1335,7 @@ export function ExplorarPageClient({
                         title="🏪 Lojas que vendem"
                         subtitle={`Vendedores de ${categoryName}`}
                         items={categoryStores}
-                        renderItem={(item: any) => <VitrineCard vitrine={item} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />}
+                        renderItem={(item: any) => <VitrineCard vitrine={item} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />}
                         itemWidthClass="w-[270px] sm:w-[320px]"
                     />
                 )}
@@ -1372,12 +1403,14 @@ export function ExplorarPageClient({
     const goToCategory = (catName: string) => {
         // "Serviços" usa o tipo de listagem de serviços em vez de uma categoria de produto
         if (catName === "Serviços" || catName.toLowerCase() === "servicos") {
-            router.push(`/explorar/${selectedCitySlug || "brasil"}?type=servicos`)
+            setCurrentType("servicos")
+            setSelectedCategories([])
+            updateUrl(selectedCitySlug, [], query, "servicos")
             return
         }
         const catSlug = categoryToSlug(catName)
-        const typeParam = currentType && currentType !== "tudo" ? `?type=${currentType}` : ""
-        router.push(`/explorar/${selectedCitySlug || "brasil"}/${catSlug}${typeParam}`)
+        setSelectedCategories([catName])
+        updateUrl(selectedCitySlug, [catName], query, currentType)
     }
 
     return (
@@ -1447,7 +1480,7 @@ export function ExplorarPageClient({
                                     title="Vendedores em destaque"
                                     items={vitrinesDestaque}
                                     renderItem={(vitrine) => (
-                                        <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                        <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
                                     )}
                                     onSeeAll={() => {
                                         setCurrentType("vitrines")
@@ -1463,7 +1496,7 @@ export function ExplorarPageClient({
                                     key={theme.id}
                                     title={`${theme.emoji} ${theme.title}`}
                                     items={theme.items}
-                                    renderItem={(item: any) => <ItemCard product={item} userCoords={userProfile?.latitude && userProfile?.longitude ? { lat: userProfile.latitude, lng: userProfile.longitude } : null} locationContext={locationContext} className="w-full" />}
+                                    renderItem={(item: any) => <ItemCard product={item} userCoords={userCoords} locationContext={locationContext} className="w-full" />}
                                     itemWidthClass="w-[190px] sm:w-[210px]"
                                     onSeeAll={() => {
                                         const catSlug = Object.keys(CATEGORY_SLUG_MAP).find(key => CATEGORY_SLUG_MAP[key] === theme.category) || theme.slug
@@ -1530,7 +1563,7 @@ export function ExplorarPageClient({
                                             {
                                                 text: "Eu vendo",
                                                 action: () => {
-                                                    router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
+                                                    router.push(userProfile ? "/erp/inicio" : "/auth/login?mode=partner")
                                                 },
                                                 variant: "default"
                                             },
@@ -1555,7 +1588,7 @@ export function ExplorarPageClient({
                                                 title="Lojas encontradas"
                                                 items={vitrinesDestaque}
                                                 renderItem={(vitrine) => (
-                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={!!selectedCitySlug} className="w-full" />
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
                                                 )}
                                                 onSeeAll={() => {
                                                     setCurrentType("vitrines")
@@ -1573,7 +1606,7 @@ export function ExplorarPageClient({
                                                 title="Lojas um pouco mais distantes do seu raio de busca"
                                                 items={moreDistantSellers}
                                                 renderItem={(vitrine) => (
-                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} hideCity={false} locationContext={locationContext} className="w-full" />
+                                                    <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={false} locationContext={locationContext} className="w-full" />
                                                 )}
                                                 onSeeAll={() => {
                                                     const stateSlug = userProfile?.state ? `estado-${userProfile.state.toLowerCase()}` : "brasil"
@@ -1609,7 +1642,7 @@ export function ExplorarPageClient({
                                                     {
                                                         text: "Eu vendo",
                                                         action: () => {
-                                                            router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
+                                                            router.push(userProfile ? "/erp/inicio" : "/auth/login?mode=partner")
                                                         },
                                                         variant: "default"
                                                     },
@@ -1634,8 +1667,8 @@ export function ExplorarPageClient({
                                                     className={viewMode === "grid" ? "col-span-full py-12 flex flex-col items-center justify-center min-h-[120px]" : "py-12 flex flex-col items-center justify-center min-h-[120px]"}
                                                 >
                                                     {isFetchingNextPage ? (
-                                                        <div className="flex flex-col items-center gap-2 animate-pulse">
-                                                            <SkeletonLoader height={24} width={180} />
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <SkeletonLoader height={24} width={180} className="rounded" />
                                                             <span className="text-[11px] font-bold text-brand-inactive-text dark:text-dark-body">Carregando mais opcoes...</span>
                                                         </div>
                                                     ) : null}

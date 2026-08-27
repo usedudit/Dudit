@@ -12,7 +12,7 @@ function hashInviteToken(token: string) {
 }
 
 function normalizeError(error: any, fallback: string) {
-  const message = String(error?.message || "")
+  const message = String(error?.message || error?.hint || error?.details || "")
   if (message.includes("delivery_driver_busy")) return "Você já possui 2 entregas em andamento. Conclua uma para aceitar novas."
   if (message.includes("delivery_offer_expired")) return "Esta oferta de entrega expirou (tempo limite de 15 minutos)."
   if (message.includes("delivery_assignment_already_accepted")) return "Esta entrega acabou de ser aceita por outro entregador."
@@ -29,7 +29,8 @@ function normalizeError(error: any, fallback: string) {
   if (message.includes("delivery_driver_not_active")) return "Seu cadastro de entregador está inativo."
   if (message.includes("delivery_payment_confirmation_not_applicable")) return "A confirmação operacional só está disponível para pagamentos em dinheiro."
   if (message.includes("delivery_invitation_invalid")) return "Convite inválido, expirado ou não corresponde a esta conta."
-  return fallback
+  console.error("[normalizeError] Erro não mapeado:", message || fallback)
+  return message ? `Erro: ${message.slice(0, 200)}` : fallback
 }
 
 export async function getDeliveryDashboardAction() {

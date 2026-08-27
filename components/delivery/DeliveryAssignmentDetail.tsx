@@ -146,6 +146,14 @@ export default function DeliveryAssignmentDetail({
         ? `Rota com ${ordersList.length} pedidos`
         : `Pedido ${orderNumberDisplay}`
 
+    const handleBackClick = useCallback(() => {
+        if (onBack) {
+            onBack()
+        } else {
+            router.push("/entregadores")
+        }
+    }, [onBack, router])
+
     useEffect(() => {
         setHeaderOverride({
             title: pageTitle,
@@ -153,15 +161,7 @@ export default function DeliveryAssignmentDetail({
             isSubPage: true,
         })
         return () => setHeaderOverride(null)
-    }, [pageTitle, assignment.status])
-
-    function handleBackClick() {
-        if (onBack) {
-            onBack()
-        } else {
-            router.push("/entregadores")
-        }
-    }
+    }, [pageTitle, assignment.status, handleBackClick, setHeaderOverride])
 
     const advance = async () => {
         const next = NEXT_STATUS[assignment.status]
@@ -444,14 +444,12 @@ export default function DeliveryAssignmentDetail({
 
                                                 {/* Customer Section(s) / Paradas */}
                                                 {ordersList.map((order: any, idx: number) => {
-                                                    const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
                                                     const custMaps = order.delivery_address
                                                         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
                                                         : null
                                                     const custWaze = order.delivery_address
                                                         ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
                                                         : null
-                                                    const custWa = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
                                                     const stopTitle = ordersList.length > 1
                                                         ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
                                                         : "Local de Entrega (Cliente)"
@@ -481,7 +479,7 @@ export default function DeliveryAssignmentDetail({
                                                                 <div className="shrink-0">
                                                                     <ActionsDropdown
                                                                         trigger={
-                                                                            <Button variant="outline" size="sm">Contato / Rota</Button>
+                                                                            <Button variant="outline" size="sm">Rota</Button>
                                                                         }
                                                                     >
                                                                         {custMaps && (
@@ -492,16 +490,6 @@ export default function DeliveryAssignmentDetail({
                                                                         {custWaze && (
                                                                             <DropdownItem onClick={() => window.open(custWaze, "_blank")}>
                                                                                 <TruckIcon size={16} /> Abrir no Waze
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                        {cleanCustPhone && (
-                                                                            <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
-                                                                                <PhoneIcon size={16} /> Ligar para o Cliente
-                                                                            </DropdownItem>
-                                                                        )}
-                                                                        {custWa && (
-                                                                            <DropdownItem onClick={() => window.open(custWa, "_blank")}>
-                                                                                <WhatsappIcon size={16} /> WhatsApp
                                                                             </DropdownItem>
                                                                         )}
                                                                     </ActionsDropdown>

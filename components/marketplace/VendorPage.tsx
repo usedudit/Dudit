@@ -18,10 +18,9 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, Spinner, MoneyInput, Separator, Checkbox } from "@/components/reusable"
+import { Button, DefaultModal, Input, Spinner, MoneyInput, Separator, Checkbox, FormSection } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl } from "@/lib/utils/url-generator"
-
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
@@ -425,19 +424,18 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
 
             {hoursList.length > 0 && (
                 <>
-                    <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Horário de Funcionamento</h3>
+                    <FormSection title="Horário de Funcionamento" hasSeparator>
                         <div className="space-y-3">
                             {hoursList.map((item: any) => {
                                 let dayColor = "text-brand-dark dark:text-dark-heading"
                                 let timeColor = "text-brand-inactive-text dark:text-dark-body"
                                 if (item.isCurrentDay) {
                                     if (item.status === "closing_soon") {
-                                        dayColor = "text-yellow-600 font-medium"
-                                        timeColor = "text-yellow-600 font-medium"
+                                        dayColor = "text-brand-yellow font-medium"
+                                        timeColor = "text-brand-yellow font-medium"
                                     } else if (item.status === "closed") {
-                                        dayColor = "text-red-600 font-medium"
-                                        timeColor = "text-red-600 font-medium"
+                                        dayColor = "text-brand-red font-medium"
+                                        timeColor = "text-brand-red font-medium"
                                     } else {
                                         dayColor = "text-brand-green font-medium"
                                         timeColor = "text-brand-green font-medium"
@@ -448,10 +446,10 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                                         <span className="flex items-center gap-1.5">
                                             <span className={dayColor}>{item.dayName}</span>
                                             {item.isCurrentDay && item.status === "closing_soon" && (
-                                                <ClockIcon size={14} className="text-yellow-600 shrink-0" />
+                                                <ClockIcon size={14} className="text-brand-yellow shrink-0" />
                                             )}
                                             {item.isCurrentDay && item.status === "closed" && (
-                                                <ClockIcon size={14} className="text-red-600 shrink-0" />
+                                                <ClockIcon size={14} className="text-brand-red shrink-0" />
                                             )}
                                         </span>
                                         <span className={timeColor}>{item.timeString}</span>
@@ -459,13 +457,11 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                                 )
                             })}
                         </div>
-                    </div>
-                    <div className="h-[1px] bg-brand-border w-full" />
+                    </FormSection>
                 </>
             )}
 
-            <div>
-                <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Endereço</h3>
+            <FormSection title="Endereço" hasSeparator>
                 <div className="flex items-start gap-3 mb-5">
                     <MapPinIcon size={20} className="text-brand-inactive-text dark:text-dark-body mt-1 shrink-0" />
                     <div>
@@ -474,10 +470,10 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                         <p className="text-[15px] text-brand-inactive-text dark:text-dark-body">CEP: {partner.zipCode}</p>
                     </div>
                 </div>
-                <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-gray-100 dark:bg-dark-border/50 shrink-0">
+                <div className="w-full h-[150px] lg:h-[260px] rounded-[12px] overflow-hidden bg-brand-gray dark:bg-dark-border/50 shrink-0">
                     <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
                 </div>
-            </div>
+            </FormSection>
         </div>
     )
 }
@@ -1435,24 +1431,27 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         <div style={{ display: activeSection === "info" ? "block" : "none" }}>
                             {infoHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Informações de {partner.storeName}</h2>
-                                    <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
+                                    <FormSection title={`Informações de ${partner.storeName}`}>
+                                        <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
+                                    </FormSection>
                                 </>
                             )}
                         </div>
                         <div style={{ display: activeSection === "reviews" ? "block" : "none" }}>
                             {reviewsHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Avaliações</h2>
-                                    <ReviewsTab reviews={reviews} />
+                                    <FormSection title="Avaliações">
+                                        <ReviewsTab reviews={reviews} />
+                                    </FormSection>
                                 </>
                             )}
                         </div>
                         <div style={{ display: activeSection === "gallery" ? "block" : "none" }}>
                             {galleryHasBeenOpened && (
                                 <>
-                                    <h2 className="text-[24px] font-normal text-brand-dark dark:text-dark-heading mb-6">Galeria</h2>
-                                    <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                                    <FormSection title="Galeria">
+                                        <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                                    </FormSection>
                                 </>
                             )}
                         </div>
@@ -1462,7 +1461,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} url={isMounted ? `${window.location.origin}${getStoreUrl(partner)}` : ""} title={partner.storeName} shareMessage={shareMessage} label="Link da vitrine" />
             <ReportModal isOpen={showReportModal} onClose={() => setShowReportModal(false)} targetType="partner" targetId={partner.partner_id || partner.partnerId || partner.id} targetName={partner.storeName || partner.store_name || partner.name || "Vendedor"} />
-
 
             <DefaultModal isOpen={!!selectedCoupon} onClose={() => setSelectedCoupon(null)} title={selectedCoupon?.code || "Cupom"} maxWidth="sm">
                 {selectedCoupon && (

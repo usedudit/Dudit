@@ -12,7 +12,7 @@ export default async function InicioPage() {
     const context = await getCurrentPartnerContext()
 
     if (!context) {
-        redirect("/erp/trocar-erp")
+        redirect("/select-erp")
     }
 
     const { partnerId, roleId } = context

@@ -1,7 +1,7 @@
-export type BusinessMode = "quick" | "erp"
+export type BusinessMode = "desapego" | "quick" | "showcase" | "erp"
 
 export type PartnerBusinessInfo = {
-  mode?: BusinessMode | string
+  mode?: BusinessMode
   activeResources?: string[]
 }
 
@@ -48,7 +48,12 @@ export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusi
     return null
   })()
 
-  const mode = raw?.mode === "quick" || raw?.mode === "erp" ? (raw.mode as BusinessMode) : DEFAULT_BUSINESS_INFO.mode
+  const rawMode = typeof raw?.mode === "string" ? raw.mode.toLowerCase() : ""
+  const mode: BusinessMode =
+    rawMode === "desapego" || rawMode === "quick" || rawMode === "showcase" || rawMode === "erp"
+      ? (rawMode as BusinessMode)
+      : DEFAULT_BUSINESS_INFO.mode
+
   const activeResources = Array.isArray(raw?.activeResources)
     ? raw.activeResources.filter((v: any) => typeof v === "string")
     : DEFAULT_BUSINESS_INFO.activeResources
@@ -60,7 +65,8 @@ export function normalizeBusinessInfo(input: unknown): Required<Pick<PartnerBusi
 }
 
 export function isQuickMode(info: unknown): boolean {
-  return normalizeBusinessInfo(info).mode === "quick"
+  const mode = normalizeBusinessInfo(info).mode
+  return mode === "quick" || mode === "desapego" || mode === "showcase"
 }
 
 

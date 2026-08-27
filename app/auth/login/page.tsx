@@ -95,13 +95,13 @@ function AuthContent() {
   // Handle direct redirection for verified partners (e-mail de verificação)
   useEffect(() => {
     if (verifiedParam === "true" && rawModeParam === "partner") {
-      router.push("/erp/trocar-erp")
+      router.push("/erp/inicio")
     }
   }, [verifiedParam, rawModeParam, router])
 
   const lastCheckedUserId = useRef<string | null>(null)
 
-  // Sessão logada + ?mode=partner: com ERP -> /erp/trocar-erp; sem ERP -> fica no wizard
+  // Sessão logada + ?mode=partner: com ERP -> /erp/inicio; sem ERP -> fica no wizard
   useEffect(() => {
     if (!user || !isPartnerMode) {
       setCanShowPartnerWizardWhenLoggedIn(null)
@@ -119,7 +119,7 @@ function AuthContent() {
       .then((has) => {
         if (gone) return
         if (has) {
-          router.replace("/erp/trocar-erp")
+          router.replace("/erp/inicio")
           return
         }
         lastCheckedUserId.current = user.id

@@ -567,12 +567,13 @@ async function _searchMarketplaceInternal(
                     supabase.from("services").select(`
                         id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                         marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                        partners(id, is_showcase_active),
+                        partners(id),
                         stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                         show_price_in_store
                     `)
                         .in("id", servicosIds)
-                        .eq("status", "ativo")
+                        .in("status", ["ativo", "active"])
+                        .is("deleted_at", null)
                         .eq("show_in_marketplace", true)
                 )
             }
@@ -751,12 +752,13 @@ async function hydrateMarketplaceSearchHits(
             supabase.from("services").select(`
                 id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                 marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                partners(id, is_showcase_active),
+                partners(id),
                 stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood)),
                 show_price_in_store
             `)
                 .in("id", servicosIds)
-                .eq("status", "ativo")
+                .in("status", ["ativo", "active"])
+                .is("deleted_at", null)
                 .eq("show_in_marketplace", true)
         )
     }
@@ -1143,11 +1145,12 @@ async function searchMarketplaceByCity(
                 .select(`
                     id, short_id, status, name, description, price, promotional_price, images, rating, category_id, duration_minutes, billing_unit, price_type, created_at,
                     marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)),
-                    partners!inner(id, is_showcase_active),
+                    partners!inner(id),
                     stores!left(id, short_id, name, slug, logo_url, banner_url, addresses!store_id!left(city, state, neighborhood, latitude, longitude)),
                     show_price_in_store
                 `)
-                .eq("status", "ativo")
+                .in("status", ["ativo", "active"])
+                .is("deleted_at", null)
                 .eq("show_in_marketplace", true)
                 .in("partner_id", partnerIds)
                 .order("created_at", { ascending: false })
@@ -1300,7 +1303,19 @@ async function searchMarketplaceByCity(
         } : null
         const categoryName = (item.marketplace_category?.parent?.name || item.marketplace_category?.name || null) as string | null
         const sanitizedCategoryName = categoryName && typeof categoryName === 'string' ? categoryName : null
-        return { ...item, category: sanitizedCategoryName, itemType: 'servico', partners: partner, subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null }
+        const basePrice = Number(item.promotional_price || item.price || 0)
+        const originalPrice = item.promotional_price && Number(item.price) > Number(item.promotional_price)
+            ? Number(item.price)
+            : undefined
+        return {
+            ...item,
+            price: basePrice,
+            originalPrice,
+            category: sanitizedCategoryName,
+            itemType: 'servico',
+            partners: partner,
+            subcategoryName: item.marketplace_category?.parent ? item.marketplace_category.name : null
+        }
     })
 
     const normalizedPlans = rawPlans.map((item: any) => normalizePlan(item))

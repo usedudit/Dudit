@@ -24,11 +24,19 @@ function deriveTemplateFromExample(raw: unknown): PermissionTemplate | null {
   return out as PermissionTemplate
 }
 
+let templateCache: { data: PermissionTemplate; expiresAt: number } | null = null
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
 /**
  * Load the canonical RBAC permission template from DB.
  * If missing, derives a template from an existing role record in DB (safe fallback).
+ * Uses in-memory cache to prevent repetitive DB queries across requests.
  */
 export const getPermissionTemplate = cache(async (): Promise<PermissionTemplate> => {
+  if (templateCache && Date.now() < templateCache.expiresAt) {
+    return templateCache.data
+  }
+
   const admin = getAdminClient()
   const { data } = await admin
     .from("roles")
@@ -40,7 +48,9 @@ export const getPermissionTemplate = cache(async (): Promise<PermissionTemplate>
   // by using the stored template if present; otherwise throw-less deny-all.
   const raw = data?.permissions
   if (raw && typeof raw === "object") {
-    return raw as PermissionTemplate
+    const template = raw as PermissionTemplate
+    templateCache = { data: template, expiresAt: Date.now() + TEMPLATE_CACHE_TTL_MS }
+    return template
   }
 
   const { data: example } = await admin
@@ -50,10 +60,15 @@ export const getPermissionTemplate = cache(async (): Promise<PermissionTemplate>
     .maybeSingle()
 
   const derived = deriveTemplateFromExample(example?.permissions)
-  if (derived) return derived
+  if (derived) {
+    templateCache = { data: derived, expiresAt: Date.now() + TEMPLATE_CACHE_TTL_MS }
+    return derived
+  }
 
   // Safe deny-all fallback: if DB is in an unexpected state, return an empty object
   // which will default-deny in can() due to missing keys.
-  return {} as PermissionTemplate
+  const emptyTemplate = {} as PermissionTemplate
+  templateCache = { data: emptyTemplate, expiresAt: Date.now() + 10_000 } // 10s fallback
+  return emptyTemplate
 })
 
