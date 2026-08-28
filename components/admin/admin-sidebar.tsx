@@ -202,7 +202,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                 ref={sidebarRef}
                 className={cn(
                     "flex flex-col fixed z-40 left-0 top-0 h-screen border-r",
-                    "bg-dark-background border-dark-border",
+                    "bg-brand-dark dark:bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
                     "xl:static xl:translate-x-0",
                     isCollapsed ? "xl:w-[68px]" : "xl:w-64",

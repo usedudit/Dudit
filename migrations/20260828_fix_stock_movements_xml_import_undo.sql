@@ -18,6 +18,9 @@ ALTER TABLE public.stock_movements
 CREATE INDEX IF NOT EXISTS idx_stock_movements_reversal ON public.stock_movements(reversal_movement_id);
 
 -- 2. Update create_batch_stock_movement with reference_name & reference_type support
+-- First drop the old 7-param overload to avoid "function is not unique" errors
+DROP FUNCTION IF EXISTS public.create_batch_stock_movement(UUID, TEXT, TEXT, TEXT, UUID, JSONB, UUID);
+
 CREATE OR REPLACE FUNCTION public.create_batch_stock_movement(
     p_partner_id UUID,
     p_movement_type TEXT,

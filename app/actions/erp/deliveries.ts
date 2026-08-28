@@ -1792,7 +1792,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         .or(assignmentFilter)
         .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
         .order("assigned_at", { ascending: false })
-        .limit(1),
+        .limit(10),
       getPartnerUserNameByIdMap(
         supabase,
         partnerId,
@@ -1814,7 +1814,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         : Promise.resolve({ data: [] }),
     ])
 
-    let platformAssignment = platformAssignments?.[0] || null
+    const platformAssignment = (platformAssignments || []).find((a: any) => a.driver_id && ["accepted", "picked_up", "out_for_delivery", "delivered"].includes(a.status))
+      || (platformAssignments || []).find((a: any) => a.driver_id)
+      || platformAssignments?.[0]
+      || null
 
     let platformDriver: any = null
     let resolvedPlatformDriverId: string | null = null
@@ -2395,12 +2398,45 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     if (updateError) return { success: false as const, error: updateError.message }
 
-    // Mantém histórico das atribuições Dudit e libera uma nova atribuição na edição.
-    await getAdminClient()
-      .from("delivery_assignments")
-      .update({ status: "cancelled" })
-      .eq("delivery_id", payload.deliveryId)
-      .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery"])
+    const isExplicitPlatformNetworkRequest = payload.deliveryPersonId === "platform:dudit_network"
+    const isExplicitUnassignOrLocal = payload.deliveryPersonId !== undefined && !payload.deliveryPersonId?.startsWith("platform:")
+
+    if (isExplicitUnassignOrLocal && payload.deliveryPersonId !== delivery.delivery_person_id) {
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "cancelled", cancelled_at: nowIso })
+        .eq("delivery_id", payload.deliveryId)
+        .in("status", ["available", "requested", "assigned"])
+    }
+
+    if (isExplicitPlatformNetworkRequest) {
+      const { data: orderRows } = await supabase
+        .from("orders")
+        .select("id, delivery_fee")
+        .in("id", orderIds)
+        .eq("partner_id", payload.partnerId)
+
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "cancelled", cancelled_at: nowIso })
+        .eq("delivery_id", payload.deliveryId)
+        .in("status", ["available", "requested", "assigned"])
+
+      const assignmentRows = (orderRows || []).map((ord: any) => ({
+        order_id: ord.id,
+        delivery_id: payload.deliveryId,
+        partner_id: payload.partnerId,
+        driver_id: null,
+        assigned_by: user?.id || null,
+        status: "available",
+        delivery_fee: Number(ord.delivery_fee || 0),
+        notes: sanitizeNotes(payload.notes),
+        assigned_at: nowIso,
+      }))
+      if (assignmentRows.length > 0) {
+        await getAdminClient().from("delivery_assignments").insert(assignmentRows)
+      }
+    }
 
     const { error: deleteLinksError } = await getAdminClient().from("delivery_orders").delete().eq("delivery_id", payload.deliveryId)
     if (deleteLinksError) return { success: false as const, error: deleteLinksError.message }

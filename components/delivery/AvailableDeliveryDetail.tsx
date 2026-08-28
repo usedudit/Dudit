@@ -314,7 +314,7 @@ export default function AvailableDeliveryDetail({
                                                 )}
 
                                                 {/* Local de Coleta */}
-                                                <FormSection title="Local de Coleta (Estabelecimento)" hasSeparator>
+                                                <FormSection title="Local de Coleta (Estabelecimento)">
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="space-y-1">
                                                             <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
@@ -466,17 +466,6 @@ export default function AvailableDeliveryDetail({
                                 {activeTab === "itens" && (
                                     <FadeIn key="itens" className="block">
                                         <FormSection title={`Itens a serem entregues (${allItems.length})`} description="Confira todos os itens antes de sair do estabelecimento">
-                                            <div className="flex items-center justify-between mb-6 pb-4 border-b border-brand-border dark:border-dark-border">
-                                                <div>
-                                                    <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                        Itens a serem entregues ({allItems.length})
-                                                    </h3>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                        Confira todos os itens antes de sair do estabelecimento
-                                                    </p>
-                                                </div>
-                                            </div>
-
                                             {allItems.length === 0 ? (
                                                 <div className="py-12 flex flex-col items-center justify-center text-center">
                                                     <IconPlaceholder

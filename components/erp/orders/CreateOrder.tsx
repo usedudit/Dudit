@@ -1563,23 +1563,29 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
         }))
 
-        if (selectedDeliveryPersonId?.startsWith("platform:")) {
-            const rawId = selectedDeliveryPersonId.slice("platform:".length)
-            const exists = baseOptions.some(opt => opt.value === selectedDeliveryPersonId)
-            if (!exists) {
-                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network") {
-                    baseOptions.unshift({
-                        value: "platform:dudit_network",
-                        label: "Dudit · Rede de Entregadores (Aguardando aceite)",
-                    })
-                } else {
-                    const driverName = platformDriver?.fullName || "Entregador Parceiro"
-                    const vehicleType = platformDriver?.vehicleType ? ` (${platformDriver.vehicleType})` : ""
-                    baseOptions.unshift({
-                        value: selectedDeliveryPersonId,
-                        label: `Dudit · ${driverName}${vehicleType}`,
-                    })
-                }
+        if (platformDriver && !platformDriver.isPendingAcceptance && platformDriver.id !== "dudit_network") {
+            const driverName = platformDriver.fullName || "Entregador Dudit"
+            const vehicleType = platformDriver.vehicleType ? ` (${platformDriver.vehicleType})` : ""
+            const optVal = `platform:${platformDriver.id}`
+            if (!baseOptions.some(opt => opt.value === optVal)) {
+                baseOptions.unshift({
+                    value: optVal,
+                    label: `Dudit · ${driverName}${vehicleType}`,
+                })
+            }
+        } else if (selectedDeliveryPersonId === "platform:dudit_network" || platformDriver?.id === "dudit_network" || platformDriver?.isPendingAcceptance) {
+            if (!baseOptions.some(opt => opt.value === "platform:dudit_network")) {
+                baseOptions.unshift({
+                    value: "platform:dudit_network",
+                    label: "Dudit · Rede de Entregadores (Aguardando aceite)",
+                })
+            }
+        } else if (selectedDeliveryPersonId?.startsWith("platform:")) {
+            if (!baseOptions.some(opt => opt.value === selectedDeliveryPersonId)) {
+                baseOptions.unshift({
+                    value: selectedDeliveryPersonId,
+                    label: "Dudit · Entregador Parceiro",
+                })
             }
         }
         return baseOptions
@@ -1761,205 +1767,205 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             </TabsContent>
 
                             {!isPaidOrder && (
-                            <TabsContent value="payment" className="xl:hidden mt-0">
-                                <FadeIn key="payment">
-                                    <div className="bg-white dark:bg-dark-surface flex flex-col gap-6">
-                                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
+                                <TabsContent value="payment" className="xl:hidden mt-0">
+                                    <FadeIn key="payment">
+                                        <div className="bg-white dark:bg-dark-surface flex flex-col gap-6">
+                                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading leading-tight">Pagamento</h3>
 
-                                        {(() => {
-                                            const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
-                                            const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
-                                                ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
-                                                : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;
-                                            const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
-                                                ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
-                                                : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod
-                                                    ? [{ method: originalPaymentMethod, amount: Number(originalPaidAmount || 0) }]
-                                                    : [];
-                                            const hasCoupon = Number(effectiveCouponDiscountAmount || 0) > 0;
+                                            {(() => {
+                                                const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
+                                                const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado"
+                                                    ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
+                                                    : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;
+                                                const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
+                                                    ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
+                                                    : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod
+                                                        ? [{ method: originalPaymentMethod, amount: Number(originalPaidAmount || 0) }]
+                                                        : [];
+                                                const hasCoupon = Number(effectiveCouponDiscountAmount || 0) > 0;
 
-                                            return isPaidOrder ? (
-                                                <div className="space-y-3">
-                                                    <div className="flex justify-between items-start text-[14px] gap-4">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Método de Pagamento</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                            {paymentMethodLabel}
-                                                        </span>
-                                                    </div>
-
-                                                    {paymentBreakdown.length > 1 && (
+                                                return isPaidOrder ? (
+                                                    <div className="space-y-3">
                                                         <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
-                                                            <div className="flex flex-col gap-1 text-right">
-                                                                {paymentBreakdown.map((entry: any, index: number) => (
-                                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                        {entry.method}: {formatCurrency(entry.amount || 0)}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex justify-between items-start text-[14px] gap-4">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Original</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>
-                                                    </div>
-
-                                                    <div className="flex justify-between items-start text-[14px] gap-4">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Entrega</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                            {deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                                        </span>
-                                                    </div>
-
-                                                    {parseFloat(shippingFee || "0") > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da Entrega</span>
-                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(parseFloat(shippingFee))}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {parseFloat(otherCosts || "0") > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
-                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(parseFloat(otherCosts))}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {discountAmount > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Pedido</span>
-                                                            <span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {effectiveCouponDiscountAmount > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto por Cupom</span>
-                                                            <span className="text-brand-green font-bold">- {formatCurrency(effectiveCouponDiscountAmount)}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {paymentMethodDiscountAmount > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Método</span>
-                                                            <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
-                                                        </div>
-                                                    )}
-
-                                                    {paymentMethodExtraAmount > 0 && (
-                                                        <div className="flex justify-between items-start text-[14px] gap-4">
-                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
-                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                        <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
-                                                        <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    <div className="grid grid-cols-1 gap-3">
-                                                        {!isQuick && (
-                                                            <>
-                                                                {canDiscount && (
-                                                                    <ListItem
-                                                                        icon={TagIcon}
-                                                                        title="Aplicar desconto"
-                                                                        description={hasCoupon || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
-                                                                        onClick={isMarketplaceLocked ? undefined : () => setIsDiscountModalOpen(true)}
-                                                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                                    />
-                                                                )}
-                                                                {deliveryMethod === "delivery" && (
-                                                                    <ListItem
-                                                                        icon={TruckIcon}
-                                                                        title="Adicionar entrega"
-                                                                        description="Define o valor da entrega do pedido"
-                                                                        onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
-                                                                        className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
-                                                                    />
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        <MoneyInput
-                                                            label="Outros Custos"
-                                                            disabled={isMarketplaceLocked}
-                                                            value={parseFloat(otherCosts || "0")}
-                                                            onChange={(val) => setOtherCosts(val.toString())}
-                                                        />
-                                                    </div>
-
-                                                    <div className="flex flex-col gap-3 mt-4 border-t border-dashed border-brand-border dark:border-dark-border pt-4">
-                                                        <div className="flex justify-between items-center text-[15px]">
-                                                            <span className="text-brand-inactive-text font-medium">Subtotal</span>
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(subtotal)}
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Método de Pagamento</span>
+                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                {paymentMethodLabel}
                                                             </span>
                                                         </div>
 
-                                                        {discountAmount > 0 && (
-                                                            <div className="flex justify-between items-center text-[15px]">
-                                                                <span className="text-brand-inactive-text font-medium">Desconto</span>
-                                                                <span className="font-bold text-brand-green">
-                                                                    -{formatCurrency(discountAmount)}
-                                                                </span>
+                                                        {paymentBreakdown.length > 1 && (
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
+                                                                <div className="flex flex-col gap-1 text-right">
+                                                                    {paymentBreakdown.map((entry: any, index: number) => (
+                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         )}
 
-                                                        {effectiveCouponDiscountAmount > 0 && (
-                                                            <div className="flex justify-between items-center text-[15px]">
-                                                                <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
-                                                                <span className="font-bold text-brand-green">
-                                                                    -{formatCurrency(effectiveCouponDiscountAmount)}
-                                                                </span>
-                                                            </div>
-                                                        )}
+                                                        <div className="flex justify-between items-start text-[14px] gap-4">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Original</span>
+                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>
+                                                        </div>
+
+                                                        <div className="flex justify-between items-start text-[14px] gap-4">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Entrega</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
+                                                                {deliveryMethod === "pickup" ? "Retirada no local" : "Entrega no endereço"}
+                                                            </span>
+                                                        </div>
 
                                                         {parseFloat(shippingFee || "0") > 0 && (
-                                                            <div className="flex justify-between items-center text-[15px]">
-                                                                <span className="text-brand-inactive-text font-medium">Entrega</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(parseFloat(shippingFee))}
-                                                                </span>
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da Entrega</span>
+                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(parseFloat(shippingFee))}</span>
                                                             </div>
                                                         )}
 
                                                         {parseFloat(otherCosts || "0") > 0 && (
-                                                            <div className="flex justify-between items-center text-[15px]">
-                                                                <span className="text-brand-inactive-text font-medium">Outros Custos</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                    {formatCurrency(parseFloat(otherCosts))}
-                                                                </span>
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
+                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(parseFloat(otherCosts))}</span>
                                                             </div>
                                                         )}
 
-                                                        <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
-                                                            <div className="flex justify-between items-end">
-                                                                <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
-                                                                <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
-                                                                    {formatCurrency(totalAmount)}
-                                                                </span>
+                                                        {discountAmount > 0 && (
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Pedido</span>
+                                                                <span className="text-brand-green font-bold">- {formatCurrency(discountAmount)}</span>
                                                             </div>
+                                                        )}
+
+                                                        {effectiveCouponDiscountAmount > 0 && (
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto por Cupom</span>
+                                                                <span className="text-brand-green font-bold">- {formatCurrency(effectiveCouponDiscountAmount)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {paymentMethodDiscountAmount > 0 && (
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Método</span>
+                                                                <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {paymentMethodExtraAmount > 0 && (
+                                                            <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
+                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
+                                                            <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                                            <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        <div className="grid grid-cols-1 gap-3">
+                                                            {!isQuick && (
+                                                                <>
+                                                                    {canDiscount && (
+                                                                        <ListItem
+                                                                            icon={TagIcon}
+                                                                            title="Aplicar desconto"
+                                                                            description={hasCoupon || discountValue > 0 ? "Desconto e/ou cupom aplicado" : "Escolha o tipo e aplique no pedido"}
+                                                                            onClick={isMarketplaceLocked ? undefined : () => setIsDiscountModalOpen(true)}
+                                                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                                        />
+                                                                    )}
+                                                                    {deliveryMethod === "delivery" && (
+                                                                        <ListItem
+                                                                            icon={TruckIcon}
+                                                                            title="Adicionar entrega"
+                                                                            description="Define o valor da entrega do pedido"
+                                                                            onClick={isMarketplaceLocked ? undefined : handleOpenShippingSheet}
+                                                                            className={`px-4 py-3 gap-4 ${isMarketplaceLocked ? 'opacity-50 pointer-events-none' : ''}`}
+                                                                        />
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            <MoneyInput
+                                                                label="Outros Custos"
+                                                                disabled={isMarketplaceLocked}
+                                                                value={parseFloat(otherCosts || "0")}
+                                                                onChange={(val) => setOtherCosts(val.toString())}
+                                                            />
                                                         </div>
 
-                                                        <Button
-                                                            size="lg"
-                                                            className="w-full mt-6"
-                                                            onClick={handleOpenPaymentModal}
-                                                            disabled={isSaving}
-                                                        >
-                                                            Ir para Pagamento
-                                                        </Button>
+                                                        <div className="flex flex-col gap-3 mt-4 border-t border-dashed border-brand-border dark:border-dark-border pt-4">
+                                                            <div className="flex justify-between items-center text-[15px]">
+                                                                <span className="text-brand-inactive-text font-medium">Subtotal</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(subtotal)}
+                                                                </span>
+                                                            </div>
+
+                                                            {discountAmount > 0 && (
+                                                                <div className="flex justify-between items-center text-[15px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Desconto</span>
+                                                                    <span className="font-bold text-brand-green">
+                                                                        -{formatCurrency(discountAmount)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {effectiveCouponDiscountAmount > 0 && (
+                                                                <div className="flex justify-between items-center text-[15px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Cupom aplicado</span>
+                                                                    <span className="font-bold text-brand-green">
+                                                                        -{formatCurrency(effectiveCouponDiscountAmount)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {parseFloat(shippingFee || "0") > 0 && (
+                                                                <div className="flex justify-between items-center text-[15px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Entrega</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(parseFloat(shippingFee))}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            {parseFloat(otherCosts || "0") > 0 && (
+                                                                <div className="flex justify-between items-center text-[15px]">
+                                                                    <span className="text-brand-inactive-text font-medium">Outros Custos</span>
+                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(parseFloat(otherCosts))}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="border-t border-dashed border-brand-border dark:border-dark-border pt-4 mt-2">
+                                                                <div className="flex justify-between items-end">
+                                                                    <span className="text-xl font-bold text-brand-dark dark:text-dark-heading tracking-tight">Total a Pagar</span>
+                                                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading leading-none tracking-tighter">
+                                                                        {formatCurrency(totalAmount)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <Button
+                                                                size="lg"
+                                                                className="w-full mt-6"
+                                                                onClick={handleOpenPaymentModal}
+                                                                disabled={isSaving}
+                                                            >
+                                                                Ir para Pagamento
+                                                            </Button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                </FadeIn>
-                            </TabsContent>
+                                                );
+                                            })()}
+                                        </div>
+                                    </FadeIn>
+                                </TabsContent>
                             )}
 
                             <TabsContent value="delivery" className="mt-0">

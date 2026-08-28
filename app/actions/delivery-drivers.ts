@@ -107,11 +107,14 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
   const supabase = await getSupabaseServerClient()
   const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
 
+  let rows: any[] = []
+
   const { data, error } = await supabase.rpc("get_available_delivery_offers", {
     p_limit: limit,
   })
 
-  if (error) {
+  if (error || !data) {
+    if (error) console.warn("[listAvailableDeliveryOffersAction] RPC get_available_delivery_offers failed, using fallback:", error)
     // Fallback: direct query if RPC is not available yet
     const { data: assignments, error: queryError } = await supabase
       .from("delivery_assignments")
@@ -130,8 +133,9 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
           delivery_address,
           total_amount,
           payment_method,
+          situation,
           customer_name,
-          order_items(id, product_name, quantity)
+          order_items(id, product_name, quantity, product_price, subtotal)
         ),
         partners(
           id,
@@ -147,7 +151,7 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
       return { success: false as const, error: normalizeError(queryError, "Não foi possível buscar ofertas disponíveis.") }
     }
 
-    const items = (assignments || []).map((row: any) => {
+    rows = (assignments || []).map((row: any) => {
       const order = row.orders || {}
       const partner = row.partners || {}
       const partnerName = partner.business_info?.nome_fantasia || partner.business_info?.razao_social || "Loja"
@@ -174,28 +178,97 @@ export async function listAvailableDeliveryOffersAction(params?: { limit?: numbe
         delivery_address: order.delivery_address || "",
         total_amount: Number(order.total_amount || 0),
         payment_method: order.payment_method || "",
+        payment_status: order.situation || "Pendente",
         notes: row.notes || "",
         items: itemsList.map((item: any) => ({
           name: item.product_name,
           quantity: item.quantity,
+          unit_price: item.product_price,
+          subtotal: item.subtotal,
         })),
+        orders: [
+          {
+            order_id: row.order_id,
+            order_number: order.order_number || `#${String(order.id || "").slice(0, 8)}`,
+            customer_name: order.customer_name || "Cliente",
+            delivery_address: order.delivery_address || "",
+            total_amount: Number(order.total_amount || 0),
+            delivery_fee: Number(row.delivery_fee || 0),
+            payment_method: order.payment_method || "",
+            payment_status: order.situation || "Pendente",
+            items: itemsList.map((item: any) => ({
+              name: item.product_name,
+              quantity: item.quantity,
+              unit_price: item.product_price,
+              subtotal: item.subtotal,
+            })),
+          },
+        ],
       }
     })
-
-    return { success: true as const, items }
+  } else {
+    rows = Array.isArray(data) ? data : []
   }
 
-  const rows = Array.isArray(data) ? data : []
-  const items = rows.map((row: any) => ({
-    ...row,
-    id: row.id || row.assignment_id,
-    assignment_id: row.assignment_id || row.id,
-    order_count: Number(row.order_count || 1),
-    delivery_fee: Number(row.delivery_fee || 0),
-    total_amount: Number(row.total_amount || 0),
-    items: Array.isArray(row.items) ? row.items : [],
-  }))
+  // Deduplicate and group by delivery_id (or assignment id)
+  const groupedMap = new Map<string, any>()
 
+  for (const row of rows) {
+    const key = String(row.delivery_id || row.assignment_id || row.id)
+    if (!groupedMap.has(key)) {
+      const ordersArr = Array.isArray(row.orders) && row.orders.length > 0
+        ? [...row.orders]
+        : [{
+            order_id: row.order_id,
+            order_number: row.order_number,
+            customer_name: row.customer_name,
+            customer_phone: row.customer_phone,
+            delivery_address: row.delivery_address,
+            total_amount: Number(row.total_amount || 0),
+            delivery_fee: Number(row.delivery_fee || 0),
+            payment_method: row.payment_method,
+            payment_status: row.payment_status,
+            items: Array.isArray(row.items) ? row.items : [],
+          }]
+
+      groupedMap.set(key, {
+        ...row,
+        id: row.id || row.assignment_id,
+        assignment_id: row.assignment_id || row.id,
+        order_count: Number(row.order_count || ordersArr.length || 1),
+        delivery_fee: Number(row.delivery_fee || 0),
+        total_amount: Number(row.total_amount || 0),
+        items: Array.isArray(row.items) ? [...row.items] : [],
+        orders: ordersArr,
+      })
+    } else {
+      const existing = groupedMap.get(key)
+      existing.delivery_fee = Number(existing.delivery_fee || 0) + Number(row.delivery_fee || 0)
+      existing.total_amount = Number(existing.total_amount || 0) + Number(row.total_amount || 0)
+      if (Array.isArray(row.items)) {
+        existing.items.push(...row.items)
+      }
+      if (Array.isArray(row.orders)) {
+        existing.orders.push(...row.orders)
+      } else {
+        existing.orders.push({
+          order_id: row.order_id,
+          order_number: row.order_number,
+          customer_name: row.customer_name,
+          customer_phone: row.customer_phone,
+          delivery_address: row.delivery_address,
+          total_amount: Number(row.total_amount || 0),
+          delivery_fee: Number(row.delivery_fee || 0),
+          payment_method: row.payment_method,
+          payment_status: row.payment_status,
+          items: Array.isArray(row.items) ? row.items : [],
+        })
+      }
+      existing.order_count = existing.orders.length
+    }
+  }
+
+  const items = Array.from(groupedMap.values())
   return { success: true as const, items }
 }
 
@@ -328,4 +401,97 @@ export async function acceptDeliveryDriverInvitationAction(params: { token: stri
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível aceitar o convite.") }
   revalidatePath("/entregadores")
   return { success: true as const, data }
+}
+
+export async function markSingleOrderDeliveredAction(params: {
+  assignmentId: string
+  orderId: string
+}) {
+  await requireDeliveryDriver()
+  const supabase = await getSupabaseServerClient()
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false as const, error: "Não autenticado." }
+
+  // Verify the assignment belongs to this driver
+  const { data: assignment } = await getAdminClient()
+    .from("delivery_assignments")
+    .select("id, delivery_id, driver_id, partner_id, status")
+    .eq("id", params.assignmentId)
+    .eq("driver_id", user.id)
+    .maybeSingle()
+
+  if (!assignment) return { success: false as const, error: "Entrega não encontrada ou sem permissão." }
+  if (!["picked_up", "out_for_delivery"].includes(assignment.status)) {
+    return { success: false as const, error: "A entrega precisa estar em retirada ou em rota para marcar pedidos individualmente." }
+  }
+
+  const nowIso = new Date().toISOString()
+
+  // Mark this specific order as delivered
+  await getAdminClient()
+    .from("orders")
+    .update({
+      delivery_status: "delivered",
+      delivery_arrived_at: nowIso,
+      delivery_completed_at: nowIso,
+    })
+    .eq("id", params.orderId)
+    .eq("partner_id", assignment.partner_id)
+
+  // Update delivery_orders for this specific order
+  if (assignment.delivery_id) {
+    await getAdminClient()
+      .from("delivery_orders")
+      .update({ status: "delivered", delivered_at: nowIso })
+      .eq("delivery_id", assignment.delivery_id)
+      .eq("order_id", params.orderId)
+
+    // Check if all orders in this delivery are now delivered
+    const { data: pendingOrders } = await getAdminClient()
+      .from("delivery_orders")
+      .select("order_id")
+      .eq("delivery_id", assignment.delivery_id)
+      .neq("status", "delivered")
+
+    if (!pendingOrders || pendingOrders.length === 0) {
+      // All orders delivered — mark the whole delivery + assignment as delivered
+      await getAdminClient()
+        .from("deliveries")
+        .update({ status: "delivered", delivered_at: nowIso, completed_at: nowIso })
+        .eq("id", assignment.delivery_id)
+
+      await getAdminClient()
+        .from("delivery_assignments")
+        .update({ status: "delivered", completed_at: nowIso, updated_at: nowIso })
+        .eq("delivery_id", assignment.delivery_id)
+        .eq("driver_id", user.id)
+    }
+  }
+
+  // Audit log
+  try {
+    await getAdminClient().from("audit_logs").insert({
+      table_name: "orders",
+      action: "SINGLE_ORDER_DELIVERED",
+      user_id: user.id,
+      actor_user_id: user.id,
+      partner_id: assignment.partner_id,
+      entity_type: "order",
+      entity_id: params.orderId,
+      action_type: "delivery_status_changed",
+      change_lines: ["Pedido marcado como entregue individualmente pelo entregador"],
+      metadata: { assignment_id: params.assignmentId, delivery_id: assignment.delivery_id },
+      source: "delivery_driver_app",
+    })
+  } catch {}
+
+  await revalidateOrderHistory(params.orderId)
+  revalidatePath("/entregadores")
+  revalidatePath(`/entregadores/entregas/${params.assignmentId}`)
+  revalidatePath("/erp/pedidos")
+  revalidatePath("/erp/logistica")
+
+  return { success: true as const }
 }

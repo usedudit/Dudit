@@ -99,7 +99,7 @@ export function DeliverySidebar({
                 ref={sidebarRef}
                 className={cn(
                     "flex flex-col fixed z-[120] left-0 top-0 h-screen border-r hidden md:flex",
-                    "bg-brand-dark border-dark-border",
+                    "bg-brand-dark dark:bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
                     "md:relative md:translate-x-0 md:z-[100]", // Ensure z-index works on desktop by changing from static to relative
                     isCollapsed ? "md:w-[68px]" : "md:w-64",

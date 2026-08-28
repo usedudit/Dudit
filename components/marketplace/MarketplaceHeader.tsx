@@ -918,16 +918,16 @@ const Header: React.FC<HeaderProps> = ({
 
                         <div className="py-2">
                             {([
-                                { label: "Meu Perfil", href: "/perfil" },
-                                { label: "Meus Favoritos", href: "/favoritos" },
-                                { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
-                                { label: "Minhas Coleções", href: "/colecoes" },
-                                { label: "Central do Vendedor", href: "/erp/inicio" },
+                                { label: "Meu Perfil", href: "/perfil", prefetch: false },
+                                { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
+                                { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
+                                { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
+                                { label: "Central do Vendedor", href: "/erp/inicio", prefetch: true },
                                 { label: "Enviar Feedback", action: () => { setIsMobileUserMenuOpen(false); setIsFeedbackOpen(true); } },
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
                                 const wrapProps = item.href
-                                    ? { href: item.href, prefetch: false }
+                                    ? { href: item.href, prefetch: item.prefetch }
                                     : { onClick: item.action || item.onClick };
 
                                 return (
@@ -1116,16 +1116,16 @@ const Header: React.FC<HeaderProps> = ({
 
                                     <div className="py-2">
                                         {([
-                                            { label: "Meu Perfil", href: "/perfil" },
-                                            { label: "Meus Favoritos", href: "/favoritos" },
-                                            { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes" },
-                                            { label: "Minhas Coleções", href: "/colecoes" },
-                                            { label: "Central do Vendedor", href: "/erp/inicio" },
+                                            { label: "Meu Perfil", href: "/perfil", prefetch: false },
+                                            { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
+                                            { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
+                                            { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
+                                            { label: "Central do Vendedor", href: "/erp/inicio", prefetch: true },
                                             { label: "Enviar Feedback", action: () => { setIsUserMenuOpen(false); setIsFeedbackOpen(true); } },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
-                                                ? { href: item.href, prefetch: false }
+                                                ? { href: item.href, prefetch: item.prefetch }
                                                 : { onClick: item.action || item.onClick };
 
                                             return (

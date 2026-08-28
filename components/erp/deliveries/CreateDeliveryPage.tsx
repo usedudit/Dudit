@@ -277,8 +277,10 @@ export default function CreateDeliveryPage({
                         initialPlatformDriverRef.current = del.platform_driver
                     }
                     const resolvedPersonId = del.platform_driver
-                        ? (del.delivery_person_id || `platform:${del.platform_driver_id || del.platform_driver.id}`)
-                        : (del.delivery_person_id || "")
+                        ? (del.platform_driver.id !== "dudit_network" && !del.platform_driver.isPendingAcceptance
+                            ? `platform:${del.platform_driver.id}`
+                            : (del.delivery_person_id === "none" ? "" : (del.delivery_person_id || "platform:dudit_network")))
+                        : (del.delivery_person_id === "none" ? "" : (del.delivery_person_id || ""))
                     setSelectedDeliveryPersonId(resolvedPersonId)
                     setStatus(del.status || "pending")
                     const startedDate = del.started_at || del.departure_time || del.created_at
@@ -413,26 +415,29 @@ export default function CreateDeliveryPage({
             })),
         ]
 
-        if (selectedDeliveryPersonId?.startsWith("platform:") || platformDriver) {
-            const rawId = selectedDeliveryPersonId?.startsWith("platform:")
-                ? selectedDeliveryPersonId.slice("platform:".length)
-                : platformDriver?.id
-
-            const exists = baseOptions.some(opt => opt.value === (selectedDeliveryPersonId || `platform:${rawId}`))
-            if (!exists) {
-                if (rawId === "dudit_network" || platformDriver?.id === "dudit_network" || platformDriver?.isPendingAcceptance) {
-                    baseOptions.push({
-                        value: "platform:dudit_network",
-                        label: "Dudit · Rede de Entregadores (Aguardando aceite)",
-                    })
-                } else {
-                    const driverName = platformDriver?.fullName || "Entregador Parceiro"
-                    const vehicleType = platformDriver?.vehicleType ? ` (${platformDriver.vehicleType})` : ""
-                    baseOptions.push({
-                        value: selectedDeliveryPersonId || `platform:${platformDriver?.id}`,
-                        label: `Dudit · ${driverName}${vehicleType}`,
-                    })
-                }
+        if (platformDriver && !platformDriver.isPendingAcceptance && platformDriver.id !== "dudit_network") {
+            const driverName = platformDriver.fullName || "Entregador Dudit"
+            const vehicleType = platformDriver.vehicleType ? ` (${platformDriver.vehicleType})` : ""
+            const optVal = `platform:${platformDriver.id}`
+            if (!baseOptions.some(opt => opt.value === optVal)) {
+                baseOptions.push({
+                    value: optVal,
+                    label: `Dudit · ${driverName}${vehicleType}`,
+                })
+            }
+        } else if (selectedDeliveryPersonId === "platform:dudit_network" || platformDriver?.id === "dudit_network" || platformDriver?.isPendingAcceptance) {
+            if (!baseOptions.some(opt => opt.value === "platform:dudit_network")) {
+                baseOptions.push({
+                    value: "platform:dudit_network",
+                    label: "Dudit · Rede de Entregadores (Aguardando aceite)",
+                })
+            }
+        } else if (selectedDeliveryPersonId?.startsWith("platform:")) {
+            if (!baseOptions.some(opt => opt.value === selectedDeliveryPersonId)) {
+                baseOptions.push({
+                    value: selectedDeliveryPersonId,
+                    label: "Dudit · Entregador Parceiro",
+                })
             }
         }
         return baseOptions
@@ -1047,15 +1052,17 @@ export default function CreateDeliveryPage({
                             </Button>
                         </header>
 
-                        <Tabs defaultValue="dados_gerais">
-                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                                <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                    Dados Gerais
-                                </TabsTrigger>
-                                <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                    Itens do Pedido
-                                </TabsTrigger>
-                            </TabsList>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
+                            <Tabs defaultValue="dados_gerais">
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                    <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                        Dados Gerais
+                                    </TabsTrigger>
+                                    <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                        Itens do Pedido
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
 
                             <div className="flex-1 overflow-y-auto p-6 space-y-6">
                                 <TabsContent value="dados_gerais" className="mt-0 space-y-6">
@@ -1088,9 +1095,7 @@ export default function CreateDeliveryPage({
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                            <Badge variant={getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).variant}>
-                                                {getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}
-                                            </Badge>
+                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
@@ -1175,7 +1180,7 @@ export default function CreateDeliveryPage({
                                     })()}
                                 </TabsContent>
                             </div>
-                        </Tabs>
+                        </div>
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                             <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>

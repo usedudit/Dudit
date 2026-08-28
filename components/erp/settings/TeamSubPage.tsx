@@ -440,7 +440,7 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                             </span>
                                                                         </td>
                                                                         <td className="py-4 px-4 text-center">
-                                                                            <Badge variant="blue">
+                                                                            <Badge variant="blue" icon={null}>
                                                                                 {ROLE_LABELS[member.role as PartnerRole] || member.role}
                                                                             </Badge>
                                                                         </td>

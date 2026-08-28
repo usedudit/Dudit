@@ -680,6 +680,7 @@ export default function PaymentStatusModal({
                                             icon={FileIcon}
                                             title="Imprimir recibo"
                                             description="Gerar e imprimir recibo da venda"
+                                            className="px-4 py-3 gap-4"
                                             onClick={() => setPrintOrderId(targetOrder.id || targetOrder.originalId)}
                                         />
                                     </div>
