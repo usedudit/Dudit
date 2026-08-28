@@ -73,7 +73,7 @@ const variants = {
 }
 
 export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; isUserLoggedIn: boolean }) => {
-    const { user } = useSupabase()
+    const { user, sessionData } = useSupabase()
     const router = useRouter()
     const searchParams = useSearchParams()
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -103,10 +103,19 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const loggedInUserName = user?.user_metadata?.full_name || user?.user_metadata?.name || (user?.email ? generateNameFromEmail(user.email) : "")
 
     React.useEffect(() => {
-        if (isUserLoggedIn && loggedInUserName && !partnerData.storeName) {
-            setPartnerData(p => ({ ...p, storeName: loggedInUserName }))
+        if (isUserLoggedIn) {
+            setPartnerData(p => ({
+                ...p,
+                storeName: p.storeName || sessionData?.profile?.full_name || loggedInUserName,
+                phone: p.phone || (user?.user_metadata?.phone as string) || p.phone,
+                address: {
+                    ...p.address,
+                    city: p.address.city || sessionData?.profile?.city || "",
+                    state: p.address.state || sessionData?.profile?.state || "",
+                }
+            }))
         }
-    }, [isUserLoggedIn, loggedInUserName])
+    }, [isUserLoggedIn, loggedInUserName, sessionData, user])
 
     const getStepTitle = () => {
         if (step === 1) return "Crie sua conta"
@@ -339,6 +348,11 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             })
 
             if (!res.success) throw new Error(res.error)
+            
+            if (typeof window !== "undefined") {
+                const { notifyAddressUpdated } = await import("@/lib/utils/address-sync")
+                notifyAddressUpdated()
+            }
 
             if (isUserLoggedIn || createdSession) {
                 const announce = searchParams.get("announce")

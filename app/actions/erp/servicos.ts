@@ -206,6 +206,20 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do serviço é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, user.id, data.id)
 
+        let finalServicePrice = data.price
+        const numServiceCost = Number(data.costPrice || data.cost_price || 0)
+        if ((finalServicePrice === undefined || finalServicePrice === null || Number(finalServicePrice) === 0) && numServiceCost > 0) {
+            try {
+                const { data: partnerRec } = await admin.from("partners").select("business_info").eq("id", finalPartnerId).single()
+                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultProfitMarginPercent
+                if (typeof defaultMargin === "number" && defaultMargin > 0) {
+                    finalServicePrice = Math.round(numServiceCost * (1 + defaultMargin / 100) * 100) / 100
+                }
+            } catch {
+                // ignore
+            }
+        }
+
         const serviceData: any = {
             ...(data.id ? { id: data.id } : {}),
             partner_id: finalPartnerId,
@@ -218,7 +232,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             subcategory_id: data.subcategory_id || data.subcategoryId || null,
             unit: data.unit || 'Sessão',
             cost_price: data.costPrice || data.cost_price || 0,
-            price: data.price || 0,
+            price: finalServicePrice || 0,
             promotional_price: data.promotional_price ?? data.promotionalPrice ?? null,
             price_type: data.price_type || data.priceType || 'fixed',
             billing_unit: data.billing_unit || data.billingUnit || 'per_service',

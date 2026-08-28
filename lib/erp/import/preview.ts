@@ -35,7 +35,26 @@ export async function generatePreview(
   const { rows, entityType, totalRows, partnerId } = session
 
   const mappedRows = rows.map((row) => mapRow(row, mapping))
-  const { errors, warnings } = validateRows(mappedRows, entityType)
+
+  let defaultMarginPercent: number | null = null
+  if (entityType === "products" || entityType === "services") {
+    try {
+      const admin = getAdminClient()
+      const { data: partnerData } = await admin
+        .from("partners")
+        .select("business_info")
+        .eq("id", partnerId)
+        .single()
+      const margin = partnerData?.business_info?.salesSettings?.defaultProfitMarginPercent
+      if (typeof margin === "number" && margin > 0) {
+        defaultMarginPercent = margin
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const { errors, warnings } = validateRows(mappedRows, entityType, { defaultMarginPercent })
 
   const errorRowIndices = new Set(errors.map((e) => e.row))
   const warningRowIndices = new Set(warnings.map((w) => w.row))

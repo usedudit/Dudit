@@ -73,10 +73,15 @@ export function mapOrderRow(
   const netAmount = Number(row.total_amount ?? row.final_amount ?? 0)
   const sellerId = row.created_by || row.finalized_by_user_id || ""
 
+  const cust = Array.isArray(row.customers) ? row.customers[0] : row.customers
+  const resolvedCustomer = (row.customer_name && row.customer_name !== "Consumidor final")
+    ? row.customer_name
+    : (cust?.name || cust?.email || row.customer_name || "Consumidor final")
+
   const base = {
     orderNumber: row.order_number || row.sale_number || row.id?.slice(0, 8) || "-",
     date: row.created_at ? formatDateTime(row.created_at) : "-",
-    customer: row.customer_name || "Consumidor final",
+    customer: resolvedCustomer,
     salesperson: sellerNames.get(String(sellerId)) || "-",
     items: formatItemNames(items),
     paymentStatus: situationLabel(row.situation || row.payment_status || row.status || "pending"),

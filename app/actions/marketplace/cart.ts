@@ -105,9 +105,9 @@ export async function getCachedCart(userId: string) {
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit),
-      product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options),
-      services(id, name, price, promotional_price, duration_minutes),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, allow_sell_without_stock, is_active),
+      product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options, is_active),
+      services(id, name, price, promotional_price, duration_minutes, is_active),
       recurring_plans(
         id, name, status,
         recurring_plan_items(unit_price, quantity)
@@ -248,8 +248,10 @@ export async function getCachedCart(userId: string) {
   for (const storeKey of Object.keys(itemsByPartner)) {
     for (const item of (itemsByPartner as any)[storeKey].items) {
       if (item.variant_id && item.product_variants) {
+        const allowSell = Boolean(item.products?.allow_sell_without_stock)
         const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
-        if (stock <= 0) {
+        const isActive = item.product_variants.is_active !== false && item.products?.is_active !== false
+        if (!allowSell && (stock <= 0 || !isActive)) {
           outOfStockVariantProductIds.push(item.product_id)
           outOfStockVariantIds.push(item.variant_id)
         }
@@ -341,18 +343,18 @@ export async function addToCartAction(
   }
   const existingItemPromise = existingQuery.maybeSingle()
 
-  // 2.C - Busca detalhes de quem é o dono do produto/variante
+  // 2.C - Busca detalhes de quem é o dono do produto/variante e estoque
   let productPromise
   if (variantId) {
     let query = adminClient
       .from("product_variants")
-      .select("id, product_id, products!inner(partner_id, store_id, partners!inner(user_id))")
+      .select("id, product_id, stock_available, stock_quantity, is_active, products!inner(partner_id, store_id, allow_sell_without_stock, is_active, partners!inner(user_id))")
       .eq("id", variantId)
     productPromise = query.maybeSingle()
   } else {
     let query = adminClient
       .from("products")
-      .select("partner_id, store_id, partners!inner(user_id)")
+      .select("partner_id, store_id, stock_available, stock_quantity, allow_sell_without_stock, is_active, partners!inner(user_id)")
       .eq("id", productId)
     productPromise = query.maybeSingle()
   }
@@ -401,6 +403,41 @@ export async function addToCartAction(
   const canBuyGuard = await assertCanBuyFromStore(user.id, partnerId, storeId)
   if (canBuyGuard.error) {
     return { error: canBuyGuard.error }
+  }
+
+  // 3.1. Validação de Estoque e Status Ativo
+  const parentProd = variantId ? (entity.products as any) : entity
+  const isItemActive = variantId
+    ? entity.is_active !== false && parentProd?.is_active !== false
+    : entity.is_active !== false
+
+  if (!isItemActive) {
+    return { error: "Este produto está temporariamente indisponível." }
+  }
+
+  const allowSellWithoutStock = Boolean(parentProd?.allow_sell_without_stock)
+  if (!allowSellWithoutStock) {
+    const availableStock = Math.max(
+      0,
+      variantId
+        ? (entity.stock_available ?? entity.stock_quantity ?? 0)
+        : (entity.stock_available ?? entity.stock_quantity ?? 0)
+    )
+
+    if (availableStock <= 0) {
+      return { error: "Este produto está esgotado no momento." }
+    }
+
+    const currentQtyInCart = initialExistingItem ? Number(initialExistingItem.quantity || 0) : 0
+    const desiredTotalQty = currentQtyInCart + quantity
+
+    if (desiredTotalQty > availableStock) {
+      const remainingAllowed = Math.max(0, availableStock - currentQtyInCart)
+      if (remainingAllowed <= 0) {
+        return { error: `Você já possui o limite máximo disponível (${availableStock} un.) deste produto na sacola.` }
+      }
+      return { error: `Estoque insuficiente. Você só pode adicionar mais ${remainingAllowed} unidade(s) (Estoque total: ${availableStock}).` }
+    }
   }
 
   // 4. Executa Inserção ou Atualização
@@ -473,14 +510,50 @@ export async function updateCartQuantityAction(cartItemId: string, quantity: num
     return { error: "Quantidade inválida" }
   }
 
-  // Verifica dono do item
+  // Verifica dono do item e detalhes de produto/estoque
   const { data: item } = await supabase
     .from("cart_items")
-    .select("user_id")
+    .select(`
+      id, user_id, item_type, product_id, variant_id,
+      products(id, stock_available, stock_quantity, allow_sell_without_stock, is_active),
+      product_variants(id, stock_available, stock_quantity, is_active)
+    `)
     .eq("id", cartItemId)
     .single()
 
   if (!item || item.user_id !== user.id) return { error: "Sem permissão" }
+
+  if (quantity > 0 && (item.item_type || "product") === "product") {
+    const prod = item.products as any
+    const variant = item.product_variants as any
+    const isVariant = Boolean(item.variant_id && variant)
+
+    const isItemActive = isVariant
+      ? variant.is_active !== false && prod?.is_active !== false
+      : prod?.is_active !== false
+
+    if (!isItemActive) {
+      return { error: "Este produto está temporariamente indisponível." }
+    }
+
+    const allowSell = Boolean(prod?.allow_sell_without_stock)
+    if (!allowSell) {
+      const availableStock = Math.max(
+        0,
+        isVariant
+          ? (variant.stock_available ?? variant.stock_quantity ?? 0)
+          : (prod?.stock_available ?? prod?.stock_quantity ?? 0)
+      )
+
+      if (availableStock <= 0) {
+        return { error: "Este produto está esgotado no momento." }
+      }
+
+      if (quantity > availableStock) {
+        return { error: `Quantidade solicitada excede o estoque disponível (${availableStock} un.).` }
+      }
+    }
+  }
 
   let error
   if (quantity <= 0) {
@@ -608,12 +681,26 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
     // We should also check the stock limit for the new variant
     const { data: variantData } = await supabase
       .from("product_variants")
-      .select("stock_available, stock_quantity")
+      .select("stock_available, stock_quantity, is_active, products!inner(allow_sell_without_stock, is_active)")
       .eq("id", newVariantId)
       .single()
 
-    const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
-    const finalQty = Math.min(newQty, stock)
+    const allowSellWithoutStock = Boolean((variantData?.products as any)?.allow_sell_without_stock)
+    const isVariantActive = variantData?.is_active !== false && (variantData?.products as any)?.is_active !== false
+
+    if (!isVariantActive) {
+      return { error: "Variante selecionada está temporariamente indisponível." }
+    }
+
+    const stock = allowSellWithoutStock
+      ? 999
+      : Math.max(0, variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 0) : 0)
+
+    if (stock <= 0) {
+      return { error: "Variante selecionada está esgotada." }
+    }
+
+    const finalQty = Math.max(1, Math.min(newQty, stock))
 
     const { error: updateError } = await supabase
       .from("cart_items")
@@ -633,12 +720,26 @@ export async function switchCartItemVariantAction(cartItemId: string, newVariant
     // Verify stock of new variant
     const { data: variantData } = await supabase
       .from("product_variants")
-      .select("stock_available, stock_quantity")
+      .select("stock_available, stock_quantity, is_active, products!inner(allow_sell_without_stock, is_active)")
       .eq("id", newVariantId)
       .single()
 
-    const stock = variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 999) : 999
-    const finalQty = Math.min(currentItem.quantity, stock)
+    const allowSellWithoutStock = Boolean((variantData?.products as any)?.allow_sell_without_stock)
+    const isVariantActive = variantData?.is_active !== false && (variantData?.products as any)?.is_active !== false
+
+    if (!isVariantActive) {
+      return { error: "Variante selecionada está temporariamente indisponível." }
+    }
+
+    const stock = allowSellWithoutStock
+      ? 999
+      : Math.max(0, variantData ? (variantData.stock_available ?? variantData.stock_quantity ?? 0) : 0)
+
+    if (stock <= 0) {
+      return { error: "Variante selecionada está esgotada." }
+    }
+
+    const finalQty = Math.max(1, Math.min(currentItem.quantity, stock))
 
     const { error: updateError } = await supabase
       .from("cart_items")
@@ -1070,13 +1171,12 @@ export async function checkoutCartAction(
     }
   }
 
-  // Ensure customer exists/is updated for this partner
-  let resolvedCustomerId: string | null = null
+  const fallbackCustomerName = buyerProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : null) || user.email || "Cliente"
   try {
     const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
     resolvedCustomerId = await ensureMarketplaceCustomer({
       partnerId,
-      name: buyerProfile?.full_name || user.email?.split("@")[0] || "Cliente",
+      name: fallbackCustomerName,
       email: user.email,
       phone: buyerProfile?.phone || null,
       cpf: null,
@@ -1192,7 +1292,7 @@ export async function checkoutCartAction(
     .insert({
       buyer_id: user.id,
       customer_id: resolvedCustomerId,
-      customer_name: buyerProfile?.full_name || null,
+      customer_name: fallbackCustomerName,
       partner_id: partnerId,
       store_id: targetStoreId,
       total_amount: persistedTotal,

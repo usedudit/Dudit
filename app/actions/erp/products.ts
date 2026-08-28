@@ -582,8 +582,19 @@ export async function createProductComprehensiveAction(data: {
             videoMetadata.video_thumbnail = cloned.video_thumbnail
         }
 
-        if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do produto é obrigatório para upload de vídeo")
-        if (data.id) await assertUploadVideoOwnership(videoMetadata, _user.id, "products", data.id)
+        let finalPrice = data.price
+        const numCost = Number(data.costPrice || 0)
+        if ((finalPrice === undefined || finalPrice === null || Number(finalPrice) === 0) && numCost > 0) {
+            try {
+                const { data: partnerRec } = await admin.from("partners").select("business_info").eq("id", finalPartnerId).single()
+                const defaultMargin = partnerRec?.business_info?.salesSettings?.defaultProfitMarginPercent
+                if (typeof defaultMargin === "number" && defaultMargin > 0) {
+                    finalPrice = Math.round(numCost * (1 + defaultMargin / 100) * 100) / 100
+                }
+            } catch {
+                // ignore
+            }
+        }
 
         const productData = {
             id: data.id || undefined,
@@ -609,7 +620,7 @@ export async function createProductComprehensiveAction(data: {
             location: data.location || null,
             location_id: (data as any).location_id || data.locationId || null,
             cost_price: data.costPrice || 0,
-            price: data.price,
+            price: finalPrice ?? 0,
             promotional_price: data.promotionalPrice || null,
             min_stock: data.minStock || 0,
             max_stock: data.maxStock || 0,

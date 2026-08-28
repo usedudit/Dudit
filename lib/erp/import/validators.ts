@@ -171,6 +171,7 @@ export function validateRow(
   rowData: Record<string, string>,
   rowIndex: number,
   entityType: EntityType,
+  options?: { defaultMarginPercent?: number | null },
 ): { errors: RowValidation[]; warnings: RowWarning[] } {
   const errors: RowValidation[] = []
   const warnings: RowWarning[] = []
@@ -182,11 +183,19 @@ export function validateRow(
     const trimmed = value ? String(value).trim() : ""
 
     if (required.includes(field.name) && !trimmed) {
-      errors.push({
-        row: rowIndex + 1,
-        field: field.label,
-        message: `${field.label} é obrigatório`,
-      })
+      const isPriceWithDefaultMargin =
+        field.name === "price" &&
+        (entityType === "products" || entityType === "services") &&
+        Boolean(options?.defaultMarginPercent && options.defaultMarginPercent > 0) &&
+        Boolean(rowData["cost_price"] && (parseNumber(rowData["cost_price"]) ?? 0) > 0)
+
+      if (!isPriceWithDefaultMargin) {
+        errors.push({
+          row: rowIndex + 1,
+          field: field.label,
+          message: `${field.label} é obrigatório`,
+        })
+      }
     }
 
     if (field.type === "number" && trimmed) {
@@ -387,12 +396,13 @@ export function validateRow(
 export function validateRows(
   rows: Record<string, string>[],
   entityType: EntityType,
+  options?: { defaultMarginPercent?: number | null },
 ): { errors: RowValidation[]; warnings: RowWarning[] } {
   const allErrors: RowValidation[] = []
   const allWarnings: RowWarning[] = []
 
   for (let i = 0; i < rows.length; i++) {
-    const result = validateRow(rows[i], i, entityType)
+    const result = validateRow(rows[i], i, entityType, options)
     allErrors.push(...result.errors)
     allWarnings.push(...result.warnings)
   }

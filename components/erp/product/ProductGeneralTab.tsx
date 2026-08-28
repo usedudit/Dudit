@@ -16,6 +16,7 @@ import QuickStockMovementSheet from "./QuickStockMovementSheet"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { ProductAddonsSection } from "./ProductAddonsSection"
+import { usePermissions } from "@/lib/permission-context"
 
 const FormCombobox = ({
     label,
@@ -106,7 +107,13 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
+    const { businessInfo } = usePermissions()
     const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false)
+
+    const defaultMargin = useMemo(() => {
+        const margin = (businessInfo as any)?.salesSettings?.defaultProfitMarginPercent
+        return typeof margin === "number" && margin > 0 ? margin : null
+    }, [businessInfo])
 
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
 
@@ -573,7 +580,21 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     {!hasVariants && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                             {!isQuickMode && (
-                                <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} dataField="costPrice" />
+                                <MoneyInput
+                                    label="Preço de Custo"
+                                    name="costPrice"
+                                    value={productData.costPrice || ""}
+                                    onChange={(val) => {
+                                        handleFieldChange({ target: { name: "costPrice", value: val } })
+                                        const numVal = Number(val)
+                                        if (defaultMargin && (!productData.price || Number(productData.price) === 0) && numVal > 0) {
+                                            const calculated = Math.round(numVal * (1 + defaultMargin / 100) * 100) / 100
+                                            handleFieldChange({ target: { name: "price", value: calculated } })
+                                        }
+                                    }}
+                                    disabled={!isEditing || !showPrice}
+                                    dataField="costPrice"
+                                />
                             )}
                             <div className="flex flex-col">
                                 <MoneyInput
@@ -591,6 +612,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     <SalePriceCalculator
                                         costPrice={Number(productData.costPrice || 0)}
                                         sellingPrice={Number(productData.price || 0)}
+                                        defaultMarginPercent={defaultMargin}
                                         onApply={(cost, sell) => {
                                             handleFieldChange({ target: { name: "costPrice", value: cost } })
                                             handleFieldChange({ target: { name: "price", value: sell } })

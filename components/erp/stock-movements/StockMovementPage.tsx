@@ -46,7 +46,7 @@ interface StockMovementPageProps {
     initialHasMore: boolean;
 }
 
-type TabType = 'all' | 'in' | 'out';
+type TabType = 'all' | 'in' | 'out' | 'adjustment';
 type SortKey = 'movement' | 'reason' | 'reference' | 'date' | 'type';
 type SortDirection = 'asc' | 'desc';
 
@@ -157,7 +157,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
             id: "movement_type",
             title: "Tipo de Movimentação",
             type: "checkbox-list",
-            options: ["Venda", "Devolução", "Ajuste", "Compra", "Avaria", "Perda"],
+            options: ["Venda", "Devolução", "Ajuste", "Compra", "Avaria", "Perda", "Inventário"],
         },
     ];
 
@@ -166,14 +166,15 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
     const isFiltered = searchTerm !== "" || hasActiveFilters;
 
     const tabCounts = useMemo(() => {
-        if (!loadedMovements) return { all: 0, in: 0, out: 0 }
+        if (!loadedMovements) return { all: 0, in: 0, out: 0, adjustment: 0 }
         const all = loadedMovements.length
-        let inCount = 0, outCount = 0
+        let inCount = 0, outCount = 0, adjustmentCount = 0
         for (const mov of loadedMovements) {
             if ((mov as any).movement_type === "in") inCount++
-            else outCount++
+            else if ((mov as any).movement_type === "out") outCount++
+            else if ((mov as any).movement_type === "adjustment") adjustmentCount++
         }
-        return { all, in: inCount, out: outCount }
+        return { all, in: inCount, out: outCount, adjustment: adjustmentCount }
     }, [loadedMovements])
 
     // ── Entity Navigation (instant via cache) ───────────────────────
@@ -307,7 +308,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
                 items_count,
                 childProductNames,
                 childProductSkus,
-                type: mov.movement_type as 'in' | 'out',
+                type: mov.movement_type as 'in' | 'out' | 'adjustment',
                 quantity: totalQuantity,
                 reason,
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',

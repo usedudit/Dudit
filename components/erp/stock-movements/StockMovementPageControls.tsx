@@ -30,8 +30,8 @@ interface FilterState {
 }
 
 interface StockMovementPageControlsProps {
-    activeTab: "all" | "in" | "out"
-    setActiveTab: (tab: "all" | "in" | "out") => void
+    activeTab: "all" | "in" | "out" | "adjustment"
+    setActiveTab: (tab: "all" | "in" | "out" | "adjustment") => void
     search: string
     onSearchChange: (value: string) => void
     onOpenFilter: () => void
@@ -42,7 +42,7 @@ interface StockMovementPageControlsProps {
     viewMode: "list" | "grid"
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
-    tabCounts?: { all: number; in: number; out: number }
+    tabCounts?: { all: number; in: number; out: number; adjustment: number }
 }
 
 const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
@@ -107,7 +107,7 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
             <div className="mb-6 px-4 md:px-8">
                 <Tabs
                     value={activeTab}
-                    onValueChange={(val) => setActiveTab(val as "all" | "in" | "out")}
+                    onValueChange={(val) => setActiveTab(val as "all" | "in" | "out" | "adjustment")}
                 >
                     <TabsList className="px-0">
                         <TabsTrigger value="all" icon={ArrowUpDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.all} variant="gray" />}>
@@ -118,6 +118,9 @@ const StockMovementPageControls: React.FC<StockMovementPageControlsProps> = ({
                         </TabsTrigger>
                         <TabsTrigger value="out" icon={ArrowUpIcon} badge={tabCounts && <TabCountBadge count={tabCounts.out} variant="red" />}>
                             Saídas
+                        </TabsTrigger>
+                        <TabsTrigger value="adjustment" icon={ArrowUpDownIcon} badge={tabCounts && <TabCountBadge count={tabCounts.adjustment} variant="blue" />}>
+                            Ajustes
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>

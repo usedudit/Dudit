@@ -693,10 +693,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     useEffect(() => {
         if (deliveryMethod !== "delivery" || deliveryPeople.length > 0) return
         async function loadDeliveryPeople() {
-            const legacy = await fetchDeliveryPeopleBucketAction(partnerId).catch(() => [])
-            setDeliveryPeople([
-                ...(legacy || []).map((person: any) => ({ ...person, source: "legacy" as const })),
-            ])
+            const list = await fetchDeliveryPeopleBucketAction(partnerId).catch(() => [])
+            setDeliveryPeople(list as any[])
         }
         void loadDeliveryPeople()
     }, [deliveryMethod, deliveryPeople.length, partnerId])

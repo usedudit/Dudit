@@ -4439,10 +4439,11 @@ export async function getERPOrdersPageAction(
             async () => {
                 const supabase = createAdminClient()
                 const baseSelect = `
-                        id, order_number, mp_payment_id, customer_name, buyer_id,
+                        id, order_number, mp_payment_id, customer_name, buyer_id, customer_id,
                         total_amount, paid_amount, situation, previous_situation_before_cancel,
                         delivery_status, delivery_type, order_source, created_at, store_id,
                         stores(name),
+                        customers(id, name, email, phone),
                         return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                         order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                         payment_method, payment_breakdown, payment_provider
@@ -4466,7 +4467,68 @@ export async function getERPOrdersPageAction(
                     ordersHasPosSaleColumn = true
                 }
                 if (queryResult.error) throw queryResult.error
-                return queryResult.data || []
+                const rawData = queryResult.data || []
+
+                // Resolve missing customer names for marketplace / external orders
+                const missingBuyerIds = Array.from(new Set(
+                    rawData
+                        .filter((r: any) => {
+                            const cust = Array.isArray(r.customers) ? r.customers[0] : r.customers
+                            const hasName = Boolean(r.customer_name && r.customer_name.trim() !== "" && r.customer_name !== "Consumidor final")
+                            return (!hasName && !cust?.name && !cust?.email && r.buyer_id)
+                        })
+                        .map((r: any) => r.buyer_id)
+                        .filter(Boolean)
+                ))
+
+                const customerInfoByBuyerId = new Map<string, { name: string; email: string | null }>()
+
+                if (missingBuyerIds.length > 0) {
+                    try {
+                        const { data: matchedCustomers } = await supabase
+                            .from("customers")
+                            .select("id, name, email, user_id, marketplace_user_id")
+                            .eq("partner_id", partnerId)
+                            .or(missingBuyerIds.map(id => `id.eq.${id},user_id.eq.${id},marketplace_user_id.eq.${id}`).join(","))
+
+                        for (const c of matchedCustomers || []) {
+                            const info = { name: c.name, email: c.email || null }
+                            if (c.id) customerInfoByBuyerId.set(c.id, info)
+                            if (c.user_id) customerInfoByBuyerId.set(c.user_id, info)
+                            if (c.marketplace_user_id) customerInfoByBuyerId.set(c.marketplace_user_id, info)
+                        }
+
+                        const stillMissingIds = missingBuyerIds.filter(id => !customerInfoByBuyerId.has(id))
+                        if (stillMissingIds.length > 0) {
+                            const { data: profiles } = await supabase
+                                .from("user_profiles")
+                                .select("user_id, full_name")
+                                .in("user_id", stillMissingIds)
+                            for (const p of profiles || []) {
+                                if (p.full_name) {
+                                    customerInfoByBuyerId.set(p.user_id, { name: p.full_name, email: null })
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("[getERPOrdersPageAction] Error resolving missing customer names:", err)
+                    }
+                }
+
+                return rawData.map((row: any) => {
+                    const cust = Array.isArray(row?.customers) ? row.customers[0] : row.customers
+                    const fallbackInfo = row?.buyer_id ? customerInfoByBuyerId.get(row.buyer_id) : null
+                    const resolvedCustomerName = (row?.customer_name && row.customer_name !== "Consumidor final")
+                        ? row.customer_name
+                        : (cust?.name || cust?.email || fallbackInfo?.name || fallbackInfo?.email || row?.customer_name || null)
+
+                    return {
+                        ...row,
+                        customer_name: resolvedCustomerName,
+                        customers: cust || (fallbackInfo ? { name: fallbackInfo.name, email: fallbackInfo.email } : null),
+                        buyer_email: cust?.email || fallbackInfo?.email || null,
+                    }
+                })
             },
             30,
         )

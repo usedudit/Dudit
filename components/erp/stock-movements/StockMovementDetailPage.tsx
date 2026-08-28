@@ -195,10 +195,10 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span>{movementTitle}</span>
                                             <Badge
-                                                variant={isIn ? "green" : "red"}
+                                                variant={data.type === "in" ? "green" : data.type === "out" ? "red" : "blue"}
                                                 className="whitespace-nowrap scale-90 shrink-0"
                                             >
-                                                {isIn ? "Entrada" : "Saída"}
+                                                {data.type === "in" ? "Entrada" : data.type === "out" ? "Saída" : "Ajuste"}
                                             </Badge>
                                             {data.isReversed && (
                                                 <Badge
@@ -264,7 +264,18 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                         {/* Bottom: Product Items (White) */}
                                                         <div className="bg-white dark:bg-dark-surface">
                                                             {displayItems.map((item, index) => {
-                                                                const lineIn = item.type === 'in';
+                                                                const delta = item.product.currentStock - item.product.previousStock;
+                                                                const lineIn = data.type === 'adjustment' ? delta > 0 : item.type === 'in';
+                                                                const lineOut = data.type === 'adjustment' ? delta < 0 : item.type === 'out';
+                                                                const deltaFormatted = data.type === 'adjustment'
+                                                                    ? (delta > 0 ? `+${delta}` : `${delta}`)
+                                                                    : (lineIn ? `+${item.quantity}` : `-${item.quantity}`);
+                                                                const deltaColorClass = lineIn
+                                                                    ? 'text-brand-green'
+                                                                    : lineOut
+                                                                        ? 'text-brand-red'
+                                                                        : 'text-brand-dark dark:text-dark-heading';
+
                                                                 return (
                                                                     <div key={item.id}>
                                                                         {index > 0 && (
@@ -289,8 +300,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                                             <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
                                                                                             <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                            <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                                                {lineIn ? '+' : '-'}{item.quantity}
+                                                                                            <span className={`text-sm font-bold ${deltaColorClass}`}>
+                                                                                                {deltaFormatted}
                                                                                             </span>
                                                                                         </div>
                                                                                     </div>
@@ -313,7 +324,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                                                                     <div className="text-center md:text-left">
                                                                                         <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                                                        <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
+                                                                                        <div className={`text-md font-bold ${deltaColorClass}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
@@ -383,7 +394,18 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             < div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden" >
                                                 {
                                                     displayItems.map((item, index) => {
-                                                        const lineIn = item.type === 'in';
+                                                        const delta = item.product.currentStock - item.product.previousStock;
+                                                        const lineIn = data.type === 'adjustment' ? delta > 0 : item.type === 'in';
+                                                        const lineOut = data.type === 'adjustment' ? delta < 0 : item.type === 'out';
+                                                        const deltaFormatted = data.type === 'adjustment'
+                                                            ? (delta > 0 ? `+${delta}` : `${delta}`)
+                                                            : (lineIn ? `+${item.quantity}` : `-${item.quantity}`);
+                                                        const deltaColorClass = lineIn
+                                                            ? 'text-brand-green'
+                                                            : lineOut
+                                                                ? 'text-brand-red'
+                                                                : 'text-brand-dark dark:text-dark-heading';
+
                                                         return (
                                                             <div key={item.id}>
                                                                 {index > 0 && (
@@ -408,8 +430,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                                                     <span className="text-brand-inactive-text dark:text-dark-body">•</span>
                                                                                     <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
                                                                                     <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                    <span className={`text-sm font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>
-                                                                                        {lineIn ? '+' : '-'}{item.quantity}
+                                                                                    <span className={`text-sm font-bold ${deltaColorClass}`}>
+                                                                                        {deltaFormatted}
                                                                                     </span>
                                                                                 </div>
                                                                             </div>
@@ -427,7 +449,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                                                             <div className="text-center md:text-left flex-1">
                                                                                 <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                                                <div className={`text-md font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
+                                                                                <div className={`text-md font-bold ${deltaColorClass}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -544,7 +566,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <span className="text-brand-inactive-text dark:text-dark-body">Tipo de Movimentação</span>
-                        <span className={`font-bold ${isIn ? 'text-brand-green' : 'text-brand-red'}`}>{isIn ? 'Entrada' : 'Saída'}</span>
+                        <span className={`font-bold ${data.type === 'in' ? 'text-brand-green' : data.type === 'out' ? 'text-brand-red' : 'text-blue-600 dark:text-blue-400'}`}>{data.type === 'in' ? 'Entrada' : data.type === 'out' ? 'Saída' : 'Ajuste'}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <span className="text-brand-inactive-text dark:text-dark-body">Motivo</span>

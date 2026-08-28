@@ -1,9 +1,7 @@
-'use client';
-
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Checkbox } from "@/components/reusable"
-import { ThreeDotsIcon, ChevronUpIcon, ChevronDownIcon, Package } from "@/lib/icons"
+import { ThreeDotsIcon, ChevronUpIcon, ChevronDownIcon, ArrowUpDownIcon, Package } from "@/lib/icons"
 
 interface ColumnDef {
     id: string
@@ -106,10 +104,14 @@ const StockMovementListItem = React.memo(
                             </div>
                         )
                     }
+                    const badgeVariant = movement.type === 'in' ? "green" : movement.type === 'out' ? "red" : "blue"
+                    const badgeIcon = movement.type === 'in' ? <ChevronDownIcon /> : movement.type === 'out' ? <ChevronUpIcon /> : <ArrowUpDownIcon />
+                    const badgeLabel = movement.type === 'in' ? "Entrada" : movement.type === 'out' ? "Saída" : "Ajuste"
+
                     return (
                         <div className={`flex items-center gap-1.5 ${getJustifyClass(columns.find(c => c.id === 'type')?.align)}`}>
-                            <Badge variant={movement.type === 'in' ? "green" : "red"} icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />} className="w-fit whitespace-nowrap">
-                                {movement.type === 'in' ? "Entrada" : "Saída"}
+                            <Badge variant={badgeVariant} icon={badgeIcon} className="w-fit whitespace-nowrap">
+                                {badgeLabel}
                             </Badge>
                             {movement.isReversed && (
                                 <Badge variant="gray" icon={null} className="w-fit whitespace-nowrap">

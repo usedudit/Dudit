@@ -67,7 +67,8 @@ export const getPartnerOrdersCached = cache(async (partnerId: string, storeId: s
                         .select(`
                       *,
                       order_items(*),
-                      stores(name)
+                      stores(name),
+                      customers(id, name, email, phone)
                   `)
                         .eq("partner_id", partnerId)
                         .order("created_at", { ascending: false }),
@@ -88,7 +89,13 @@ export const getPartnerOrdersCached = cache(async (partnerId: string, storeId: s
                     console.error("[getPartnerOrdersCached] sales error:", salesRes.error)
                 }
 
-                const orderRows = (ordersRes.data || []).map((o: any) => ({ ...o, is_pos_sale: false }))
+                const orderRows = (ordersRes.data || []).map((o: any) => {
+                    const cust = Array.isArray(o.customers) ? o.customers[0] : o.customers
+                    const resolvedCustomerName = (o.customer_name && o.customer_name !== "Consumidor final")
+                        ? o.customer_name
+                        : (cust?.name || cust?.email || o.buyer_email || o.customer_name || "Consumidor final")
+                    return { ...o, customer_name: resolvedCustomerName, is_pos_sale: false }
+                })
                 const rawSales = salesRes.data || []
                 const saleCustomerIds = [...new Set(rawSales.map((s: any) => s.customer_id).filter(Boolean))]
                 const customerNameById = new Map<string, string>()

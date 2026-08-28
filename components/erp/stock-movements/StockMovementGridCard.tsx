@@ -1,9 +1,7 @@
-'use client';
-
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Checkbox, Tooltip } from "@/components/reusable"
-import { ChevronDownIcon, ChevronUpIcon, Package } from "@/lib/icons"
+import { ChevronDownIcon, ChevronUpIcon, ArrowUpDownIcon, Package } from "@/lib/icons"
 
 interface StockMovementGridCardProps {
     movement: any
@@ -28,6 +26,10 @@ const StockMovementGridCard = React.memo(
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
     }: StockMovementGridCardProps) => {
+
+        const badgeVariant = movement.type === 'in' ? "green" : movement.type === 'out' ? "red" : "blue"
+        const badgeIcon = movement.type === 'in' ? <ChevronDownIcon /> : movement.type === 'out' ? <ChevronUpIcon /> : <ArrowUpDownIcon />
+        const badgeLabel = movement.type === 'in' ? "Entrada" : movement.type === 'out' ? "Saída" : "Ajuste"
 
         return (
             <motion.div
@@ -58,10 +60,10 @@ const StockMovementGridCard = React.memo(
                                     {movement.displayId}
                                 </h3>
 
-                                <Tooltip text={movement.type === 'in' ? "Entrada" : "Saída"}>
+                                <Tooltip text={badgeLabel}>
                                     <Badge
-                                        variant={movement.type === 'in' ? "green" : "red"}
-                                        icon={movement.type === 'in' ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                                        variant={badgeVariant}
+                                        icon={badgeIcon}
                                         className="whitespace-nowrap scale-90"
                                     />
                                 </Tooltip>

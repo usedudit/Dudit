@@ -7,6 +7,7 @@ import {
     SearchIcon,
     ChevronDownIcon,
     ChevronUpIcon,
+    ArrowUpDownIcon,
     Package,
     FileIcon,
     TrashIcon,
@@ -25,7 +26,8 @@ import {
     IconPlaceholder,
     ThreeDotsLoader,
     FormTextarea,
-    FormSection
+    FormSection,
+    Badge
 } from '@/components/reusable';
 import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
 import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
@@ -33,7 +35,7 @@ import { Lock, Unlock } from 'lucide-react';
 import { CameraScannerModal } from '@/components/reusable/CameraScannerModal';
 import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
-import { formatUnit } from '@/lib/utils/formatters';
+import { formatUnit, formatQuantityWithUnit } from '@/lib/utils/formatters';
 import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
@@ -83,7 +85,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, []);
 
     // Form State
-    const [type, setType] = useState<'in' | 'out'>('in');
+    const [type, setType] = useState<'in' | 'out' | 'adjustment'>('in');
     const [notes, setNotes] = useState('');
     const [reason, setReason] = useState('Selecione um motivo...');
     const [customReason, setCustomReason] = useState('');
@@ -206,7 +208,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     }, [nextAction])
 
 
-    const addProduct = useCallback((product: ProductBucketItem, quantity = 1, variant?: any) => {
+    const addProduct = useCallback((product: ProductBucketItem, quantity?: number, variant?: any) => {
         setItems(prev => {
             const existsIndex = prev.findIndex(item =>
                 item.product.id === product.id &&
@@ -214,11 +216,16 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             );
             const availableStock = variant ? Number(variant.stock || 0) : Number(product.stock || 0);
             const displayName = product.name + (variant ? ` - ${variant.name}` : '');
+            const defaultQty = type === 'adjustment' ? availableStock : (quantity ?? 1);
 
             if (existsIndex > -1) {
                 const next = [...prev];
                 const item = next[existsIndex];
-                const nextQty = item.quantity + quantity;
+                if (type === 'adjustment') {
+                    // For adjustment, preserve or update target stock
+                    return prev;
+                }
+                const nextQty = item.quantity + (quantity ?? 1);
                 if (type === 'out' && nextQty > availableStock) {
                     notifyError(`A quantidade de "${displayName}" excede o estoque disponível.`);
                     return prev;
@@ -227,11 +234,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                 return next;
             }
             // Add new item
-            if (type === 'out' && quantity > availableStock) {
+            if (type === 'out' && defaultQty > availableStock) {
                 notifyError(`A quantidade de "${displayName}" excede o estoque disponível.`);
                 return prev;
             }
-            return [...prev, { product, variant, quantity }];
+            return [...prev, { product, variant, quantity: defaultQty }];
         });
         productBucket.setSearchQuery('');
         setIsProductSearchOpen(false);
@@ -344,6 +351,10 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const updateItemQty = useCallback((index: number, qty: number) => {
         setItems(prev => prev.map((item, i) => {
             if (i !== index) return item;
+            if (type === 'adjustment') {
+                const nextQty = Math.max(0, qty);
+                return { ...item, quantity: nextQty };
+            }
             const nextQty = Math.max(1, qty);
             const stockLimit = item.variant ? Number(item.variant.stock || 0) : Number(item.product.stock || 0);
             const displayName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
@@ -388,9 +399,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
         // Validate individual quantities
         for (const item of items) {
-            if (item.quantity <= 0) {
+            if (type !== 'adjustment' && item.quantity <= 0) {
                 errors.add('items');
                 notifyError("Todas as quantidades devem ser maiores que zero.");
+                break;
+            }
+            if (type === 'adjustment' && item.quantity < 0) {
+                errors.add('items');
+                notifyError("O estoque ajustado não pode ser negativo.");
                 break;
             }
             const stockLimit = item.variant ? Number(item.variant.stock || 0) : Number(item.product.stock || 0);
@@ -463,7 +479,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Registre uma nova entrada ou saída de itens no seu estoque
+                                            Registre uma entrada, saída ou ajuste de inventário no seu estoque
                                         </div>
                                     </div>
 
@@ -472,7 +488,12 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
                                             Cancelar
                                         </Button>
-                                        <Button onClick={handleSave} disabled={isSaving} leftIcon={<SaveIcon size={18} />}>
+                                        <Button
+                                            onClick={handleSave}
+                                            disabled={isSaving}
+                                            leftIcon={<SaveIcon size={18} />}
+                                            className={type === 'in' ? 'bg-brand-green hover:bg-brand-green/90 text-white' : type === 'out' ? 'bg-brand-red hover:bg-brand-red/90 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}
+                                        >
                                             {isSaving ? "Salvando..." : "Salvar"}
                                         </Button>
                                     </div>
@@ -510,10 +531,11 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
                                                 {/* Tipo de Movimentação */}
                                                 <FormSection title="Tipo de Movimentação">
-                                                    <div className="flex flex-col md:flex-row gap-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                         <motion.button
+                                                            type="button"
                                                             onClick={() => { setType('in'); handleReasonChange('Selecione um motivo...'); }}
-                                                            className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'in'
+                                                            className={`flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'in'
                                                                 ? 'bg-green-50/50 dark:bg-green-900/10 border-brand-green'
                                                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
                                                                 }`}
@@ -525,14 +547,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 </div>
                                                                 <div className="flex flex-col items-start text-left">
                                                                     <span className={`font-bold text-[15px] ${type === 'in' ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`}>Entrada</span>
-                                                                    <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Adicionar itens ao estoque</span>
+                                                                    <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Adicionar ao estoque</span>
                                                                 </div>
                                                             </div>
                                                         </motion.button>
 
                                                         <motion.button
+                                                            type="button"
                                                             onClick={() => { setType('out'); handleReasonChange('Selecione um motivo...'); }}
-                                                            className={`flex-1 flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
+                                                            className={`flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'out'
                                                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'
                                                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
                                                                 }`}
@@ -544,7 +567,34 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                 </div>
                                                                 <div className="flex flex-col items-start text-left">
                                                                     <span className={`font-bold text-[15px] ${type === 'out' ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading'}`}>Saída</span>
-                                                                    <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Remover itens do estoque</span>
+                                                                    <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Remover do estoque</span>
+                                                                </div>
+                                                            </div>
+                                                        </motion.button>
+
+                                                        <motion.button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setType('adjustment');
+                                                                handleReasonChange('Selecione um motivo...');
+                                                                setItems(prev => prev.map(item => {
+                                                                    const curStock = item.variant ? Number(item.variant.stock || 0) : Number(item.product.stock || 0);
+                                                                    return { ...item, quantity: curStock };
+                                                                }));
+                                                            }}
+                                                            className={`flex items-center justify-between p-5 rounded-2xl transition-all border ${type === 'adjustment'
+                                                                ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-600 dark:border-blue-500'
+                                                                : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center gap-4">
+                                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${type === 'adjustment' ? 'bg-blue-600 text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                                                    }`}>
+                                                                    <ArrowUpDownIcon size={22} strokeWidth={2.5} />
+                                                                </div>
+                                                                <div className="flex flex-col items-start text-left">
+                                                                    <span className={`font-bold text-[15px] ${type === 'adjustment' ? 'text-blue-600 dark:text-blue-400' : 'text-brand-dark dark:text-dark-heading'}`}>Ajuste</span>
+                                                                    <span className="text-xs text-brand-inactive-text mt-0.5 font-medium">Corrigir contagem / balanço</span>
                                                                 </div>
                                                             </div>
                                                         </motion.button>
@@ -661,7 +711,15 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     <thead>
                                                                         <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                             <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
-                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                            {type === 'adjustment' && (
+                                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-28">Estoque Atual</th>
+                                                                            )}
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">
+                                                                                {type === 'adjustment' ? 'Novo Estoque' : 'Qtd.'}
+                                                                            </th>
+                                                                            {type === 'adjustment' && (
+                                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-28">Diferença</th>
+                                                                            )}
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
                                                                         </tr>
                                                                     </thead>
@@ -670,7 +728,8 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                             const itemImage = item.variant?.image || item.product.image;
                                                                             const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
                                                                             const itemSku = item.variant?.sku || item.product.sku;
-                                                                            const itemStock = item.variant ? item.variant.stock : item.product.stock;
+                                                                            const itemStock = Number(item.variant ? item.variant.stock : item.product.stock) || 0;
+                                                                            const delta = item.quantity - itemStock;
 
                                                                             return (
                                                                                 <tr key={`${item.product.id}-${item.variant?.id || 'base'}`} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
@@ -685,20 +744,51 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                                 </span>
                                                                                                 <div className="flex items-center gap-2">
                                                                                                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{itemSku}</span>
-                                                                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
-                                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{itemStock}</strong></span>
+                                                                                                    {type !== 'adjustment' && (
+                                                                                                        <>
+                                                                                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
+                                                                                                            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{itemStock}</strong></span>
+                                                                                                        </>
+                                                                                                    )}
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
                                                                                     </td>
+                                                                                    {type === 'adjustment' && (
+                                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">
+                                                                                                {itemStock}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                    )}
                                                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                                                         <div className="flex justify-center">
-                                                                                            <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(itemStock || 0)) : undefined} size="md" />
+                                                                                            <QuantitySelector
+                                                                                                value={item.quantity}
+                                                                                                onChange={(val) => updateItemQty(index, val)}
+                                                                                                min={type === 'adjustment' ? 0 : 1}
+                                                                                                max={type === 'out' ? Math.max(0, itemStock) : undefined}
+                                                                                                size="md"
+                                                                                            />
                                                                                         </div>
                                                                                     </td>
+                                                                                    {type === 'adjustment' && (
+                                                                                        <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center">
+                                                                                            <div className="flex justify-center">
+                                                                                                {delta > 0 ? (
+                                                                                                    <Badge variant="green" icon={null}>+{delta}</Badge>
+                                                                                                ) : delta < 0 ? (
+                                                                                                    <Badge variant="red" icon={null}>{delta}</Badge>
+                                                                                                ) : (
+                                                                                                    <Badge variant="gray" icon={null}>0</Badge>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    )}
                                                                                     <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
                                                                                         <div className="flex justify-center">
                                                                                             <button
+                                                                                                type="button"
                                                                                                 onClick={() => removeItem(index)}
                                                                                                 className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors"
                                                                                                 title="Remover item"
@@ -722,12 +812,13 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     const itemImage = item.variant?.image || item.product.image;
                                                                     const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
                                                                     const itemSku = item.variant?.sku || item.product.sku;
-                                                                    const itemStock = item.variant ? item.variant.stock : item.product.stock;
+                                                                    const itemStock = Number(item.variant ? item.variant.stock : item.product.stock) || 0;
+                                                                    const delta = item.quantity - itemStock;
 
                                                                     return (
                                                                         <div key={`${item.product.id}-${item.variant?.id || 'base'}`} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
                                                                             <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
-                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!itemImage ? 'object-contain p-1.5' : 'object-cover'}`} alt="" />
+                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!itemImage ? 'object-contain' : 'object-cover'}`} alt="" />
                                                                             </div>
                                                                             <div className="flex-1 min-w-0">
                                                                                 <div className="flex justify-between items-start mb-0.5">
@@ -735,16 +826,34 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                                         {itemName}
                                                                                     </h4>
                                                                                     <button
+                                                                                        type="button"
                                                                                         onClick={() => removeItem(index)}
                                                                                         className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors shrink-0"
                                                                                     >
                                                                                         <TrashIcon size={14} />
                                                                                     </button>
                                                                                 </div>
-                                                                                <p className="text-[11px] font-medium text-brand-inactive-text pr-2 truncate mb-2">
-                                                                                    {itemSku} • Estoque: {itemStock}
-                                                                                </p>
-                                                                                <QuantitySelector value={item.quantity} onChange={(val) => updateItemQty(index, val)} max={type === 'out' ? Math.max(0, Number(itemStock || 0)) : undefined} size="md" />
+                                                                                <div className="flex items-center gap-2 mb-2">
+                                                                                    <p className="text-[11px] font-medium text-brand-inactive-text truncate">
+                                                                                        {itemSku} • Estoque: {itemStock}
+                                                                                    </p>
+                                                                                    {type === 'adjustment' && (
+                                                                                        delta > 0 ? (
+                                                                                            <Badge variant="green" icon={null} className="text-[10px] py-0.5 px-1.5">+{delta}</Badge>
+                                                                                        ) : delta < 0 ? (
+                                                                                            <Badge variant="red" icon={null} className="text-[10px] py-0.5 px-1.5">{delta}</Badge>
+                                                                                        ) : (
+                                                                                            <Badge variant="gray" icon={null} className="text-[10px] py-0.5 px-1.5">0</Badge>
+                                                                                        )
+                                                                                    )}
+                                                                                </div>
+                                                                                <QuantitySelector
+                                                                                    value={item.quantity}
+                                                                                    onChange={(val) => updateItemQty(index, val)}
+                                                                                    min={type === 'adjustment' ? 0 : 1}
+                                                                                    max={type === 'out' ? Math.max(0, itemStock) : undefined}
+                                                                                    size="md"
+                                                                                />
                                                                             </div>
                                                                         </div>
                                                                     );
@@ -778,12 +887,25 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     options={type === 'in' ? [
                                                                         { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                                                                         { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
+                                                                        { value: 'Bonificação / Brinde', label: 'Bonificação / Brinde' },
                                                                         { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
+                                                                        { value: 'Transferência entre Lojas', label: 'Transferência entre Lojas' },
                                                                         { value: 'Outro', label: 'Outro' }
-                                                                    ] : [
+                                                                    ] : type === 'out' ? [
                                                                         { value: 'Avaria / Perda', label: 'Avaria / Perda' },
                                                                         { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
                                                                         { value: 'Uso Interno', label: 'Uso Interno' },
+                                                                        { value: 'Descarte / Vencimento', label: 'Descarte / Vencimento' },
+                                                                        { value: 'Brinde / Doação', label: 'Brinde / Doação' },
+                                                                        { value: 'Transferência entre Lojas', label: 'Transferência entre Lojas' },
+                                                                        { value: 'Outro', label: 'Outro' }
+                                                                    ] : [
+                                                                        { value: 'Balanço / Inventário', label: 'Balanço / Inventário' },
+                                                                        { value: 'Correção de Contagem', label: 'Correção de Contagem' },
+                                                                        { value: 'Ajuste Operacional', label: 'Ajuste Operacional' },
+                                                                        { value: 'Sobra de Estoque', label: 'Sobra de Estoque' },
+                                                                        { value: 'Perda / Extravio não identificado', label: 'Perda / Extravio não identificado' },
+                                                                        { value: 'Produto Vencido / Avariado', label: 'Produto Vencido / Avariado' },
                                                                         { value: 'Outro', label: 'Outro' }
                                                                     ]}
                                                                 />
@@ -869,13 +991,25 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                         className="space-y-0"
                                                     >
                                                         {items.map((item, index) => {
-                                                            const itemStock = item.variant ? item.variant.stock : item.product.stock;
+                                                            const itemStock = Number(item.variant ? item.variant.stock : item.product.stock) || 0;
                                                             const itemImage = item.variant?.image || item.product.image;
                                                             const itemName = item.product.name + (item.variant ? ` - ${item.variant.name}` : '');
                                                             const itemSku = item.variant?.sku || item.product.sku;
                                                             const newStock = type === 'in'
                                                                 ? itemStock + item.quantity
-                                                                : Math.max(0, itemStock - item.quantity);
+                                                                : type === 'out'
+                                                                    ? Math.max(0, itemStock - item.quantity)
+                                                                    : item.quantity;
+                                                            const delta = newStock - itemStock;
+                                                            const colorClass = type === 'in'
+                                                                ? 'text-brand-green'
+                                                                : type === 'out'
+                                                                    ? 'text-brand-red'
+                                                                    : delta > 0
+                                                                        ? 'text-brand-green'
+                                                                        : delta < 0
+                                                                            ? 'text-brand-red'
+                                                                            : 'text-brand-dark dark:text-dark-heading';
 
                                                             return (
                                                                 <div key={`${item.product.id}-${item.variant?.id || 'base'}`} className={`py-4 flex items-center justify-between gap-4 ${index > 0 ? 'border-t border-brand-border/40 dark:border-dark-border/40' : ''}`}>
@@ -894,7 +1028,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     <div className="flex items-center gap-2 shrink-0">
                                                                         <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{itemStock} <span className="text-[10px] font-medium opacity-60">{formatUnit((item.variant as any)?.unit || (item.product as any)?.unit)}</span></span>
                                                                         <ArrowRightIcon size={14} className="text-brand-inactive-text" />
-                                                                        <span className={`text-[15px] font-bold ${type === 'in' ? 'text-brand-green' : 'text-brand-red'}`}>
+                                                                        <span className={`text-[15px] font-bold ${colorClass}`}>
                                                                             {newStock} <span className="text-xs font-bold">{formatUnit((item.variant as any)?.unit || (item.product as any)?.unit)}</span>
                                                                         </span>
                                                                     </div>
@@ -938,7 +1072,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`flex-1 h-12 ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90' : 'bg-brand-red hover:bg-brand-red/90'}`}
+                            className={`flex-1 h-12 ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90 text-white' : type === 'out' ? 'bg-brand-red hover:bg-brand-red/90 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                             leftIcon={<SaveIcon size={18} />}
                         >
                             {isSaving ? "Salvando..." : "Salvar"}

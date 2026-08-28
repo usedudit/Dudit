@@ -35,6 +35,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const router = useRouter()
     const { user } = useSupabase()
     const { setDirection } = useTransitionDirection()
+    const { success: notifySuccess, error: notifyError } = useNotification()
     const [isVendorExpanded, setIsVendorExpanded] = useState<Record<string, boolean>>({})
     const [loading, setLoading] = useState<string | null>(null)
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; cartItemId: string | null }>({ open: false, cartItemId: null })
@@ -312,14 +313,32 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     }
 
 
+    const getItemMaxStock = (item: any): number => {
+        const type = item.item_type || "product"
+        if (type !== "product") return 999
+        if (item.products?.allow_sell_without_stock) return 999
+        if (item.variant_id && item.product_variants) {
+            return Math.max(0, item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0)
+        }
+        return Math.max(0, item.products?.stock_available ?? item.products?.stock_quantity ?? 0)
+    }
+
     const isItemOutOfStock = (item: any): boolean => {
         const type = item.item_type || "product"
         if (type !== "product") return false
-        if (item.variant_id && item.product_variants) {
-            const stock = item.product_variants.stock_available ?? item.product_variants.stock_quantity ?? 0
-            return stock <= 0
-        }
-        return false
+        if (item.products?.is_active === false) return true
+        if (item.variant_id && item.product_variants && item.product_variants.is_active === false) return true
+        if (item.products?.allow_sell_without_stock) return false
+        return getItemMaxStock(item) <= 0
+    }
+
+    const isQuantityExceedingStock = (item: any): boolean => {
+        const type = item.item_type || "product"
+        if (type !== "product") return false
+        if (item.products?.allow_sell_without_stock) return false
+        const maxStock = getItemMaxStock(item)
+        const qty = getItemQuantity(item)
+        return maxStock > 0 && qty > maxStock
     }
 
     const getAlternativePrice = (alt: any, product: any) => {
@@ -374,18 +393,28 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         })
     }, [itemsByPartner])
 
-    const updateQty = async (cartItemId: string, newQty: number, currentQty: number) => {
+    const updateQty = async (cartItemId: string, newQty: number, currentQty: number, maxStock?: number) => {
         if (loading || isActionInProgress.current || newQty === currentQty) return
+        if (maxStock !== undefined && newQty > maxStock) {
+            notifyError(`Quantidade máxima disponível: ${maxStock}`)
+            newQty = maxStock
+        }
+        if (newQty === currentQty) return
         isActionInProgress.current = true
         setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: newQty } }))
         setLoading(cartItemId)
         try {
             const token = await getCsrfToken()
-            await updateCartQuantityAction(cartItemId, newQty, token)
-            invalidateCartCache()
-            // Removed router.refresh() - optimistic state update handles UI
+            const res = await updateCartQuantityAction(cartItemId, newQty, token)
+            if (res?.error) {
+                notifyError(res.error)
+                setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
+            } else {
+                invalidateCartCache()
+            }
         } catch {
             setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
+            notifyError("Erro ao atualizar quantidade.")
         } finally {
             setLoading(null)
             isActionInProgress.current = false
@@ -493,6 +522,20 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         }
 
         const partnerItems = partnerData.items.filter((item: any) => getItemSelected(item))
+
+        // Validação de estoque e disponibilidade dos itens selecionados
+        for (const item of partnerItems) {
+            if (isItemOutOfStock(item)) {
+                notifyError(`O item "${getItemName(item)}" está esgotado. Desmarque ou remova-o da sacola para prosseguir.`)
+                return
+            }
+            if (isQuantityExceedingStock(item)) {
+                const max = getItemMaxStock(item)
+                notifyError(`O item "${getItemName(item)}" possui apenas ${max} unidade(s) disponível(is). Ajuste a quantidade para continuar.`)
+                return
+            }
+        }
+
         const partnerId = partnerData.partnerId || storeKey
 
         const checkoutData = {
@@ -524,8 +567,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         sessionStorage.setItem("checkout_session", JSON.stringify(checkoutData))
         router.push("/checkout")
     }
-
-    const { success: notifySuccess, error: notifyError } = useNotification()
 
     // Trigger quote delivery per partner whenever items selection, totals or address change
     useEffect(() => {
@@ -813,6 +854,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                             {/* Mobile/Tablet Layout (< md) */}
                                                                             {(() => {
                                                                                 const isOutOfStock = isItemOutOfStock(item);
+                                                                                const maxStock = getItemMaxStock(item);
+                                                                                const exceedsStock = !isOutOfStock && isQuantityExceedingStock(item);
+                                                                                const isSellWithoutStock = Boolean(item.products?.allow_sell_without_stock);
                                                                                 return (
                                                                                     <div className="flex flex-col">
                                                                                         <div className={`flex md:hidden gap-3 ${isOutOfStock ? "opacity-75" : ""}`}>
@@ -880,6 +924,17 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{getItemBooking(item)}</p>
                                                                                                 )}
 
+                                                                                                {exceedsStock && (
+                                                                                                    <p className="text-[12px] text-brand-red font-medium mt-0.5">
+                                                                                                        Apenas {maxStock} unidade(s) disponível(is) no estoque
+                                                                                                    </p>
+                                                                                                )}
+                                                                                                {!isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0 && (
+                                                                                                    <p className="text-[11px] text-brand-orange dark:text-orange-400 font-medium mt-0.5">
+                                                                                                        Apenas {maxStock} restante(s) em estoque
+                                                                                                    </p>
+                                                                                                )}
+
                                                                                                 <div className="flex items-center justify-between mt-2">
                                                                                                     {isOutOfStock ? (
                                                                                                         <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
@@ -888,8 +943,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
-                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty, isSellWithoutStock ? undefined : maxStock)}
                                                                                                             disabled={loading === item.id}
+                                                                                                            max={isSellWithoutStock ? undefined : maxStock}
                                                                                                             size="sm"
                                                                                                         />
                                                                                                     ) : null}
@@ -974,6 +1030,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                             {/* Desktop Layout (>= md) */}
                                                                             {(() => {
                                                                                 const isOutOfStock = isItemOutOfStock(item);
+                                                                                const maxStock = getItemMaxStock(item);
+                                                                                const exceedsStock = !isOutOfStock && isQuantityExceedingStock(item);
+                                                                                const isSellWithoutStock = Boolean(item.products?.allow_sell_without_stock);
                                                                                 return (
                                                                                     <div className="hidden md:block">
                                                                                         <div className="flex gap-4">
@@ -1032,6 +1091,17 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     {item.item_type === "service_booking" && getItemBooking(item) && (
                                                                                                         <p className="text-[13px] text-brand-inactive-text dark:text-dark-body mb-1">{getItemBooking(item)}</p>
                                                                                                     )}
+
+                                                                                                    {exceedsStock && (
+                                                                                                        <p className="text-[12px] text-brand-red font-medium mb-1">
+                                                                                                            Apenas {maxStock} unidade(s) disponível(is) no estoque
+                                                                                                        </p>
+                                                                                                    )}
+                                                                                                    {!isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0 && (
+                                                                                                        <p className="text-[12px] text-brand-orange dark:text-orange-400 font-medium mb-1">
+                                                                                                            Apenas {maxStock} restante(s) em estoque
+                                                                                                        </p>
+                                                                                                    )}
                                                                                                     {(() => {
                                                                                                         const ctx = getItemPricingContext(item, partnerPromos)
                                                                                                         return (
@@ -1072,8 +1142,9 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                                                     ) : item.item_type !== "service_booking" ? (
                                                                                                         <QuantitySelector
                                                                                                             value={itemQty}
-                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty)}
+                                                                                                            onChange={(val) => updateQty(item.id, val, itemQty, isSellWithoutStock ? undefined : maxStock)}
                                                                                                             disabled={loading === item.id}
+                                                                                                            max={isSellWithoutStock ? undefined : maxStock}
                                                                                                         />
                                                                                                     ) : null}
                                                                                                     {(() => {

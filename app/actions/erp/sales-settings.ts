@@ -51,6 +51,7 @@ export async function getSalesSettingsAction(partnerId: string, storeId?: string
       autoCancelManualOrdersHours: typeof rawSettings?.autoCancelManualOrdersHours === "number" ? rawSettings.autoCancelManualOrdersHours : DEFAULT_SALES_SETTINGS.autoCancelManualOrdersHours,
       onlinePixExpirationMinutes: typeof rawSettings?.onlinePixExpirationMinutes === "number" ? rawSettings.onlinePixExpirationMinutes : DEFAULT_SALES_SETTINGS.onlinePixExpirationMinutes,
       defaultReceiptFormat: rawSettings?.defaultReceiptFormat === "a4" ? "a4" : "thermal",
+      defaultProfitMarginPercent: typeof rawSettings?.defaultProfitMarginPercent === "number" ? rawSettings.defaultProfitMarginPercent : null,
     }
 
     return { success: true as const, data: settings }

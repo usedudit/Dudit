@@ -53,8 +53,9 @@ export async function fetchStockMovementsExport(
       if (types.length > 0) query = query.in("movement_type", types)
 
       if (filters.activeTab && filters.activeTab !== "all") {
-        if (filters.activeTab === "in") query = query.eq("movement_type", "purchase")
-        else if (filters.activeTab === "out") query = query.in("movement_type", ["sale", "damage", "loss", "return"])
+        if (filters.activeTab === "in") query = query.in("movement_type", ["in", "purchase"])
+        else if (filters.activeTab === "out") query = query.in("movement_type", ["out", "sale", "damage", "loss", "return"])
+        else if (filters.activeTab === "adjustment") query = query.eq("movement_type", "adjustment")
       }
 
       if (search) {

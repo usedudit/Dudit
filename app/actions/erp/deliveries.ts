@@ -1101,36 +1101,111 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
     ["erp-delivery-people-bucket", partnerId],
     [TAGS.partner(partnerId)],
     async () => {
-      const supabase = await getSupabaseServerClient()
-      const { data, error } = await supabase
+      const admin = getAdminClient()
+
+      // 1. Fetch team members with delivery role
+      const { data: partnerUsers, error } = await admin
         .from("partner_users")
-        .select("id, role_id, user_id")
+        .select("id, role_id, role, user_id")
         .eq("partner_id", partnerId)
-        .eq("role_id", "delivery")
+        .or("role_id.ilike.delivery,role.ilike.delivery,role_id.eq.delivery,role_id.eq.DELIVERY,role.eq.DELIVERY,role.eq.delivery")
         .order("created_at", { ascending: true })
 
       if (error) {
-        console.error("[fetchDeliveryPeopleBucketAction]", error)
-        return []
+        console.error("[fetchDeliveryPeopleBucketAction] partner_users error:", error)
       }
 
-      const userIds = Array.from(new Set((data || []).map((member: any) => member.user_id).filter(Boolean)))
+      // 2. Fetch linked partner delivery drivers
+      const { data: linkedDrivers, error: linkedError } = await admin
+        .from("delivery_driver_partners")
+        .select("driver_id")
+        .eq("partner_id", partnerId)
+        .eq("is_active", true)
+
+      if (linkedError) {
+        console.error("[fetchDeliveryPeopleBucketAction] linkedDrivers error:", linkedError)
+      }
+
+      const teamUserIds = (partnerUsers || []).map((m: any) => m.user_id).filter(Boolean)
+      const linkedDriverUserIds = (linkedDrivers || []).map((l: any) => l.driver_id).filter(Boolean)
+      const allUserIds = Array.from(new Set([...teamUserIds, ...linkedDriverUserIds]))
+
+      if (allUserIds.length === 0) return []
+
       const nameByUserId = new Map<string, string>()
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("user_profiles")
-          .select("user_id, full_name")
-          .in("user_id", userIds)
-        for (const profile of profiles || []) {
-          nameByUserId.set(String(profile.user_id), String(profile.full_name || "Entregador"))
+      const emailByUserId = new Map<string, string>()
+
+      // Parallel batch query for auth metadata/emails
+      const userResults = await Promise.allSettled(
+        allUserIds.map((uid: string) => admin.auth.admin.getUserById(uid))
+      )
+      for (let i = 0; i < allUserIds.length; i++) {
+        const res = userResults[i]
+        if (res.status === "fulfilled" && res.value.data?.user) {
+          const u = res.value.data.user
+          if (u.email) emailByUserId.set(allUserIds[i], u.email)
+          const meta = u.user_metadata || {}
+          const metaName = meta.full_name || meta.name || meta.display_name
+          if (metaName && typeof metaName === "string" && metaName.trim()) {
+            nameByUserId.set(allUserIds[i], metaName.trim())
+          }
         }
       }
 
-      return (data || []).map((member: any) => ({
-        id: member.id,
-        userId: member.user_id,
-        fullName: nameByUserId.get(String(member.user_id)) || "Entregador",
-      }))
+      // Query user_profiles and delivery_drivers in parallel
+      const [{ data: profiles }, { data: driversData }] = await Promise.all([
+        admin.from("user_profiles").select("user_id, full_name").in("user_id", allUserIds),
+        linkedDriverUserIds.length > 0
+          ? admin.from("delivery_drivers").select("user_id, vehicle_type").in("user_id", linkedDriverUserIds)
+          : Promise.resolve({ data: [] }),
+      ])
+
+      for (const p of profiles || []) {
+        if (p?.full_name && typeof p.full_name === "string" && p.full_name.trim()) {
+          nameByUserId.set(p.user_id, p.full_name.trim())
+        }
+      }
+
+      const vehicleByUserId = new Map<string, string>()
+      for (const d of driversData || []) {
+        if (d?.user_id && d?.vehicle_type) {
+          vehicleByUserId.set(d.user_id, d.vehicle_type)
+        }
+      }
+
+      const formatEmailAsName = (email?: string): string => {
+        if (!email) return "Entregador"
+        const username = email.split("@")[0] || ""
+        return username
+          .replace(/[._-]/g, " ")
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(" ")
+      }
+
+      const teamList = (partnerUsers || []).map((member: any) => {
+        const resolvedName = nameByUserId.get(String(member.user_id)) || formatEmailAsName(emailByUserId.get(String(member.user_id)))
+        return {
+          id: member.id,
+          userId: member.user_id,
+          fullName: resolvedName,
+          source: "legacy" as const,
+        }
+      })
+
+      const linkedList = (linkedDrivers || []).map((link: any) => {
+        const driverUid = String(link.driver_id)
+        const resolvedName = nameByUserId.get(driverUid) || formatEmailAsName(emailByUserId.get(driverUid))
+        return {
+          id: `platform:${driverUid}`,
+          userId: driverUid,
+          fullName: resolvedName,
+          vehicleType: vehicleByUserId.get(driverUid),
+          source: "platform" as const,
+        }
+      })
+
+      return [...teamList, ...linkedList]
     },
     30,
   )

@@ -15,6 +15,7 @@ import { RichTextEditor } from "@/components/reusable"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { usePermissions } from "@/lib/permission-context"
 
 const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
@@ -74,6 +75,13 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
     serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isDesapego = false, isGeneratingDetails = false, onGenerateDetails
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
+    const { businessInfo } = usePermissions()
+
+    const defaultMargin = useMemo(() => {
+        const margin = (businessInfo as any)?.salesSettings?.defaultProfitMarginPercent
+        return typeof margin === "number" && margin > 0 ? margin : null
+    }, [businessInfo])
+
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
 
     const manualChange = (name: string, value: any) => {
@@ -487,6 +495,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                         <SalePriceCalculator
                                             costPrice={Number(serviceData.cost_price || 0)}
                                             sellingPrice={Number(serviceData.price || 0)}
+                                            defaultMarginPercent={defaultMargin}
                                             onApply={(cost, sell) => {
                                                 handleFieldChange({ target: { name: "cost_price", value: cost } })
                                                 handleFieldChange({ target: { name: "price", value: sell } })
@@ -516,7 +525,20 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                     {!isFree && !isQuickMode && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                            <MoneyInput label="Custo do Serviço" name="cost_price" value={serviceData.cost_price || ""} onChange={(val) => handleFieldChange({ target: { name: "cost_price", value: val } })} disabled={!isEditing || !showPrice} />
+                            <MoneyInput
+                                label="Custo do Serviço"
+                                name="cost_price"
+                                value={serviceData.cost_price || ""}
+                                onChange={(val) => {
+                                    handleFieldChange({ target: { name: "cost_price", value: val } })
+                                    const numVal = Number(val)
+                                    if (defaultMargin && (!serviceData.price || Number(serviceData.price) === 0) && numVal > 0) {
+                                        const calculated = Math.round(numVal * (1 + defaultMargin / 100) * 100) / 100
+                                        handleFieldChange({ target: { name: "price", value: calculated } })
+                                    }
+                                }}
+                                disabled={!isEditing || !showPrice}
+                            />
                             <div className="flex flex-col">
                                 <MoneyInput
                                     label={serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
@@ -533,6 +555,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     <SalePriceCalculator
                                         costPrice={Number(serviceData.cost_price || 0)}
                                         sellingPrice={Number(serviceData.price || 0)}
+                                        defaultMarginPercent={defaultMargin}
                                         onApply={(cost, sell) => {
                                             handleFieldChange({ target: { name: "cost_price", value: cost } })
                                             handleFieldChange({ target: { name: "price", value: sell } })

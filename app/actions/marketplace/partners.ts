@@ -5,7 +5,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { unstable_cache, revalidatePath, revalidateTag } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { cache } from "react"
-import { revalidatePartnerProfile } from "@/lib/utils/revalidation"
+import { revalidatePartnerProfile, revalidateAddresses } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -740,10 +740,12 @@ export async function registerPartner(data: any) {
       return { success: false, error: "Número de telefone inválido" }
     }
 
+    const normalizedPhone = normalizePhoneToE164(sanitizedPhone)
+
     // --- GARANTIR QUE O PERFIL EXISTE ANTES DE CRIAR O PARTNER ---
     const { data: profileExists } = await supabaseAdmin
       .from("user_profiles")
-      .select("id")
+      .select("id, full_name, phone")
       .eq("user_id", userId)
       .maybeSingle()
 
@@ -752,13 +754,24 @@ export async function registerPartner(data: any) {
         .from("user_profiles")
         .insert({
           user_id: userId,
-          full_name: "",
-          phone: null,
+          full_name: data.fullName || data.storeName || "",
+          phone: normalizedPhone || null,
           pending_partner_registration: false,
         })
 
       if (userProfileError && userProfileError.code !== "23505") {
         console.warn("Erro ao criar user_profile:", userProfileError.message)
+      }
+    } else {
+      const updateProfileData: any = {}
+      if (!profileExists.full_name && (data.fullName || data.storeName)) {
+        updateProfileData.full_name = data.fullName || data.storeName
+      }
+      if (!profileExists.phone && normalizedPhone) {
+        updateProfileData.phone = normalizedPhone
+      }
+      if (Object.keys(updateProfileData).length > 0) {
+        await supabaseAdmin.from("user_profiles").update(updateProfileData).eq("user_id", userId)
       }
     }
     // -------------------------------------------------------
@@ -826,7 +839,7 @@ export async function registerPartner(data: any) {
       console.error("[registerPartner] Failed to create default store:", storeError.message)
     }
 
-    // 3. Inserir o Endereço na tabela ADDRESSES (Usando o ID do novo parceiro)
+    // 3. Inserir o Endereço na tabela ADDRESSES (separando Store e User para respeitar a constraint check_address_type)
     const rawZip = data.zipCode || data.address?.cep || data.address?.zipCode || ""
     const rawStreet = data.street || data.address?.street || ""
     const rawCity = data.city || data.address?.city || ""
@@ -838,37 +851,91 @@ export async function registerPartner(data: any) {
     const rawLatitude = typeof data.latitude === "number" ? data.latitude : (typeof data.address?.latitude === "number" ? data.address.latitude : undefined)
     const rawLongitude = typeof data.longitude === "number" ? data.longitude : (typeof data.address?.longitude === "number" ? data.address.longitude : undefined)
 
-    if (rawZip || rawStreet || rawCity) {
-      const enrichedAddress = await enrichAddressData({
-        partner_id: newPartner.id,
-        store_id: newStore?.id || null,
-        user_id: userId,
-        zip_code: rawZip,
-        street: rawStreet,
-        number: rawNumber,
-        complement: rawComplement,
-        neighborhood: rawNeighborhood,
-        city: rawCity,
-        state: rawState,
-        country: "BR",
-        is_default: true,
-        address_type: "primary",
-        municipio_codigo_ibge: rawIbge,
-        latitude: rawLatitude,
-        longitude: rawLongitude,
-      })
+    if (rawZip || rawStreet || rawCity || rawState) {
+      // 3.1 Endereço da Loja (store_id)
+      let resolvedLat = rawLatitude
+      let resolvedLng = rawLongitude
 
-      const { error: addressError } = await supabaseAdmin
-        .from("addresses")
-        .insert(enrichedAddress)
+      if (newStore?.id) {
+        const enrichedStoreAddress = await enrichAddressData({
+          store_id: newStore.id,
+          zip_code: rawZip,
+          street: rawStreet,
+          number: rawNumber,
+          complement: rawComplement,
+          neighborhood: rawNeighborhood,
+          city: rawCity,
+          state: rawState,
+          country: "BR",
+          is_default: true,
+          address_type: "primary",
+          municipio_codigo_ibge: rawIbge,
+          latitude: rawLatitude,
+          longitude: rawLongitude,
+        })
 
-      if (addressError) {
-        console.error("[registerPartner] Error inserting address:", addressError)
-      } else if (newStore?.id && enrichedAddress.latitude != null && enrichedAddress.longitude != null) {
-        await supabaseAdmin
-          .from("stores")
-          .update({ latitude: enrichedAddress.latitude, longitude: enrichedAddress.longitude })
-          .eq("id", newStore.id)
+        resolvedLat = enrichedStoreAddress.latitude ?? resolvedLat
+        resolvedLng = enrichedStoreAddress.longitude ?? resolvedLng
+
+        const { error: storeAddressError } = await supabaseAdmin
+          .from("addresses")
+          .insert(enrichedStoreAddress)
+
+        if (storeAddressError) {
+          console.error("[registerPartner] Error inserting store address:", storeAddressError)
+        } else if (resolvedLat != null && resolvedLng != null) {
+          await supabaseAdmin
+            .from("stores")
+            .update({ latitude: resolvedLat, longitude: resolvedLng })
+            .eq("id", newStore.id)
+        }
+      }
+
+      // 3.2 Endereço do Usuário (user_id) - Essencial para que cidade/estado apareçam no marketplace e perfil
+      if (userId) {
+        const { data: userAddrs } = await supabaseAdmin
+          .from("addresses")
+          .select("id, is_default, city, state")
+          .eq("user_id", userId)
+          .order("is_default", { ascending: false })
+
+        const defaultAddr = userAddrs?.[0]
+
+        const enrichedUserAddress = await enrichAddressData({
+          user_id: userId,
+          zip_code: rawZip,
+          street: rawStreet,
+          number: rawNumber,
+          complement: rawComplement,
+          neighborhood: rawNeighborhood,
+          city: rawCity,
+          state: rawState,
+          country: "BR",
+          is_default: true,
+          address_type: "casa",
+          municipio_codigo_ibge: rawIbge,
+          latitude: resolvedLat,
+          longitude: resolvedLng,
+        })
+
+        if (!defaultAddr) {
+          const { error: userAddressError } = await supabaseAdmin
+            .from("addresses")
+            .insert(enrichedUserAddress)
+
+          if (userAddressError) {
+            console.error("[registerPartner] Error inserting user address:", userAddressError)
+          }
+        } else {
+          const { error: updateUserAddressError } = await supabaseAdmin
+            .from("addresses")
+            .update(enrichedUserAddress)
+            .eq("id", defaultAddr.id)
+
+          if (updateUserAddressError) {
+            console.error("[registerPartner] Error updating user address:", updateUserAddressError)
+          }
+        }
       }
     }
 
@@ -933,6 +1000,12 @@ export async function registerPartner(data: any) {
         })),
       )
     }
+
+    await revalidateAddresses("user", userId)
+    if (newStore?.id) {
+      await revalidateAddresses("store", newStore.id)
+    }
+    await revalidatePartnerProfile(newPartner.id)
 
     revalidateTag(TAGS.userAccess(userId), "max")
     revalidatePath("/erp")

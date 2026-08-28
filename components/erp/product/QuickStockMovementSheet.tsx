@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react"
 import { motion } from "framer-motion"
-import { Button, Input, FormDropdown, ThreeDotsLoader, FormTextarea } from "@/components/reusable"
+import { Button, Input, FormDropdown, ThreeDotsLoader, FormTextarea, Badge } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { XIcon, ChevronDownIcon, ChevronUpIcon } from "@/lib/icons"
+import { XIcon, ChevronDownIcon, ChevronUpIcon, ArrowUpDownIcon } from "@/lib/icons"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 import { createBatchStockMovementAction } from "@/app/actions/erp/stock-movements"
@@ -40,8 +40,13 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const { success: notifySuccess, error: notifyError } = useNotification()
 
+    const currentStock = variant ? Number(variant.stock || 0) : Number(product.stock || 0)
+    const displayName = product.name + (variant ? ` - ${variant.name}` : '')
+    const displaySku = variant ? variant.sku : product.sku
+    const displayImage = variant?.image || product.image || null
+
     // Form States
-    const [type, setType] = useState<'in' | 'out'>('in')
+    const [type, setType] = useState<'in' | 'out' | 'adjustment'>('in')
     const [quantity, setQuantity] = useState<number>(1)
     const [reason, setReason] = useState<string>("Selecione um motivo...")
     const [customReason, setCustomReason] = useState<string>("")
@@ -61,11 +66,6 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
         }
     }, [isOpen])
 
-    const currentStock = variant ? Number(variant.stock || 0) : Number(product.stock || 0)
-    const displayName = product.name + (variant ? ` - ${variant.name}` : '')
-    const displaySku = variant ? variant.sku : product.sku
-    const displayImage = variant?.image || product.image || null
-
     const handleReasonChange = useCallback((value: string) => {
         setReason(value)
         if (value !== 'Outro') setCustomReason('')
@@ -80,8 +80,11 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
     const handleSave = async () => {
         const newErrors: Record<string, string> = {}
 
-        if (quantity <= 0) {
+        if (type !== 'adjustment' && quantity <= 0) {
             newErrors.quantity = "A quantidade deve ser maior que zero."
+        }
+        if (type === 'adjustment' && quantity < 0) {
+            newErrors.quantity = "O estoque ajustado não pode ser negativo."
         }
         if (reason === "Selecione um motivo...") {
             newErrors.reason = "Selecione um motivo."
@@ -113,7 +116,11 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
             })
 
             if (res && res.success) {
-                const finalStock = type === 'in' ? currentStock + quantity : Math.max(0, currentStock - quantity)
+                const finalStock = type === 'in'
+                    ? currentStock + quantity
+                    : type === 'out'
+                        ? Math.max(0, currentStock - quantity)
+                        : quantity
                 notifySuccess("Movimentação de estoque registrada!")
                 onSaveSuccess(finalStock)
                 onClose()
@@ -126,6 +133,14 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
             setIsSaving(false)
         }
     }
+
+    const projectedStock = type === 'in'
+        ? currentStock + (Number(quantity) || 0)
+        : type === 'out'
+            ? Math.max(0, currentStock - (Number(quantity) || 0))
+            : (Number(quantity) || 0)
+
+    const delta = projectedStock - currentStock
 
     const content = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -162,53 +177,93 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                 {/* Tipo de Movimentação */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Tipo de Operação</label>
-                    <div className="flex gap-4 mt-1">
+                    <div className="grid grid-cols-3 gap-2 mt-1">
                         <button
                             type="button"
-                            onClick={() => { setType('in'); handleReasonChange('Selecione um motivo...'); }}
-                            className={`flex-1 flex items-center justify-between p-4 rounded-xl transition-all border ${type === 'in'
+                            onClick={() => {
+                                setType('in')
+                                setQuantity(1)
+                                handleReasonChange('Selecione um motivo...')
+                            }}
+                            className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all border ${type === 'in'
                                 ? 'bg-green-50/50 dark:bg-green-900/10 border-brand-green'
                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
                                 }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
-                                    }`}>
-                                    <ChevronDownIcon size={16} strokeWidth={2.5} />
-                                </div>
-                                <span className={`font-bold text-sm ${type === 'in' ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`}>Entrada</span>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-1 ${type === 'in' ? 'bg-brand-green text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                }`}>
+                                <ChevronDownIcon size={16} strokeWidth={2.5} />
                             </div>
+                            <span className={`font-bold text-xs ${type === 'in' ? 'text-brand-green' : 'text-brand-dark dark:text-dark-heading'}`}>Entrada</span>
                         </button>
 
                         <button
                             type="button"
-                            onClick={() => { setType('out'); handleReasonChange('Selecione um motivo...'); }}
-                            className={`flex-1 flex items-center justify-between p-4 rounded-xl transition-all border ${type === 'out'
+                            onClick={() => {
+                                setType('out')
+                                setQuantity(1)
+                                handleReasonChange('Selecione um motivo...')
+                            }}
+                            className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all border ${type === 'out'
                                 ? 'bg-red-50/50 dark:bg-red-900/10 border-brand-red'
                                 : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
                                 }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
-                                    }`}>
-                                    <ChevronUpIcon size={16} strokeWidth={2.5} />
-                                </div>
-                                <span className={`font-bold text-sm ${type === 'out' ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading'}`}>Saída</span>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-1 ${type === 'out' ? 'bg-brand-red text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                }`}>
+                                <ChevronUpIcon size={16} strokeWidth={2.5} />
                             </div>
+                            <span className={`font-bold text-xs ${type === 'out' ? 'text-brand-red' : 'text-brand-dark dark:text-dark-heading'}`}>Saída</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setType('adjustment')
+                                setQuantity(currentStock)
+                                handleReasonChange('Selecione um motivo...')
+                            }}
+                            className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all border ${type === 'adjustment'
+                                ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-600 dark:border-blue-500'
+                                : 'bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border border-brand-border dark:border-dark-border'
+                                }`}
+                        >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-1 ${type === 'adjustment' ? 'bg-blue-600 text-white' : 'bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text'
+                                }`}>
+                                <ArrowUpDownIcon size={16} strokeWidth={2.5} />
+                            </div>
+                            <span className={`font-bold text-xs ${type === 'adjustment' ? 'text-blue-600 dark:text-blue-400' : 'text-brand-dark dark:text-dark-heading'}`}>Ajuste</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Quantidade */}
-                <div>
+                {/* Quantidade ou Novo Estoque */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                            {type === 'adjustment' ? 'Novo Estoque (Real)' : 'Quantidade'}
+                        </label>
+                        {type === 'adjustment' && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                                <span className="text-brand-inactive-text">Diferença:</span>
+                                {delta > 0 ? (
+                                    <Badge variant="green" icon={null} className="py-0.5 px-2">+{delta}</Badge>
+                                ) : delta < 0 ? (
+                                    <Badge variant="red" icon={null} className="py-0.5 px-2">{delta}</Badge>
+                                ) : (
+                                    <Badge variant="gray" icon={null} className="py-0.5 px-2">0</Badge>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     <Input
-                        label="Quantidade"
                         name="quantity"
                         type="number"
-                        min={1}
-                        value={quantity || ""}
+                        min={type === 'adjustment' ? 0 : 1}
+                        value={quantity !== undefined ? quantity : ""}
                         onChange={(e) => {
-                            setQuantity(Math.max(1, Number(e.target.value)))
+                            const val = e.target.value === "" ? 0 : Number(e.target.value)
+                            setQuantity(type === 'adjustment' ? Math.max(0, val) : Math.max(1, val))
                             setErrors(prev => {
                                 const next = { ...prev }
                                 delete next.quantity
@@ -218,6 +273,11 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         error={!!errors.quantity}
                         errorMessage={errors.quantity}
                     />
+                    {type !== 'adjustment' && (
+                        <p className="text-xs text-brand-inactive-text">
+                            Estoque resultante: <strong className="text-brand-dark dark:text-dark-heading">{projectedStock}</strong>
+                        </p>
+                    )}
                 </div>
 
                 {/* Motivo */}
@@ -231,12 +291,25 @@ export default function QuickStockMovementSheet({ isOpen, product, variant, onCl
                         options={type === 'in' ? [
                             { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                             { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
+                            { value: 'Bonificação / Brinde', label: 'Bonificação / Brinde' },
                             { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
+                            { value: 'Transferência entre Lojas', label: 'Transferência entre Lojas' },
                             { value: 'Outro', label: 'Outro' }
-                        ] : [
+                        ] : type === 'out' ? [
                             { value: 'Avaria / Perda', label: 'Avaria / Perda' },
                             { value: 'Ajuste de Estoque', label: 'Ajuste de Estoque' },
                             { value: 'Uso Interno', label: 'Uso Interno' },
+                            { value: 'Descarte / Vencimento', label: 'Descarte / Vencimento' },
+                            { value: 'Brinde / Doação', label: 'Brinde / Doação' },
+                            { value: 'Transferência entre Lojas', label: 'Transferência entre Lojas' },
+                            { value: 'Outro', label: 'Outro' }
+                        ] : [
+                            { value: 'Balanço / Inventário', label: 'Balanço / Inventário' },
+                            { value: 'Correção de Contagem', label: 'Correção de Contagem' },
+                            { value: 'Ajuste Operacional', label: 'Ajuste Operacional' },
+                            { value: 'Sobra de Estoque', label: 'Sobra de Estoque' },
+                            { value: 'Perda / Extravio não identificado', label: 'Perda / Extravio não identificado' },
+                            { value: 'Produto Vencido / Avariado', label: 'Produto Vencido / Avariado' },
                             { value: 'Outro', label: 'Outro' }
                         ]}
                     />

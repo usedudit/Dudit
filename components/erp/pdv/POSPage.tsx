@@ -138,6 +138,29 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     )
     const [activeCashSession, setActiveCashSession] = useState<any | null>(initialActiveSession || null)
 
+    useEffect(() => {
+        if (initialData?.products) {
+            setProducts((prev) => {
+                const serverProducts = initialData.products
+                const serverIds = new Set(serverProducts.map((p) => p.id))
+                const locallyAdded = prev.filter((p) => !serverIds.has(p.id))
+                return [...serverProducts, ...locallyAdded]
+            })
+        }
+    }, [initialData?.products])
+
+    useEffect(() => {
+        if (initialData?.customers) {
+            setCustomers(initialData.customers)
+        }
+    }, [initialData?.customers])
+
+    useEffect(() => {
+        if (initialData?.preSales) {
+            setPreSales(initialData.preSales)
+        }
+    }, [initialData?.preSales])
+
     // New states and computations
     const [isCameraOpen, setIsCameraOpen] = useState(false)
     const [itemTypeTab, setItemTypeTab] = useState<"product" | "service">("product")
@@ -1169,6 +1192,79 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             if (!result.success) {
                 notifyError(result.error || "Não foi possível finalizar a venda.")
                 return { error: result.error || "Não foi possível finalizar a venda." }
+            }
+
+            // Deduct sold products and variants stock immediately in local state
+            const soldList: Array<{ productId: string; variantId: string | null; qty: number }> = []
+            for (const item of cart) {
+                if (item.productId && !item.serviceId) {
+                    soldList.push({
+                        productId: item.productId,
+                        variantId: item.variantId || null,
+                        qty: Number(item.qty || 1),
+                    })
+                }
+            }
+            if (pricingResult.appliedGiftProductIds && pricingResult.appliedGiftProductIds.length > 0) {
+                for (const giftId of pricingResult.appliedGiftProductIds) {
+                    soldList.push({
+                        productId: giftId,
+                        variantId: null,
+                        qty: 1,
+                    })
+                }
+            }
+
+            if (soldList.length > 0) {
+                setProducts((prevProducts) => {
+                    return prevProducts.map((prod) => {
+                        const itemsForThisProduct = soldList.filter((s) => s.productId === prod.id)
+                        if (itemsForThisProduct.length === 0) return prod
+
+                        const rawVariants = prod.product_variants || (prod as any).variants || []
+                        const hasVariants = Array.isArray(rawVariants) && rawVariants.length > 0
+
+                        if (hasVariants) {
+                            const updatedVariants = rawVariants.map((v: any) => {
+                                const variantSales = itemsForThisProduct.filter((s) => s.variantId === v.id)
+                                const totalQtyVariant = variantSales.reduce((acc, s) => acc + s.qty, 0)
+                                if (totalQtyVariant === 0) return v
+
+                                const currentStock = Number(v.stock_available ?? v.stock_quantity ?? v.stock ?? 0)
+                                const newStock = Math.max(0, currentStock - totalQtyVariant)
+                                return {
+                                    ...v,
+                                    stock_available: newStock,
+                                    stock_quantity: newStock,
+                                    stock: newStock,
+                                }
+                            })
+
+                            const newTotalStock = updatedVariants.reduce(
+                                (sum: number, v: any) => sum + Number(v.stock_available ?? v.stock_quantity ?? v.stock ?? 0),
+                                0
+                            )
+
+                            return {
+                                ...prod,
+                                stock_available: newTotalStock,
+                                stock_quantity: newTotalStock,
+                                product_variants: updatedVariants,
+                                variants: updatedVariants,
+                            }
+                        } else {
+                            const totalQtyProduct = itemsForThisProduct.reduce((acc, s) => acc + s.qty, 0)
+                            const currentStock = Number(prod.stock_available ?? (prod as any).stock_quantity ?? 0)
+                            const newStock = Math.max(0, currentStock - totalQtyProduct)
+
+                            return {
+                                ...prod,
+                                stock_available: newStock,
+                                stock_quantity: newStock,
+                            }
+                        }
+                    })
+                })
             }
 
             notifySuccess("Venda finalizada com sucesso.")

@@ -16,6 +16,8 @@ interface SalePriceCalculatorProps {
     onApply: (costPrice: number, sellingPrice: number) => void
     /** Whether the calculator is disabled (e.g. in details mode) */
     disabled?: boolean
+    /** Default profit margin / markup percent configured in sales settings */
+    defaultMarginPercent?: number | null
 }
 
 export const SalePriceCalculator: React.FC<SalePriceCalculatorProps> = ({
@@ -23,6 +25,7 @@ export const SalePriceCalculator: React.FC<SalePriceCalculatorProps> = ({
     sellingPrice: externalSellingPrice,
     onApply,
     disabled = false,
+    defaultMarginPercent = null,
 }) => {
     const [isOpen, setIsOpen] = useState(false)
     const [costPrice, setCostPrice] = useState(externalCostPrice || 0)
@@ -38,12 +41,20 @@ export const SalePriceCalculator: React.FC<SalePriceCalculatorProps> = ({
                 const existingMarkup = ((externalSellingPrice - externalCostPrice) / externalCostPrice) * 100
                 setMarkup(existingMarkup > 0 ? existingMarkup.toFixed(2).replace(".", ",") : "")
                 setCalculatedPrice(externalSellingPrice)
+            } else if (defaultMarginPercent !== null && defaultMarginPercent !== undefined && defaultMarginPercent > 0) {
+                const defMarkupStr = String(defaultMarginPercent).replace(".", ",")
+                setMarkup(defMarkupStr)
+                if (externalCostPrice > 0) {
+                    setCalculatedPrice(externalCostPrice * (1 + defaultMarginPercent / 100))
+                } else {
+                    setCalculatedPrice(0)
+                }
             } else {
                 setMarkup("")
                 setCalculatedPrice(0)
             }
         }
-    }, [isOpen, externalCostPrice, externalSellingPrice])
+    }, [isOpen, externalCostPrice, externalSellingPrice, defaultMarginPercent])
 
     // Recalculate selling price when cost or markup changes
     useEffect(() => {

@@ -29,7 +29,6 @@ import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { SalesSettingsSubPage } from "./SalesSettingsSubPage"
-import { ReceiptSettingsSubPage } from "./ReceiptSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import { AuditLogsSubPage } from "./AuditLogsSubPage"
@@ -347,18 +346,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               <ListItem
                                 icon={ShoppingCartIcon}
                                 title="Configurações Gerais"
-                                description="Regras de descontos, estoque negativo, vendedor e cancelamento."
+                                description="Margem de lucro, descontos, estoque, PDV e modelos de recibos."
                                 onClick={() => navigateToSubpage("sales-settings")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
-                            {canAccessReceipts && (
-                              <ListItem
-                                icon={PrinterIcon}
-                                title="Recibos e Impressão"
-                                description="Personalize formato, rodapé e políticas nos recibos de venda."
-                                onClick={() => navigateToSubpage("receipts")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -482,20 +471,12 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             />
           )}
 
-          {activePage === "sales-settings" && canAccessSalesSettings && (
+          {(activePage === "sales-settings" || activePage === "receipts") && canAccessSalesSettings && (
             <SalesSettingsSubPage
-              key="sales-settings"
+              key={`sales-settings-${activePage}`}
               partnerId={partner.id}
               storeId={selectedStore?.id}
-              onBack={() => navigateToSubpage("home")}
-            />
-          )}
-
-          {activePage === "receipts" && canAccessReceipts && (
-            <ReceiptSettingsSubPage
-              key="receipts"
-              partnerId={partner.id}
-              storeId={selectedStore?.id}
+              initialTab={activePage === "receipts" ? "recibos" : "geral"}
               onBack={() => navigateToSubpage("home")}
             />
           )}

@@ -14,6 +14,7 @@ function hashInviteToken(token: string) {
 function normalizeError(error: any, fallback: string) {
   const message = String(error?.message || error?.hint || error?.details || "")
   if (message.includes("delivery_driver_busy")) return "Você já possui 2 entregas em andamento. Conclua uma para aceitar novas."
+  if (message.includes("delivery_driver_different_partner_busy")) return "Você já possui entregas em andamento em outro estabelecimento. Conclua-as para aceitar entregas de outra loja."
   if (message.includes("delivery_offer_expired")) return "Esta oferta de entrega expirou (tempo limite de 15 minutos)."
   if (message.includes("delivery_assignment_already_accepted")) return "Esta entrega acabou de ser aceita por outro entregador."
   if (message.includes("delivery_already_assigned_to_team_driver")) return "Esta entrega já foi atribuída a um entregador da equipe da loja."

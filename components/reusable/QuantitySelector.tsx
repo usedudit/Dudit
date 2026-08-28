@@ -33,12 +33,16 @@ export const QuantitySelector: React.FC<QuantitySelectorProps> = ({
   const commitInput = useCallback(() => {
     setIsEditing(false);
     const parsed = parseInt(inputValue, 10);
-    if (!isNaN(parsed) && parsed >= min) {
-      onChange(parsed);
+    if (!isNaN(parsed)) {
+      let clamped = Math.max(parsed, min);
+      if (max !== undefined) {
+        clamped = Math.min(clamped, max);
+      }
+      onChange(clamped);
     } else {
       setInputValue(String(value));
     }
-  }, [inputValue, min, onChange, value]);
+  }, [inputValue, min, max, onChange, value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;

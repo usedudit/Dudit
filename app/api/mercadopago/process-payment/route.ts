@@ -652,7 +652,7 @@ async function handler(request: NextRequest) {
       .eq("user_id", buyerId)
       .single()
 
-    const customerName = userProfile?.full_name || "Cliente"
+    const customerName = userProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : null) || user.email || "Cliente"
     const customerNameParts = customerName.split(" ")
     const payerFirstName = customerNameParts[0] || "Cliente"
     const payerLastName = customerNameParts.slice(1).join(" ") || "Comprador"

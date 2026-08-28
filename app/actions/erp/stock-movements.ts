@@ -80,7 +80,7 @@ export async function searchProductsForMovement(query: string, storeId?: string 
 export async function createStockMovementAction(data: {
     productId: string
     variantId?: string | null
-    type: 'in' | 'out'
+    type: 'in' | 'out' | 'adjustment'
     quantity: number
     reason: string
     notes: string
@@ -96,20 +96,24 @@ export async function createStockMovementAction(data: {
         await requirePermission(partnerId, "stock_movements", "create")
 
         if (!data.productId) return errorResponse("Produto inválido")
-        if (data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
+        if (data.type !== 'adjustment' && data.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero")
+        if (data.type === 'adjustment' && data.quantity < 0) return errorResponse("O estoque ajustado não pode ser negativo")
         if (!data.reason) return errorResponse("Motivo é obrigatório")
 
         const supabase = createAdminClient()
 
-        const { data: movementRecord, error } = await supabase.rpc('create_manual_stock_movement', {
+        const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
             p_partner_id: partnerId,
-            p_product_id: data.productId,
             p_movement_type: data.type,
-            p_quantity: data.quantity,
             p_reason: data.reason,
-                p_notes: sanitizeNotes(data.notes),
+            p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
-            p_variant_id: data.variantId || null
+            p_items: [{
+                product_id: data.productId,
+                variant_id: data.variantId || null,
+                quantity: data.quantity,
+            }],
+            p_store_id: ctx.activeStoreId || null,
         })
 
         if (error) {
@@ -120,7 +124,6 @@ export async function createStockMovementAction(data: {
         revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
-
 
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
@@ -133,7 +136,7 @@ export async function createStockMovementAction(data: {
 
 // New batch action for multi-item movements
 export async function createBatchStockMovementAction(data: {
-    type: 'in' | 'out'
+    type: 'in' | 'out' | 'adjustment'
     reason: string
     notes: string
     items: { productId: string; variantId?: string | null; quantity: number }[]
@@ -153,7 +156,12 @@ export async function createBatchStockMovementAction(data: {
 
         for (const item of data.items) {
             if (!item.productId) return errorResponse("Produto inválido em um dos itens")
-            if (item.quantity <= 0) return errorResponse("Quantidade deve ser maior que zero em todos os itens")
+            if (data.type !== 'adjustment' && item.quantity <= 0) {
+                return errorResponse("Quantidade deve ser maior que zero em todos os itens")
+            }
+            if (data.type === 'adjustment' && item.quantity < 0) {
+                return errorResponse("O estoque ajustado não pode ser negativo em nenhum dos itens")
+            }
         }
 
         const supabase = createAdminClient()
@@ -264,7 +272,7 @@ export async function createBatchStockMovementAction(data: {
             p_partner_id: partnerId,
             p_movement_type: data.type,
             p_reason: data.reason,
-                p_notes: sanitizeNotes(data.notes),
+            p_notes: sanitizeNotes(data.notes),
             p_created_by: userId,
             p_items: itemsPayload,
             p_store_id: ctx.activeStoreId || null,
@@ -402,6 +410,8 @@ export async function getStockMovementDetails(id: string) {
                 : null
             const itemImage = variantImage || (item.products?.images && item.products.images.length > 0 ? item.products.images[0] : null)
 
+            const itemType = item.quantity > 0 ? 'in' : item.quantity < 0 ? 'out' : 'adjustment'
+
             return {
                 id: item.id,
                 product: {
@@ -414,7 +424,8 @@ export async function getStockMovementDetails(id: string) {
                     currentStock: item.new_quantity || 0,
                 },
                 quantity: Math.abs(item.quantity),
-                type: item.quantity > 0 ? 'in' : 'out',
+                rawQuantity: item.quantity,
+                type: data.movement_type === 'adjustment' ? itemType : (item.quantity > 0 ? 'in' : 'out'),
             }
         })
 
@@ -515,7 +526,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         // 2. Fetch all items
         const { data: childItems } = await supabase
             .from("stock_movement_items")
-            .select("product_id, variant_id, quantity")
+            .select("product_id, variant_id, quantity, previous_quantity, new_quantity")
             .eq("movement_id", id)
 
         if (!childItems || childItems.length === 0) {
@@ -523,15 +534,16 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         }
 
         const shortId = id.split('-')[0].toUpperCase()
-        const invertedType = original.movement_type === 'in' ? 'out' : 'in'
-        const reason = customReason || `Estorno da movimentação ${shortId}`
+        const isAdjustment = original.movement_type === 'adjustment'
+        const invertedType = isAdjustment ? 'adjustment' : (original.movement_type === 'in' ? 'out' : 'in')
+        const reason = customReason || `Estorno ${isAdjustment ? 'do ajuste' : 'da movimentação'} ${shortId}`
         const notes = customReason ? `Motivo: ${customReason}` : `Estorno da movimentação ID: ${shortId}`
 
-        // Undo multi-item: create a batch reversal
+        // Undo: for adjustment, restore previous_quantity; for in/out, reverse delta
         const itemsPayload = childItems.map((item: any) => ({
             product_id: item.product_id,
             variant_id: item.variant_id || null,
-            quantity: Math.abs(item.quantity),
+            quantity: isAdjustment ? Number(item.previous_quantity ?? 0) : Math.abs(item.quantity),
         }))
 
         const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {

@@ -286,6 +286,20 @@ export async function executeImport(
     }
   }
 
+  // Fetch default profit margin if importing products or services
+  let defaultProfitMarginPercent: number | null = null
+  if (entityType === "products" || entityType === "services") {
+    const { data: partnerData } = await supabase
+      .from("partners")
+      .select("business_info")
+      .eq("id", partnerId)
+      .single()
+    const margin = partnerData?.business_info?.salesSettings?.defaultProfitMarginPercent
+    if (typeof margin === "number" && margin > 0) {
+      defaultProfitMarginPercent = margin
+    }
+  }
+
   // Execute in batches
   for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
     const batch = mappedRows.slice(i, i + BATCH_SIZE)
@@ -304,6 +318,7 @@ export async function executeImport(
         categoryCache,
         brandCache,
         duplicateStrategy,
+        defaultProfitMarginPercent,
       )
       successRows += result.success
       createdRows += result.created
@@ -340,6 +355,7 @@ export async function executeImport(
         startIndex,
         categoryCache,
         duplicateStrategy,
+        defaultProfitMarginPercent,
       )
       successRows += result.success
       createdRows += result.created
@@ -642,6 +658,7 @@ async function importProductBatch(
   categoryCache: Map<string, string>,
   brandCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
+  defaultProfitMarginPercent: number | null = null,
 ): Promise<{
   success: number
   created: number
@@ -700,7 +717,14 @@ async function importProductBatch(
       warnings++
     }
 
-    const price = parseNumber(row["price"])
+    let price = parseNumber(row["price"])
+    const costPrice = parseNumber(row["cost_price"])
+
+    // Apply default profit margin if price is missing or zero and cost price is given
+    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultProfitMarginPercent && defaultProfitMarginPercent > 0) {
+      price = Math.round(costPrice * (1 + defaultProfitMarginPercent / 100) * 100) / 100
+    }
+
     if (price === null) {
       errors++
       failedRows.push({
@@ -1195,6 +1219,7 @@ async function importServiceBatch(
   startIndex: number,
   categoryCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
+  defaultProfitMarginPercent: number | null = null,
 ): Promise<{
   success: number
   created: number
@@ -1252,7 +1277,14 @@ async function importServiceBatch(
       warnings++
     }
 
-    const price = parseNumber(row["price"])
+    let price = parseNumber(row["price"])
+    const costPrice = parseNumber(row["cost_price"])
+
+    // Apply default profit margin if price is missing or zero and cost price is given
+    if ((price === null || price === 0) && costPrice !== null && costPrice > 0 && defaultProfitMarginPercent && defaultProfitMarginPercent > 0) {
+      price = Math.round(costPrice * (1 + defaultProfitMarginPercent / 100) * 100) / 100
+    }
+
     if (price === null) {
       errors++
       failedRows.push({

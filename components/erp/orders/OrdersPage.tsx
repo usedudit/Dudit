@@ -358,11 +358,15 @@ export default function OrdersPage({
                 const orderItems = o.order_items || []
                 const hasOnlyServices = o.order_source === "admin_service_order" || o.order_source === "Ordem de Serviço" || (orderItems.length > 0 && orderItems.every((item: any) => item.service_id || item.line_type === "service_booking"))
                 const deliveryType = o.delivery_type || "delivery"
+                const cust = Array.isArray(o.customers) ? o.customers[0] : o.customers
+                const resolvedCustomerName = (o.customer_name && o.customer_name !== "Consumidor final")
+                    ? o.customer_name
+                    : (cust?.name || cust?.email || o.buyer_email || o.customer_name || "Consumidor final")
 
                 return {
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
-                    customer_name: o.customer_name || "Consumidor final",
+                    customer_name: resolvedCustomerName,
                     customer_id: o.buyer_id || "-",
                     total_amount: Number(o.total_amount),
                     statusLabel: statusInfo.label,
@@ -789,10 +793,14 @@ export default function OrdersPage({
                                 openEntity('edit', order.id)
                             }}
                             onUpdateDeliveryStatus={(order: any) => {
+                                const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
+                                const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
+                                    ? order.customer_name
+                                    : (cust?.name || cust?.email || order.buyer_email || order.customer_name || "Consumidor final")
                                 openDeliveryStatusModal({
                                     originalId: order.id,
                                     displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                    customer_name: order.customer_name || "Consumidor final",
+                                    customer_name: resolvedCustName,
                                     customer_id: order.buyer_id || "-",
                                     total_amount: Number(order.total_amount || 0),
                                     statusLabel: "",
@@ -820,10 +828,14 @@ export default function OrdersPage({
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
                                 const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
                                 if (isMarketplace || hasMethod) {
+                                    const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
+                                    const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
+                                        ? order.customer_name
+                                        : (cust?.name || cust?.email || order.buyer_email || order.customer_name || "Consumidor final")
                                     openPaymentStatusModal({
                                         originalId: order.id,
                                         displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                        customer_name: order.customer_name || "Consumidor final",
+                                        customer_name: resolvedCustName,
                                         customer_id: order.buyer_id || "-",
                                         total_amount: Number(order.total_amount || 0),
                                         statusLabel: "",

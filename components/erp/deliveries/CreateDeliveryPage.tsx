@@ -339,25 +339,6 @@ export default function CreateDeliveryPage({
                 setPlanAccess(null)
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [editDeliveryId, partnerId])
-
-    useEffect(() => {
-        let mounted = true
-        const run = async () => {
-            const res = await getERPDeliveryPlanAccessAction(partnerId)
-            if (!mounted) return
-            if (res.success) {
-                setPlanAccess({
-                    allowed: res.allowed,
-                    maxOrders: Number(res.maxOrders || 0),
-                    planSlug: String(res.planSlug || "free"),
-                    message: res.message,
-                })
-            } else {
-                setPlanAccess(null)
-            }
-        }
         run()
         return () => { mounted = false }
     }, [partnerId])
@@ -398,20 +379,27 @@ export default function CreateDeliveryPage({
         [primaryOrder?.address]
     )
 
-    const loadDeliveryPeople = async () => {
-        if (deliveryPeople.length > 0) return
-        const legacy = await fetchDeliveryPeopleBucketAction(partnerId).catch(() => [])
-        setDeliveryPeople([
-            ...(legacy as DeliveryPerson[]).map((person) => ({ ...person, source: "legacy" as const })),
-        ])
-    }
+    const loadDeliveryPeople = useCallback(async () => {
+        try {
+            const people = await fetchDeliveryPeopleBucketAction(partnerId)
+            if (people && Array.isArray(people)) {
+                setDeliveryPeople(people as DeliveryPerson[])
+            }
+        } catch (err) {
+            console.error("Erro ao carregar entregadores:", err)
+        }
+    }, [partnerId])
+
+    useEffect(() => {
+        void loadDeliveryPeople()
+    }, [loadDeliveryPeople])
 
     const deliveryPeopleOptions = useMemo(() => {
         const baseOptions = [
             { value: "none", label: "Entrega própria" },
             ...deliveryPeople.map((person) => ({
                 value: person.id,
-                label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` · ${person.vehicleType}` : ""}`,
+                label: `${person.source === "platform" ? "Dudit · " : ""}${person.fullName}${person.vehicleType ? ` (${person.vehicleType})` : ""}`,
             })),
         ]
 
