@@ -8,9 +8,11 @@ import { useNotification } from "@/hooks/use-notification"
 import {
     getSalesSettingsAction,
     updateSalesSettingsAction,
+} from "@/app/actions/erp/sales-settings"
+import {
     DEFAULT_SALES_SETTINGS,
     type SalesSettings,
-} from "@/app/actions/erp/sales-settings"
+} from "@/lib/sales/sales-settings-types"
 
 const QUOTE_VALIDITY_OPTIONS = [
     { value: "7", label: "7 dias" },

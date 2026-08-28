@@ -13,12 +13,15 @@ import { decryptCPF } from "@/lib/crypto"
 import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { checkLimit, canUseFeature } from "@/lib/services/subscription.service"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { uploadBufferToR2, generateSignedDownloadUrl } from "@/lib/r2/server"
 import { R2_PREFIXES } from "@/lib/r2/config"
 import { revalidatePath } from "next/cache"
-import { revalidateTransactions } from "@/lib/utils/revalidation"
+import { revalidateTransactions, revalidateStockMovements, revalidateProducts } from "@/lib/utils/revalidation"
+import { invalidateProductCache } from "@/lib/cache/invalidation"
+import { cleanAndFormatPhone, sanitizeAddressComplement } from "@/lib/utils/phone-utils"
 
 interface ImportPreview {
   xml_import_id: string
@@ -476,6 +479,16 @@ export async function uploadXMLAction(
     await requireRateLimit(RateLimitCategory.PRODUCT_CREATE)
     await requirePermission(partnerId, "products", "create")
 
+    const allowedFeature = await canUseFeature(partnerId, "xml_import")
+    if (!allowedFeature) {
+      return { success: false, error: "A importação de XML requer o plano Crescer ou superior." }
+    }
+
+    const capabilities = await getPartnerCapabilities(partnerId, { storeId })
+    if (!capabilities.hasProducts) {
+      return { success: false, error: "O catálogo de produtos não está ativo nas configurações." }
+    }
+
     const supabase = await getSupabaseServerClient()
     const user = await requireUser()
 
@@ -489,6 +502,11 @@ export async function uploadXMLAction(
 
     if (metadata.produtos.length === 0) {
       return { success: false, error: "Nenhum produto encontrado no XML" }
+    }
+
+    const limitCheck = await checkLimit(partnerId, "items", metadata.produtos.length)
+    if (!limitCheck.allowed) {
+      return { success: false, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
     }
 
     if (!metadata.invoice.chave) {
@@ -666,6 +684,7 @@ export async function uploadXMLAction(
 
     // 10. Buscar ou preparar fornecedor
     const supplier = await findOrCreateSupplier(supabase, partnerId, metadata.emitente)
+    const formattedPhone = cleanAndFormatPhone(metadata.emitente.fone) || null
 
     // 5. Se fornecedor não existe, precisamos criar
     let supplierId = supplier.id
@@ -682,7 +701,7 @@ export async function uploadXMLAction(
           inscricao_estadual: metadata.emitente.ie || null,
           crt: metadata.emitente.crt || null,
           email: metadata.emitente.email || null,
-          phone: metadata.emitente.fone || null,
+          phone: formattedPhone,
         })
         .select("id")
         .single()
@@ -696,12 +715,16 @@ export async function uploadXMLAction(
       // Criar endereço do fornecedor a partir do XML
       if (metadata.emitente.endereco) {
         const addr = metadata.emitente.endereco
+        const cleanCep = addr.cep ? addr.cep.replace(/\D/g, "").padStart(8, "0") : null
+        const cleanComplement = sanitizeAddressComplement(addr.complemento)
+
         const enrichedXmlAddr = await enrichAddressData({
           supplier_id: newSupplier.id,
           user_id: user.id,
-          zip_code: addr.cep || null,
+          zip_code: cleanCep,
           street: addr.logradouro || null,
-          number: addr.numero || null,
+          number: addr.numero || "S/N",
+          complement: cleanComplement,
           neighborhood: addr.bairro || null,
           city: addr.cidade || null,
           state: addr.uf || null,
@@ -711,6 +734,72 @@ export async function uploadXMLAction(
           address_type: "primary",
         })
         await supabase.from("addresses").insert(enrichedXmlAddr)
+      }
+    } else if (supplier.id) {
+      // Fornecedor já existente: enriquecer dados faltantes ou corrigir telefone bugado
+      try {
+        const { data: existingSupp } = await supabase
+          .from("suppliers")
+          .select("phone, email, inscricao_estadual, crt")
+          .eq("id", supplier.id)
+          .single()
+
+        if (existingSupp) {
+          const suppUpdates: Record<string, any> = {}
+          const existingPhoneDigits = existingSupp.phone ? existingSupp.phone.replace(/\D/g, "") : ""
+          const isPhoneInvalid = !existingSupp.phone || existingSupp.phone.startsWith("(00)") || /^0+$/.test(existingPhoneDigits)
+
+          if (isPhoneInvalid && formattedPhone) {
+            suppUpdates.phone = formattedPhone
+          }
+          if (!existingSupp.email && metadata.emitente.email) {
+            suppUpdates.email = metadata.emitente.email
+          }
+          if (!existingSupp.inscricao_estadual && metadata.emitente.ie) {
+            suppUpdates.inscricao_estadual = metadata.emitente.ie
+          }
+          if (!existingSupp.crt && metadata.emitente.crt) {
+            suppUpdates.crt = metadata.emitente.crt
+          }
+
+          if (Object.keys(suppUpdates).length > 0) {
+            await supabase.from("suppliers").update(suppUpdates).eq("id", supplier.id)
+          }
+
+          // Verificar se fornecedor já possui endereço cadastrado
+          if (metadata.emitente.endereco) {
+            const { data: existingAddrs } = await supabase
+              .from("addresses")
+              .select("id")
+              .eq("supplier_id", supplier.id)
+              .limit(1)
+
+            if (!existingAddrs || existingAddrs.length === 0) {
+              const addr = metadata.emitente.endereco
+              const cleanCep = addr.cep ? addr.cep.replace(/\D/g, "").padStart(8, "0") : null
+              const cleanComplement = sanitizeAddressComplement(addr.complemento)
+
+              const enrichedXmlAddr = await enrichAddressData({
+                supplier_id: supplier.id,
+                user_id: user.id,
+                zip_code: cleanCep,
+                street: addr.logradouro || null,
+                number: addr.numero || "S/N",
+                complement: cleanComplement,
+                neighborhood: addr.bairro || null,
+                city: addr.cidade || null,
+                state: addr.uf || null,
+                country: addr.pais || "BR",
+                municipio_codigo_ibge: addr.codigo_municipio || null,
+                is_default: true,
+                address_type: "primary",
+              })
+              await supabase.from("addresses").insert(enrichedXmlAddr)
+            }
+          }
+        }
+      } catch (enrichErr) {
+        console.error("Erro ao enriquecer dados do fornecedor existente:", enrichErr)
       }
     }
 
@@ -991,6 +1080,23 @@ export async function confirmImportAction(
     const user = await requireUser()
     const capabilities = await getPartnerCapabilities(partnerId, { storeId })
 
+    const allowedFeature = await canUseFeature(partnerId, "xml_import")
+    if (!allowedFeature) {
+      return { success: false, error: "A importação de XML requer o plano Crescer ou superior." }
+    }
+
+    if (!capabilities.hasProducts) {
+      return { success: false, error: "O catálogo de produtos não está ativo nas configurações." }
+    }
+
+    const newProductsCount = decisions.filter((d) => d.decision === "create_product").length
+    if (newProductsCount > 0) {
+      const limitCheck = await checkLimit(partnerId, "items", newProductsCount)
+      if (!limitCheck.allowed) {
+        return { success: false, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
+      }
+    }
+
     const { data: xmlImport, error: fetchErr } = await supabase
       .from("xml_imports")
       .select("id, status, total_value, supplier_id, duplicatas, partner_id, invoice_number, access_key, raw_xml, xml_hash, xml_size, file_key, file_name")
@@ -1213,6 +1319,12 @@ export async function confirmImportAction(
       metadata: { imported: result.imported, skipped: result.skipped },
       source: "manual",
     }).catch(() => { })
+
+    await revalidateStockMovements(partnerId)
+    await revalidateProducts(partnerId)
+    revalidatePath("/erp/produtos")
+    revalidatePath("/erp/movimentacao-estoque")
+    revalidatePath("/erp/importacao-xml")
 
     return {
       success: true,
@@ -1469,11 +1581,33 @@ export async function revertImportAction(
       source: "manual",
     }).catch(() => { })
 
+    // Revalidar financeiro, estoque e produtos
     await revalidateTransactions(partnerId)
+    await revalidateStockMovements(partnerId)
+    await revalidateProducts(partnerId)
     revalidatePath("/erp/contas-a-pagar")
     revalidatePath("/erp/contas-a-receber")
     revalidatePath("/erp/transacoes")
     revalidatePath("/erp/importacao-xml")
+    revalidatePath("/erp/produtos")
+    revalidatePath("/erp/movimentacao-estoque")
+
+    // Invalida cache de todos os produtos do XML
+    try {
+      const { data: xmlItems } = await supabase
+        .from("xml_import_items")
+        .select("matched_product_id, created_product_id")
+        .eq("xml_import_id", xmlImportId)
+
+      for (const item of (xmlItems || [])) {
+        const prodId = item.created_product_id || item.matched_product_id
+        if (prodId) {
+          await invalidateProductCache(prodId, partnerId, 'update', { silent: true })
+        }
+      }
+    } catch (cacheErr) {
+      console.error("Erro ao invalidar cache dos produtos revertidos:", cacheErr)
+    }
 
     return { success: true, message: result.message || "Importação revertida com sucesso" }
   } catch (error: any) {

@@ -15,6 +15,8 @@ interface ERPOnboardingFeedbackModalProps {
   partnerId: string
   partnerPlan?: string
   userRole?: string
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 const ONBOARDING_SENTIMENTS = [
@@ -42,8 +44,12 @@ export function ERPOnboardingFeedbackModal({
   partnerId,
   partnerPlan,
   userRole,
+  isOpen: propIsOpen,
+  onClose: propOnClose,
 }: ERPOnboardingFeedbackModalProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const isControlled = typeof propIsOpen === "boolean"
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isModalOpen = isControlled ? !!propIsOpen : internalIsOpen
   const [partnerStoreName, setPartnerStoreName] = useState<string>("")
   const [selectedSentiment, setSelectedSentiment] = useState<FeedbackSentiment | null>(null)
   const [comment, setComment] = useState("")
@@ -52,6 +58,17 @@ export function ERPOnboardingFeedbackModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
+    if (propIsOpen) {
+      setIsSuccess(false)
+      setSelectedSentiment(null)
+      setComment("")
+      setErrorMessage(null)
+    }
+  }, [propIsOpen])
+
+  useEffect(() => {
+    if (isControlled) return
+
     // Only verify for management / owners / admins
     const roleLower = String(userRole || "").toLowerCase()
     const isPrivileged = roleLower === "owner" || roleLower === "admin" || roleLower === "manager"
@@ -63,7 +80,7 @@ export function ERPOnboardingFeedbackModal({
       try {
         const res = await checkERPOnboardingFeedbackPromptAction(partnerId)
         if (isMounted && res.shouldShow) {
-          setIsOpen(true)
+          setInternalIsOpen(true)
           if (res.partnerName) setPartnerStoreName(res.partnerName)
           // Record shown
           recordFeedbackPromptShownAction(partnerId, "erp_onboarding")
@@ -78,13 +95,17 @@ export function ERPOnboardingFeedbackModal({
     return () => {
       isMounted = false
     }
-  }, [partnerId, userRole])
+  }, [partnerId, userRole, isControlled])
 
   const handleClose = async () => {
-    setIsOpen(false)
-    if (!isSuccess) {
-      // Mark dismissed so it never pesters the user again
-      await dismissFeedbackPromptAction(partnerId, "erp_onboarding")
+    if (propOnClose) {
+      propOnClose()
+    } else {
+      setInternalIsOpen(false)
+      if (!isSuccess) {
+        // Mark dismissed so it never pesters the user again
+        await dismissFeedbackPromptAction(partnerId, "erp_onboarding")
+      }
     }
   }
 
@@ -139,56 +160,47 @@ export function ERPOnboardingFeedbackModal({
     }
   }
 
-  if (!isOpen) return null
+  if (!isModalOpen) return null
 
   return (
     <DefaultModal
-      isOpen={isOpen}
+      isOpen={isModalOpen}
       onClose={handleClose}
       title={isSuccess ? "Obrigado!" : "Como está sendo sua experiência na Dudit?"}
       maxWidth="md"
       footer={
-        <div className="flex justify-end gap-3 w-full">
-          <Button
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Agora não
-          </Button>
+        !isSuccess ? (
+          <div className="flex justify-end gap-3 w-full">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Agora não
+            </Button>
 
-          <Button
-            type="submit"
-            disabled={isSubmitting || !selectedSentiment}
-          >
-            Enviar Resposta
-          </Button>
-        </div>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !selectedSentiment}
+            >
+              Enviar Resposta
+            </Button>
+          </div>
+        ) : undefined
       }
     >
       {isSuccess ? (
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex flex-col items-center justify-center p-2">
           <IconPlaceholder
             placeholderType="image"
             imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
             title="Obrigado pelo feedback!"
             subtitle="Sua experiência nos ajuda a aprimorar o dia a dia da gestão do seu negócio."
             itemButton={{
-              text: "Continuar no ERP",
+              text: "Continuar",
               action: handleClose,
             }}
           />
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-              Agradecemos seu retorno!
-            </h3>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-sm">
-              Sua experiência nos ajuda a aprimorar o dia a dia da gestão do seu negócio.
-            </p>
-          </div>
-          <Button variant="filled" className="mt-4 px-8" onClick={handleClose}>
-            Continuar no ERP
-          </Button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5 pt-1">

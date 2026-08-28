@@ -7,6 +7,7 @@ import { getPOSInitialDataAction } from "@/app/actions/erp/pdv"
 import { getActiveCashSessionAction } from "@/app/actions/erp/cash-register"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { getTeamMembers } from "@/app/actions/erp/team"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
 export const dynamic = "force-dynamic"
 
@@ -18,10 +19,14 @@ export default async function POSPageServer() {
   const partnerId = context.partnerId
   const activeStoreId = context.activeStoreId
 
+  const capabilities = await getPartnerCapabilities(partnerId, { storeId: activeStoreId })
+
   // Parallel: load all initial data in a single waterfall step
   const [initialDataResult, activeSessionResult, promotionsResult, teamResult] = await Promise.all([
     getPOSInitialDataAction(partnerId, activeStoreId),
-    getActiveCashSessionAction(partnerId, activeStoreId),
+    capabilities.hasFinancial
+      ? getActiveCashSessionAction(partnerId, activeStoreId)
+      : Promise.resolve({ success: true as const, data: null }),
     listActivePromotionsForMarketplaceAction(partnerId).catch(() => []),
     getTeamMembers().catch(() => ({ members: [], currentUserId: undefined })),
   ])
@@ -62,6 +67,7 @@ export default async function POSPageServer() {
           initialActiveSession={activeSession}
           initialPromotions={initialPromotions}
           initialTeam={initialTeam}
+          hasFinancial={capabilities.hasFinancial}
         />
       </FadeIn>
     </>

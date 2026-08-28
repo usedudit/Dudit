@@ -107,7 +107,7 @@ O `pg_restore` deve ser da versão 17 ou superior. Não use um cliente 15 para e
 Se o Windows não encontrar os comandos, adicione a pasta abaixo ao PATH da sessão, ajustando o caminho se necessário:
 
 ```powershell
-$env:Path += ";C:\Program Files\PostgreSQL\17\bin"
+$env:Path += ";C:\Program Files\PostgreSQL\18\bin"
 ```
 
 ### Conectar ao projeto Supabase de teste
@@ -121,6 +121,7 @@ $testHost = "db.PROJETO_DE_TESTE.supabase.co"
 $testPort = 5432
 $testUser = "postgres"
 $testDatabase = "postgres"
+$env:PGSSLMODE = "require"
 ```
 
 Teste a conexão sem colocar a senha no comando. O `psql` solicitará a senha de forma interativa:
@@ -135,7 +136,7 @@ psql -h $testHost -p $testPort -U $testUser -d $testDatabase `
 Execute o restore apontando diretamente para o Supabase de teste. O `pg_restore` solicitará a senha sem exibi-la:
 
 ```powershell
-pg_restore --verbose --exit-on-error --no-owner --no-acl `
+pg_restore --verbose --no-owner --no-acl --clean --if-exists `
   -h $testHost -p $testPort -U $testUser -d $testDatabase `
   "C:\Users\MuriloSTR\Downloads\dudit-restore.dump"
 ```

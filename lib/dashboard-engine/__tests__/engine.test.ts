@@ -105,6 +105,25 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
       const logisticsStep = checklist.find((item) => item.id === "logistics");
       expect(logisticsStep).toBeUndefined();
     });
+
+    it("should exclude payment methods step on Free plan", () => {
+      const ctx = createBaseContext({
+        planSlug: "free",
+      });
+      const checklist = getChecklistItems(ctx);
+      const paymentsStep = checklist.find((item) => item.id === "payments");
+      expect(paymentsStep).toBeUndefined();
+    });
+
+    it("should include payment methods step on Crescer/Escalar plan", () => {
+      const ctx = createBaseContext({
+        planSlug: "crescer",
+      });
+      const checklist = getChecklistItems(ctx);
+      const paymentsStep = checklist.find((item) => item.id === "payments");
+      expect(paymentsStep).toBeDefined();
+      expect(paymentsStep?.title).toBe("Ativar recebimento online (Mercado Pago)");
+    });
   });
 
   describe("Cards Rules", () => {

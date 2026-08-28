@@ -313,6 +313,9 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
                 user: mov.created_by ? mov.created_by.split('@')[0] : 'Sistema',
                 reference: orderReference || mov.reference_name || mov.reference_type || "-",
                 notes: notes,
+                isReversed: !!mov.reversed_at || !!mov.reversal_movement_id,
+                reversedAt: mov.reversed_at || null,
+                reversalMovementId: mov.reversal_movement_id || null,
             };
         });
     }, [loadedMovements]);

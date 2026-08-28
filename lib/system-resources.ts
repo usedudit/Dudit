@@ -262,10 +262,6 @@ export function getDefaultResourcesForModeAndCategory(mode?: string, categorySlu
       )
     }
 
-    if (isServicesCategory) {
-      return quickDefaults.filter(r => r !== "deliveries")
-    }
-
     return quickDefaults
   }
 
@@ -301,11 +297,6 @@ export function getDefaultResourcesForModeAndCategory(mode?: string, categorySlu
     return allDefaults.filter(
       r => r !== "services" && r !== "appointments" && r !== "serviceOrders" && r !== "serviceCadastros"
     )
-  }
-
-  // Serviços, Profissional / Consultoria, Saúde e Estética: esconde entregas por padrão
-  if (isServicesCategory) {
-    return allDefaults.filter(r => r !== "deliveries")
   }
 
   return allDefaults

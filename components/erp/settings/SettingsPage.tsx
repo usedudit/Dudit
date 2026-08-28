@@ -16,6 +16,7 @@ import {
   ClockIcon,
   ShoppingCartIcon,
   PrinterIcon,
+  MotorbikeIcon,
 } from "@/lib/icons"
 
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
@@ -379,7 +380,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             )}
                             {canAccessDelivery && (
                               <ListItem
-                                icon={PackageReceiveIcon}
+                                icon={MotorbikeIcon}
                                 title={deliveryPlanBlocked ? (
                                   <span className="inline-flex items-center gap-2">
                                     Logística e Entrega

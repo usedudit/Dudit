@@ -12,12 +12,9 @@ import {
     InfoIcon,
     LinkIcon,
     CopyIcon,
-    ShareIcon,
     DownloadIcon,
     SparklesIcon,
     WhatsappIcon,
-    FacebookIcon,
-    QRCodeIcon,
     EyeIcon,
     Package,
     WrenchIcon,
@@ -31,7 +28,7 @@ import AlertModal from "@/components/reusable/AlertModal";
 import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
-import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal";
+import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedbackModal";
 import { usePermissions } from "@/lib/permission-context";
 import { MessageSquare } from "lucide-react";
 
@@ -477,11 +474,10 @@ function ProgressCard({
                                 <ChevronRightIcon size={16} className="text-brand-inactive-text shrink-0" />
                             )
                         }
-                        className={`border rounded-2xl transition-all cursor-pointer p-3 ${
-                            item.completed
-                                ? "border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5"
-                                : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
-                        }`}
+                        className={`border rounded-2xl transition-all cursor-pointer p-3 ${item.completed
+                            ? "border-brand-green/30 dark:border-brand-green/20 bg-brand-green-light/20 dark:bg-brand-green/5"
+                            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-dark/30 dark:hover:border-brand-gray/30"
+                            }`}
                     />
                 ))}
             </div>
@@ -675,7 +671,11 @@ function ModeCard({
                     description: modeToSet === "erp" ? "Bem-vindo ao modo ERP completo." : "Sua vitrine online e catálogo comercial estão prontos."
                 });
                 setModalOpen(false);
-                onSuccess();
+                if (typeof window !== "undefined") {
+                    window.location.reload();
+                } else {
+                    onSuccess();
+                }
             } else {
                 toast({ title: "Erro", description: res.error, variant: "destructive" });
             }
@@ -798,39 +798,67 @@ function ModeCard({
 // TIPS CARD
 // ============================================
 
-const PLATFORM_TIPS = [
-    "Conecte seu WhatsApp no ERP para responder clientes e fechar vendas mais rápido.",
-    "Mantenha seu catálogo atualizado com boas fotos para vender muito mais.",
-    "Use a Central de Ajuda para descobrir tutoriais e dicas sobre a plataforma.",
-    "Ative as notificações para não perder nenhum pedido que chegar.",
-    "Cadastre cupons promocionais para atrair novos clientes.",
-    "Acompanhe os relatórios para entender o desempenho do seu negócio.",
-    "Configure o horário de funcionamento da sua loja para seus clientes.",
-    "Use o fluxo de caixa para manter as contas da sua empresa em dia.",
-    "Cadastre seus produtos com preço de venda e compare com o custo.",
-    "Divulgue seu perfil de vendedor nas redes sociais para ganhar mais clientes.",
-    "Defina metas de vendas para manter sua equipe motivada.",
-    "Importe planilhas para cadastrar vários produtos de uma vez só.",
-    "Separe as vendas por categoria para facilitar a busca dos clientes.",
-    "Fique de olho no estoque para evitar vender produtos indisponíveis.",
-    "Personalize seu perfil com logo e banner para transmitir mais confiança.",
-];
+const MODE_TIPS: Record<string, string[]> = {
+    desapego: [
+        "Tire fotos nítidas com boa iluminação para destacar o estado real do seu item.",
+        "Descreva com sinceridade o estado de conservação, tempo de uso e detalhes do produto.",
+        "Responda rapidamente aos interessados no WhatsApp para fechar negócio mais rápido.",
+        "Pesquise itens semelhantes para definir um preço atrativo e desapegar sem demora.",
+        "Para segurança de ambos, prefira combinar a entrega ou retirada em locais públicos e movimentados.",
+        "Compartilhe o link do seu anúncio em grupos e redes sociais para alcançar mais compradores.",
+        "Mantenha o anúncio atualizado ou pause-o assim que o item for vendido.",
+        "Inclua fotos de diferentes ângulos mostrando os principais detalhes do item.",
+    ],
+    quick: [
+        "Compartilhe o link da sua Vitrine no Instagram, TikTok e status do WhatsApp.",
+        "Personalize sua logo e banner para transmitir muito mais credibilidade aos clientes.",
+        "Organize seus produtos e serviços em categorias para facilitar a navegação no catálogo.",
+        "Baixe e imprima o poster com QR Code da sua vitrine para colocar no balcão da loja.",
+        "Crie cupons de desconto sazonais para atrair novos clientes e incentivar a recompra.",
+        "Adicione descrições detalhadas e benefícios de cada item no seu catálogo online.",
+        "Conecte seu WhatsApp para receber os pedidos formatados diretamente na sua conversa.",
+        "Divulgue promoções e novidades da semana nos seus canais de atendimento.",
+    ],
+    erp: [
+        "Acompanhe o DRE e o fluxo de caixa semanalmente para manter as finanças sob controle.",
+        "Mantenha seu estoque sempre conciliado para evitar rupturas e vendas de itens indisponíveis.",
+        "Importe notas fiscais de entrada direto via XML de NF-e para abastecer seu estoque em segundos.",
+        "Defina metas de vendas para engajar sua equipe e acompanhar resultados em tempo real.",
+        "Utilize o PDV frente de caixa para agilizar o atendimento balcão e registrar vendas presenciais.",
+        "Cadastre os dados completos de clientes para criar um histórico de compras e pós-venda.",
+        "Monitore as comissões e produtividade dos vendedores direto pelo painel de desempenho.",
+        "Configure políticas de trocas e recibos térmicos personalizados para sua operação.",
+    ],
+};
 
-function TipsCard() {
-    const [tipIdx, setTipIdx] = useState(() => Math.floor(Math.random() * PLATFORM_TIPS.length));
+function TipsCard({ mode }: { mode?: string }) {
+    const tipsList = React.useMemo(() => {
+        const normalized = String(mode || "quick").toLowerCase();
+        if (normalized === "desapego") return MODE_TIPS.desapego;
+        if (normalized === "erp") return MODE_TIPS.erp;
+        return MODE_TIPS.quick;
+    }, [mode]);
+
+    const [tipIdx, setTipIdx] = useState(0);
+
+    useEffect(() => {
+        setTipIdx(Math.floor(Math.random() * tipsList.length));
+    }, [tipsList]);
 
     useEffect(() => {
         const interval = setInterval(() => {
             setTipIdx((prev) => {
                 let next = prev;
-                while (next === prev) {
-                    next = Math.floor(Math.random() * PLATFORM_TIPS.length);
+                while (next === prev && tipsList.length > 1) {
+                    next = Math.floor(Math.random() * tipsList.length);
                 }
                 return next;
             });
         }, 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [tipsList]);
+
+    const currentTip = tipsList[tipIdx] || tipsList[0];
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
@@ -840,10 +868,10 @@ function TipsCard() {
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Dica {tipIdx + 1}/{PLATFORM_TIPS.length}
+                        Dica {tipIdx + 1}/{tipsList.length}
                     </span>
                     <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        {PLATFORM_TIPS[tipIdx]}
+                        {currentTip}
                     </p>
                 </div>
             </div>
@@ -851,7 +879,7 @@ function TipsCard() {
                 variant="ghost"
                 size="sm"
                 className="gap-1 text-brand-green font-bold text-xs shrink-0"
-                onClick={() => setTipIdx((prev) => (prev + 1) % PLATFORM_TIPS.length)}
+                onClick={() => setTipIdx((prev) => (prev + 1) % tipsList.length)}
             >
                 Próxima <ChevronRightIcon size={14} />
             </Button>
@@ -878,7 +906,7 @@ function FeedbackCard({ onOpen }: { onOpen: () => void }) {
                         Feedback
                     </span>
                     <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        Sua opinião nos ajuda a melhorar. Sugestões, elogios ou bugs — tudo bem-vindo!
+                        Conte como está sendo sua experiência na Dudit e nos ajude a evoluir a plataforma.
                     </p>
                 </div>
             </div>
@@ -890,13 +918,14 @@ function FeedbackCard({ onOpen }: { onOpen: () => void }) {
 // MAIN COMPONENT
 // ============================================
 
-export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
+export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     const router = useRouter();
     const { toast } = useToast();
-    const { openPlanUpgrade } = usePlanUpgrade();
     const { partnerId: permPartnerId, planSlug: permPlanSlug, role: permRole } = usePermissions();
+    const { openPlanUpgrade } = usePlanUpgrade();
+
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
-    const [showDeleteModal, setShowDeleteModal] = useState<any>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState<{ id: string; itemType: 'product' | 'service'; name: string } | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [currentImportOptions, setCurrentImportOptions] = useState<DashboardChecklistItem["importOptions"] | null>(null);
@@ -1035,7 +1064,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         {(data.isQuickMode || data.isDesapego) && (
                             <ModeCard partnerId={partnerId} isDesapego={data.isDesapego} onSuccess={() => router.refresh()} />
                         )}
-                        {!data.isDesapego && <TipsCard />}
+                        <TipsCard mode={data.businessMode || (data.isDesapego ? "desapego" : data.isQuickMode ? "quick" : "erp")} />
                         <FeedbackCard onOpen={() => setShowFeedbackModal(true)} />
                     </div>
                 </div>
@@ -1061,7 +1090,7 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     variant="danger"
                 />
 
-                <GeneralFeedbackModal
+                <ERPOnboardingFeedbackModal
                     isOpen={showFeedbackModal}
                     onClose={() => setShowFeedbackModal(false)}
                     partnerId={permPartnerId}
@@ -1072,3 +1101,5 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
         </>
     );
 }
+
+export default QuickModeHome;

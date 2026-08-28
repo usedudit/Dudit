@@ -65,6 +65,11 @@ const StockMovementGridCard = React.memo(
                                         className="whitespace-nowrap scale-90"
                                     />
                                 </Tooltip>
+                                {movement.isReversed && (
+                                    <Badge variant="gray" icon={null} className="whitespace-nowrap scale-90">
+                                        Desfeita
+                                    </Badge>
+                                )}
                             </div>
 
                             {onSelect && (
@@ -113,16 +118,18 @@ const StockMovementGridCard = React.memo(
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div
-                                className="shrink-0"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <ActionsDropdown
-                                    onUndo={() => onUndo(movement.id)}
-                                />
+                        {!movement.isReversed && (
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <ActionsDropdown
+                                        onUndo={() => onUndo(movement.id)}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </motion.div>

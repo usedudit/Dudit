@@ -73,6 +73,7 @@ interface Props {
         members: { id: string; fullName?: string | null; userId?: string; avatarUrl?: string | null }[]
         currentUserId?: string
     }
+    hasFinancial?: boolean
 }
 
 type TeamMember = {
@@ -119,7 +120,7 @@ function DesktopPOSSheet({
     )
 }
 
-export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam }: Props) {
+export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam, hasFinancial = true }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const { planSlug, hasSpecific } = usePermissions()
@@ -168,7 +169,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         return hasProductsInCatalog && hasServicesInCatalog
     }, [hasProductsInCatalog, hasServicesInCatalog])
 
-    const isCashierOpen = !!activeCashSession?.id
+    const isCashierOpen = !hasFinancial || !!activeCashSession?.id
     const [selectedCategory, setSelectedCategory] = useState("Todos")
     const [search, setSearch] = useState("")
     const [debouncedSearch, setDebouncedSearch] = useState("")

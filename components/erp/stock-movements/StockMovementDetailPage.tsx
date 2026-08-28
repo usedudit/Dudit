@@ -10,7 +10,7 @@ import {
     PinIcon,
     LinkIcon
 } from '@/lib/icons';
-import { Button, ThreeDotsLoader, AlertModal, InfoCard, Badge, Input } from '@/components/reusable';
+import { Button, ThreeDotsLoader, AlertModal, InfoCard, Badge, Input, DefaultModal } from '@/components/reusable';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useNotification } from '@/hooks/use-notification';
 import { useSidebar } from "@/lib/sidebar-context"
@@ -56,6 +56,9 @@ interface StockMovement {
     notes?: string;
     referenceName?: string;
     orderId?: string;
+    isReversed?: boolean;
+    reversedAt?: string | null;
+    reversalMovementId?: string | null;
 }
 
 interface StockMovementDetailProps {
@@ -92,6 +95,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
     const [isUndoModalOpen, setIsUndoModalOpen] = useState(false);
     const [undoReason, setUndoReason] = useState('');
     const [isUndoing, setIsUndoing] = useState(false);
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
     const { success: notifySuccess, error: notifyError } = useNotification();
 
     const handleUndo = async () => {
@@ -196,6 +200,14 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             >
                                                 {isIn ? "Entrada" : "Saída"}
                                             </Badge>
+                                            {data.isReversed && (
+                                                <Badge
+                                                    variant="gray"
+                                                    className="whitespace-nowrap scale-90 shrink-0"
+                                                >
+                                                    Desfeita
+                                                </Badge>
+                                            )}
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -209,14 +221,16 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <Button
-                                            variant="outline"
-                                            className="h-[42px]"
-                                            onClick={() => setIsUndoModalOpen(true)}
-                                            leftIcon={<ReloadIcon size={18} />}
-                                        >
-                                            Desfazer
-                                        </Button>
+                                        {!data.isReversed && (
+                                            <Button
+                                                variant="outline"
+                                                className="h-[42px]"
+                                                onClick={() => setIsUndoModalOpen(true)}
+                                                leftIcon={<ReloadIcon size={18} />}
+                                            >
+                                                Desfazer
+                                            </Button>
+                                        )}
 
                                         <Button className="h-[42px]" onClick={() => { /* PDF Logic */ }} leftIcon={<DownloadIcon size={18} />}>
                                             PDF
@@ -247,19 +261,6 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                                     {/* Movement Details Card */}
                                                     <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden mb-8">
-                                                        {/* Top: Info (Gray) */}
-                                                        <div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total de itens:</span>
-                                                                    <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                        {displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
                                                         {/* Bottom: Product Items (White) */}
                                                         <div className="bg-white dark:bg-dark-surface">
                                                             {displayItems.map((item, index) => {
@@ -323,8 +324,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                         </div>
                                                     </div>
 
-                                                    {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                                    <FormSection title="Detalhes da Movimentação" hasSeparator>
+                                                    {/* Resumo da Operação - BELOW Items (like XML import sidebar) */}
+                                                    <FormSection title="Resumo da Operação" hasSeparator>
                                                         <div className={hasNotes ? "grid md:grid-cols-2 gap-4" : "grid md:grid-cols-4 gap-4"}>
                                                             <ListItem
                                                                 icon={PinIcon}
@@ -368,21 +369,18 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                                         {/* Mobile/Tablet View */}
                                         < div className="xl:hidden space-y-6" >
+                                            {/* Summary List Item at the top (like XML import page) */}
+                                            <ListItem
+                                                icon={FileTextIcon}
+                                                title={`${displayItems.length} ${displayItems.length === 1 ? 'item' : 'itens'}`}
+                                                description={`${isIn ? 'Entrada' : 'Saída'} • ${reason || "-"}`}
+                                                showChevron={true}
+                                                onClick={() => setShowSummaryModal(true)}
+                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                            />
+
                                             {/* Items Cards for Mobile */}
                                             < div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden" >
-                                                {/* Top: Info (Gray) */}
-                                                < div className="bg-brand-gray dark:bg-dark-border/30 p-6 border-b border-brand-border dark:border-dark-border" >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo da Operação</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Total de itens:</span>
-                                                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-                                                                {displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div >
-
                                                 {
                                                     displayItems.map((item, index) => {
                                                         const lineIn = item.type === 'in';
@@ -440,20 +438,21 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                 }
                                             </div >
 
-                                            {/* Detalhes da Movimentação - BELOW Resumo da Operação */}
-                                            <FormSection title="Detalhes da Movimentação" className="mt-0" >
+                                            {/* Operation Summary below items (like XML import page sidebar) */}
+                                            <FormSection title="Resumo da Operação" hasSeparator>
                                                 <div className="space-y-4">
                                                     <ListItem
+                                                        icon={PinIcon}
                                                         title="Motivo"
                                                         description={reason || "-"}
-                                                        className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                        className="px-4 py-3 gap-4"
                                                     />
                                                     {data.referenceName && (
                                                         <ListItem
+                                                            icon={LinkIcon}
                                                             title="Referência"
                                                             description={data.referenceName}
-                                                            left={<FileTextIcon size={18} className="text-brand-inactive-text dark:text-dark-body" />}
-                                                            className="border-0 bg-transparent px-0 hover:bg-transparent"
+                                                            className="px-4 py-3 gap-4"
                                                         />
                                                     )}
                                                 </div>
@@ -496,14 +495,16 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
 
                 {/* Mobile Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
-                    <Button
-                        variant="outline"
-                        className="flex-1 h-12"
-                        onClick={() => setIsUndoModalOpen(true)}
-                        leftIcon={<ReloadIcon size={18} />}
-                    >
-                        Desfazer
-                    </Button>
+                    {!data.isReversed && (
+                        <Button
+                            variant="outline"
+                            className="flex-1 h-12"
+                            onClick={() => setIsUndoModalOpen(true)}
+                            leftIcon={<ReloadIcon size={18} />}
+                        >
+                            Desfazer
+                        </Button>
+                    )}
                     <Button
                         className="flex-1 h-12"
                         leftIcon={<DownloadIcon size={18} />}
@@ -533,6 +534,47 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                     isLoading={isUndoing}
                 />
             </div>
+
+            {/* Mobile/Tablet: Summary modal */}
+            <DefaultModal isOpen={showSummaryModal} onClose={() => setShowSummaryModal(false)} title="Resumo da Operação">
+                <div className="space-y-4 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Total de Itens</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">{displayItems.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Tipo de Movimentação</span>
+                        <span className={`font-bold ${isIn ? 'text-brand-green' : 'text-brand-red'}`}>{isIn ? 'Entrada' : 'Saída'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-brand-inactive-text dark:text-dark-body">Motivo</span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right max-w-[200px] truncate">{reason || "-"}</span>
+                    </div>
+                    {data.referenceName && (
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-brand-inactive-text dark:text-dark-body">Referência</span>
+                            <span className="font-bold text-brand-dark dark:text-dark-heading text-right max-w-[200px] truncate">{data.referenceName}</span>
+                        </div>
+                    )}
+                    <div className="pt-2 border-t border-brand-border dark:border-dark-border">
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Itens da Movimentação</span>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {displayItems.map((item, index) => {
+                                const lineIn = item.type === 'in';
+                                return (
+                                    <div key={item.id} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-brand-dark dark:text-dark-heading font-medium truncate max-w-[150px]">{item.product.name}</span>
+                                            <span className="text-brand-inactive-text">({item.product.sku})</span>
+                                        </div>
+                                        <span className={`font-bold ${lineIn ? 'text-brand-green' : 'text-brand-red'}`}>{lineIn ? '+' : '-'}{item.quantity}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </DefaultModal>
         </FadeIn >
     );
 };

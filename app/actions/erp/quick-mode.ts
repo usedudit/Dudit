@@ -109,7 +109,7 @@ export async function switchBusinessModeAction(partnerId: string, targetMode: Bu
             .select("role_id")
             .eq("partner_id", partnerId)
             .eq("user_id", user.id)
-            .single()
+            .maybeSingle()
 
         // If not found in partner_users, check if they are the direct owner in partners table
         const { data: partnerData } = await supabase

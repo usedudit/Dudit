@@ -1,3 +1,5 @@
+import { sanitizeAddressComplement } from "@/lib/utils/phone-utils"
+
 export type LocationPoint = {
     lat: number
     lng: number
@@ -280,14 +282,41 @@ async function _executeGeocode(address: string): Promise<GeocodeResult> {
   const raw = String(address || "").trim()
   if (!raw) return null
 
-  // Nominatim free-text search fails when the query contains a Brazilian CEP
-  // (e.g. "17783-124" or "01304000") or dashes between city/state ("Lucélia - SP").
-  // Sanitize: strip CEP, normalize dashes, remove "BR"/"Brazil" noise.
+  // 1. If address contains an 8-digit CEP, try resolving coordinates via fast CEP API
+  const cepMatch = raw.match(/\b(\d{5})-?(\d{3})\b/)
+  if (cepMatch) {
+    const cleanCep = `${cepMatch[1]}${cepMatch[2]}`
+    try {
+      const cepRes = await fetch(`https://cep.awesomeapi.com.br/json/${cleanCep}`, {
+        headers: { "User-Agent": "Dudit/1.0" },
+        signal: AbortSignal.timeout(3500),
+      })
+      if (cepRes.ok) {
+        const data = await cepRes.json()
+        if (data.lat && data.lng) {
+          const lat = Number(data.lat)
+          const lng = Number(data.lng)
+          if (!isNaN(lat) && !isNaN(lng)) {
+            const point = normalizePoint({ lat, lng })
+            if (point) {
+              console.log(`[Geocode] CEP OK "${cleanCep}" => [${point.lat}, ${point.lng}]`)
+              return point
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore and fallback to Nominatim
+    }
+  }
+
+  // 2. Sanitize and extract clean street + city + state for Nominatim
   function sanitize(addr: string): string {
     return addr
-      .replace(/\b\d{5}-?\d{3}\b/g, "")   // strip CEP patterns (XXXXX-XXX or XXXXXXXX)
+      .replace(/\b\d{5}-?\d{3}\b/g, "")   // strip CEP patterns
       .replace(/\s*-\s*/g, ", ")            // "Lucélia - SP" => "Lucélia, SP"
       .replace(/,\s*BR\b/gi, "")            // strip trailing ", BR"
+      .replace(/,\s*Brasil\b/gi, "")        // strip trailing ", Brasil"
       .replace(/,\s*Brazil\b/gi, "")        // strip trailing ", Brazil"
       .replace(/,\s*,/g, ",")              // collapse empty segments
       .replace(/\s{2,}/g, " ")             // collapse whitespace
@@ -298,35 +327,42 @@ async function _executeGeocode(address: string): Promise<GeocodeResult> {
   const query = sanitize(raw)
   if (!query) return null
 
-  // Attempt 1: full sanitized query
-  const result = await _geocodeFetch(query)
-  if (result) return result
+  // In Brazil, Nominatim almost always fails if house numbers (e.g. ", 286,") or
+  // specific neighborhood descriptors (e.g. "Lado Sul", "Zona Leste") are included.
+  // Construct clean street + city + state directly:
+  const rawParts = query.split(",").map(s => s.trim()).filter(Boolean)
 
-  // Attempt 2: retry without the street number (Nominatim is more flexible with just street + city)
-  const withoutNumber = query
-    .replace(/,\s*\d+\s*,/, ",")          // remove ", 286," style numbers
-    .replace(/,\s*S\/N\s*,/i, ",")        // remove ", S/N,"
-    .replace(/,\s*,/g, ",")
-    .trim()
+  let cleanStreetQuery: string | null = null
+  let cityStateQuery: string | null = null
 
-  if (withoutNumber !== query) {
-    const r2 = await _geocodeFetch(withoutNumber)
+  if (rawParts.length >= 3) {
+    // rawParts: [Street, (optional number), (optional neighborhood), City, State]
+    const state = rawParts[rawParts.length - 1]
+    const city = rawParts[rawParts.length - 2]
+    const street = rawParts[0].replace(/\s+(?:n[º°.]+|no\.|num(?:ero)?\.?|\d+[a-zA-Z]?|s\/n)$/i, "").trim()
+    cleanStreetQuery = `${street}, ${city}, ${state}`
+    cityStateQuery = `${city}, ${state}`
+  } else if (rawParts.length === 2) {
+    cityStateQuery = `${rawParts[0]}, ${rawParts[1]}`
+  } else {
+    cityStateQuery = query
+  }
+
+  // Attempt 1: Clean street + city + state (highest accuracy for delivery)
+  if (cleanStreetQuery) {
+    const r1 = await _geocodeFetch(cleanStreetQuery)
+    if (r1) return r1
+  }
+
+  // Attempt 2: Full sanitized query (in case full string had a landmark)
+  if (query !== cleanStreetQuery && query !== cityStateQuery) {
+    const r2 = await _geocodeFetch(query)
     if (r2) return r2
   }
 
-  // Attempt 3: strip the neighborhood segment (e.g. "Lado Sul" confuses Nominatim)
-  // Pattern: "Street, Neighborhood, City, State" → "Street, City, State"
-  const parts = (withoutNumber || query).split(",").map(s => s.trim()).filter(Boolean)
-  if (parts.length >= 4) {
-    const withoutNeighborhood = [parts[0], ...parts.slice(2)].join(", ")
-    const r3 = await _geocodeFetch(withoutNeighborhood)
-    if (r3) return r3
-  }
-
-  // Attempt 4: just city + state (last resort)
-  if (parts.length >= 2) {
-    const cityState = parts.slice(-2).join(", ")
-    return _geocodeFetch(cityState)
+  // Attempt 3: City + State fallback
+  if (cityStateQuery) {
+    return _geocodeFetch(cityStateQuery)
   }
 
   return null
@@ -488,7 +524,7 @@ export async function enrichAddressData<T extends RawAddressPayload>(input: T) {
   const cleanZip = String(input.zip_code || input.zipCode || input.cep || "").trim()
   const street = String(input.street || "").trim()
   const number = String(input.number || "S/N").trim()
-  const complement = input.complement ? String(input.complement).trim() : null
+  const complement = sanitizeAddressComplement(input.complement)
   const neighborhood = String(input.neighborhood || input.bairro || "").trim()
   const city = String(input.city || "").trim()
   const state = String(input.state || input.uf || "").trim().toUpperCase()

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, Fragment, useEffect } from "react"
+import { useState, useRef, Fragment, useEffect, useCallback } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
-import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal, Badge } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal, Badge, Input, CepInput, StateComboBox, NumberInputWithCheckbox, Spinner, RadioButton } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -20,10 +20,11 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
-import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
-import { MapPinIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, CheckCircleIcon } from "@/lib/icons"
+import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -48,18 +49,124 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
     const [selectedAddressId, setSelectedAddressId] = useState<string>("")
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
+    const [showAddressModal, setShowAddressModal] = useState(false)
+    const [showNewAddressForm, setShowNewAddressForm] = useState(false)
+    const [newAddressData, setNewAddressData] = useState({
+        zipCode: "",
+        street: "",
+        number: "",
+        complement: "",
+        neighborhood: "",
+        city: "",
+        state: "",
+        noNumber: false,
+        latitude: null as number | null,
+        longitude: null as number | null,
+    })
+    const [loadingAddressSave, setLoadingAddressSave] = useState(false)
+    const [addressFormError, setAddressFormError] = useState<string | null>(null)
+    const [loadingCep, setLoadingCep] = useState(false)
 
-    useEffect(() => {
+    const loadUserAddresses = useCallback(async (preferredId?: string) => {
         if (!userId) return
-        getAddressesAction(userId, "user").then(res => {
+        try {
+            const res = await getAddressesAction(userId, "user")
             if (res.addresses && res.addresses.length > 0) {
                 const list = res.addresses as any[]
                 setUserAddresses(list)
-                const def = list.find((a: any) => a.is_default) || list[0]
-                if (def) setSelectedAddressId(def.id)
+                if (preferredId && list.some((a: any) => a.id === preferredId)) {
+                    setSelectedAddressId(preferredId)
+                } else if (!selectedAddressId || !list.some((a: any) => a.id === selectedAddressId)) {
+                    const def = list.find((a: any) => a.is_default) || list[0]
+                    if (def) setSelectedAddressId(def.id)
+                }
+            } else {
+                setUserAddresses([])
+                setSelectedAddressId("")
             }
-        }).catch(err => console.error("Error loading user addresses in cart:", err))
-    }, [userId])
+        } catch (err) {
+            console.error("Error loading user addresses in cart:", err)
+        }
+    }, [userId, selectedAddressId])
+
+    useEffect(() => {
+        loadUserAddresses()
+    }, [loadUserAddresses])
+
+    useAddressSync(useCallback((updatedId?: string) => {
+        loadUserAddresses(updatedId)
+    }, [loadUserAddresses]))
+
+    const handleSelectAddress = (id: string) => {
+        setSelectedAddressId(id)
+        notifyAddressUpdated(id)
+        setShowAddressModal(false)
+    }
+
+    const handleCepBlurInCart = async () => {
+        const zip = newAddressData.zipCode.replace(/\D/g, "")
+        if (zip.length !== 8) return
+        setLoadingCep(true)
+        try {
+            const response = await fetch(`/api/cep?cep=${zip}`)
+            const data = await response.json()
+            if (!data.erro && !data.error) {
+                setNewAddressData(prev => ({
+                    ...prev,
+                    street: data.logradouro || prev.street,
+                    number: data.numero || prev.number,
+                    noNumber: data.numero ? data.numero === "S/N" : prev.noNumber,
+                    neighborhood: data.bairro || prev.neighborhood,
+                    city: data.localidade || data.municipio || prev.city,
+                    state: data.uf || prev.state,
+                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
+                }))
+            }
+        } catch (err) {
+            console.error("Erro ao buscar CEP:", err)
+        } finally {
+            setLoadingCep(false)
+        }
+    }
+
+    const handleSaveNewAddressInCart = async () => {
+        if (!userId) return
+        const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
+        const finalNumber = noNumber ? "S/N" : number
+        if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
+            setAddressFormError("Preencha todos os campos obrigatórios do endereço")
+            return
+        }
+        setLoadingAddressSave(true)
+        setAddressFormError(null)
+        try {
+            const csrfToken = await fetchCSRFTokenSingleton() || ""
+            const result = await createAddressAction({
+                entityId: userId, entityType: "user",
+                street, number: finalNumber, complement: newAddressData.complement,
+                neighborhood, city, state, zipCode,
+                isDefault: userAddresses.length === 0,
+                latitude: newAddressData.latitude ?? null,
+                longitude: newAddressData.longitude ?? null,
+                csrf_token: csrfToken,
+            })
+            if (result.error) {
+                setAddressFormError(result.error)
+            } else if (result.address) {
+                setUserAddresses(prev => [...prev, result.address])
+                setSelectedAddressId(result.address.id)
+                notifyAddressUpdated(result.address.id)
+                setShowNewAddressForm(false)
+                setShowAddressModal(false)
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+            }
+        } catch {
+            setAddressFormError("Erro ao salvar endereço.")
+        } finally {
+            setLoadingAddressSave(false)
+        }
+    }
 
     const hasOnlyServices = (items: any[]) => {
         const selected = (items || []).filter((item: any) => getItemSelected(item))
@@ -438,10 +545,15 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 [storeKey]: { ...(prev[storeKey] || { fee: 0, distanceKm: null, breakdown: null }), loading: true, error: null }
             }))
 
+            const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
+                ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                : null
+
             quoteDeliveryFeeAction({
                 partnerId: targetPartnerId,
                 storeId: targetStoreId,
                 destinationAddress: addressStr,
+                destinationCoords,
                 orderSubtotal: partnerItemsTotal,
             }).then(quote => {
                 if (quote.success) {
@@ -533,7 +645,10 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
         }
         if (quote?.error && quote.error !== "Entrega não disponível no plano atual.") {
-            return <span className="text-xs text-red-500 font-normal">{quote.error}</span>
+            const isTechnical = quote.error.includes("incompleto") || quote.error.includes("coordenadas") || quote.error.includes("plano")
+            if (!isTechnical) {
+                return <span className="text-xs text-red-500 font-normal">{quote.error}</span>
+            }
         }
         const settings = partnerData?.deliverySettings
         if (quote?.breakdown?.deliveryPayer === "seller" || settings?.delivery_payer === "seller") {
@@ -553,11 +668,11 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             return <span className="text-brand-green font-semibold">Grátis (Entrega grátis ativada)</span>
         }
         if (quote?.fee != null) {
-            if (quote.fee === 0 && quote.breakdown?.hasRatesConfigured) {
+            if (quote.fee === 0 && quote.breakdown?.hasRatesConfigured && !quote.breakdown?.isEstimate) {
                 return <span className="text-brand-green font-semibold">Grátis</span>
             }
             if (quote.fee > 0) {
-                return formatCurrency(quote.fee)
+                return quote.breakdown?.isEstimate ? `${formatCurrency(quote.fee)} (A partir de)` : formatCurrency(quote.fee)
             }
             if (quote.fee === 0) {
                 return "A combinar"
@@ -1022,12 +1137,19 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 {/* Mobile/Tablet: resumo inline + botão */}
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
-                                                                    {selectedAddress && (
-                                                                        <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1">
+                                                                    <div className="flex items-center justify-between gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1">
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
                                                                             <MapPinIcon size={13} className="text-brand-green shrink-0" />
-                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress.city} - {selectedAddress.state}</strong></span>
+                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress ? `${selectedAddress.city} - ${selectedAddress.state}` : "Não definido"}</strong></span>
                                                                         </div>
-                                                                    )}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowAddressModal(true)}
+                                                                            className="text-[11px] font-semibold text-brand-green hover:underline shrink-0"
+                                                                        >
+                                                                            {selectedAddress ? "Trocar" : "Definir"}
+                                                                        </button>
+                                                                    </div>
                                                                     <div className="flex justify-between items-center text-sm">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -1078,12 +1200,19 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                             >
                                                                 <div className="p-6 space-y-4">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
-                                                                    {selectedAddress && (
-                                                                        <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1 border-b border-brand-border/60 dark:border-dark-border/60">
+                                                                    <div className="flex items-center justify-between gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1 border-b border-brand-border/60 dark:border-dark-border/60">
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
                                                                             <MapPinIcon size={13} className="text-brand-green shrink-0" />
-                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress.city} - {selectedAddress.state}</strong></span>
+                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress ? `${selectedAddress.city} - ${selectedAddress.state}` : "Não definido"}</strong></span>
                                                                         </div>
-                                                                    )}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowAddressModal(true)}
+                                                                            className="text-[11px] font-semibold text-brand-green hover:underline shrink-0"
+                                                                        >
+                                                                            {selectedAddress ? "Trocar" : "Definir"}
+                                                                        </button>
+                                                                    </div>
                                                                     <div className="flex justify-between items-center text-sm font-medium">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -1124,6 +1253,195 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             </div>
 
             <MarketplaceFooter />
+
+            {/* Modal de seleção/troca e criação de endereço na Sacola */}
+            <DefaultModal
+                isOpen={showAddressModal}
+                onClose={() => {
+                    setShowAddressModal(false)
+                    setShowNewAddressForm(false)
+                    setAddressFormError(null)
+                }}
+                title={showNewAddressForm ? "Adicionar novo endereço" : "Selecione o endereço de entrega"}
+            >
+                <div className="space-y-4">
+                    {!showNewAddressForm ? (
+                        <>
+                            {userAddresses.length === 0 ? (
+                                <div className="text-center py-6 space-y-3">
+                                    <MapPinIcon size={32} className="mx-auto text-brand-inactive-text" />
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum endereço cadastrado</p>
+                                    <Button
+                                        onClick={() => setShowNewAddressForm(true)}
+                                        className="w-full"
+                                    >
+                                        Cadastrar endereço
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                                    {userAddresses.map((addr: any) => {
+                                        const isSelected = addr.id === selectedAddressId
+                                        return (
+                                            <button
+                                                key={addr.id}
+                                                type="button"
+                                                onClick={() => handleSelectAddress(addr.id)}
+                                                className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${isSelected
+                                                    ? "border-brand-green bg-brand-green/5 shadow-sm ring-1 ring-brand-green"
+                                                    : "border-brand-border dark:border-dark-border hover:border-brand-dark/40 dark:hover:border-dark-heading/40 bg-white dark:bg-dark-surface"
+                                                }`}
+                                            >
+                                                <div className="mt-0.5">
+                                                    <RadioButton
+                                                        name="cart_address_selection"
+                                                        value={addr.id}
+                                                        checked={isSelected}
+                                                        onChange={() => handleSelectAddress(addr.id)}
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                            {addr.street}, {addr.number}
+                                                        </span>
+                                                        {addr.is_default && (
+                                                            <span className="text-[10px] uppercase font-bold text-brand-green bg-brand-green/10 px-1.5 py-0.5 rounded">
+                                                                Padrão
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                                        {addr.neighborhood}, {addr.city} - {addr.state}
+                                                    </p>
+                                                    {addr.zip_code && (
+                                                        <p className="text-[11px] text-brand-inactive-text/80 dark:text-dark-body/80 mt-0.5">
+                                                            CEP: {addr.zip_code}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowNewAddressForm(true)}
+                                        className="w-full mt-2"
+                                    >
+                                        <PlusIcon size={16} className="mr-1.5" />
+                                        Novo endereço
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault()
+                                void handleSaveNewAddressInCart()
+                            }}
+                            className="space-y-3.5"
+                        >
+                            {addressFormError && (
+                                <p className="text-xs text-red-500 font-medium bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-200 dark:border-red-900">
+                                    {addressFormError}
+                                </p>
+                            )}
+                            <div>
+                                <CepInput
+                                    value={newAddressData.zipCode}
+                                    onChange={(v) => setNewAddressData(prev => ({ ...prev, zipCode: v }))}
+                                    onAddressFetched={(data) => {
+                                        setNewAddressData(prev => ({
+                                            ...prev,
+                                            street: data.street || prev.street,
+                                            number: data.number || prev.number,
+                                            noNumber: data.number ? data.number === "S/N" : prev.noNumber,
+                                            neighborhood: data.neighborhood || prev.neighborhood,
+                                            city: data.city || prev.city,
+                                            state: data.state || prev.state,
+                                            latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
+                                            longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
+                                        }))
+                                    }}
+                                    placeholder="00000-000"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Rua / Logradouro *</label>
+                                <Input
+                                    value={newAddressData.street}
+                                    onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
+                                    placeholder="Ex: Av. Paulista"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <NumberInputWithCheckbox
+                                        label="Número *"
+                                        number={newAddressData.number}
+                                        onNumberChange={(v: string) => setNewAddressData(prev => ({ ...prev, number: v }))}
+                                        noNumber={newAddressData.noNumber}
+                                        onNoNumberChange={(val: boolean) => setNewAddressData(prev => ({ ...prev, noNumber: val }))}
+                                        placeholder="123"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Complemento</label>
+                                    <Input
+                                        value={newAddressData.complement}
+                                        onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
+                                        placeholder="Apto, Bloco"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Bairro *</label>
+                                <Input
+                                    value={newAddressData.neighborhood}
+                                    onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                                    placeholder="Bairro"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Cidade *</label>
+                                    <Input
+                                        value={newAddressData.city}
+                                        onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
+                                        placeholder="Cidade"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading block mb-1">Estado *</label>
+                                    <StateComboBox
+                                        value={newAddressData.state}
+                                        onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowNewAddressForm(false)}
+                                    className="flex-1"
+                                    disabled={loadingAddressSave}
+                                >
+                                    Voltar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    className="flex-1"
+                                    disabled={loadingAddressSave}
+                                >
+                                    {loadingAddressSave ? <Spinner size={16} /> : "Salvar endereço"}
+                                </Button>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            </DefaultModal>
 
             <AlertModal
                 isOpen={deleteModal.open}

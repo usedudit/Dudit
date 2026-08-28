@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { safeFetch } from "@/lib/security/ssrf-guard"
 import { geocodeAddress } from "@/lib/services/location.service"
 
-export const runtime = "edge"
-
 const STREET_TYPE_PREFIXES = /^(r\.|rua|av\.|avenida|tv\.|travessa|al\.|alameda|rod\.|rodovia|estrada|estr\.|praca|praça|pc\.|pç\.|largo|lg\.|quadra|qd\.|bloco|bl\.|setor|st\.|vila|vl\.|parque|pq\.|jardim|jd\.)$/i
 
 function cleanAddressLogradouro(rawLogradouro: string) {
@@ -60,6 +58,11 @@ function cleanAddressLogradouro(rawLogradouro: string) {
   return { cleanLogradouro, parsedNumber }
 }
 
+const COMMON_FETCH_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Dudit/1.0",
+  "Accept": "application/json",
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const cep = searchParams.get("cep")?.replace(/\D/g, "")
@@ -73,7 +76,8 @@ export async function GET(request: NextRequest) {
   // 1. Tentar ViaCEP primeiro
   try {
     const response = await safeFetch(`https://viacep.com.br/ws/${cep}/json/`, {
-      timeoutMs: 8_000,
+      headers: COMMON_FETCH_HEADERS,
+      timeoutMs: 6_000,
       maxResponseBytes: 256 * 1024,
       maxRedirects: 2,
       skipDnsCheck: true,
@@ -140,14 +144,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "CEP não encontrado" }, { status: 404 })
       }
     }
-  } catch (viaCepErr) {
-    console.warn(`[API CEP] Falha ao consultar ViaCEP para ${cep}:`, viaCepErr)
+  } catch (viaCepErr: any) {
+    console.warn(`[API CEP] Falha ao consultar ViaCEP para ${cep}:`, viaCepErr?.message || viaCepErr)
   }
 
-  // 2. Fallback para BrasilAPI caso ViaCEP falhe (erro de rede, timeout, SSRF guard, etc)
+  // 2. Fallback para BrasilAPI caso ViaCEP falhe
   try {
     const fallbackRes = await safeFetch(`https://brasilapi.com.br/api/cep/v2/${cep}`, {
-      timeoutMs: 8_000,
+      headers: COMMON_FETCH_HEADERS,
+      timeoutMs: 6_000,
       maxResponseBytes: 256 * 1024,
       maxRedirects: 2,
       skipDnsCheck: true,
@@ -190,7 +195,7 @@ export async function GET(request: NextRequest) {
               longitude = coords.lng
             }
           } catch (geocodeErr) {
-            console.warn(`[API CEP] Falha na geocodificação fallback do CEP ${cep}:`, geocodeErr)
+            console.warn(`[API CEP] Falha na geocodificação fallback BrasilAPI do CEP ${cep}:`, geocodeErr)
           }
         }
       }
@@ -216,8 +221,57 @@ export async function GET(request: NextRequest) {
     } else if (fallbackRes.status === 404) {
       return NextResponse.json({ error: "CEP não encontrado" }, { status: 404 })
     }
-  } catch (fallbackErr) {
-    console.warn(`[API CEP] Falha no fallback BrasilAPI para ${cep}:`, fallbackErr)
+  } catch (fallbackErr: any) {
+    console.warn(`[API CEP] Falha no fallback BrasilAPI para ${cep}:`, fallbackErr?.message || fallbackErr)
+  }
+
+  // 3. Fallback 3: AwesomeAPI (inclui latitude e longitude de quase todos os CEPs do Brasil)
+  try {
+    const awesomeRes = await safeFetch(`https://cep.awesomeapi.com.br/json/${cep}`, {
+      headers: COMMON_FETCH_HEADERS,
+      timeoutMs: 6_000,
+      maxResponseBytes: 256 * 1024,
+      maxRedirects: 2,
+      skipDnsCheck: true,
+    })
+
+    if (awesomeRes.ok) {
+      const awesomeData = await awesomeRes.json()
+      const { cleanLogradouro, parsedNumber } = cleanAddressLogradouro(awesomeData.address || awesomeData.address_name || "")
+
+      let latitude: number | null = null
+      let longitude: number | null = null
+
+      if (awesomeData.lat && awesomeData.lng) {
+        const pLat = Number(awesomeData.lat)
+        const pLng = Number(awesomeData.lng)
+        if (!isNaN(pLat) && !isNaN(pLng)) {
+          latitude = pLat
+          longitude = pLng
+        }
+      }
+
+      const mappedData = {
+        cep: formattedCep,
+        logradouro: cleanLogradouro,
+        numero: parsedNumber,
+        complemento: "",
+        bairro: awesomeData.district || "",
+        localidade: awesomeData.city || "",
+        uf: awesomeData.state || "",
+        ibge: awesomeData.city_ibge || "",
+        latitude,
+        longitude,
+      }
+
+      return NextResponse.json(mappedData, {
+        headers: {
+          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=43200",
+        },
+      })
+    }
+  } catch (awesomeErr: any) {
+    console.warn(`[API CEP] Falha no fallback AwesomeAPI para ${cep}:`, awesomeErr?.message || awesomeErr)
   }
 
   return NextResponse.json({ error: "Erro interno ao buscar CEP" }, { status: 500 })

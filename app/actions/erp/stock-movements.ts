@@ -120,6 +120,8 @@ export async function createStockMovementAction(data: {
         revalidateStockMovements(partnerId)
         revalidatePath('/erp/movimentacao-estoque')
         revalidatePath('/erp/produtos')
+
+
         await invalidateProductCache(data.productId, partnerId, 'update', { silent: true })
 
         return successResponse(movementRecord)
@@ -309,6 +311,9 @@ export async function getStockMovementDetails(id: string) {
                 reason,
                 notes,
                 created_by,
+                reversed_at,
+                reversed_by,
+                reversal_movement_id,
                 orders(order_number)
             `)
             .eq("id", id)
@@ -428,6 +433,10 @@ export async function getStockMovementDetails(id: string) {
             notes: data.notes || '',
             referenceName: data.reference_name || data.reference_type || '-',
             orderId: data.order_id || null,
+            reversedAt: data.reversed_at || null,
+            reversedBy: data.reversed_by || null,
+            reversalMovementId: data.reversal_movement_id || null,
+            isReversed: !!data.reversed_at || !!data.reversal_movement_id,
             reference: data.order_id && data.orders?.order_number
                 ? `Pedido #${data.orders.order_number}`
                 : data.reference_name || data.reference_type || '-',
@@ -488,7 +497,7 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         // 1. Fetch the original movement
         const { data: original, error: fetchError } = await supabase
             .from("stock_movements")
-            .select("id, movement_type")
+            .select("id, movement_type, reversed_at, reversal_movement_id, reason, reference_name")
             .eq("id", id)
             .eq("partner_id", partnerId)
             .single()
@@ -496,6 +505,11 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         if (fetchError || !original) {
             console.error("undoStockMovementAction fetch error:", fetchError)
             return errorResponse("Movimentação original não encontrada")
+        }
+
+        // Validate double reversal
+        if (original.reversed_at || original.reversal_movement_id) {
+            return errorResponse("Esta movimentação já foi desfeita anteriormente")
         }
 
         // 2. Fetch all items
@@ -508,9 +522,10 @@ export async function undoStockMovementAction(id: string, customReason?: string)
             return errorResponse("Itens da movimentação não encontrados")
         }
 
+        const shortId = id.split('-')[0].toUpperCase()
         const invertedType = original.movement_type === 'in' ? 'out' : 'in'
-        const reason = customReason || "Movimentação desfeita"
-        const notes = `Estorno da movimentação ID: ${id.split('-')[0].toUpperCase()}`
+        const reason = customReason || `Estorno da movimentação ${shortId}`
+        const notes = customReason ? `Motivo: ${customReason}` : `Estorno da movimentação ID: ${shortId}`
 
         // Undo multi-item: create a batch reversal
         const itemsPayload = childItems.map((item: any) => ({
@@ -522,16 +537,32 @@ export async function undoStockMovementAction(id: string, customReason?: string)
         const { data: movementRecord, error } = await supabase.rpc('create_batch_stock_movement', {
             p_partner_id: partnerId,
             p_movement_type: invertedType,
-            p_reason: customReason || "Estorno",
+            p_reason: reason,
             p_notes: notes,
             p_created_by: userId,
             p_items: itemsPayload,
             p_store_id: ctx.activeStoreId || null,
+            p_reference_name: shortId,
+            p_reference_type: 'adjustment',
         })
 
         if (error) {
             console.error("undoStockMovementAction batch RPC error:", error)
             return errorResponse(error.message)
+        }
+
+        const newMovementId = movementRecord?.id || movementRecord
+
+        // Mark original movement as reversed
+        if (newMovementId) {
+            await supabase
+                .from("stock_movements")
+                .update({
+                    reversed_at: new Date().toISOString(),
+                    reversed_by: userId,
+                    reversal_movement_id: newMovementId,
+                })
+                .eq("id", id)
         }
 
         revalidateStockMovements(partnerId)
@@ -615,6 +646,7 @@ export async function getERPStockMovementsPageAction(
                     .select(`
                         id, created_at, movement_type, order_id, reference_type,
                         reference_name, reason, notes, created_by, store_id,
+                        reversed_at, reversed_by, reversal_movement_id,
                         orders(order_number), stock_movement_items(quantity, products(name, sku))
                     `)
                     .eq("partner_id", partnerId)

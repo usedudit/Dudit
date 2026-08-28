@@ -20,6 +20,18 @@ const PUBLIC_PATHS = [
   "/os",
 ]
 
+type SecureRuntimeStatus = {
+  is_banned: boolean
+  ban_expired: boolean
+  user_deletion: boolean
+  partner_access: boolean
+  partner_deletion: boolean
+  partner_status: {
+    is_active: boolean | null
+    erp_disabled: boolean | null
+  } | null
+}
+
 // Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout.
 // Note: /institucional and /ajuda are now excluded from the middleware matcher entirely,
 // but we keep the header for any edge cases where dynamic routing might reach here.
@@ -113,7 +125,21 @@ export async function middleware(request: NextRequest) {
   // Server Actions (POST with Next-Action header) are internal Next.js calls
   const isServerAction = request.headers.has("Next-Action")
   if (!isServerAction) {
-    console.log(`[MIDDLEWARE] request=${requestId} ${request.method} ${pathname}`)
+    // Classify App Router requests without logging cookies, tokens, query values
+    // or user identifiers. This lets us distinguish a real navigation from a
+    // speculative RSC/prefetch request in Railway logs.
+    const purpose = request.headers.get("purpose")
+    const isPrefetch = request.headers.has("next-router-prefetch")
+      || request.headers.get("x-middleware-prefetch") === "1"
+      || purpose === "prefetch"
+    const isRsc = request.headers.get("RSC") === "1"
+      || request.headers.get("Accept")?.includes("text/x-component") === true
+    const kind = isPrefetch ? "prefetch" : isRsc ? "rsc" : "navigation"
+
+    console.log(
+      `[MIDDLEWARE] request=${requestId} ${request.method} ${pathname}`
+      + ` kind=${kind} prefetch=${isPrefetch} rsc=${isRsc}`
+    )
   }
 
   // ============================================================================
@@ -476,8 +502,10 @@ export async function middleware(request: NextRequest) {
 
         if (user) {
           // ================================================================
-          // PARALLEL: Ban check + Partner status check
-          // These are independent queries - run them concurrently to save ~30-50ms
+          // CONSOLIDATED SECURITY CHECK
+          // One SECURITY DEFINER RPC replaces the independent profile,
+          // account-deletion and partner-status reads. It returns only the
+          // minimum flags required by this middleware.
           // ================================================================
           const isAllowedWhenBanned =
             pathname === "/banned" || pathname.startsWith("/banned/") ||
@@ -497,47 +525,36 @@ export async function middleware(request: NextRequest) {
           const needsUserDeletionCheck = (hasDeletionFlag || isProtected) && (isProtected || pathname.startsWith("/sacola") || pathname.startsWith("/checkout"))
           const needsPartnerDeletionCheck = (hasDeletionFlag || isProtected) && needsPartnerCheck
 
-          // Launch all queries in parallel
-          const [profileResult, partnerResult, deletionResult, partnerDeletionResult] = await Promise.all([
-            needsBanCheck
-              ? supabase
-                .from("user_profiles")
-                .select("banned_at, banned_until")
-                .eq("user_id", user.id)
-                .maybeSingle()
-              : Promise.resolve({ data: null }),
-            // SECURITY FIX (MED-04): get_partner_runtime_status (SECURITY DEFINER) returns
-            // ONLY {is_active, erp_disabled} and only for owner/members of the partner.
-            // Previously we joined partner_users -> partners!inner(...), but partners RLS
-            // only exposes the row to the OWNER, so the inner join returned null for
-            // invited members and the middleware cleared their cookie. The RPC avoids
-            // the RLS join while still returning null for cookie tamperers (non-members).
-            needsPartnerCheck
-              ? Promise.resolve(
-                supabase.rpc("get_partner_runtime_status", { p_partner_id: activePartnerId! })
-              ).then((rpcResult) => ({ data: rpcResult.error ? null : rpcResult.data }))
-              : Promise.resolve({ data: null }),
-            needsUserDeletionCheck
-              ? supabase
-                .from("account_deletions")
-                .select("status, grace_period_ends_at")
-                .eq("user_id", user.id)
-                .not("status", "eq", "completed")
-                .maybeSingle()
-              : Promise.resolve({ data: null }),
-            needsPartnerDeletionCheck
-              ? supabase
-                .from("account_deletions")
-                .select("status, grace_period_ends_at")
-                .eq("partner_id", activePartnerId!)
-                .not("status", "eq", "completed")
-                .maybeSingle()
-              : Promise.resolve({ data: null }),
-          ])
+          const needsRuntimeCheck = needsBanCheck
+            || needsPartnerCheck
+            || needsUserDeletionCheck
+            || needsPartnerDeletionCheck
+
+          let runtimeStatus: SecureRuntimeStatus | null = null
+          if (needsRuntimeCheck) {
+            const { data, error } = await supabase.rpc("get_secure_runtime_status", {
+              p_partner_id: activePartnerId || null,
+            })
+
+            // Security checks fail closed. A temporary database/RPC failure
+            // must not turn into an allowed request.
+            if (error || !data || typeof data !== "object") {
+              console.error("[MIDDLEWARE] Secure runtime check failed", {
+                requestId,
+                code: error?.code,
+              })
+              return new NextResponse(
+                JSON.stringify({ error: "Não foi possível validar a sessão com segurança." }),
+                { status: 503, headers: { "Content-Type": "application/json" } }
+              )
+            }
+
+            runtimeStatus = data as SecureRuntimeStatus
+          }
 
           // Process account deletion check result
-          const userDeletion = deletionResult.data
-          const partnerDeletion = partnerDeletionResult?.data
+          const userDeletion = needsUserDeletionCheck && runtimeStatus?.user_deletion === true
+          const partnerDeletion = needsPartnerDeletionCheck && runtimeStatus?.partner_deletion === true
 
           // Under the new immediate architecture, any active deletion record blocks access instantly
           if (userDeletion) {
@@ -569,33 +586,37 @@ export async function middleware(request: NextRequest) {
           }
 
           // Process ban check result
-          const profile = profileResult.data
-          if (profile?.banned_at) {
-            // Ban com expiração E já expirou → auto-clear
-            if (profile.banned_until && new Date(profile.banned_until) < new Date()) {
-              await supabase
-                .from("user_profiles")
-                .update({
-                  banned_at: null,
-                  banned_until: null,
-                  banned_reason: null,
-                  banned_by: null,
-                })
-                .eq("user_id", user.id)
-              // Ban expirado e limpo, segue normal
-            } else {
-              // Ativamente banido (permanente ou ainda não expirou)
-              console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
-              const bannedUrl = new URL("/banned", request.url)
-              return NextResponse.redirect(bannedUrl)
-            }
+          if (needsBanCheck && runtimeStatus?.is_banned === true) {
+            console.log(`[MIDDLEWARE] User ${user.id} is BANNED - redirecting to /banned`)
+            const bannedUrl = new URL("/banned", request.url)
+            return NextResponse.redirect(bannedUrl)
           }
 
-          // Process partner status check result
-          // MED-04: partnerResult comes from get_partner_runtime_status, so
-          // .data is null if user doesn't belong to this partner (cookie tampered).
-          const partnerStatus = partnerResult.data
-          if (partnerStatus) {
+          if (needsBanCheck && runtimeStatus?.ban_expired === true) {
+            // Ban expirado e limpo, segue normal.
+            await supabase
+              .from("user_profiles")
+              .update({
+                banned_at: null,
+                banned_until: null,
+                banned_reason: null,
+                banned_by: null,
+              })
+              .eq("user_id", user.id)
+          }
+
+          // Process partner status/access check result
+          if (needsPartnerCheck && runtimeStatus?.partner_access !== true) {
+            // User has no membership for this partner_id → cookie is invalid/tampered
+            console.warn(`[MIDDLEWARE] User ${user.id} has no access to partner ${activePartnerId} - clearing cookie`)
+            const selectErpUrl = new URL("/select-erp", request.url)
+            const responseRedirect = NextResponse.redirect(selectErpUrl)
+            responseRedirect.cookies.delete("active_partner_id")
+            return responseRedirect
+          }
+
+          const partnerStatus = runtimeStatus?.partner_status
+          if (needsPartnerCheck && partnerStatus) {
             if (partnerStatus.is_active === false || partnerStatus.erp_disabled === true) {
               console.log(`[MIDDLEWARE] Partner ${activePartnerId} is inactive/disabled - redirecting to /select-erp`)
               const selectErpUrl = new URL("/select-erp", request.url)
@@ -603,13 +624,6 @@ export async function middleware(request: NextRequest) {
               responseRedirect.cookies.delete("active_partner_id")
               return responseRedirect
             }
-          } else if (needsPartnerCheck) {
-            // User has no membership for this partner_id → cookie is invalid/tampered
-            console.warn(`[MIDDLEWARE] User ${user.id} has no access to partner ${activePartnerId} - clearing cookie`)
-            const selectErpUrl = new URL("/select-erp", request.url)
-            const responseRedirect = NextResponse.redirect(selectErpUrl)
-            responseRedirect.cookies.delete("active_partner_id")
-            return responseRedirect
           }
 
           // Re-create the response to inject the new requestHeaders downstream

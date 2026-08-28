@@ -549,8 +549,10 @@ export async function createProductComprehensiveAction(data: {
             data.featured = false
         }
 
-        // SKU: função pura (zero queries), unicidade garantida pelo banco
-        const sku = data.sku?.trim() || generateSKUBase(data.name)
+        // SKU: sanitização e geração automática caso venha vazio ou 'Gerar automaticamente'
+        const rawSku = data.sku?.trim()
+        const isAutoSku = !rawSku || rawSku.toLowerCase() === "gerar automaticamente" || rawSku.toLowerCase() === "gerar" || rawSku.toLowerCase() === "sem sku"
+        const sku = isAutoSku ? generateSKUBase(data.name) : rawSku
 
         const videoMetadata = await normalizeVideoMetadata({
             video_type: data.videoType || (data.videoUrl ? "youtube" : null),
@@ -942,6 +944,12 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         })
 
         if (payload.name !== undefined) payload.name = sanitizeInput(payload.name, 150)
+
+        if (payload.sku !== undefined && payload.sku !== null) {
+            const rawSku = String(payload.sku).trim()
+            const isAutoSku = !rawSku || rawSku.toLowerCase() === "gerar automaticamente" || rawSku.toLowerCase() === "gerar" || rawSku.toLowerCase() === "sem sku"
+            payload.sku = isAutoSku ? generateSKUBase(payload.name || product.name) : rawSku
+        }
 
         fiscalMapFields.forEach(field => {
             if (dataRecord[field] !== undefined) fiscalPayload[field] = dataRecord[field]
@@ -1907,13 +1915,13 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
     }
 }
 
-export async function getStagnantProductsAction(partnerId: string) {
+export async function getStagnantProductsAction(partnerId: string, days: number = 90) {
     try {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
         const admin = getAdminClient()
 
-        const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
         const { data, error } = await admin
             .from("products")
@@ -1921,7 +1929,7 @@ export async function getStagnantProductsAction(partnerId: string) {
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .gt("stock_quantity", 0)
-            .lte("created_at", ninetyDaysAgo)
+            .lte("created_at", cutoff)
             .order("created_at", { ascending: true })
             .limit(200)
 
@@ -1930,7 +1938,7 @@ export async function getStagnantProductsAction(partnerId: string) {
         const now = Date.now()
         const products = (data || []).map((p: any) => {
             const createdAtTime = new Date(p.created_at).getTime()
-            const daysStagnant = Math.max(90, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
+            const daysStagnant = Math.max(days, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
             return {
                 id: p.id,
                 name: p.name,
@@ -2118,9 +2126,15 @@ export async function duplicateProductsAction(productIds: string[]) {
         const { data: products } = await supabase.from("products").select("*").in("id", productIds)
 
         if (!products?.length) return { success: false, error: "Produtos não encontrados" }
-        await requirePermission(products[0].partner_id, "products", "create")
+        const partnerId = products[0].partner_id
+        await requirePermission(partnerId, "products", "create")
 
-        // SKU puro (zero queries) â€” unicidade pelo banco
+        const limitCheck = await checkLimit(partnerId, "items", products.length)
+        if (!limitCheck.allowed) {
+            return { success: false, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
+        }
+
+        // SKU puro (zero queries) — unicidade pelo banco
         const { cloneMediaForDuplicate } = await import("@/lib/r2/server")
         const duplicated = await Promise.all(products.map(async (p: any) => {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars

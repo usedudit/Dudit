@@ -35,10 +35,12 @@ const ALLOWED_HOSTNAMES: ReadonlySet<string> = new Set([
   // ── Payment (Mercado Pago) ──
   "api.mercadopago.com",
 
-  // ── Fiscal (ViaCEP, CNPJA, BrasilAPI) ──
+  // ── Fiscal (ViaCEP, CNPJA, BrasilAPI, AwesomeAPI, OpenCEP) ──
   "viacep.com.br",
   "open.cnpja.com",
   "brasilapi.com.br",
+  "cep.awesomeapi.com.br",
+  "opencep.com",
 
   // ── AI / Moderation ──
   "api.cloudflare.com",

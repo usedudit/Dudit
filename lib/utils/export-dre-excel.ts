@@ -133,7 +133,7 @@ export async function exportDreToXLSX({
     cell.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "FF1E824C" }, // Verde oficial do Dudit
+      fgColor: { argb: "FF1E824C" }, // Verde oficial da Dudit
     }
     cell.alignment = {
       vertical: "middle",

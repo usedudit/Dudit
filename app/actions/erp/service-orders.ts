@@ -20,6 +20,7 @@ import {
 import { createNotification } from "@/lib/services/notification.service"
 import { revalidatePath } from "next/cache"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { generateShortId, isUuid } from "@/lib/utils/short-id"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
@@ -247,6 +248,11 @@ export async function createServiceOrderAction(
     const storeId = input.store_id
     if (!storeId) {
       return { success: false, error: "store_id é obrigatório. Selecione uma loja antes de criar a OS." }
+    }
+
+    const capabilities = await getPartnerCapabilities(partnerId, { storeId })
+    if (!capabilities.hasServiceOrders) {
+      return { success: false, error: "O módulo de Ordens de Serviço requer o plano Crescer ou superior e deve estar ativo nas configurações." }
     }
 
     // Run store access, plan limit, and customer snapshot validation in parallel
@@ -2014,8 +2020,10 @@ export async function confirmServiceOrderPaymentAction(payload: {
       if (itemsErr) throw itemsErr
     }
 
+    const capabilities = await getPartnerCapabilities(payload.partnerId, { storeId: order.store_id || null })
+
     // 6. Create or update transaction in `transactions` table (if paidAmount > 0)
-    if (payload.paidAmount > 0.009) {
+    if (capabilities.hasFinancial && payload.paidAmount > 0.009) {
       const txRefNote = `service_order:${order.id}:payment`
       const { data: existingPaymentTx } = await supabase
         .from("transactions")
@@ -2113,7 +2121,7 @@ export async function confirmServiceOrderPaymentAction(payload: {
 
     // 7. Sync goals
     const sellerUserId = order.assigned_user_id || user.id
-    if (sellerUserId) {
+    if (capabilities.hasProductivity && sellerUserId) {
       try {
         const { applyServiceOrderToGoals } = await import("@/lib/services/sales-goals.service")
         const adminClient = getAdminClient()

@@ -341,7 +341,33 @@ export async function quoteDeliveryFeeAction(input: {
     }
 
     if (!originCoords) {
-      return { success: false as const, error: "Endereço da loja incompleto para calcular entrega por distância." }
+      // Se não foi possível obter as coordenadas da loja, fazemos fallback gracioso para a taxa base configurada ou A Combinar
+      const rules = (rulesRows || []).map(mapRuleRow)
+      const priced = calculateDeliveryFee({
+        distanceKm: 0,
+        currentTime: input.currentTimeIso ? new Date(input.currentTimeIso) : new Date(),
+        settings,
+        rules,
+        freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
+        orderSubtotal: input.orderSubtotal,
+        allowOutsideRadius: true,
+      })
+
+      return {
+        success: true as const,
+        distanceKm: null,
+        fee: priced.fee,
+        breakdown: {
+          ...priced.breakdown,
+          isEstimate: true,
+          fallbackReason: "store_address_missing",
+        },
+        capability,
+        isOutsideRadius: false,
+        maxDeliveryKm: effectiveMaxKm,
+        outsideRadiusWarning: null,
+        hasRatesConfigured: Boolean(priced.breakdown.hasRatesConfigured || settings.baseFee > 0),
+      }
     }
 
     let destinationCoords = input.destinationCoords;
@@ -375,14 +401,41 @@ export async function quoteDeliveryFeeAction(input: {
     }
 
     if (!destinationCoords) {
-      return { success: false as const, error: "Não foi possível encontrar as coordenadas do seu endereço para entrega." }
+      // Se não foi possível obter as coordenadas do destino, fazemos fallback gracioso
+      const rules = (rulesRows || []).map(mapRuleRow)
+      const priced = calculateDeliveryFee({
+        distanceKm: 0,
+        currentTime: input.currentTimeIso ? new Date(input.currentTimeIso) : new Date(),
+        settings,
+        rules,
+        freeDeliveryCoupon: Boolean(input.freeDeliveryCoupon),
+        orderSubtotal: input.orderSubtotal,
+        allowOutsideRadius: true,
+      })
+
+      return {
+        success: true as const,
+        distanceKm: null,
+        fee: priced.fee,
+        breakdown: {
+          ...priced.breakdown,
+          isEstimate: true,
+          fallbackReason: "destination_coords_missing",
+        },
+        capability,
+        isOutsideRadius: false,
+        maxDeliveryKm: effectiveMaxKm,
+        outsideRadiusWarning: null,
+        hasRatesConfigured: Boolean(priced.breakdown.hasRatesConfigured || settings.baseFee > 0),
+      }
     }
 
     const calculatedDistance = calculateDistance(originCoords, destinationCoords)
     if (calculatedDistance == null || Number.isNaN(calculatedDistance)) {
-      return { success: false as const, error: "Não foi possível calcular a distância de entrega." }
+      distanceKm = 0
+    } else {
+      distanceKm = Number(calculatedDistance.toFixed(2))
     }
-    distanceKm = Number(calculatedDistance.toFixed(2))
   }
 
   const rules = (rulesRows || []).map(mapRuleRow)

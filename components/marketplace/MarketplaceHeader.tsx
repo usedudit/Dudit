@@ -927,7 +927,7 @@ const Header: React.FC<HeaderProps> = ({
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
                                 const wrapProps = item.href
-                                    ? { href: item.href }
+                                    ? { href: item.href, prefetch: false }
                                     : { onClick: item.action || item.onClick };
 
                                 return (
@@ -1125,7 +1125,7 @@ const Header: React.FC<HeaderProps> = ({
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";
                                             const wrapProps = item.href
-                                                ? { href: item.href, prefetch: true }
+                                                ? { href: item.href, prefetch: false }
                                                 : { onClick: item.action || item.onClick };
 
                                             return (

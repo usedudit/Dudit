@@ -822,7 +822,7 @@ export function ImportAppointmentsPage({ partnerId }: ImportAppointmentsPageProp
                                         <thead>
                                             <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                 <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Coluna da Planilha</th>
-                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Campo no Dudit</th>
+                                                <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Campo na Dudit</th>
                                                 <th className="py-3 px-4 text-[13px] font-bold text-brand-dark dark:text-dark-heading">Confiança</th>
                                             </tr>
                                         </thead>

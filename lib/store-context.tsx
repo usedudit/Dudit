@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 
 interface Store {
@@ -193,27 +192,41 @@ export function StoreProvider({
     fetchStores()
   }, [partnerId, fetchStores])
 
-  const queryClient = useQueryClient()
+  const storeChangeInFlight = useRef<string | null>(null)
 
   const selectStore = (storeId: string) => {
     const store = stores.find((s) => s.id === storeId)
-    if (store) {
+    if (store && selectedStore?.id !== storeId && storeChangeInFlight.current !== storeId) {
+      storeChangeInFlight.current = storeId
       setSelectedStore(store)
       localStorage.setItem(getStoreStorageKey("selectedStoreId", store.partner_id), storeId)
 
       import("@/app/actions/erp/stores").then(({ setActiveStoreAction }) => {
-        setActiveStoreAction(storeId, store.partner_id).then(() => {
-          queryClient.invalidateQueries()
-          router.refresh()
+        return setActiveStoreAction(storeId, store.partner_id).then(() => {
+          if (typeof window !== "undefined") {
+            window.location.reload()
+          } else {
+            router.refresh()
+          }
         }).catch((e) => {
           console.warn("setActiveStoreAction failed", e)
-          queryClient.invalidateQueries()
-          router.refresh()
+          if (typeof window !== "undefined") {
+            window.location.reload()
+          } else {
+            router.refresh()
+          }
         })
       }).catch((e) => {
         console.warn("dynamic import stores failed", e)
-        queryClient.invalidateQueries()
-        router.refresh()
+        if (typeof window !== "undefined") {
+          window.location.reload()
+        } else {
+          router.refresh()
+        }
+      }).finally(() => {
+        if (storeChangeInFlight.current === storeId) {
+          storeChangeInFlight.current = null
+        }
       })
     }
   }

@@ -22,10 +22,18 @@ import { logAuditEvent } from "@/lib/services/timeline.service"
 import { revalidateTransactions, revalidateEntityTimeline } from "@/lib/utils/revalidation"
 import { requireUser } from "@/lib/auth/authorization"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+
+async function requireFinancialCapability(partnerId: string, storeId?: string | null) {
+    const capabilities = await getPartnerCapabilities(partnerId, { storeId })
+    if (!capabilities.hasFinancial) {
+        throw new Error("O módulo Financeiro requer o plano Crescer ou superior e deve estar ativo nas configurações.")
+    }
+}
 
 type DbTransaction = {
     id: string
@@ -916,7 +924,7 @@ export async function createManualTransactionAction(input: CreateManualTransacti
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        // await requireMinimumPlan(input.partnerId, "crescer")
+        await requireFinancialCapability(input.partnerId, input.storeId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -1046,7 +1054,7 @@ export async function createTransferPairAction(input: CreateTransferPairInput) {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
-        // await requireMinimumPlan(input.partnerId, "crescer")
+        await requireFinancialCapability(input.partnerId, input.storeId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -1182,6 +1190,7 @@ export async function updateManualTransactionAction(
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(partnerId, patch.storeId)
         const { userId } = await requirePermission(partnerId, "financial", "edit")
         const supabase = createAdminClient()
 
@@ -1363,7 +1372,7 @@ export async function cancelPendingTransactionAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
-        // await requireMinimumPlan(input.partnerId, "crescer")
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "cancel")
         const supabase = createAdminClient()
 
@@ -1484,6 +1493,7 @@ export async function createInstallmentGroupAction(input: {
     storeId?: string | null
 }) {
     try {
+        await requireFinancialCapability(input.partnerId, input.storeId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -1748,6 +1758,7 @@ export async function recordInstallmentPaymentAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -2025,6 +2036,7 @@ export async function recordRegularTransactionPaymentAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -2287,6 +2299,7 @@ export async function settleInstallmentGroupAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
         const nowIso = new Date().toISOString()
@@ -2460,6 +2473,7 @@ export async function markRecurringOccurrenceAsPaidAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(input.partnerId)
         const { userId } = await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 
@@ -2714,6 +2728,7 @@ export async function adjustAccountBalanceViaTransactionAction(input: {
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false, error: rl.error || "Muitas tentativas." }
 
+        await requireFinancialCapability(input.partnerId, input.storeId)
         await requirePermission(input.partnerId, "financial", "create")
         const supabase = createAdminClient()
 

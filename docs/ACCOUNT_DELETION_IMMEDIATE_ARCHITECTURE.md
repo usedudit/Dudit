@@ -1,6 +1,6 @@
 # Arquitetura de Exclusão Imediata e Assíncrona de Conta
 
-Este documento descreve a nova arquitetura do Dudit para encerramento definitivo de parceiros e usuários. O fluxo foi refatorado para remover o período de carência de 48 horas, executando a limpeza de forma assíncrona por meio do Trigger.dev de maneira robusta, tolerante a falhas e idempotente.
+Este documento descreve a nova arquitetura da Dudit para encerramento definitivo de parceiros e usuários. O fluxo foi refatorado para remover o período de carência de 48 horas, executando a limpeza de forma assíncrona por meio do Trigger.dev de maneira robusta, tolerante a falhas e idempotente.
 
 ---
 

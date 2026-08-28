@@ -38,6 +38,10 @@ async function createGoalBonusExpense(params: {
   const bonusAmount = money(Math.max(0, Number(params.amount || 0)))
   if (bonusAmount <= 0.009) return
 
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId)
+  if (!capabilities.hasFinancial) return
+
   const referenceNote = params.referenceNote || `goal-bonus:${params.goalId}:${params.userId}`
   const { data: existing } = await params.supabase
     .from("transactions")
@@ -85,6 +89,10 @@ async function reverseGoalBonusExpense(params: {
   createdByUserId?: string | null
   accountId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId)
+  if (!capabilities.hasFinancial) return
+
   const refPatterns = [
     `goal-bonus:${params.goalId}:${params.userId}`,
     `goal-bonus-team:${params.goalId}:${params.userId}`,
@@ -397,6 +405,10 @@ async function reverseAllTeamBonusExpenses(params: {
   createdByUserId?: string | null
   accountId?: string | null
 }) {
+  const { getPartnerCapabilities } = await import("@/lib/services/partner-capabilities")
+  const capabilities = await getPartnerCapabilities(params.partnerId)
+  if (!capabilities.hasFinancial) return
+
   const teamRefPattern = `goal-bonus-team:${params.goalId}:%`
   const { data: bonuses } = await params.supabase
     .from("transactions")

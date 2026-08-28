@@ -18,12 +18,11 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
 
   const items: DashboardChecklistItem[] = [];
 
-  // 1. Dados Básicos da Loja (Nome + WhatsApp + Categoria + Endereço)
-  // O usuário já preenche isso no cadastro, então já nasce completo como vitória inicial (Endowed Progress)
+  // 1. Dados Básicos da Loja / Vitrine (Nome + WhatsApp + Categoria + Endereço)
   const dadosNegocioCompleted = ctx.hasPhone && ctx.hasCategory && ctx.hasAddress;
   items.push({
     id: "business-data",
-    title: "Dados da sua Loja",
+    title: ctx.isQuickMode ? "Dados da sua Vitrine" : "Dados da sua Loja",
     description: "Nome, WhatsApp, categoria e endereço comercial já foram configurados.",
     completed: dadosNegocioCompleted,
     actionText: "Revisar Dados",
@@ -36,7 +35,9 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
   const isServicesOnly = ctx.sellsServices && !ctx.sellsProducts;
 
   let itemTitle = "Publicar seu 1º produto";
-  let itemDesc = "Adicione foto, nome e preço. Você também pode importar direto via XML de NF-e ou planilha!";
+  let itemDesc = ctx.isQuickMode
+    ? "Adicione foto, nome e preço para começar a vender online."
+    : "Adicione foto, nome e preço. Você também pode importar direto via XML de NF-e ou planilha!";
   let itemAction = "Adicionar Produto";
 
   if (isHybrid) {
@@ -68,7 +69,7 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
   });
 
   // 3. Horários de Atendimento (Especialmente importante para prestadores de serviços / atendimento local)
-  if (isServicesOnly) {
+  if (ctx.sellsServices) {
     items.push({
       id: "hours",
       title: "Definir horários de atendimento",
@@ -79,7 +80,29 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
     });
   }
 
-  // 4. Formas de Recebimento
+  // 4. Visual da Vitrine Online & Marca
+  items.push({
+    id: "showcase",
+    title: ctx.isQuickMode ? "Personalizar sua Vitrine Online" : "Personalizar Vitrine e Catálogo",
+    description: "Adicione sua logo e banner para deixar seu catálogo público com a cara da sua marca.",
+    completed: ctx.hasLogoAndBanner,
+    actionText: "Personalizar Vitrine",
+    tabTarget: "vitrine"
+  });
+
+  // 5. Entregas e Logística (Para quem vende produtos físicos em Vitrine ou ERP no Plano Crescer/Escalar)
+  if (ctx.sellsProducts && (ctx.planSlug === "crescer" || ctx.planSlug === "escalar")) {
+    items.push({
+      id: "logistics",
+      title: "Configurar taxas de entrega",
+      description: "Defina sua taxa fixa ou valor por km para o cálculo automático no checkout.",
+      completed: ctx.hasDeliveryConfig,
+      actionText: "Configurar Frete",
+      tabTarget: "entrega"
+    });
+  }
+
+  // 6. Formas de Recebimento Online (Apenas nos planos Crescer e Escalar, onde métodos de pagamento são permitidos)
   if (ctx.planSlug === "crescer" || ctx.planSlug === "escalar") {
     items.push({
       id: "payments",
@@ -90,38 +113,7 @@ export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem
       badgeText: "Pix Automático",
       tabTarget: "formas-de-pagamento"
     });
-  } else {
-    items.push({
-      id: "payments",
-      title: "Definir chave Pix para recebimento",
-      description: "Cadastre sua chave Pix para seus clientes transferirem direto para você.",
-      completed: ctx.hasPix,
-      actionText: "Definir Pix",
-      tabTarget: "formas-de-pagamento"
-    });
   }
-
-  // 5. Entregas e Logística (Apenas para quem vende PRODUTOS físicos e tem plano Crescer/Escalar com endereço)
-  if (ctx.sellsProducts && (ctx.planSlug === "crescer" || ctx.planSlug === "escalar") && ctx.hasAddress) {
-    items.push({
-      id: "logistics",
-      title: "Configurar taxas de entrega",
-      description: "Defina sua taxa fixa ou valor por km para o cálculo automático no checkout.",
-      completed: ctx.hasDeliveryConfig,
-      actionText: "Configurar Frete",
-      tabTarget: "entregas"
-    });
-  }
-
-  // 6. Visual da Vitrine Online & Marca
-  items.push({
-    id: "showcase",
-    title: "Personalizar sua Vitrine Online",
-    description: "Adicione sua logo e banner para deixar seu catálogo público com a cara da sua marca.",
-    completed: ctx.hasLogoAndBanner,
-    actionText: "Personalizar Vitrine",
-    tabTarget: "vitrine"
-  });
 
   return items;
 }

@@ -29,6 +29,7 @@ import { resolvePaymentMethodsForStore } from "@/lib/data/payment-methods"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { checkLimit } from "@/lib/services/subscription.service"
 import { enrichAddressData } from "@/lib/services/location.service"
 
 type DraftItemInput = {
@@ -1416,6 +1417,16 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     }) {
         await requireUser()
         await requirePermission(input.partnerId, "products", "create")
+
+        const capabilities = await getPartnerCapabilities(input.partnerId, { storeId: input.storeId })
+        if (!capabilities.hasProducts) {
+            return { success: false as const, error: "O recurso de catálogo de produtos não está ativo nas configurações." }
+        }
+
+        const limitCheck = await checkLimit(input.partnerId, "items")
+        if (!limitCheck.allowed) {
+            return { success: false as const, error: limitCheck.message || "Limite de itens do catálogo atingido para o seu plano." }
+        }
 
         const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }

@@ -3187,7 +3187,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             }))
     ]
 
-    if (currentOrder.inventory_deducted) {
+    if (capabilities.hasStockMovements && currentOrder.inventory_deducted) {
         if (delta.incoming.length > 0) {
             const movementResult = await createOrderStockMovement({
                 supabase,
@@ -3219,7 +3219,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
             if ("error" in movementResult) return { error: movementResult.error }
         }
-    } else {
+    } else if (capabilities.hasStockMovements) {
         if (delta.incoming.length > 0) {
             const releaseResult = await releaseOrderInventory({
                 client: supabase,

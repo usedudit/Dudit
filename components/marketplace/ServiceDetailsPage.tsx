@@ -55,6 +55,7 @@ import {
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
@@ -383,7 +384,11 @@ export function ServiceDetailsPageClient({
         }
     }, [userId, isProductOwner])
 
-    const loadUserAddresses = async () => {
+    useAddressSync(useCallback((updatedId?: string) => {
+        loadUserAddresses(updatedId)
+    }, [userId]))
+
+    const loadUserAddresses = async (preferredId?: string) => {
         if (!userId) return
         setLoadingAddresses(true)
         try {
@@ -391,11 +396,15 @@ export function ServiceDetailsPageClient({
             if (result.addresses) {
                 const list = result.addresses as any[]
                 setUserAddresses(list)
-                const defaultAddress = list.find((a: any) => a.is_default)
-                if (defaultAddress) {
-                    setSelectedAddressId(defaultAddress.id)
-                } else if (list.length > 0) {
-                    setSelectedAddressId(list[0].id)
+                if (preferredId && list.some((a: any) => a.id === preferredId)) {
+                    setSelectedAddressId(preferredId)
+                } else {
+                    const defaultAddress = list.find((a: any) => a.is_default)
+                    if (defaultAddress) {
+                        setSelectedAddressId(defaultAddress.id)
+                    } else if (list.length > 0) {
+                        setSelectedAddressId(list[0].id)
+                    }
                 }
             }
         } catch (err) {
@@ -410,6 +419,7 @@ export function ServiceDetailsPageClient({
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
+        notifyAddressUpdated(addressId)
     }
 
     const handleCepBlur = async () => {
@@ -464,8 +474,10 @@ export function ServiceDetailsPageClient({
             if (result.address) {
                 setUserAddresses(prev => [...prev, result.address])
                 setSelectedAddressId(result.address.id)
+                notifyAddressUpdated(result.address.id)
             } else {
                 await loadUserAddresses()
+                notifyAddressUpdated()
             }
             setShowAddressForm(false)
             setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
@@ -536,10 +548,15 @@ export function ServiceDetailsPageClient({
                 setShippingState("calculated")
                 setCep(selectedAddress.zip_code || "")
 
+                const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
+                    ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                    : null
+
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: targetPartnerId,
                     storeId: partner.store_id || (service as any)?.store_id || (service as any)?.stores?.id || null,
                     destinationAddress: addressStr,
+                    destinationCoords,
                     orderSubtotal: pricing.total,
                 })
                 if (!active) return
@@ -2153,8 +2170,8 @@ export function ServiceDetailsPageClient({
                                         )}
                                     </div>
 
-                                    {/* Desktop Right Column (Actions) */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center">
+                                    {/* Desktop Right Column (Actions) - aligned to the top, same Y axis as the Next button */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center absolute top-[30px]" style={{ right: 0 }}>
                                         {(() => {
                                             const isFavService = isFav(service.id, "servico")
                                             return (

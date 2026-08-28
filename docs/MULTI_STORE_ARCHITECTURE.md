@@ -1,6 +1,6 @@
 # Multi-Store Architecture
 
-> Arquitetura oficial multi-store do DUDIT.
+> Arquitetura oficial multi-store da DUDIT.
 > Baseline: Fase 4.5 - bridge performance optimization.
 > Data: 2026-07-18
 

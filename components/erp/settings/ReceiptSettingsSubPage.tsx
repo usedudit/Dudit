@@ -8,18 +8,11 @@ import { useNotification } from "@/hooks/use-notification"
 import {
     getReceiptSettingsAction,
     updateReceiptSettingsAction,
-    type ReceiptSettings,
 } from "@/app/actions/erp/sales-settings"
-
-const DEFAULT_RECEIPT_SETTINGS: ReceiptSettings = {
-    receiptMessage: "Obrigado pela preferência e volte sempre!",
-    receiptShowPolicyBlock: true,
-    receiptShowAcknowledgment: true,
-    defaultReceiptFormat: "thermal",
-    showStorePhone: true,
-    showStoreAddress: true,
-    showSellerName: true,
-}
+import {
+    DEFAULT_RECEIPT_SETTINGS,
+    type ReceiptSettings,
+} from "@/lib/sales/sales-settings-types"
 
 export function ReceiptSettingsSubPage({
     partnerId,

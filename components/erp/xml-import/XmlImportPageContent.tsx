@@ -20,7 +20,8 @@ import {
     SearchIcon, PlusIcon, ClockIcon, GridIcon, ListIcon,
     PackageIcon, ChevronLeftIcon, InfoIcon, ArrowUpDownIcon,
     ReloadIcon, ExportFileIcon, MoneyIcon,
-    FileIcon
+    FileIcon,
+    TruckIcon
 } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
 import { usePermissions } from "@/lib/permission-context"
@@ -1372,8 +1373,8 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                 <div className="bg-white dark:bg-dark-surface">
                                                     <div className="p-6 border-b border-brand-border dark:border-dark-border">
                                                         <div className="flex items-center gap-4">
-                                                            <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20 flex items-center justify-center">
-                                                                <FileTextIcon className="w-6 h-6 text-brand-inactive-text" />
+                                                            <div className="w-14 h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center">
+                                                                <TruckIcon className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" />
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{preview.supplier.name}</h4>
@@ -1383,7 +1384,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-brand-border/60 dark:border-dark-border/60">
+                                                    <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                         <div className="flex items-center gap-2 min-w-0">
                                                             <InfoIcon size={14} className="text-brand-inactive-text shrink-0" />
                                                             <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
@@ -1549,7 +1550,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
                                                                 {isReversed ? (
                                                                     <>
-                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-2">Resumo Financeiro</span>
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body mb-2">Resumo Financeiro</span>
                                                                         <div className="space-y-1">
                                                                             {(() => {
                                                                                 const originals = financeData.filter((t: any) => t.transaction_type !== 'refund')
@@ -1559,29 +1560,28 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                                 const totalRefunded = refunds.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0)
                                                                                 return (
                                                                                     <>
-                                                                                        <div className="flex items-center justify-between text-xs">
-                                                                                            <span className="text-brand-inactive-text">Valor original</span>
-                                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {totalOriginal.toFixed(2)}</span>
+                                                                                        <div className="flex items-center justify-between text-sm">
+                                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor original</span>
+                                                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">R$ {totalOriginal.toFixed(2)}</span>
                                                                                         </div>
                                                                                         {totalPaid > 0 && (
-                                                                                            <div className="flex items-center justify-between text-xs">
-                                                                                                <span className="text-brand-inactive-text">Pago</span>
-                                                                                                <span className="text-green-600 dark:text-green-400 font-medium">R$ {totalPaid.toFixed(2)}</span>
+                                                                                            <div className="flex items-center justify-between text-sm">
+                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">Pago</span>
+                                                                                                <span className="font-bold text-brand-green">R$ {totalPaid.toFixed(2)}</span>
                                                                                             </div>
                                                                                         )}
                                                                                         {totalRefunded > 0 && (
-                                                                                            <div className="flex items-center justify-between text-xs">
-                                                                                                <span className="text-brand-inactive-text">Reembolsado</span>
-                                                                                                <span className="text-blue-600 dark:text-blue-400 font-medium">R$ {totalRefunded.toFixed(2)}</span>
+                                                                                            <div className="flex items-center justify-between text-sm">
+                                                                                                <span className="text-brand-inactive-text dark:text-dark-body">Reembolsado</span>
+                                                                                                <span className="font-bold text-brand-blue">R$ {totalRefunded.toFixed(2)}</span>
                                                                                             </div>
                                                                                         )}
                                                                                         {refunds.filter((t: any) => t.status === 'pending').map((t: any, i: number) => (
-                                                                                            <div key={i} className="flex items-center justify-between text-xs">
+                                                                                            <div key={i} className="flex items-center justify-between text-sm">
                                                                                                 <div className="flex items-center gap-1">
-                                                                                                    <span className="text-brand-inactive-text">Estorno aguardando</span>
-                                                                                                    <Badge variant="orange">Pendente</Badge>
+                                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Estorno aguardando</span>
                                                                                                 </div>
-                                                                                                <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                                                <span className="font-bold text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
                                                                                             </div>
                                                                                         ))}
                                                                                     </>
@@ -1593,20 +1593,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                     <>
                                                                         <span className="text-brand-inactive-text dark:text-dark-body my-2">Contas a Pagar</span>
                                                                         <div className="space-y-1">
-                                                                            {financeData.map((t: any, i: number) => {
-                                                                                const badge = getFinanceStatusBadge(t)
-                                                                                return (
-                                                                                    <div key={i} className="flex items-center justify-between text-xs">
-                                                                                        <div className="flex items-center gap-1">
-                                                                                            <span className="text-brand-dark dark:text-dark-heading font-medium">R$ {Number(t.amount || 0).toFixed(2)}</span>
-                                                                                            <Badge variant={badge.variant}>
-                                                                                                {badge.label}
-                                                                                            </Badge>
-                                                                                        </div>
-                                                                                        <span className="text-brand-inactive-text">{t.due_date ? safeDate(t.due_date) : ""}</span>
-                                                                                    </div>
-                                                                                )
-                                                                            })}
+                                                                            {financeData.map((t: any, i: number) => (
+                                                                                <div key={i} className="flex items-center justify-between text-sm">
+                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">R$ {Number(t.amount || 0).toFixed(2)}</span>
+                                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{t.due_date ? safeDate(t.due_date) : ""}</span>
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
                                                                     </>
                                                                 )}
@@ -1615,7 +1607,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                         {/* Stock movements for completed/reversed imports */}
                                                         {(isCompleted || isReversed) && stockData && stockData.length > 0 && (
                                                             <div className="pt-2 border-t border-brand-border dark:border-dark-border">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body my-2">Movimentações de Estoque</span>
+                                                                <span className="text-brand-inactive-text dark:text-dark-body mb-2">Movimentações de Estoque</span>
                                                                 <div className="space-y-1">
                                                                     {stockData.map((m: any, i: number) => (
                                                                         <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">

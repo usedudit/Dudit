@@ -1,3 +1,5 @@
+import { cleanAndFormatPhone, sanitizeAddressComplement } from "@/lib/utils/phone-utils"
+
 export interface ProductFromXML {
   codigo: string
   nome: string
@@ -35,12 +37,14 @@ export interface EmitenteFromXML {
   endereco?: {
     logradouro: string
     numero: string
+    complemento?: string
     bairro: string
     cidade: string
     uf: string
     cep: string
     pais?: string
     codigo_municipio?: string
+    codigo_pais?: string
   }
 }
 
@@ -151,6 +155,14 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
 
   const ideBlock = extractBlock("ide", cleanXml)
 
+  const enderecoEmit = extractBlock("enderEmit", emitBlock)
+
+  const rawPhone = getTagValue("fone", enderecoEmit || "") || getTagValue("fone", emitBlock) || undefined
+  const formattedPhone = cleanAndFormatPhone(rawPhone) || undefined
+
+  const rawCep = getTagValue("CEP", enderecoEmit || "") || ""
+  const cleanCep = rawCep.replace(/\D/g, "").padStart(8, "0")
+
   const emitente: EmitenteFromXML = {
     cnpj: getTagValue("CNPJ", emitBlock) || undefined,
     cpf: getTagValue("CPF", emitBlock) || undefined,
@@ -160,20 +172,24 @@ export function parseNFeFull(xmlContent: string): NFMetadata {
     ie_st: getTagValue("IEST", emitBlock) || undefined,
     crt: getTagValue("CRT", emitBlock) || undefined,
     email: getTagValue("email", emitBlock) || undefined,
-    fone: getTagValue("fone", emitBlock) || undefined,
+    fone: formattedPhone,
   }
 
-  const enderecoEmit = extractBlock("enderEmit", emitBlock)
   if (enderecoEmit) {
+    const rawComplement = getTagValue("xCpl", enderecoEmit)
+    const cleanComplement = sanitizeAddressComplement(rawComplement)
+
     emitente.endereco = {
       logradouro: getTagValue("xLgr", enderecoEmit) || "",
       numero: getTagValue("nro", enderecoEmit) || "",
+      complemento: cleanComplement || undefined,
       bairro: getTagValue("xBairro", enderecoEmit) || "",
       cidade: getTagValue("xMun", enderecoEmit) || "",
       uf: getTagValue("UF", enderecoEmit) || "",
-      cep: getTagValue("CEP", enderecoEmit) || "",
+      cep: cleanCep,
       pais: getTagValue("xPais", enderecoEmit) || undefined,
       codigo_municipio: getTagValue("cMun", enderecoEmit) || undefined,
+      codigo_pais: getTagValue("cPais", enderecoEmit) || undefined,
     }
   }
 

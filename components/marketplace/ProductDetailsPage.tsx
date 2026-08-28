@@ -25,6 +25,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
+import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { useFavorites } from "@/providers/favorites-provider"
@@ -480,7 +481,11 @@ export function ProductDetailsPageClient({
         }
     }, [userId])
 
-    const loadUserAddresses = async () => {
+    useAddressSync(useCallback((updatedId?: string) => {
+        loadUserAddresses(updatedId)
+    }, [userId]))
+
+    const loadUserAddresses = async (preferredId?: string) => {
         if (!userId) return
         setLoadingAddresses(true)
         try {
@@ -488,11 +493,15 @@ export function ProductDetailsPageClient({
             if (result.addresses) {
                 const list = result.addresses as any[]
                 setUserAddresses(list)
-                const defaultAddress = list.find((a: any) => a.is_default)
-                if (defaultAddress) {
-                    setSelectedAddressId(defaultAddress.id)
-                } else if (list.length > 0) {
-                    setSelectedAddressId(list[0].id)
+                if (preferredId && list.some((a: any) => a.id === preferredId)) {
+                    setSelectedAddressId(preferredId)
+                } else {
+                    const defaultAddress = list.find((a: any) => a.is_default)
+                    if (defaultAddress) {
+                        setSelectedAddressId(defaultAddress.id)
+                    } else if (list.length > 0) {
+                        setSelectedAddressId(list[0].id)
+                    }
                 }
             }
         } catch (err) {
@@ -507,6 +516,7 @@ export function ProductDetailsPageClient({
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
+        notifyAddressUpdated(addressId)
     }
 
     const handleCepBlur = async () => {
@@ -561,8 +571,10 @@ export function ProductDetailsPageClient({
             if (result.address) {
                 setUserAddresses(prev => [...prev, result.address])
                 setSelectedAddressId(result.address.id)
+                notifyAddressUpdated(result.address.id)
             } else {
                 await loadUserAddresses()
+                notifyAddressUpdated()
             }
             setShowAddressForm(false)
             setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
@@ -641,10 +653,15 @@ export function ProductDetailsPageClient({
                 setShippingState("calculated")
                 setCep(selectedAddress.zip_code || "")
 
+                const destinationCoords = (selectedAddress?.latitude != null && selectedAddress?.longitude != null)
+                    ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
+                    : null
+
                 const quote = await quoteDeliveryFeeAction({
                     partnerId: targetPartnerId,
                     storeId: partner.store_id || (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
+                    destinationCoords,
                     orderSubtotal: pricing.total,
                 })
                 if (!active) return
@@ -1608,6 +1625,13 @@ export function ProductDetailsPageClient({
                                         const currentPrice = pricing.total || Number(product.price || 0)
                                         const isFreeByThreshold = freeThreshold > 0 && currentPrice >= freeThreshold
                                         const diffFree = freeThreshold > 0 && currentPrice < freeThreshold ? freeThreshold - currentPrice : 0
+                                        const isEstimate = Boolean(deliveryBreakdown?.isEstimate)
+                                        const baseFee = Number(deliveryConfig?.settings?.baseFee ?? deliveryConfig?.settings?.base_fee ?? 0)
+                                        const isTechnicalError = deliveryError && (
+                                            deliveryError.includes("plano") ||
+                                            deliveryError.includes("incompleto") ||
+                                            deliveryError.includes("coordenadas")
+                                        )
 
                                         return (
                                             <div className="flex justify-between items-start py-4">
@@ -1615,11 +1639,16 @@ export function ProductDetailsPageClient({
                                                     <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega pelo vendedor</p>
                                                     {deliveryLoading ? (
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</p>
-                                                    ) : (deliveryError && deliveryError !== "Entrega não disponível no plano atual.") ? (
+                                                    ) : (deliveryError && !isTechnicalError) ? (
                                                         <p className="text-xs text-red-500">{deliveryError}</p>
                                                     ) : calculatedAddress ? (
                                                         <div>
                                                             <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
+                                                            {isEstimate && (
+                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                    Valor final a combinar com a loja
+                                                                </p>
+                                                            )}
                                                             {diffFree > 0 && (
                                                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                     Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
@@ -1658,15 +1687,15 @@ export function ProductDetailsPageClient({
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>
                                                     ) : deliveryFee !== null && deliveryFee > 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                            {formatMoney(deliveryFee)}
+                                                            {isEstimate ? `A partir de ${formatMoney(deliveryFee)}` : formatMoney(deliveryFee)}
                                                         </p>
                                                     ) : deliveryFee !== null && deliveryFee === 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                                    ) : deliveryConfig?.settings?.baseFee != null && Number(deliveryConfig.settings.baseFee) > 0 ? (
+                                                    ) : baseFee > 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                            {hasDeliveryRatesConfigured(deliveryConfig.settings, deliveryConfig.rules) ? `A partir de ${formatMoney(Number(deliveryConfig.settings.baseFee))}` : formatMoney(Number(deliveryConfig.settings.baseFee))}
+                                                            {hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules) ? `A partir de ${formatMoney(baseFee)}` : formatMoney(baseFee)}
                                                         </p>
-                                                    ) : deliveryError === "Entrega não disponível no plano atual." ? (
+                                                    ) : isTechnicalError ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : (
                                                         <p className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">-</p>
@@ -2405,8 +2434,8 @@ export function ProductDetailsPageClient({
                                         )}
                                     </div>
 
-                                    {/* Desktop Right Column (Actions) */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center">
+                                    {/* Desktop Right Column (Actions) - aligned to the top, same Y axis as the Next button */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center absolute top-[30px]" style={{ right: 0 }}>
                                         {(() => {
                                             const isFavProd = isFav(product.id, "produto")
                                             return (

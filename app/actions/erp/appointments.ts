@@ -18,6 +18,7 @@ import { checkLimit, increment_usage_counter } from "@/lib/services/subscription
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { DASHBOARD_TAGS } from "@/lib/data/dashboard"
 import { calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
 export type AppointmentStatus =
   | "Reservado"
@@ -207,8 +208,10 @@ async function createAppointmentSaleAndSyncGoals(params: {
   const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(params.supabase as any, params.partnerId, false)
   const fallbackSaleNumber = `DDT-${String(params.appointment.id).slice(0, 8).toUpperCase()}`
 
+  const capabilities = await getPartnerCapabilities(params.partnerId, { storeId: params.appointment.store_id || null })
+
   let paymentTransactionId = existingPaymentTx?.id || null
-  if (!paymentTransactionId) {
+  if (capabilities.hasFinancial && !paymentTransactionId) {
     const nowIso = new Date().toISOString()
     const { data: tx, error: txError } = await params.supabase
       .from("transactions")
@@ -252,16 +255,18 @@ async function createAppointmentSaleAndSyncGoals(params: {
     }
   }
 
-  try {
-    await applyServiceOrderToGoals({
-      supabase: params.supabase as any,
-      partnerId: params.partnerId,
-      sellerUserId: params.appointment.staff_partner_user_id || params.userId,
-      saleAmount: finalAmount > 0 ? finalAmount : paidAmount,
-      createdByUserId: params.userId,
-    })
-  } catch (err: any) {
-    console.error("[createAppointmentSaleAndSyncGoals] Erro ao sincronizar metas:", err.message)
+  if (capabilities.hasProductivity) {
+    try {
+      await applyServiceOrderToGoals({
+        supabase: params.supabase as any,
+        partnerId: params.partnerId,
+        sellerUserId: params.appointment.staff_partner_user_id || params.userId,
+        saleAmount: finalAmount > 0 ? finalAmount : paidAmount,
+        createdByUserId: params.userId,
+      })
+    } catch (err: any) {
+      console.error("[createAppointmentSaleAndSyncGoals] Erro ao sincronizar metas:", err.message)
+    }
   }
 
   return { saleId: params.appointment.marketplace_order_id || null, paymentTransactionId }
@@ -274,6 +279,9 @@ export async function syncAppointmentReceivable(params: {
   appointment: any
   currentReceivableId?: string | null
 }) {
+  const capabilities = await getPartnerCapabilities(params.partnerId, { storeId: params.appointment.store_id || null })
+  if (!capabilities.hasFinancial) return params.currentReceivableId || null
+
   const ref = `appointment:${params.appointment.id}:receivable`
   const status = String(params.appointment.status || "")
   const paymentStatus = String(params.appointment.payment_status || "")

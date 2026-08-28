@@ -1,4 +1,4 @@
-# Backups do PostgreSQL do Dudit
+# Backups do PostgreSQL da Dudit
 
 Esta solução faz um backup lógico diário do PostgreSQL do Supabase e o envia para um bucket privado do Cloudflare R2.
 

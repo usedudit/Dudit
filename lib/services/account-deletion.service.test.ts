@@ -81,7 +81,7 @@ describe("AccountDeletionService", () => {
 
   describe("assertNotLocked", () => {
     it("throws ForbiddenError if deletion is pending or in progress", async () => {
-      mockMaybeSingle.mockResolvedValue({ data: { status: "waiting_grace_period" }, error: null })
+      mockMaybeSingle.mockResolvedValue({ data: { status: "deleting_storage" }, error: null })
 
       await expect(AccountDeletionService.assertNotLocked("partner-123")).rejects.toThrow(ForbiddenError)
     })

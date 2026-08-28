@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
-import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon } from "@/lib/icons"
-import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
+import { Package, ShoppingCartIcon, AlertTriangleIcon, XIcon, ClockIcon, ArrowLeftIcon, SparklesIcon, TagIcon, SearchIcon } from "@/lib/icons"
+import { Button, MoneyInput, IconPlaceholder, Spinner, Badge, InfoCard, Tabs, TabsList, TabsTrigger, ThreeDotsLoader, Input, FormDropdown } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
@@ -59,11 +59,21 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
 
     const [activeTab, setActiveTab] = useState<"reposicao" | "parados">("reposicao")
 
+    const [selectedPeriod, setSelectedPeriod] = useState<number>(90)
+    const [searchQuery, setSearchQuery] = useState("")
+
+    const PERIOD_OPTIONS = [
+        { value: "7", label: "7 dias" },
+        { value: "30", label: "30 dias" },
+        { value: "60", label: "60 dias" },
+        { value: "90", label: "90 dias" },
+    ]
+
     // Replenishment suggestions
     const [suggestions, setSuggestions] = useState<Suggestion[]>([])
     const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
-    // Stagnant products (>90d)
+    // Stagnant products (>selectedPeriod d)
     const [stagnantProducts, setStagnantProducts] = useState<StagnantProduct[]>([])
     const [loadingStagnant, setLoadingStagnant] = useState(false)
 
@@ -88,18 +98,23 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
 
     const fetchStagnant = useCallback(() => {
         setLoadingStagnant(true)
-        getStagnantProductsAction(partnerId).then((res) => {
+        getStagnantProductsAction(partnerId, selectedPeriod).then((res) => {
             if (res.products) {
                 setStagnantProducts(res.products)
             }
             setLoadingStagnant(false)
         })
-    }, [partnerId])
+    }, [partnerId, selectedPeriod])
+
+    const refetchStagnant = useCallback(() => {
+        fetchStagnant()
+    }, [fetchStagnant])
 
     useEffect(() => {
         if (!isOpen) {
             setSuggestions([])
             setStagnantProducts([])
+            setSearchQuery("")
             setIsDiscountSheetOpen(false)
             setSelectedStagnant(null)
             return
@@ -108,12 +123,29 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
         fetchStagnant()
     }, [isOpen, fetchSuggestions, fetchStagnant])
 
+    useEffect(() => {
+        if (isOpen) {
+            fetchStagnant()
+        }
+    }, [selectedPeriod, isOpen, fetchStagnant])
+
     const openDiscountSheet = (product: StagnantProduct) => {
         setSelectedStagnant(product)
         const initialPromo = product.promotional_price || Math.round(product.price * 0.85 * 100) / 100
         setPromoPriceInput(initialPromo)
         setIsDiscountSheetOpen(true)
     }
+
+    const filteredStagnantProducts = useMemo(() => {
+        if (!searchQuery.trim()) return stagnantProducts
+        const term = searchQuery.toLowerCase().trim()
+        return stagnantProducts.filter(
+            (p) =>
+                p.name.toLowerCase().includes(term) ||
+                (p.sku || "").toLowerCase().includes(term) ||
+                (p.gtin || "").toLowerCase().includes(term)
+        )
+    }, [stagnantProducts, searchQuery])
 
     const handleSavePromoPrice = async () => {
         if (!selectedStagnant) return
@@ -142,7 +174,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
     const mainContent = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Sugestões & Oportunidades</h2>
+                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Parados</h2>
                 <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
@@ -157,7 +189,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                             Reposição ({suggestions.length})
                         </TabsTrigger>
                         <TabsTrigger value="parados" className="px-0 pb-3 text-sm">
-                            Parados +90d ({stagnantProducts.length})
+                            Parados ({stagnantProducts.length})
                         </TabsTrigger>
                     </TabsList>
                 </Tabs>
@@ -241,15 +273,41 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                             <IconPlaceholder
                                 icon={ClockIcon}
                                 title="Nenhum produto estagnado!"
-                                subtitle="Todos os seus produtos possuem movimentação ou foram cadastrados há menos de 90 dias."
+                                subtitle={`Todos os seus produtos possuem movimentação ou foram cadastrados há menos de ${selectedPeriod} dias.`}
                             />
                         </div>
                     ) : (
                         <div className="space-y-3">
+                            <div className="mb-3 flex items-center justify-between">
+                                <FormDropdown
+                                    options={PERIOD_OPTIONS}
+                                    value={String(selectedPeriod)}
+                                    setValue={(v) => setSelectedPeriod(Number(v))}
+                                    placeholder="Período"
+                                    width="w-40"
+                                />
+                                <div className="w-56">
+                                    <Input
+                                        name="search"
+                                        placeholder="Buscar..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        variant="full-rounded"
+                                        prefix={
+                                            <SearchIcon
+                                                size={18}
+                                                className="text-brand-inactive-text shrink-0"
+                                            />
+                                        }
+                                        label=""
+                                    />
+                                </div>
+                            </div>
+
                             <p className="text-xs font-semibold text-brand-inactive-text px-1">
-                                {stagnantProducts.length} produto(s) sem giro há mais de 90 dias
+                                {filteredStagnantProducts.length} produto(s) sem giro há mais de {selectedPeriod} dias
                             </p>
-                            {stagnantProducts.map((p) => {
+                            {filteredStagnantProducts.map((p) => {
                                 const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < p.price
                                 return (
                                     <div
@@ -339,7 +397,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                         <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
                             Preço Promocional
                         </h2>
-                        <p className="text-xs text-brand-inactive-text">Girar estoque parado por +90 dias</p>
+                        <p className="text-xs text-brand-inactive-text">Girar estoque parado por +{selectedPeriod} dias</p>
                     </div>
                 </div>
                 <Button variant="filled" onClick={() => setIsDiscountSheetOpen(false)} size="icon" className="hidden lg:flex">

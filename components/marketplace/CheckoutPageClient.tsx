@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon, CrownIcon } from "@/lib/icons"
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
@@ -25,6 +25,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
+import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 import type { StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
@@ -673,11 +674,16 @@ export function CheckoutPageClient() {
         }
     }
 
+    useAddressSync(useCallback((updatedId?: string) => {
+        void loadUserAddresses(updatedId)
+    }, [userId]))
+
     const buildAddressString = (a: UserAddress) =>
         `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
+        notifyAddressUpdated(addressId)
         const address = userAddresses.find(a => a.id === addressId)
         if (address) setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(address) }))
     }
@@ -724,6 +730,7 @@ export function CheckoutPageClient() {
                 })
 
                 setSelectedAddressId(savedAddr.id)
+                notifyAddressUpdated(savedAddr.id)
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
 
                 setShowAddressForm(false)

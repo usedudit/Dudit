@@ -7,6 +7,7 @@ import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, Defaul
 import { Feedback, PageHeader, fade, View } from "./profile-shared"
 import { createAddressAction, updateAddressAction, deleteAddressAction, setDefaultAddressAction } from "@/app/actions/shared/addresses"
 import { useNotification } from "@/hooks/use-notification"
+import { notifyAddressUpdated } from "@/lib/utils/address-sync"
 
 const ADDRESS_TYPE_OPTIONS = [
     { value: "casa", label: "Casa" },
@@ -135,6 +136,7 @@ export const AddressView = ({
                     setAddresses([...(result.address?.is_default ? addresses.map((a: any) => ({ ...a, is_default: false })) : addresses), result.address])
                     notifySuccess("Sucesso", "Endereço adicionado!")
                     setEditingId(null)
+                    notifyAddressUpdated(result.address?.id)
                 }
             } else {
                 const result = await updateAddressAction({
@@ -156,6 +158,7 @@ export const AddressView = ({
                     setAddresses(addresses.map((a: any) => a.id === editingId ? result.address : a))
                     notifySuccess("Sucesso", "Endereço atualizado!")
                     setEditingId(null)
+                    notifyAddressUpdated(result.address?.id)
                 }
             }
         } catch {
@@ -178,6 +181,7 @@ export const AddressView = ({
                 setAddresses(addresses.filter((a: any) => a.id !== addrId))
                 notifySuccess("Sucesso", "Endereço removido!")
                 if (editingId === addrId) setEditingId(null)
+                notifyAddressUpdated()
             }
         } catch {
             setError("Erro ao excluir endereço.")
@@ -197,6 +201,7 @@ export const AddressView = ({
             } else {
                 setAddresses(addresses.map((a: any) => ({ ...a, is_default: a.id === addrId })))
                 notifySuccess("Sucesso", "Endereço padrão atualizado!")
+                notifyAddressUpdated(addrId)
             }
         } catch {
             setError("Erro ao definir endereço padrão.")
