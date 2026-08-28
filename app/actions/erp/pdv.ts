@@ -1468,7 +1468,7 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
                 sku,
                 price,
                 stock_quantity: stockQuantity,
-                is_active: true,
+                status: "ativo",
                 allow_sell_without_stock: false,
             })
             .select("id, name, category, sku, price, stock_available, allow_sell_without_stock, images, product_variants(id, variant_name, sku, price_adjustment, stock_available, variant_options)")

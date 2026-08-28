@@ -16,6 +16,7 @@ interface FormDropdownProps {
   error?: boolean
   errorMessage?: string
   onFocus?: () => void
+  dataField?: string
 }
 
 export const FormDropdown: React.FC<FormDropdownProps> = ({
@@ -31,8 +32,9 @@ export const FormDropdown: React.FC<FormDropdownProps> = ({
   error,
   errorMessage,
   onFocus,
+  dataField,
 }) => (
-  <div className="flex-1 w-full">
+  <div className="flex-1 w-full" {...(dataField ? { "data-field": dataField } : {})}>
     {label && <label className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">{label}</label>}
     <Dropdown
       className={className}

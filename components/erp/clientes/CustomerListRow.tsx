@@ -84,10 +84,19 @@ const CustomerListItem = React.memo(
           )
         }
 
-        case "phone":
+        case "contact":
           return (
-            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {customer.phone ? formatBrazilMobile(customer.phone) : "-"}
+            <div className="flex flex-col">
+              {customer.email && <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">{customer.email}</span>}
+              {customer.phone && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{formatBrazilMobile(customer.phone)}</span>}
+              {!customer.email && !customer.phone && <span className="text-[13px] text-brand-inactive-text">-</span>}
+            </div>
+          )
+
+        case "city":
+          return (
+            <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
+              {customer.city && customer.state ? `${customer.city}, ${customer.state}` : customer.city || customer.state || "-"}
             </span>
           )
 
@@ -196,7 +205,10 @@ const CustomerListItem = React.memo(
     prev.customer.originalId === next.customer.originalId &&
     prev.customer.name === next.customer.name &&
     prev.customer.status === next.customer.status &&
+    prev.customer.email === next.customer.email &&
     prev.customer.phone === next.customer.phone &&
+    prev.customer.city === next.customer.city &&
+    prev.customer.state === next.customer.state &&
     prev.customer.orders === next.customer.orders &&
     prev.customer.totalOrderValue === next.customer.totalOrderValue &&
     prev.customer.lastOrderDate === next.customer.lastOrderDate &&

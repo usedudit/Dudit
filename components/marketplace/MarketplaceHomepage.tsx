@@ -144,37 +144,6 @@ function HomeValueProps() {
 
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
 
-function HomeSellerCTA({ userProfile, router, onAnnounceClick }: { userProfile: any; router: any; onAnnounceClick?: () => void }) {
-    return (
-        <section className="my-6 sm:my-8 rounded-2xl md:rounded-3xl bg-[#82e15b] text-[#083b28] p-6 sm:p-8 md:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div className="max-w-2xl space-y-2">
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">
-                    Nós crescemos<br className="hidden sm:inline" /> com quem cresce junto.
-                </h3>
-                <p className="text-[#083b28]/90 text-sm sm:text-base leading-relaxed">
-                    Venda produtos ou serviços com 0% de comissão.<br className="hidden sm:inline" />
-                    A Dudit se torna melhor com mais pessoas por aqui.
-                </p>
-            </div>
-
-            <div className="shrink-0 w-full sm:w-auto">
-                <Button
-                    onClick={() => {
-                        if (onAnnounceClick) {
-                            onAnnounceClick()
-                        } else {
-                            router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
-                        }
-                    }}
-                    className="w-full sm:w-auto bg-[#083b28] text-white hover:bg-[#063020] px-6 py-3 font-bold text-sm sm:text-base rounded-full cursor-pointer"
-                >
-                    Anunciar na Dudit
-                </Button>
-            </div>
-        </section>
-    )
-}
-
 interface MarketplaceHomeProps {
     sections?: HomeSection[]
     user?: any
@@ -711,8 +680,6 @@ export default function MarketplaceHome({
                     </div>
 
                     <HomeValueProps />
-
-                    <HomeSellerCTA userProfile={userProfile} router={router} />
                 </div>
 
                 {renderAddressModal()}
@@ -742,13 +709,6 @@ export default function MarketplaceHome({
                             itemWidthClass="w-[190px] sm:w-[210px]"
                         />
                     )}
-
-                    {/* 2. Banner / Card de Atração para Vendedores */}
-                    <HomeSellerCTA
-                        userProfile={userProfile}
-                        router={router}
-                        onAnnounceClick={() => setIsAnnounceModalOpen(true)}
-                    />
 
                     {/* 3. Seção de Serviços */}
                     {serviceSection && serviceSection.items.length > 0 && (

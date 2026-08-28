@@ -1000,7 +1000,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (product.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score, city, state, slug")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
                 .eq("partner_id", product.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)
@@ -1027,7 +1027,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (service.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score, city, state, slug")
+                .select("id, name, logo_url, risk_score, slug, short_id, addresses(city, state)")
                 .eq("partner_id", service.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)
@@ -1079,7 +1079,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
             }
         }
 
-        return store ? { ...store, store: { name: store.name, id: store.id } } : null
+        return store ? { ...store, store } : null
     }
 
     if (targetType === "review") {
@@ -1105,7 +1105,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (review.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score")
+                .select("id, name, logo_url, risk_score, short_id, addresses(city, state)")
                 .eq("partner_id", review.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)
@@ -1156,7 +1156,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
         if (returnReq.partner_id) {
             const { data: storeData } = await adminClient
                 .from("stores")
-                .select("id, name, logo_url, risk_score")
+                .select("id, name, logo_url, risk_score, short_id, addresses(city, state)")
                 .eq("partner_id", returnReq.partner_id)
                 .order("is_headquarters", { ascending: false })
                 .limit(1)

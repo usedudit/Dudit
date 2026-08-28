@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
 import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
@@ -22,7 +23,7 @@ import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscrip
 import { fetchJSONWithCSRF, fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Spinner } from "@/components/reusable/Spinner"
-import { normalizeBusinessInfo } from "@/lib/business-info"
+import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import { generateEAN13 } from "@/lib/utils/barcode"
@@ -65,6 +66,14 @@ const REQUIRED_FIELDS = [
         },
         message: "Preço inválido"
     },
+    { field: "stock", tab: "general", validate: (v: any) => v !== undefined && v !== null, message: "Estoque é obrigatório" },
+    { field: "sku", tab: "general", validate: () => true, message: "" },
+    { field: "gtin", tab: "general", validate: () => true, message: "" },
+    { field: "costPrice", tab: "general", validate: () => true, message: "" },
+    { field: "category_id", tab: "general", validate: () => true, message: "" },
+    { field: "origin", tab: "fiscal", validate: () => true, message: "" },
+    { field: "cest", tab: "fiscal", validate: () => true, message: "" },
+    { field: "ncm", tab: "fiscal", validate: () => true, message: "" },
 ]
 
 const getEmptyProduct = () => ({
@@ -131,7 +140,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const suppliersPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
-    const isQuick = businessInfo.mode === "quick"
+    const isQuick = isQuickMode(businessInfo)
+    const isDesapego = businessInfo.mode === "desapego"
 
     const partnerId = propPartnerId || selectedStore?.partner_id || ""
     const storeId = propStoreId || selectedStore?.id || ""
@@ -350,6 +360,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
         }
         return Array.from(fieldErrors).filter(field => fieldTabs[field] === tab).length
     }, [fieldErrors])
+
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS: REQUIRED_FIELDS.map(r => ({ field: r.field, tab: r.tab })),
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
 
     const [showNcmModal, setShowNcmModal] = useState(false)
     const [ncmSuggestions, setNcmSuggestions] = useState<any[]>([])
@@ -897,22 +915,22 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 </div>
 
                                 {/* Tabs */}
-                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">
-                                            Dados gerais
-                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                        </TabsTrigger>
-                                        <TabsTrigger value="variations" disabled={isLoadingDetails}>
-                                            <span className="inline-flex items-center gap-2">
-                                                Variações
-                                                {variantsPlanBlocked ? (
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                                ) : null}
-                                                {getTabErrorCount("variations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </span>
-                                        </TabsTrigger>
-                                        {!isQuick && (
+                                {!isQuick && (
+                                    <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                            <TabsTrigger value="general">
+                                                Dados gerais
+                                                {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                            </TabsTrigger>
+                                            <TabsTrigger value="variations" disabled={isLoadingDetails}>
+                                                <span className="inline-flex items-center gap-2">
+                                                    Variações
+                                                    {variantsPlanBlocked ? (
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                                    ) : null}
+                                                    {getTabErrorCount("variations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                                </span>
+                                            </TabsTrigger>
                                             <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
                                                 <span className="inline-flex items-center gap-2">
                                                     Fornecedores
@@ -922,25 +940,25 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </span>
                                             </TabsTrigger>
-                                        )}
-                                        {!isQuick && productData.show_in_marketplace && (
-                                            <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
-                                                Marketplace
-                                                {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
-                                        )}
-                                        {productData.show_in_marketplace && internalMode === "details" && (
-                                            <TabsTrigger value="metrics" disabled={isLoadingDetails}>
-                                                <span className="inline-flex items-center gap-2">
-                                                    Métricas
-                                                    {metricsPlanBlocked ? (
-                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                                    ) : null}
-                                                </span>
-                                            </TabsTrigger>
-                                        )}
-                                    </TabsList>
-                                </div>
+                                            {productData.show_in_marketplace && (
+                                                <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
+                                                    Marketplace
+                                                    {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                                </TabsTrigger>
+                                            )}
+                                            {productData.show_in_marketplace && internalMode === "details" && (
+                                                <TabsTrigger value="metrics" disabled={isLoadingDetails}>
+                                                    <span className="inline-flex items-center gap-2">
+                                                        Métricas
+                                                        {metricsPlanBlocked ? (
+                                                            <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                        ) : null}
+                                                    </span>
+                                                </TabsTrigger>
+                                            )}
+                                        </TabsList>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -959,6 +977,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             uploadingImages={uploadingImages} mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages} isSaving={isSavingProduct}
                                             isQuickMode={isQuick}
+                                            isDesapego={isDesapego}
                                             generateRandomCode={handleGenerateRandomCode}
                                             onGenerateBarcode={handleGenerateBarcode}
                                             openAddItemModal={handleOpenMetadataModal}
@@ -1117,7 +1136,10 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 {showValidationModal && (
                     <AlertModal
                         isOpen
-                        onClose={() => setShowValidationModal(false)}
+                        onClose={() => {
+                            setShowValidationModal(false)
+                            scrollToFirstError()
+                        }}
                         title="Campos obrigatórios"
                         description="Existem campos pendentes. Verifique os erros abaixo antes de salvar."
                         message={<ul className="list-disc list-inside">{validationErrors.map((e, i) => <li key={i}>{e.message}</li>)}</ul>}

@@ -203,6 +203,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 />
                                 <DatePicker
                                     label="Data de saída"
+                                    dataField="deliveryDate"
                                     value={deliveryDate}
                                     onChange={(value) => setDeliveryDate(value instanceof Date ? value.toISOString().slice(0, 10) : String(value || ""))}
                                     placeholder="Selecione a data"
@@ -210,6 +211,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 />
                                 <TimePicker
                                     label="Horário de saída"
+                                    dataField="deliveryTime"
                                     value={deliveryTime}
                                     onChange={setDeliveryTime}
                                     placeholder="Selecione o horário"

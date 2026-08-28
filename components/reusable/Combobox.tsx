@@ -38,6 +38,7 @@ interface ComboboxProps {
     /** Permite digitar e selecionar um valor customizado livre */
     creatable?: boolean
     createLabel?: (search: string) => React.ReactNode
+    dataField?: string
 }
 
 export function Combobox({
@@ -57,6 +58,7 @@ export function Combobox({
     errorMessage,
     creatable = false,
     createLabel,
+    dataField,
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -311,7 +313,7 @@ export function Combobox({
 
     return (
         <>
-            <div ref={triggerRef} className={cn("relative", width, className)}>
+            <div ref={triggerRef} className={cn("relative", width, className)} {...(dataField ? { "data-field": dataField } : {})}>
                 {label && (
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">

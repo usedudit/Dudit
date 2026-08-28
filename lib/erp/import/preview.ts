@@ -84,10 +84,20 @@ export async function generatePreview(
     warnings,
     duplicates: [...duplicateRowIndices].map((rowNum) => {
       const mapped = mappedRows[rowNum - 1] || {}
-      const field = entityType === "customers"
-        ? (mapped["email"] ? "E-mail" : "CPF")
-        : "SKU"
-      const value = mapped["email"] || mapped["cpf"] || mapped["sku"] || ""
+      const field =
+        entityType === "customers"
+          ? (mapped["email"] ? "E-mail" : "CPF")
+          : entityType === "appointments"
+            ? "Data / Horário"
+            : "SKU"
+      const value =
+        mapped["email"] ||
+        mapped["cpf"] ||
+        (entityType === "appointments"
+          ? `${mapped["start_date"] || ""} ${mapped["start_time"] || ""} (${mapped["customer_name"] || ""})`
+          : "") ||
+        mapped["sku"] ||
+        ""
       return { row: rowNum, field, value }
     }),
     unknownCategories,
@@ -102,6 +112,48 @@ async function detectDuplicates(
 ): Promise<Set<number>> {
   const duplicates = new Set<number>()
   const supabase = await getSupabaseServerClient()
+
+  if (session.entityType === "appointments") {
+    // Collect unique dates from the spreadsheet to check existing DB appointments
+    const dates = [
+      ...new Set(
+        mappedRows
+          .map((r) => r["start_date"]?.trim())
+          .filter(Boolean),
+      ),
+    ]
+
+    if (dates.length > 0) {
+      const chunkSize = 50
+      for (let i = 0; i < dates.length; i += chunkSize) {
+        const chunk = dates.slice(i, i + chunkSize)
+        const { data: existing } = await supabase
+          .from("appointments")
+          .select("customer_name, start_date, start_time")
+          .eq("partner_id", session.partnerId)
+          .in("start_date", chunk)
+
+        if (existing && existing.length > 0) {
+          const existingKeySet = new Set(
+            existing.map(
+              (a: any) =>
+                `${String(a.customer_name || "").trim().toLowerCase()}|${a.start_date}|${String(a.start_time || "").slice(0, 5)}`,
+            ),
+          )
+
+          mappedRows.forEach((r, idx) => {
+            const cName = String(r["customer_name"] || "").trim().toLowerCase()
+            const sDate = String(r["start_date"] || "").trim()
+            const sTime = String(r["start_time"] || "").trim().slice(0, 5)
+            const key = `${cName}|${sDate}|${sTime}`
+            if (cName && sDate && sTime && existingKeySet.has(key)) {
+              duplicates.add(idx + 1)
+            }
+          })
+        }
+      }
+    }
+  }
 
   if (session.entityType === "products") {
     const skus = mappedRows

@@ -244,10 +244,16 @@ export async function getDashboardLayout(
   const recentOrders = recentOrdersRes.data || [];
 
   // 3. Monta o objeto de Contexto
+  const businessMode = businessInfo.mode || "erp";
+  const isDesapego = businessMode === "desapego";
+  const isQuickMode = businessMode === "quick" || businessMode === "showcase";
+
   const context: DashboardContext = {
     partnerId,
     storeName: store?.name || "Sua Loja",
-    isQuickMode: businessInfo.mode === "quick",
+    businessMode,
+    isDesapego,
+    isQuickMode,
     sellsProducts,
     sellsServices,
     planSlug,
@@ -280,9 +286,9 @@ export async function getDashboardLayout(
   // 5. Constrói o checklist se houver tarefas pendentes
   const totalCount = checklistItems.length;
   const completedCount = checklistItems.filter((i) => i.completed).length;
-  const percentComplete = Math.round((completedCount / totalCount) * 100);
+  const percentComplete = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
 
-  const checklist = percentComplete < 100
+  const checklist = (totalCount > 0 && percentComplete < 100)
     ? {
       percentComplete,
       completedCount,
@@ -296,11 +302,13 @@ export async function getDashboardLayout(
   const remainingCount = totalCount - completedCount;
   const greeting = {
     title: `Olá, ${storeName}! 👋`,
-    subtitle: checklist
-      ? (remainingCount === 1
-        ? `🔥 Falta apenas 1 passo para sua vitrine ficar 100% pronta para vender!`
-        : `🔥 Você já concluiu ${percentComplete}% da sua loja! Faltam apenas ${remainingCount} passos para começar a vender.`)
-      : "Veja como está o desempenho do seu negócio hoje e turbine suas vendas."
+    subtitle: isDesapego
+      ? "Gerencie seus anúncios rápidos e desapegos no marketplace da Dudit."
+      : checklist
+        ? (remainingCount === 1
+          ? `🔥 Falta apenas 1 passo para sua vitrine ficar 100% pronta para vender!`
+          : `🔥 Você já concluiu ${percentComplete}% da sua loja! Faltam apenas ${remainingCount} passos para começar a vender.`)
+        : "Veja como está o desempenho do seu negócio hoje e turbine suas vendas."
   };
 
   // 7. Gera a URL pública do perfil do vendedor (baseada na loja ativa)
@@ -331,6 +339,8 @@ export async function getDashboardLayout(
   return {
     storeName: storeName,
     partnerUrl,
+    businessMode,
+    isDesapego,
     isQuickMode: context.isQuickMode,
     planSlug: context.planSlug,
     sellsProducts: context.sellsProducts,

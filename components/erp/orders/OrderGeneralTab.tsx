@@ -259,6 +259,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <Input
                                     label=""
                                     name="productSearch"
+                                    dataField="productSearch"
                                     placeholder="Buscar produtos para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={searchQuery}
@@ -702,6 +703,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         label="Conta de recebimento"
                                         disabled={isMarketplaceLocked && isPaidOrder}
                                         value={financeAccountId || undefined}
+                                        dataField="financeAccountId"
                                         onChange={(val) => {
                                             setFinanceAccountId(val)
                                             if (setFieldErrors) {
@@ -1040,6 +1042,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 <Input
                                     label=""
                                     name="productSearchMobile"
+                                    dataField="productSearch"
                                     placeholder="Buscar produtos para adicionar..."
                                     prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
                                     value={searchQuery}
@@ -1341,6 +1344,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label="Conta de recebimento"
                                     disabled={isMarketplaceLocked && isPaidOrder}
                                     value={financeAccountId || undefined}
+                                    dataField="financeAccountId"
                                     onChange={(val) => {
                                         setFinanceAccountId(val)
                                         if (setFieldErrors) {

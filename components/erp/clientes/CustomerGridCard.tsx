@@ -123,10 +123,12 @@ const CustomerGridCard = React.memo(
                         </div>
 
                         <div className="flex flex-col gap-0.5 items-end min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Telefone</span>
-                            <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-full">
-                                {mobile ? formatBrazilMobile(mobile) : "-"}
-                            </span>
+                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Contato</span>
+                            <div className="flex flex-col items-end min-w-0">
+                                {customer.email && <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-full">{customer.email}</span>}
+                                {mobile && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{formatBrazilMobile(mobile)}</span>}
+                                {!customer.email && !mobile && <span className="text-[13px] text-brand-inactive-text">-</span>}
+                            </div>
                         </div>
                     </div>
 
@@ -163,7 +165,10 @@ const CustomerGridCard = React.memo(
         prev.customer.originalId === next.customer.originalId &&
         prev.customer.name === next.customer.name &&
         prev.customer.status === next.customer.status &&
+        prev.customer.email === next.customer.email &&
         prev.customer.phone === next.customer.phone &&
+        prev.customer.city === next.customer.city &&
+        prev.customer.state === next.customer.state &&
         prev.customer.orders === next.customer.orders &&
         prev.customer.totalOrderValue === next.customer.totalOrderValue &&
         prev.customer.birth_date === next.customer.birth_date &&

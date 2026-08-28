@@ -2,6 +2,7 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { unstable_cache } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { generateShortId, isUuid } from "@/lib/utils/short-id"
 
 /**
  * Fetches all quotes for a partner, including customer name and items count.
@@ -101,6 +102,12 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 if (quoteError || !quote) {
                     console.error("[getQuoteWithItems] Quote error:", quoteError)
                     return null
+                }
+
+                if (!quote.public_token || isUuid(quote.public_token)) {
+                    const newToken = generateShortId(6)
+                    await supabase.from("quotes").update({ public_token: newToken }).eq("id", quoteId)
+                    quote.public_token = newToken
                 }
 
                 const { data: items, error: itemsError } = await supabase

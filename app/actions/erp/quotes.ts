@@ -149,8 +149,14 @@ export async function getERPQuotesPageAction(
             const finalizedStatuses = ["approved", "rejected", "expired", "cancelled", "converted_to_order"]
 
             const mappedData = rowsWithCreator.map((row: any) => {
+                let cleanToken = row.public_token
+                if (!cleanToken || isUuid(cleanToken)) {
+                    cleanToken = generateShortId(6)
+                    getAdminClient().from("quotes").update({ public_token: cleanToken }).eq("id", row.id).then(() => {})
+                }
                 const mappedRow = {
                     ...row,
+                    public_token: cleanToken,
                     user_profiles: (row.user_id || row.created_by_user_id)
                         ? { full_name: creatorNameById.get(String(row.user_id || row.created_by_user_id)) || "Sistema" }
                         : null,
@@ -514,9 +520,15 @@ export async function createQuoteAction(data: {
             // Sync full state to compute native triggers (subtotals)
             const { data: updatedQuote } = await supabase
                 .from("quotes")
-                .select("id, quote_number, total, subtotal, status")
+                .select("id, quote_number, total, subtotal, status, public_token")
                 .eq("id", quoteResult.id)
                 .single()
+
+            let shortPublicToken = updatedQuote?.public_token
+            if (!shortPublicToken || isUuid(shortPublicToken)) {
+                shortPublicToken = generateShortId(6)
+                await supabase.from("quotes").update({ public_token: shortPublicToken }).eq("id", quoteResult.id)
+            }
 
             const newQuoteId = updatedQuote?.id || quoteResult.id
 
@@ -538,6 +550,7 @@ export async function createQuoteAction(data: {
                 id: newQuoteId,
                 quote_number: updatedQuote?.quote_number || quoteResult.quote_number,
                 total: updatedQuote?.total || 0,
+                public_token: shortPublicToken,
             })
         } catch (err: any) {
             console.error("[createQuoteAction] Error:", err)
@@ -679,9 +692,34 @@ export async function updateQuoteAction(data: {
                 }
             }
 
-            if (Object.keys(updatePayload).length === 0) {
-                return successResponse({ id: data.quoteId, noop: true })
+            // Recalculate subtotal and total from quote items in database
+            const { data: allItems } = await supabase
+                .from("quote_items")
+                .select("quantity, unit_price")
+                .eq("quote_id", data.quoteId)
+
+            const calculatedSubtotal = (allItems || []).reduce(
+                (acc, it) => acc + Number(it.quantity || 0) * Number(it.unit_price || 0),
+                0
+            )
+
+            const discType = data.discountType || currentQuote.discount_type || "fixed"
+            const discVal = data.discountValue !== undefined ? Number(data.discountValue) : Number(currentQuote.discount_value || 0)
+            const shipping = data.shippingCost !== undefined ? Number(data.shippingCost) : Number(currentQuote.shipping_cost || 0)
+            const additional = data.additionalCosts !== undefined ? Number(data.additionalCosts) : Number(currentQuote.additional_costs || 0)
+
+            let discountAmount = 0
+            if (discType === "percentage") {
+                discountAmount = (calculatedSubtotal * discVal) / 100
+            } else {
+                discountAmount = discVal
             }
+
+            const calculatedTotal = Math.max(0, calculatedSubtotal - discountAmount + shipping + additional)
+
+            updatePayload.subtotal = Number(calculatedSubtotal.toFixed(2))
+            updatePayload.total = Number(calculatedTotal.toFixed(2))
+            updatePayload.updated_at = new Date().toISOString()
 
             const { error } = await supabase
                 .from("quotes")
@@ -978,6 +1016,10 @@ export async function updateQuoteStatusAction(data: {
                 cancelled: ["draft"],
             }
 
+            if (current.status === data.status) {
+                return successResponse({ id: data.quoteId, status: data.status, noop: true })
+            }
+
             const allowed = allowedTransitions[current.status] || []
             if (!allowed.includes(data.status)) {
                 return errorResponse(
@@ -1049,6 +1091,22 @@ export async function updateQuoteStatusAction(data: {
                 import("@/lib/services/whatsapp-automation.service")
                     .then(({ onQuoteShared }) => onQuoteShared(updatedQuote))
                     .catch(console.error)
+            } else if (data.status === "approved") {
+                await notifyQuoteEvent({
+                    event: "approved",
+                    quote: updatedQuote,
+                    actorUserId: user.id,
+                    actorName: approverDisplayName,
+                    approvalMethod: "erp_manual",
+                }).catch(console.error)
+            } else if (data.status === "rejected") {
+                await notifyQuoteEvent({
+                    event: "rejected",
+                    quote: updatedQuote,
+                    actorUserId: user.id,
+                    actorName: approverDisplayName,
+                    approvalMethod: "erp_manual",
+                }).catch(console.error)
             }
 
             await revalidateQuotes(data.partnerId, data.quoteId)
@@ -1342,6 +1400,10 @@ export async function updateQuoteItemAction(data: {
         if (data.unitPrice !== undefined) updatePayload.unit_price = data.unitPrice
         if (data.sortOrder !== undefined) updatePayload.sort_order = data.sortOrder
 
+        const newQty = data.quantity !== undefined ? data.quantity : Number((existingItem as any).quantity || 1)
+        const newPrice = data.unitPrice !== undefined ? data.unitPrice : Number(existingItem.unit_price || 0)
+        updatePayload.total_price = Number((newQty * newPrice).toFixed(2))
+
         const { error } = await supabase
             .from("quote_items")
             .update(updatePayload)
@@ -1353,7 +1415,49 @@ export async function updateQuoteItemAction(data: {
             return errorResponse(error.message)
         }
 
-        await revalidateQuotes(data.partnerId)
+        // Recalculate parent quote subtotal and total
+        const { data: allQuoteItems } = await supabase
+            .from("quote_items")
+            .select("quantity, unit_price")
+            .eq("quote_id", existingItem.quote_id)
+
+        const calculatedSubtotal = (allQuoteItems || []).reduce(
+            (acc, it) => acc + Number(it.quantity || 0) * Number(it.unit_price || 0),
+            0
+        )
+
+        const { data: parentQuote } = await supabase
+            .from("quotes")
+            .select("discount_type, discount_value, shipping_cost, additional_costs")
+            .eq("id", existingItem.quote_id)
+            .single()
+
+        if (parentQuote) {
+            const discType = parentQuote.discount_type || "fixed"
+            const discVal = Number(parentQuote.discount_value || 0)
+            const shipping = Number(parentQuote.shipping_cost || 0)
+            const additional = Number(parentQuote.additional_costs || 0)
+
+            let discountAmount = 0
+            if (discType === "percentage") {
+                discountAmount = (calculatedSubtotal * discVal) / 100
+            } else {
+                discountAmount = discVal
+            }
+
+            const calculatedTotal = Math.max(0, calculatedSubtotal - discountAmount + shipping + additional)
+
+            await supabase
+                .from("quotes")
+                .update({
+                    subtotal: Number(calculatedSubtotal.toFixed(2)),
+                    total: Number(calculatedTotal.toFixed(2)),
+                    updated_at: new Date().toISOString()
+                })
+                .eq("id", existingItem.quote_id)
+        }
+
+        await revalidateQuotes(data.partnerId, existingItem.quote_id)
         return successResponse({ id: data.itemId })
     } catch (err: any) {
         console.error("[updateQuoteItemAction] Error:", err)
@@ -1977,7 +2081,7 @@ export async function getQuoteDetailsAction(quoteId: string, partnerId: string) 
 
 export async function getPartnerAddressAction(partnerId: string, storeId?: string) {
     try {
-        const supabase = await getSupabaseServerClient()
+        const supabase = getAdminClient()
 
         let addrData: any = null
 
@@ -2014,7 +2118,7 @@ export async function getPartnerAddressAction(partnerId: string, storeId?: strin
                 .from("stores")
                 .select("id")
                 .eq("partner_id", partnerId)
-            const sIds = (partnerStores || []).map((s) => s.id)
+            const sIds = (partnerStores as any[] || []).map((s: any) => s.id)
             if (sIds.length > 0) {
                 const { data: fallbackStoreAddr } = await supabase
                     .from("addresses")
@@ -2302,20 +2406,20 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     .maybeSingle()
                 if (quoteById) {
                     quote = quoteById
-                    // Auto-generate public_token if missing
-                    if (!quote.public_token) {
-                        await admin.from("quotes").update({ public_token: generateShortId(6) }).eq("id", quote.id)
-                        const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
-                        if (refreshed?.public_token) quote.public_token = refreshed.public_token
+                    // Auto-generate public_token if missing or UUID
+                    if (!quote.public_token || isUuid(quote.public_token)) {
+                        const newToken = generateShortId(6)
+                        await admin.from("quotes").update({ public_token: newToken }).eq("id", quote.id)
+                        quote.public_token = newToken
                     }
                 }
             }
 
-            // 1c. Auto-generate public_token if quote exists but has none
-            if (quote && !quote.public_token) {
-                await admin.from("quotes").update({ public_token: generateShortId(6) }).eq("id", quote.id)
-                const { data: refreshed } = await admin.from("quotes").select("public_token").eq("id", quote.id).single()
-                if (refreshed?.public_token) quote.public_token = refreshed.public_token
+            // 1c. Auto-generate public_token if quote exists but has none or is UUID
+            if (quote && (!quote.public_token || isUuid(quote.public_token))) {
+                const newToken = generateShortId(6)
+                await admin.from("quotes").update({ public_token: newToken }).eq("id", quote.id)
+                quote.public_token = newToken
             }
 
             if (quoteErr || !quote) {
@@ -2703,11 +2807,12 @@ export async function approvePublicQuoteAction(
                 .eq("id", quote.id)
                 .single()
 
-            // 5. Send email notification
+            // 5. Send notification and audit log
             await notifyQuoteEvent({
                 event: "approved",
                 quote: updatedQuote,
-                actorName: currentUser ? (currentUser.email || "Cliente Autenticado") : approverName.trim(),
+                actorName: approverDisplayName,
+                actorUserId: currentUser?.id || null,
                 approvalMethod: method,
                 ipAddress: ip,
                 userAgent: userAgent
@@ -2829,11 +2934,12 @@ export async function rejectPublicQuoteAction(
                 .eq("id", quote.id)
                 .single()
 
-            // 5. Send email notification
+            // 5. Send notification and audit log
             await notifyQuoteEvent({
                 event: "rejected",
                 quote: updatedQuote,
-                actorName: currentUser ? (currentUser.email || "Cliente Autenticado") : rejectorName.trim(),
+                actorName: rejectorDisplayName,
+                actorUserId: currentUser?.id || null,
                 rejectionReason: reason.trim(),
                 approvalMethod: method,
                 ipAddress: ip,

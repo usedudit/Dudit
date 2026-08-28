@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     PlusIcon,
     ExportFileIcon,
     Settings2Icon,
+    UploadIcon,
 } from '@/lib/icons';
 import { useErpExport } from '@/hooks/use-erp-export';
 import { usePermissions } from '@/lib/permission-context';
@@ -96,6 +98,7 @@ const AppointmentsPage = ({
     initialUnavailableTypes?: any[];
     openingHours?: any;
 }) => {
+    const router = useRouter();
     const APPOINTMENT_COLUMNS = useMemo<Array<{
         id: string;
         label: string;
@@ -824,6 +827,9 @@ const AppointmentsPage = ({
                                         <DropdownItem onClick={handleExport} >
                                             <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
                                         </DropdownItem>
+                                        <DropdownItem onClick={() => router.push('/erp/agendamentos/importar')}>
+                                            <UploadIcon size={16} /> Importar agendamentos
+                                        </DropdownItem>
                                     </Dropdown>
                                     <Button onClick={() => handleOpenCreate()} leftIcon={<PlusIcon size={18} />}>
                                         Novo agendamento
@@ -856,6 +862,7 @@ const AppointmentsPage = ({
                                 }}
                                 onExport={handleExport}
                                 isExporting={isExporting}
+                                onImport={() => router.push('/erp/agendamentos/importar')}
                             />
 
                             <div className="flex-1 bg-white dark:bg-dark-surface md:rounded-2xl overflow-hidden h-full md:px-8">

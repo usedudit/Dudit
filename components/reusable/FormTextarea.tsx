@@ -19,6 +19,7 @@ interface FormTextareaProps {
     error?: boolean
     errorMessage?: string
     showCharacterCount?: boolean
+    dataField?: string
 }
 
 export const FormTextarea: React.FC<FormTextareaProps> = ({
@@ -38,8 +39,9 @@ export const FormTextarea: React.FC<FormTextareaProps> = ({
     error = false,
     errorMessage,
     showCharacterCount = false,
+    dataField,
 }) => (
-    <div className={`flex-1 w-full ${className || ""}`}>
+    <div className={`flex-1 w-full ${className || ""}`} {...(dataField ? { "data-field": dataField } : {})}>
         {(label || labelAddon) && (
             <div className="flex items-center gap-2 mb-1.5">
                 {label && (

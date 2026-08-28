@@ -223,7 +223,15 @@ describe("Dashboard Engine - Rules Evaluation Tests", () => {
   describe("Business Modes & Resource Presets", () => {
     it("should return minimal resources for desapego mode", () => {
       const resources = getDefaultResourcesForModeAndCategory("desapego");
-      expect(resources).toEqual(["products", "showcase"]);
+      expect(resources).toEqual(["products", "services", "showcase"]);
+    });
+
+    it("should return empty checklist for desapego mode", () => {
+      const items = getChecklistItems(createBaseContext({
+        isDesapego: true,
+        businessMode: "desapego",
+      }));
+      expect(items).toEqual([]);
     });
 
     it("should return streamlined showcase resources for quick mode without ERP overhead", () => {

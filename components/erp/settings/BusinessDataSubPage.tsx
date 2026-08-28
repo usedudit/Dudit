@@ -29,6 +29,7 @@ import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon
 import PartnerCategoryModal from "./PartnerCategoryModal"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
@@ -38,6 +39,13 @@ import { normalizeBusinessInfo, type BusinessMode } from "@/lib/business-info"
 import { useStore } from "@/lib/store-context"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { consultarCNPJ } from "@/lib/fiscal"
+
+const TIMEZONE_OPTIONS = [
+    { value: "America/Noronha", label: "Fernando de Noronha (UTC-2)" },
+    { value: "America/Sao_Paulo", label: "Brasília (UTC-3)" },
+    { value: "America/Manaus", label: "Amazonas (UTC-4)" },
+    { value: "America/Rio_Branco", label: "Acre (UTC-5)" },
+]
 
 const MODE_OPTIONS: Array<{
     value: BusinessMode
@@ -189,20 +197,23 @@ export const BusinessDataSubPage = ({
     const effectiveHours = storeHoursObj || partnerHoursObj || {}
 
     const [hours, setHours] = useState(() => normalizeOpeningHours(effectiveHours))
+    const [timezone, setTimezone] = useState<string>(store?.timezone || partner?.timezone || "America/Sao_Paulo")
 
     const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },
         addresses: { ...addresses },
         fiscalInfo: { ...fiscalInfo },
         hours: { ...hours },
+        timezone: store?.timezone || partner?.timezone || "America/Sao_Paulo",
     }))
 
     const isDirty = useMemo(() => {
         return JSON.stringify(initialState.generalInfo) !== JSON.stringify(generalInfo) ||
             JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
             JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
-            JSON.stringify(initialState.hours) !== JSON.stringify(hours)
-    }, [initialState, generalInfo, addresses, fiscalInfo, hours])
+            JSON.stringify(initialState.hours) !== JSON.stringify(hours) ||
+            initialState.timezone !== timezone
+    }, [initialState, generalInfo, addresses, fiscalInfo, hours, timezone])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -293,10 +304,28 @@ export const BusinessDataSubPage = ({
         return 0
     }, [fieldErrors])
 
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS: [
+            { field: "storeName", tab: "general" },
+            { field: "phone", tab: "general" },
+            { field: "cnpj", tab: "general" },
+            { field: "zipCode", tab: "address" },
+            { field: "street", tab: "address" },
+            { field: "neighborhood", tab: "address" },
+            { field: "city", tab: "address" },
+            { field: "state", tab: "address" },
+        ],
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
 
         if (!validate()) {
+            scrollToFirstError()
             setShowValidationModal(true)
             return
         }
@@ -331,6 +360,7 @@ export const BusinessDataSubPage = ({
                         municipioCodigoIbge: addresses.ibge || undefined,
                         latitude: addresses.latitude ?? null,
                         longitude: addresses.longitude ?? null,
+                        timezone: timezone || "America/Sao_Paulo",
                         person_type: generalInfo.personType as "pf" | "pj",
                         cnpj: generalInfo.personType === "pj" ? (generalInfo.cnpj || null) : null,
                         cpf: generalInfo.personType === "pf" ? (generalInfo.cnpj || null) : null,
@@ -368,6 +398,7 @@ export const BusinessDataSubPage = ({
                         addresses: { ...addresses },
                         fiscalInfo: { ...fiscalInfo },
                         hours: { ...hours },
+                        timezone: timezone || "America/Sao_Paulo",
                     })
                     setTimeout(() => {
                         onBack()
@@ -476,8 +507,9 @@ export const BusinessDataSubPage = ({
                                                                 setGeneralInfo({ ...generalInfo, storeName: e.target.value })
                                                                 setFieldErrors(prev => { const n = new Set(prev); n.delete("storeName"); return n })
                                                             }}
-                                                            error={fieldErrors.has("storeName")}
-                                                            maxLength={150}
+                                                        error={fieldErrors.has("storeName")}
+                                                        maxLength={150}
+                                                        dataField="storeName"
                                                         />
                                                     </div>
                                                     <div className="col-span-12 md:col-span-6">
@@ -490,6 +522,7 @@ export const BusinessDataSubPage = ({
                                                             }}
                                                             error={fieldErrors.has("phone")}
                                                             errorMessage={fieldErrors.has("phone") && generalInfo.phone.trim() ? "Número de celular inválido" : "Celular é obrigatório"}
+                                                            dataField="phone"
                                                         />
                                                     </div>
                                                 </div>
@@ -558,6 +591,7 @@ export const BusinessDataSubPage = ({
                                                                 name="cnpj"
                                                                 error={fieldErrors.has("cnpj")}
                                                                 errorMessage={fieldErrors.has("cnpj") ? (generalInfo.personType === "pj" ? "CNPJ inválido" : "CPF inválido") : undefined}
+                                                                dataField="cnpj"
                                                             />
                                                             {isSearchingCnpj && <span className="text-[11px] text-brand-primary animate-pulse font-medium">Consultando CNPJ...</span>}
                                                         </div>
@@ -713,6 +747,7 @@ export const BusinessDataSubPage = ({
                                                         }}
                                                         error={fieldErrors.has("zipCode")}
                                                         errorMessage={fieldErrors.has("zipCode") ? "CEP inválido" : ""}
+                                                        dataField="zipCode"
                                                     />
                                                     <Input
                                                         label="Rua/Avenida"
@@ -723,6 +758,7 @@ export const BusinessDataSubPage = ({
                                                             setFieldErrors(prev => { const n = new Set(prev); n.delete("street"); return n })
                                                         }}
                                                         error={fieldErrors.has("street")}
+                                                        dataField="street"
                                                     />
 
                                                     <div className="grid grid-cols-2 gap-3 flex-row items-start pt-1.5 pb-1.5">
@@ -754,6 +790,7 @@ export const BusinessDataSubPage = ({
                                                             setFieldErrors(prev => { const n = new Set(prev); n.delete("neighborhood"); return n })
                                                         }}
                                                         error={fieldErrors.has("neighborhood")}
+                                                        dataField="neighborhood"
                                                     />
 
                                                     <div className="grid grid-cols-2 gap-3 items-start">
@@ -767,6 +804,7 @@ export const BusinessDataSubPage = ({
                                                                     setFieldErrors(prev => { const n = new Set(prev); n.delete("city"); return n })
                                                                 }}
                                                                 error={fieldErrors.has("city")}
+                                                                dataField="city"
                                                             />
                                                         </div>
                                                         <div>
@@ -813,8 +851,22 @@ export const BusinessDataSubPage = ({
                                 </TabsContent>
 
                                 <TabsContent value="hours" className="mt-0 focus-visible:outline-none">
-                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden">
-                                        <FormSection title="Horários de Funcionamento">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative overflow-hidden space-y-8">
+                                        <FormSection title="Fuso horário">
+                                            <div className="max-w-md space-y-2">
+                                                <FormDropdown
+                                                    label="Fuso horário do negócio"
+                                                    value={timezone}
+                                                    setValue={setTimezone}
+                                                    options={TIMEZONE_OPTIONS}
+                                                />
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    Define como datas e horários de pedidos, agendamentos e relatórios são interpretados no sistema.
+                                                </p>
+                                            </div>
+                                        </FormSection>
+
+                                        <FormSection title="Horários de Funcionamento" hasSeparator>
                                             <BusinessHoursSelector value={hours as any} onChange={setHours} />
                                         </FormSection>
                                     </motion.div>

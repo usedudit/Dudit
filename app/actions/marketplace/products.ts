@@ -187,7 +187,7 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
   }
   let query = supabase
     .from("reviews")
-    .select("id, rating, comment, created_at, user_id, product_id, store_id")
+    .select("id, rating, comment, created_at, user_id, order_id, product_id, store_id")
     .eq("product_id", resolvedId)
 
   if (storeId) {
@@ -223,12 +223,44 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
     }
   }
 
-  return reviewsData.map((r: any) => ({
-    rating: r.rating,
-    comment: r.comment,
-    created_at: r.created_at,
-    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
-  }))
+  const orderIds = Array.from(new Set(reviewsData.map((r: any) => r.order_id).filter(Boolean)))
+  let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
+
+  if (orderIds.length > 0) {
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select(`
+        id, order_id, quantity, product_id, service_id,
+        product_variants(id, variant_name, variant_options)
+      `)
+      .in("order_id", orderIds)
+
+    if (itemsData) {
+      itemsData.forEach((item: any) => {
+        const key = `${item.order_id}_${item.product_id || item.service_id}`
+        orderItemsMap.set(key, {
+          quantity: item.quantity,
+          variant_name: item.product_variants?.variant_name || null,
+          variant_options: item.product_variants?.variant_options || null,
+        })
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => {
+    const itemKey = `${r.order_id}_${r.product_id}`
+    const orderItem = orderItemsMap.get(itemKey)
+    return {
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at,
+      quantity: orderItem?.quantity || null,
+      variant_name: orderItem?.variant_name || null,
+      variant_options: orderItem?.variant_options || null,
+      profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
+    }
+  })
 }
 
 // React cache() wrappers - deduplicate within SSR request

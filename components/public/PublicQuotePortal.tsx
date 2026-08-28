@@ -127,12 +127,13 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
     const handleApprove = async () => {
         setIsProcessingAction(true)
-        setErrorMessage(null)
+        setApproveModalError(null)
         try {
-            const res = await approvePublicQuoteAction(token, "Cliente", isClientEmailMatched ? "" : approvalCode, ip, userAgent)
+            const res = await approvePublicQuoteAction(token, "Cliente", (isClientEmailMatched || !!currentUser) ? "" : approvalCode, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento aprovado com sucesso!")
                 setShowApproveModal(false)
+                setApproveModalError(null)
                 // Reload data
                 const refreshRes = await getPublicQuoteAction(token, ip, userAgent)
                 if (refreshRes.success && refreshRes.data) {
@@ -140,10 +141,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                     setSnapshot(refreshRes.data.snapshot)
                 }
             } else {
-                setErrorMessage(res.error || "Erro ao aprovar orçamento.")
+                setApproveModalError(res.error || "Erro ao aprovar orçamento.")
             }
         } catch (err: any) {
-            setErrorMessage(err.message || "Erro de conexão ao processar aprovação.")
+            setApproveModalError(err.message || "Erro de conexão ao processar aprovação.")
         } finally {
             setIsProcessingAction(false)
         }
@@ -151,16 +152,17 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
 
     const handleReject = async () => {
         if (!rejectionReason.trim()) {
-            setErrorMessage("O motivo da recusa é obrigatório.")
+            setRejectModalError("O motivo da recusa é obrigatório.")
             return
         }
         setIsProcessingAction(true)
-        setErrorMessage(null)
+        setRejectModalError(null)
         try {
-            const res = await rejectPublicQuoteAction(token, "Cliente", isClientEmailMatched ? "" : approvalCode, rejectionReason, ip, userAgent)
+            const res = await rejectPublicQuoteAction(token, "Cliente", (isClientEmailMatched || !!currentUser) ? "" : approvalCode, rejectionReason, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento recusado com sucesso.")
                 setShowRejectModal(false)
+                setRejectModalError(null)
                 // Reload data
                 const refreshRes = await getPublicQuoteAction(token, ip, userAgent)
                 if (refreshRes.success && refreshRes.data) {
@@ -168,10 +170,10 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                     setSnapshot(refreshRes.data.snapshot)
                 }
             } else {
-                setErrorMessage(res.error || "Erro ao recusar orçamento.")
+                setRejectModalError(res.error || "Erro ao recusar orçamento.")
             }
         } catch (err: any) {
-            setErrorMessage(err.message || "Erro de conexão ao processar recusa.")
+            setRejectModalError(err.message || "Erro de conexão ao processar recusa.")
         } finally {
             setIsProcessingAction(false)
         }
@@ -299,11 +301,11 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                             <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
                                 {/* Success and Error Banners */}
                                 {successMessage && (
-                                    <InfoCard message={successMessage} color='green' rightElement={<Button variant="link" className="text-brand-green mb-8" onClick={() => setSuccessMessage(null)} value="X" />} />
+                                    <InfoCard message={successMessage} color='green' className="mb-8" rightElement={<Button variant="link" className="text-brand-green" onClick={() => setSuccessMessage(null)} value="X" />} />
                                 )}
 
                                 {errorMessage && (
-                                    <InfoCard message={errorMessage} color='red' rightElement={<Button variant="link" className="text-brand-red mb-8" onClick={() => setErrorMessage(null)} value="X" />} />
+                                    <InfoCard message={errorMessage} color='red' className="mb-8" rightElement={<Button variant="link" className="text-brand-red" onClick={() => setErrorMessage(null)} value="X" />} />
                                 )}
 
                                 {/* TABS CONTENT */}
@@ -312,9 +314,29 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                     {isFinalized && (
                                         <div className="mb-8">
                                             {quote.status === "approved" ? (
-                                                <InfoCard title='Aprovado pelo cliente' message={`Aprovador: ${quote.approver_name || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`} color='green' />
+                                                <InfoCard
+                                                    title={
+                                                        quote.approval_method === "erp_manual"
+                                                            ? "Aprovado no ERP"
+                                                            : quote.approval_method === "erp_portal"
+                                                                ? "Aprovado pelo lojista"
+                                                                : "Aprovado pelo cliente"
+                                                    }
+                                                    message={`Aprovador: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`}
+                                                    color='green'
+                                                />
                                             ) : quote.status === "rejected" ? (
-                                                <InfoCard title='Recusado pelo cliente' message={`Autor: ${quote.approver_name || "Cliente"} - Data: ${formatDateTime(quote.rejected_at)}` + (quote.rejection_reason && ` - Motivo: ${quote.rejection_reason}`)} color='red' />
+                                                <InfoCard
+                                                    title={
+                                                        quote.approval_method === "erp_manual"
+                                                            ? "Recusado no ERP"
+                                                            : quote.approval_method === "erp_portal"
+                                                                ? "Recusado pelo lojista"
+                                                                : "Recusado pelo cliente"
+                                                    }
+                                                    message={`Autor: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.rejected_at)}` + (quote.rejection_reason ? ` - Motivo: ${quote.rejection_reason}` : "")}
+                                                    color='red'
+                                                />
                                             ) : quote.status === "expired" ? (
                                                 <InfoCard title="Proposta Expirada" message={`A proposta atingiu seu limite de validade em ${formatDateString(quote.expiration_date)} e expirou.`} color="orange" />
                                             ) : (
@@ -466,14 +488,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         <Button
                             variant="outline"
                             onClick={() => setShowApproveModal(false)}
-                            className="flex-1 py-2.5 h-auto"
+                            className="flex-1 h-auto"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleApprove}
                             disabled={(!isClientEmailMatched && approvalCode.length < 4) || isProcessingAction}
-                            className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
+                            className="flex-1 h-auto"
                         >
                             {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
                         </Button>
@@ -513,14 +535,14 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         <Button
                             variant="outline"
                             onClick={() => setShowRejectModal(false)}
-                            className="flex-1 py-2.5 h-auto"
+                            className="flex-1 h-auto"
                         >
                             Cancelar
                         </Button>
                         <Button
                             onClick={handleReject}
                             disabled={(!isClientEmailMatched && approvalCode.length < 4) || !rejectionReason.trim() || isProcessingAction}
-                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 h-auto border-none"
+                            className="flex-1 h-auto"
                         >
                             {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
                         </Button>

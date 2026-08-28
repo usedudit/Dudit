@@ -208,17 +208,18 @@ export function ProductDetailsPageClient({
         const p = Array.isArray(product.partners) ? product.partners[0] : product.partners
         const store = product?.stores || p?.stores
         const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
-        const storeId = store?.id || p?.store_id || product.store_id || p?.id || product.partner_id || "1"
+        const realPartnerId = product.partner_id || p?.id || p?.partner_id || "1"
+        const storeId = store?.id || p?.store_id || product.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Vendedor da Dudit"
 
         return {
-            id: storeId,
+            id: realPartnerId,
             short_id: store?.short_id || p?.short_id || product.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
             store_id: storeId,
             name: storeName,
             user_id: p?.user_id,
-            partner_id: p?.id || product.partner_id,
+            partner_id: realPartnerId,
             phone: store?.phone || store?.whatsapp_phone || p?.phone,
             store_name: storeName,
             city: address?.city || store?.city || p?.city || "Brasil",
@@ -270,10 +271,11 @@ export function ProductDetailsPageClient({
     // Combined effect: promotions + view counter + delivery config
     // Grouped into a single timer to reduce Server Action POST count on mount
     useEffect(() => {
-        if (!partner?.id || !product?.id || isProductOwner) return
+        const targetPartnerId = partner?.partner_id || partner?.id
+        if (!targetPartnerId || !product?.id || isProductOwner) return
         const timer = setTimeout(() => {
             // Fire all deferred actions in parallel
-            listActivePromotionsForMarketplaceAction(partner.id)
+            listActivePromotionsForMarketplaceAction(targetPartnerId)
                 .then((res) => {
                     if (Array.isArray(res)) setActivePromotions(res)
                 })
@@ -285,12 +287,12 @@ export function ProductDetailsPageClient({
                 body: JSON.stringify({ entityType: "produto", entityId: product.id }),
             }).catch(() => { })
 
-            getPartnerDeliveryConfigAction(partner.id).then((res: any) => {
+            getPartnerDeliveryConfigAction(targetPartnerId, partner.store_id || product.store_id).then((res: any) => {
                 if (res.success) setDeliveryConfig(res)
             })
-        }, 600)
+        }, 300)
         return () => clearTimeout(timer)
-    }, [partner?.id, product?.id, isProductOwner])
+    }, [partner?.partner_id, partner?.id, partner?.store_id, product?.id, product?.store_id, isProductOwner])
 
     const activePromo = useMemo(() => {
         return activePromotions.find((promo) => {
@@ -626,7 +628,8 @@ export function ProductDetailsPageClient({
 
     // Automatically calculate delivery when selectedAddress changes (for logged in users)
     useEffect(() => {
-        if (!selectedAddress || !partner.id) return
+        const targetPartnerId = partner.partner_id || partner.id
+        if (!selectedAddress || !targetPartnerId) return
         let active = true
 
         async function calculateForAddress() {
@@ -639,8 +642,8 @@ export function ProductDetailsPageClient({
                 setCep(selectedAddress.zip_code || "")
 
                 const quote = await quoteDeliveryFeeAction({
-                    partnerId: partner.id,
-                    storeId: (product as any)?.store_id || (product as any)?.stores?.id || null,
+                    partnerId: targetPartnerId,
+                    storeId: partner.store_id || (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
@@ -666,7 +669,7 @@ export function ProductDetailsPageClient({
 
         calculateForAddress()
         return () => { active = false }
-    }, [selectedAddress, partner.id, pricing.total])
+    }, [selectedAddress, partner.partner_id, partner.id, partner.store_id, product.store_id, pricing.total])
 
     // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
     useEffect(() => {
@@ -681,6 +684,9 @@ export function ProductDetailsPageClient({
             }
             return
         }
+
+        const targetPartnerId = partner.partner_id || partner.id
+        if (!targetPartnerId) return
 
         let active = true
         async function calculateForCep() {
@@ -703,8 +709,8 @@ export function ProductDetailsPageClient({
                 setShippingState("calculated")
 
                 const quote = await quoteDeliveryFeeAction({
-                    partnerId: partner.id,
-                    storeId: (product as any)?.store_id || (product as any)?.stores?.id || null,
+                    partnerId: targetPartnerId,
+                    storeId: partner.store_id || (product as any)?.store_id || (product as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
@@ -730,7 +736,7 @@ export function ProductDetailsPageClient({
 
         calculateForCep()
         return () => { active = false }
-    }, [cep, partner.id, userId, pricing.total])
+    }, [cep, partner.partner_id, partner.id, partner.store_id, product.store_id, userId, pricing.total])
 
     const galleryContainerRef = useRef<HTMLDivElement>(null)
     const reviewsRef = useRef<HTMLDivElement>(null)
@@ -1595,7 +1601,7 @@ export function ProductDetailsPageClient({
                             {!loadingAddresses && <Separator className="opacity-60" />}
 
                             {/* Delivery Option if configured */}
-                            {deliveryConfig?.settings?.isDeliveryEnabled ? (
+                            {(deliveryConfig?.settings?.isDeliveryEnabled !== false || deliveryFee !== null) ? (
                                 <>
                                     {(() => {
                                         const freeThreshold = Number(deliveryConfig?.settings?.freeDeliveryThreshold ?? deliveryConfig?.settings?.free_delivery_threshold ?? 0)
@@ -1648,7 +1654,7 @@ export function ProductDetailsPageClient({
                                                             )}
                                                             <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
                                                         </div>
-                                                    ) : isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
+                                                    ) : isFreeByThreshold || deliveryBreakdown?.isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>
                                                     ) : deliveryFee !== null && deliveryFee > 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -1656,6 +1662,10 @@ export function ProductDetailsPageClient({
                                                         </p>
                                                     ) : deliveryFee !== null && deliveryFee === 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+                                                    ) : deliveryConfig?.settings?.baseFee != null && Number(deliveryConfig.settings.baseFee) > 0 ? (
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                            {hasDeliveryRatesConfigured(deliveryConfig.settings, deliveryConfig.rules) ? `A partir de ${formatMoney(Number(deliveryConfig.settings.baseFee))}` : formatMoney(Number(deliveryConfig.settings.baseFee))}
+                                                        </p>
                                                     ) : deliveryError === "Entrega não disponível no plano atual." ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : (
@@ -1673,13 +1683,10 @@ export function ProductDetailsPageClient({
                                     <div className="flex justify-between items-start py-4">
                                         <div>
                                             <p className="text-sm text-brand-dark dark:text-dark-heading font-medium leading-snug">Entrega a combinar</p>
-                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Fale com o vendedor no WhatsApp após o pedido</p>
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Consulte os detalhes com o vendedor</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-                                        </div>
+                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                     </div>
-
                                     {(deliveryConfig?.settings?.isPickupEnabled !== false) && <Separator className="opacity-60" />}
                                 </>
                             )}
@@ -2088,20 +2095,33 @@ export function ProductDetailsPageClient({
                 title="Adicionar novo endereço"
             >
                 <div className="flex flex-col gap-4">
-                    <div onBlur={handleCepBlur}>
+                    <div>
                         <CepInput
                             value={newAddressData.zipCode}
-                            onChange={(val) => setNewAddressData({ ...newAddressData, zipCode: val })}
-                            disabled={loadingCep}
+                            onChange={(val) => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
+                            onAddressFetched={(addr) => {
+                                setNewAddressData(prev => ({
+                                    ...prev,
+                                    street: addr.street || prev.street,
+                                    number: addr.number || prev.number,
+                                    noNumber: addr.number ? addr.number === "S/N" : prev.noNumber,
+                                    neighborhood: addr.neighborhood || prev.neighborhood,
+                                    city: addr.city || prev.city,
+                                    state: addr.state || prev.state,
+                                    latitude: addr.latitude ?? prev.latitude,
+                                    longitude: addr.longitude ?? prev.longitude,
+                                }))
+                                setDeliveryError(null)
+                            }}
+                            onLoadingChange={setLoadingCep}
                         />
                     </div>
                     <div>
                         <Input
                             label="Rua/Avenida"
                             value={newAddressData.street}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, street: e.target.value })}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
                             placeholder="Rua, Avenida, etc."
-                            disabled={loadingCep}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -2110,8 +2130,8 @@ export function ProductDetailsPageClient({
                                 label="Número"
                                 number={newAddressData.number}
                                 noNumber={newAddressData.noNumber}
-                                onNumberChange={(val) => setNewAddressData({ ...newAddressData, number: val })}
-                                onNoNumberChange={(checked) => setNewAddressData({ ...newAddressData, noNumber: checked, number: checked ? "S/N" : "" })}
+                                onNumberChange={(val) => setNewAddressData(prev => ({ ...prev, number: val }))}
+                                onNoNumberChange={(checked) => setNewAddressData(prev => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
                                 placeholder="123"
                             />
                         </div>
@@ -2119,7 +2139,7 @@ export function ProductDetailsPageClient({
                             <Input
                                 label="Complemento"
                                 value={newAddressData.complement}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, complement: e.target.value })}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
                                 placeholder="Apto, Bloco, etc."
                             />
                         </div>
@@ -2128,8 +2148,7 @@ export function ProductDetailsPageClient({
                         <Input
                             label="Bairro"
                             value={newAddressData.neighborhood}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, neighborhood: e.target.value })}
-                            disabled={loadingCep}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
                             placeholder="Nome do bairro"
                         />
                     </div>
@@ -2138,15 +2157,14 @@ export function ProductDetailsPageClient({
                             <Input
                                 label="Cidade"
                                 value={newAddressData.city}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, city: e.target.value })}
-                                disabled={loadingCep}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="Nome da cidade"
                             />
                         </div>
                         <div>
                             <StateComboBox
                                 value={newAddressData.state}
-                                onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
+                                onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
                             />
                         </div>
                     </div>
@@ -2378,8 +2396,17 @@ export function ProductDetailsPageClient({
                                         </div>
                                     </div>
 
-                                    {/* Desktop Right Column (Actions + Next) */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
+                                    {/* Desktop Next Button */}
+                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                        {galleryItems.length > 1 && (
+                                            <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Desktop Right Column (Actions) */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center">
                                         {(() => {
                                             const isFavProd = isFav(product.id, "produto")
                                             return (
@@ -2397,14 +2424,6 @@ export function ProductDetailsPageClient({
                                         <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
                                             <PlusIcon size={18} className="text-brand-green" />
                                         </Button>
-
-                                        <div className="flex-1 flex items-center">
-                                            {galleryItems.length > 1 && (
-                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                                </Button>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             </div>

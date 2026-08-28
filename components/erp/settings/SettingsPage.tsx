@@ -12,9 +12,10 @@ import {
   MoneyIcon,
   TagIcon,
   PackageReceiveIcon,
-  WrenchIcon,
   CadastrosIcon,
   ClockIcon,
+  ShoppingCartIcon,
+  PrinterIcon,
 } from "@/lib/icons"
 
 import { BusinessDataSubPage } from "./BusinessDataSubPage"
@@ -23,11 +24,11 @@ import { IntegrationsSubPage } from "./IntegrationsSubPage"
 import { TeamSubPage } from "./TeamSubPage"
 import { SubscriptionSubPage } from "./SubscriptionSubPage"
 import { PaymentsPage } from "./PaymentsPage"
-import { SimpleSettingsSubPage } from "./SimpleSettingsSubPage"
 import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
-import { SystemSettingsSubPage } from "./SystemSettingsSubPage"
+import { SalesSettingsSubPage } from "./SalesSettingsSubPage"
+import { ReceiptSettingsSubPage } from "./ReceiptSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import { AuditLogsSubPage } from "./AuditLogsSubPage"
@@ -53,12 +54,13 @@ type ActivePage =
   | "integrations"
   | "team"
   | "subscription"
+  | "sales-settings"
+  | "receipts"
   | "payment-methods"
   | "comissao"
   | "trocas"
   | "vitrine"
   | "delivery"
-  | "system-settings"
   | "resources"
   | "logs"
 
@@ -77,12 +79,13 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "business-data": "dados-do-negocio",
     "team": "equipe-e-acessos",
     "subscription": "assinatura",
+    "sales-settings": "vendas-gerais",
+    "receipts": "recibos-impressao",
     "payment-methods": "formas-de-pagamento",
     "comissao": "comissao",
     "trocas": "trocas-devolucoes",
     "vitrine": "vitrine",
     "delivery": "entrega",
-    "system-settings": "configuracoes-sistema",
     "integrations": "integracoes",
     "resources": "gerenciar-recursos",
     "logs": "historico-atividades",
@@ -94,6 +97,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       {} as Record<string, ActivePage>
     ),
     "recibo-devolucao": "trocas", // Legacy fallback compatibility
+    "configuracoes-sistema": "receipts", // Legacy fallback compatibility
+    "entregas": "delivery", // Legacy fallback compatibility
   }
 
   const navigateToSubpage = (page: ActivePage) => {
@@ -134,7 +139,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         setActivePage(SLUG_TO_PAGE[tab])
         if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("empresa")
-        } else if (["payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+        } else if (["sales-settings", "receipts", "payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("vendas")
         } else {
           setActiveTab("adicionais")
@@ -155,7 +160,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         setActivePage(SLUG_TO_PAGE[tab])
         if (["business-data", "team", "subscription"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("empresa")
-        } else if (["payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
+        } else if (["sales-settings", "receipts", "payment-methods", "comissao", "trocas"].includes(SLUG_TO_PAGE[tab])) {
           setActiveTab("vendas")
         } else {
           setActiveTab("adicionais")
@@ -177,12 +182,15 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "integrations": "Integrações",
         "team": "Equipe e Acessos",
         "subscription": "Minha Assinatura",
+        "sales-settings": "Configurações de Vendas",
+        "receipts": "Recibos e Impressão",
         "payment-methods": "Formas de Pagamentos",
         "comissao": "Comissão",
         "trocas": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
         "delivery": "Logística e Entrega",
         "logs": "Histórico de Atividades",
+        "resources": "Gerenciar Recursos",
         "home": "Configurações"
       }
       setHeaderOverride({
@@ -208,20 +216,22 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const isOwnerAdminOrManager = isOwner || isAdmin || isManager
 
   const showVitrine = isOwnerOrAdmin && isSystemResourceActive(businessInfo, "showcase")
-  const isQuick = businessInfo.mode === "quick"
+  const isDesapego = businessInfo.mode === "desapego"
+  const isQuick = businessInfo.mode === "quick" || businessInfo.mode === "showcase"
   const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
   const isTeamResourceActive = isSystemResourceActive(businessInfo, "team")
   const canAccessSubscription = isOwner
-  const canAccessIntegrations = isOwner
-  const canAccessCommissions = isOwnerOrAdmin
-  const canAccessTeam = isOwnerOrAdmin
-  const canAccessPayments = isOwnerOrAdmin
-  const canAccessReturns = isOwnerAdminOrManager
-  const canAccessDelivery = isOwnerOrAdmin
-  const canAccessSystemSettings = isOwnerOrAdmin
-  const canAccessBusinessData = isOwnerAdminOrManager
-  const canAccessResources = isOwnerOrAdmin
-  const canAccessLogs = isOwnerOrAdmin
+  const canAccessIntegrations = isOwner && !isDesapego
+  const canAccessCommissions = isOwnerOrAdmin && !isDesapego && !isQuick
+  const canAccessTeam = isOwnerOrAdmin && !isDesapego && !isQuick
+  const canAccessPayments = isOwnerOrAdmin && !isDesapego
+  const canAccessReturns = isOwnerAdminOrManager && !isDesapego && !isQuick
+  const canAccessDelivery = isOwnerOrAdmin && !isDesapego
+  const canAccessSalesSettings = isOwnerAdminOrManager && !isDesapego
+  const canAccessReceipts = isOwnerAdminOrManager && !isDesapego
+  const canAccessBusinessData = isOwnerAdminOrManager && !isDesapego
+  const canAccessResources = isOwnerOrAdmin && !isDesapego
+  const canAccessLogs = isOwnerOrAdmin && !isDesapego && !isQuick
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
@@ -231,6 +241,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   React.useEffect(() => {
     if (activePage === "subscription" && !canAccessSubscription) setActivePage("home")
     if (activePage === "integrations" && !canAccessIntegrations) setActivePage("home")
+    if (activePage === "sales-settings" && !canAccessSalesSettings) setActivePage("home")
+    if (activePage === "receipts" && !canAccessReceipts) setActivePage("home")
     if (activePage === "comissao" && !canAccessCommissions) setActivePage("home")
     if (activePage === "team" && !canAccessTeam) setActivePage("home")
     if (activePage === "payment-methods" && !canAccessPayments) setActivePage("home")
@@ -238,7 +250,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
     if (activePage === "resources" && !canAccessResources) setActivePage("home")
     if (activePage === "logs" && !canAccessLogs) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources, canAccessLogs])
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessSalesSettings, canAccessReceipts, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources, canAccessLogs])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -258,21 +270,19 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               </div>
 
               <Tabs value={activeTab} onValueChange={handleCategoryTabChange} className="flex flex-col h-full px-4 md:px-8">
-                <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
-                  <TabsTrigger value="empresa">
-                    Configurações do negócio
-                  </TabsTrigger>
-                  {!isQuick && (
+                {!isDesapego && (
+                  <TabsList className="bg-transparent p-0 gap-8 w-full justify-start border-b border-brand-border dark:border-dark-border mb-8">
+                    <TabsTrigger value="empresa">
+                      Configurações do negócio
+                    </TabsTrigger>
                     <TabsTrigger value="vendas">
                       Configurações de vendas
                     </TabsTrigger>
-                  )}
-                  {!isQuick && (
                     <TabsTrigger value="adicionais">
                       Configurações adicionais
                     </TabsTrigger>
-                  )}
-                </TabsList>
+                  </TabsList>
+                )}
 
                 <div className="flex-1 overflow-y-auto no-scrollbar pb-10">
                   <AnimatePresence mode="wait">
@@ -293,7 +303,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                             <ListItem
                               icon={Store}
                               title="Minha Vitrine"
-                              description="Personalize o banner, logo e o status de exibição da sua vitrine online."
+                              description={isDesapego ? "Personalize banner, logo, status da vitrine e endereço." : "Personalize o banner, logo e o status de exibição da sua vitrine online."}
                               onClick={() => navigateToSubpage("vitrine")}
                               showChevron
                               className="px-4 py-3 gap-4"
@@ -328,10 +338,30 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       )}
                     </TabsContent>
 
-                    {!isQuick && (
+                    {!isDesapego && (
                       <TabsContent value="vendas" key="vendas" className="mt-0 focus-visible:outline-none">
                         {activeTab === "vendas" && (
                           <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {canAccessSalesSettings && (
+                              <ListItem
+                                icon={ShoppingCartIcon}
+                                title="Configurações Gerais"
+                                description="Regras de descontos, estoque negativo, vendedor e cancelamento."
+                                onClick={() => navigateToSubpage("sales-settings")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
+                            {canAccessReceipts && (
+                              <ListItem
+                                icon={PrinterIcon}
+                                title="Recibos e Impressão"
+                                description="Personalize formato, rodapé e políticas nos recibos de venda."
+                                onClick={() => navigateToSubpage("receipts")}
+                                showChevron
+                                className="px-4 py-3 gap-4"
+                              />
+                            )}
                             {canAccessPayments && (
                               <ListItem
                                 icon={MoneyIcon}
@@ -392,7 +422,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       </TabsContent>
                     )}
 
-                    {!isQuick && (
+                    {!isDesapego && (
                       <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
                         {activeTab === "adicionais" && (
                           <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -402,16 +432,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 title="Gerenciar recursos"
                                 description="Ative ou desative modulos do sistema para limpar o menu."
                                 onClick={() => navigateToSubpage("resources")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
-                            {canAccessSystemSettings && (
-                              <ListItem
-                                icon={WrenchIcon}
-                                title="Configurações do Sistema"
-                                description="Fuso horário e configurações gerais do sistema."
-                                onClick={() => navigateToSubpage("system-settings")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -461,6 +481,24 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             />
           )}
 
+          {activePage === "sales-settings" && canAccessSalesSettings && (
+            <SalesSettingsSubPage
+              key="sales-settings"
+              partnerId={partner.id}
+              storeId={selectedStore?.id}
+              onBack={() => navigateToSubpage("home")}
+            />
+          )}
+
+          {activePage === "receipts" && canAccessReceipts && (
+            <ReceiptSettingsSubPage
+              key="receipts"
+              partnerId={partner.id}
+              storeId={selectedStore?.id}
+              onBack={() => navigateToSubpage("home")}
+            />
+          )}
+
           {activePage === "payment-methods" && (
             <PaymentsPage
               key="payment-methods"
@@ -487,9 +525,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "trocas" && <ReturnPolicySubPage key="trocas" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
           {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => navigateToSubpage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
-          {activePage === "system-settings" && canAccessSystemSettings && (
-            <SystemSettingsSubPage key="system-settings" partnerId={partner.id} onBack={() => navigateToSubpage("home")} />
-          )}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => navigateToSubpage("home")} />}
           {activePage === "logs" && canAccessLogs && <AuditLogsSubPage key="logs" onBack={() => navigateToSubpage("home")} />}
         </AnimatePresence>

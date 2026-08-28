@@ -20,6 +20,10 @@ import { useTransitionDirection } from "@/providers/transition-provider"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
+import { getAddressesAction } from "@/app/actions/shared/addresses"
+import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
+import { MapPinIcon } from "@/lib/icons"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -39,6 +43,23 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
+
+    const [userAddresses, setUserAddresses] = useState<any[]>([])
+    const [selectedAddressId, setSelectedAddressId] = useState<string>("")
+    const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
+    const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
+
+    useEffect(() => {
+        if (!userId) return
+        getAddressesAction(userId, "user").then(res => {
+            if (res.addresses && res.addresses.length > 0) {
+                const list = res.addresses as any[]
+                setUserAddresses(list)
+                const def = list.find((a: any) => a.is_default) || list[0]
+                if (def) setSelectedAddressId(def.id)
+            }
+        }).catch(err => console.error("Error loading user addresses in cart:", err))
+    }, [userId])
 
     const hasOnlyServices = (items: any[]) => {
         const selected = (items || []).filter((item: any) => getItemSelected(item))
@@ -399,8 +420,73 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const { success: notifySuccess, error: notifyError } = useNotification()
 
-    const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0) => {
+    // Trigger quote delivery per partner whenever items selection, totals or address change
+    useEffect(() => {
+        if (!selectedAddress) return
+        const addressStr = `${selectedAddress.street}, ${selectedAddress.number}${selectedAddress.complement ? `, ${selectedAddress.complement}` : ""} - ${selectedAddress.neighborhood}, ${selectedAddress.city} - ${selectedAddress.state}, ${selectedAddress.zip_code}`
+
+        Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
+            const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
+            const isServicesOnly = hasOnlyServices(data.items || [])
+            if (isServicesOnly || partnerItemsTotal <= 0) return
+
+            const targetPartnerId = data.partnerId || data.partner?.id || storeKey
+            const targetStoreId = data.storeId || data.store?.id || null
+
+            setDeliveryQuotes(prev => ({
+                ...prev,
+                [storeKey]: { ...(prev[storeKey] || { fee: 0, distanceKm: null, breakdown: null }), loading: true, error: null }
+            }))
+
+            quoteDeliveryFeeAction({
+                partnerId: targetPartnerId,
+                storeId: targetStoreId,
+                destinationAddress: addressStr,
+                orderSubtotal: partnerItemsTotal,
+            }).then(quote => {
+                if (quote.success) {
+                    setDeliveryQuotes(prev => ({
+                        ...prev,
+                        [storeKey]: {
+                            fee: Number(quote.fee || 0),
+                            distanceKm: Number(quote.distanceKm || 0),
+                            breakdown: quote.breakdown || null,
+                            loading: false,
+                            error: null,
+                        }
+                    }))
+                } else {
+                    setDeliveryQuotes(prev => ({
+                        ...prev,
+                        [storeKey]: {
+                            fee: 0,
+                            distanceKm: null,
+                            breakdown: null,
+                            loading: false,
+                            error: quote.error || null,
+                        }
+                    }))
+                }
+            }).catch(() => {
+                setDeliveryQuotes(prev => ({
+                    ...prev,
+                    [storeKey]: {
+                        fee: 0,
+                        distanceKm: null,
+                        breakdown: null,
+                        loading: false,
+                        error: "Erro ao calcular entrega.",
+                    }
+                }))
+            })
+        })
+    }, [selectedAddress, optimisticItems, itemsByPartner])
+
+    const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
         if (hasOnlyServices(partnerData?.items || [])) return 0
+        if (storeKey && deliveryQuotes[storeKey] && !deliveryQuotes[storeKey].loading && !deliveryQuotes[storeKey].error) {
+            return Number(deliveryQuotes[storeKey].fee || 0)
+        }
         const settings = partnerData?.deliverySettings
         if (!settings || settings.is_delivery_enabled === false || settings.delivery_payer === "seller") return 0
         if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
@@ -414,7 +500,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         const items = partner.items.filter((item: any) => getItemSelected(item))
         if (items.length === 0) return acc
         const itemsTotal = getPartnerDisplayTotal(storeKey, items)
-        return acc + itemsTotal + getPartnerDeliveryFee(partner, itemsTotal)
+        return acc + itemsTotal + getPartnerDeliveryFee(partner, itemsTotal, storeKey)
     }, 0)
 
     const getPartnerSelectedTotal = (items: any[], storeKey?: string) =>
@@ -440,12 +526,18 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 selectedAddons: item.booking_metadata?.selectedAddons || undefined,
             }))
 
-    const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0) => {
+    const getDeliveryLabel = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
         if (hasOnlyServices(partnerData?.items || [])) return null
+        const quote = storeKey ? deliveryQuotes[storeKey] : null
+        if (quote?.loading) {
+            return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
+        }
+        if (quote?.error && quote.error !== "Entrega não disponível no plano atual.") {
+            return <span className="text-xs text-red-500 font-normal">{quote.error}</span>
+        }
         const settings = partnerData?.deliverySettings
-        if (!settings) return "A combinar"
-        if (settings.delivery_payer === "seller") {
-            const fee = Number(settings.base_fee || 0)
+        if (quote?.breakdown?.deliveryPayer === "seller" || settings?.delivery_payer === "seller") {
+            const fee = Number(quote?.breakdown?.originalFee || settings?.base_fee || 0)
             return (
                 <span className="flex items-center gap-1.5 justify-end">
                     {fee > 0 && <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(fee)}</span>}
@@ -453,14 +545,29 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 </span>
             )
         }
-        if (settings.is_delivery_enabled === false) {
+        if (settings?.is_delivery_enabled === false) {
             return settings.is_pickup_enabled !== false ? "Apenas retirada (Grátis)" : "Indisponível"
         }
-        if (settings.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) {
+        const isFreeThreshold = (settings?.free_delivery_threshold != null && Number(settings.free_delivery_threshold) > 0 && selectedItemsTotal >= Number(settings.free_delivery_threshold)) || Boolean(quote?.breakdown?.isFreeByThreshold)
+        if (isFreeThreshold) {
             return <span className="text-brand-green font-semibold">Grátis (Entrega grátis ativada)</span>
         }
-        const fee = Number(settings.base_fee || 0)
-        return fee > 0 ? formatCurrency(fee) : "A combinar"
+        if (quote?.fee != null) {
+            if (quote.fee === 0 && quote.breakdown?.hasRatesConfigured) {
+                return <span className="text-brand-green font-semibold">Grátis</span>
+            }
+            if (quote.fee > 0) {
+                return formatCurrency(quote.fee)
+            }
+            if (quote.fee === 0) {
+                return "A combinar"
+            }
+        }
+        const fee = Number(settings?.base_fee || 0)
+        if (fee > 0) {
+            return hasDeliveryRatesConfigured(settings, []) ? `${formatCurrency(fee)} (A partir de)` : formatCurrency(fee)
+        }
+        return "A combinar"
     }
 
     const multiplePartners = Object.keys(itemsByPartner).length > 1
@@ -498,7 +605,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                 const partnerId = data.partnerId || storeKey
                                 const partnerPromos = data.promotions || []
                                 const partnerItemsTotal = getPartnerSelectedTotal(data.items, storeKey)
-                                const partnerDeliveryFee = getPartnerDeliveryFee(data)
+                                const partnerDeliveryFee = getPartnerDeliveryFee(data, partnerItemsTotal, storeKey)
                                 const partnerTotalWithDelivery = partnerItemsTotal > 0 ? partnerItemsTotal + partnerDeliveryFee : 0
                                 const expanded = isExpanded(storeKey)
                                 const inStockItems = data.items.filter((item: any) => !isItemOutOfStock(item))
@@ -915,14 +1022,20 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                                 {/* Mobile/Tablet: resumo inline + botão */}
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
+                                                                    {selectedAddress && (
+                                                                        <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1">
+                                                                            <MapPinIcon size={13} className="text-brand-green shrink-0" />
+                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress.city} - {selectedAddress.state}</strong></span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="flex justify-between items-center text-sm">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
-                                                                    {getDeliveryLabel(data, partnerItemsTotal) !== null && (
+                                                                    {getDeliveryLabel(data, partnerItemsTotal, storeKey) !== null && (
                                                                         <div className="flex justify-between items-center text-sm">
                                                                             <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
-                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
+                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
@@ -947,7 +1060,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                             {/* Desktop sidebar para esta loja especificamente */}
                                             <div className="hidden lg:block col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 self-start">
                                                 <div className="border border-brand-border dark:border-dark-border rounded-[12px] overflow-hidden bg-white dark:bg-dark-surface sticky top-[100px]">
-                                                    <div className="bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                                    <div className="bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                                                         Resumo do Pedido{!expanded && partnerTotalWithDelivery > 0 && (
                                                             <span className="text-brand-green font-semibold ml-1">({formatCurrency(partnerTotalWithDelivery)})</span>
                                                         )}
@@ -965,14 +1078,20 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                                                             >
                                                                 <div className="p-6 space-y-4">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
+                                                                    {selectedAddress && (
+                                                                        <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1 border-b border-brand-border/60 dark:border-dark-border/60">
+                                                                            <MapPinIcon size={13} className="text-brand-green shrink-0" />
+                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress.city} - {selectedAddress.state}</strong></span>
+                                                                        </div>
+                                                                    )}
                                                                     <div className="flex justify-between items-center text-sm font-medium">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
                                                                     </div>
-                                                                    {getDeliveryLabel(data, partnerItemsTotal) !== null && (
+                                                                    {getDeliveryLabel(data, partnerItemsTotal, storeKey) !== null && (
                                                                         <div className="flex justify-between items-center text-sm font-medium">
                                                                             <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
-                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal)}</span>
+                                                                            <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />

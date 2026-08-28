@@ -50,14 +50,43 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             break
 
         case "approved":
-            changeLines = [`Orçamento ${quoteNum} APROVADO pelo cliente.`]
-            if (actorName) changeLines.push(`Aprovador: ${actorName}`)
-            if (approvalMethod) changeLines.push(`Método: ${approvalMethod === "code" ? "Código de aprovação" : "Autenticado"}`)
+            if (approvalMethod === "erp_manual") {
+                changeLines = [`Orçamento ${quoteNum} aprovado manualmente no ERP.`]
+                if (actorName) changeLines.push(`Aprovador: ${actorName}`)
+                changeLines.push(`Método: Manual pelo ERP`)
+            } else if (approvalMethod === "erp_portal") {
+                changeLines = [`Orçamento ${quoteNum} aprovado pelo lojista via portal público.`]
+                if (actorName) changeLines.push(`Aprovador: ${actorName}`)
+                changeLines.push(`Método: Lojista (Portal)`)
+            } else if (approvalMethod === "auth") {
+                changeLines = [`Orçamento ${quoteNum} aprovado pelo cliente.`]
+                if (actorName) changeLines.push(`Aprovador: ${actorName}`)
+                changeLines.push(`Método: Cliente autenticado`)
+            } else {
+                changeLines = [`Orçamento ${quoteNum} aprovado pelo cliente.`]
+                if (actorName) changeLines.push(`Aprovador: ${actorName}`)
+                changeLines.push(`Método: Código de aprovação (4 dígitos)`)
+            }
             break
 
         case "rejected":
-            changeLines = [`Orçamento ${quoteNum} REJEITADO pelo cliente.`]
-            if (actorName) changeLines.push(`Rejeitado por: ${actorName}`)
+            if (approvalMethod === "erp_manual") {
+                changeLines = [`Orçamento ${quoteNum} recusado manualmente no ERP.`]
+                if (actorName) changeLines.push(`Recusado por: ${actorName}`)
+                changeLines.push(`Método: Manual pelo ERP`)
+            } else if (approvalMethod === "erp_portal") {
+                changeLines = [`Orçamento ${quoteNum} recusado pelo lojista via portal público.`]
+                if (actorName) changeLines.push(`Recusado por: ${actorName}`)
+                changeLines.push(`Método: Lojista (Portal)`)
+            } else if (approvalMethod === "auth") {
+                changeLines = [`Orçamento ${quoteNum} recusado pelo cliente.`]
+                if (actorName) changeLines.push(`Recusado por: ${actorName}`)
+                changeLines.push(`Método: Cliente autenticado`)
+            } else {
+                changeLines = [`Orçamento ${quoteNum} recusado pelo cliente.`]
+                if (actorName) changeLines.push(`Recusado por: ${actorName}`)
+                changeLines.push(`Método: Código de aprovação (4 dígitos)`)
+            }
             if (rejectionReason) changeLines.push(`Motivo da recusa: ${rejectionReason}`)
             metadata.rejectionReason = rejectionReason
             break
@@ -102,7 +131,9 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             sellerUserId = partner?.user_id || null
         }
 
-        if (event === "approved" && sellerUserId) {
+        const isStaffManualAction = approvalMethod === "erp_manual" || approvalMethod === "erp_portal" || Boolean(actorUserId)
+
+        if (event === "approved" && sellerUserId && !isStaffManualAction) {
             await createNotification({
                 userId: sellerUserId,
                 title: `Orçamento Aprovado! - ${quoteNum}`,
@@ -121,7 +152,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
             })
         }
 
-        if (event === "rejected" && sellerUserId) {
+        if (event === "rejected" && sellerUserId && !isStaffManualAction) {
             await createNotification({
                 userId: sellerUserId,
                 title: `Orçamento Recusado - ${quoteNum}`,

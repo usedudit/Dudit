@@ -502,9 +502,30 @@ export async function getERPSuppliersPageAction(
         const hasMore = rows.length > limit
         const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
-        // Aggregate XML import stats only for the visible page.
         const supplierIds = items.map((s: any) => s.id).filter(Boolean)
+
         if (supplierIds.length > 0) {
+          // Fetch address info (city, state) for all suppliers on this page
+          const { data: addrRows } = await supabase
+            .from("addresses")
+            .select("supplier_id, city, state")
+            .in("supplier_id", supplierIds)
+
+          if (addrRows) {
+            const addrMap = new Map<string, { city: string | null; state: string | null }>()
+            for (const a of addrRows) {
+              if (!addrMap.has(a.supplier_id)) {
+                addrMap.set(a.supplier_id, { city: a.city, state: a.state })
+              }
+            }
+            for (const item of items) {
+              const addr = addrMap.get(item.id)
+              item.city = addr?.city || null
+              item.state = addr?.state || null
+            }
+          }
+
+          // Aggregate XML import stats only for the visible page.
           const { data: xmlAgg } = await supabase
             .from("xml_imports")
             .select("supplier_id, total_value, created_at, id")

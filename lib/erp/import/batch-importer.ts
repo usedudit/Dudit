@@ -4,8 +4,8 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
 import { enrichAddressData } from "@/lib/services/location.service"
-import { parseNumber, parseDate } from "./validators"
-import { canUseFeature } from "@/lib/services/subscription.service"
+import { parseNumber, parseDate, parseTime } from "./validators"
+import { canUseFeature, checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
 import type { ColumnMapping, FailedRow, ImportOptions, ImportResult, ImportSession } from "./types"
 
 const BATCH_SIZE = 250
@@ -222,6 +222,70 @@ export async function executeImport(
     }
   }
 
+  // Pre-load caches for appointments
+  const staffCache = new Map<string, { id: string; name: string }>()
+  const serviceCache = new Map<string, any>()
+  const customerCache = new Map<string, string>()
+  let defaultStaff: { id: string; name: string } = { id: "", name: "Profissional" }
+
+  if (entityType === "appointments") {
+    const { data: partnerUsers } = await admin
+      .from("partner_users")
+      .select("id, user_id, role_id")
+      .eq("partner_id", partnerId)
+
+    if (partnerUsers && partnerUsers.length > 0) {
+      const userIds = partnerUsers.map((pu: any) => pu.user_id)
+      const userResults = await Promise.allSettled(
+        userIds.map((uid: string) => admin.auth.admin.getUserById(uid))
+      )
+      for (let idx = 0; idx < partnerUsers.length; idx++) {
+        const pu = partnerUsers[idx]
+        const res = userResults[idx]
+        let memberName = "Profissional"
+        if (res.status === "fulfilled" && res.value.data?.user) {
+          const u = res.value.data.user
+          const meta = u.user_metadata || {}
+          memberName = meta.full_name || meta.name || meta.display_name || u.email?.split("@")[0] || "Profissional"
+        }
+        if (!defaultStaff.id) {
+          defaultStaff = { id: pu.id, name: memberName }
+        }
+        const norm = memberName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        staffCache.set(norm, { id: pu.id, name: memberName })
+      }
+    }
+
+    const { data: services } = await admin
+      .from("services")
+      .select("id, name, price, category_id, duration_minutes")
+      .eq("partner_id", partnerId)
+
+    for (const s of services || []) {
+      const norm = String(s.name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+      serviceCache.set(norm, s)
+    }
+
+    const { data: customers } = await admin
+      .from("customers")
+      .select("id, name, phone, email")
+      .eq("partner_id", partnerId)
+
+    for (const c of customers || []) {
+      if (c.phone) {
+        const cleanPhone = String(c.phone).replace(/\D/g, "")
+        if (cleanPhone) customerCache.set(`phone:${cleanPhone}`, c.id)
+      }
+      if (c.email) {
+        customerCache.set(`email:${String(c.email).trim().toLowerCase()}`, c.id)
+      }
+      if (c.name) {
+        const norm = String(c.name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+        customerCache.set(`name:${norm}`, c.id)
+      }
+    }
+  }
+
   // Execute in batches
   for (let i = 0; i < mappedRows.length; i += BATCH_SIZE) {
     const batch = mappedRows.slice(i, i + BATCH_SIZE)
@@ -275,6 +339,29 @@ export async function executeImport(
         rawBatch,
         startIndex,
         categoryCache,
+        duplicateStrategy,
+      )
+      successRows += result.success
+      createdRows += result.created
+      updatedRows += result.updated
+      errorRows += result.errors
+      duplicateRows += result.duplicates
+      warningRows += result.warnings
+      failedRows.push(...result.failedRows)
+      if (result.errorMessage) errorMessages.push(result.errorMessage)
+    } else if (entityType === "appointments") {
+      const result = await importAppointmentBatch(
+        supabase,
+        admin,
+        partnerId,
+        storeId,
+        batch,
+        rawBatch,
+        startIndex,
+        staffCache,
+        serviceCache,
+        customerCache,
+        defaultStaff,
         duplicateStrategy,
       )
       successRows += result.success
@@ -1247,6 +1334,285 @@ async function importServiceBatch(
     for (const item of toUpdate) {
       const { error } = await supabase
         .from("services")
+        .update(item.data)
+        .eq("id", item.id)
+        .eq("partner_id", partnerId)
+
+      if (error) {
+        errors++
+        errorMessage = error.message
+      } else {
+        updated++
+      }
+    }
+  }
+
+  return {
+    success: created + updated,
+    created,
+    updated,
+    errors,
+    duplicates,
+    warnings,
+    errorMessage,
+    failedRows,
+  }
+}
+
+/* ========================================================================= */
+/* APPOINTMENTS BATCH IMPORTER                                               */
+/* ========================================================================= */
+
+function addMinutesToTimeStr(timeStr: string, minutes: number): string {
+  const [h, m] = timeStr.split(":").map(Number)
+  const total = (h || 0) * 60 + (m || 0) + Math.max(0, minutes)
+  const endH = Math.floor(total / 60) % 24
+  const endM = total % 60
+  return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`
+}
+
+function sanitizeAppointmentStatus(raw?: string | null): string {
+  const s = String(raw || "").trim().toLowerCase()
+  if (s === "confirmado" || s === "confirmed") return "Confirmado"
+  if (s === "aguardando" || s === "pending" || s === "pendente") return "Aguardando"
+  if (s === "iniciado" || s === "in progress" || s === "em andamento") return "Iniciado"
+  if (s === "concluído" || s === "concluido" || s === "completed" || s === "finalizado" || s === "atendido") return "Concluído"
+  if (s === "pago" || s === "paid") return "Pago"
+  if (s === "pago parcialmente" || s === "partially paid" || s === "parcialmente pago") return "Pago Parcialmente"
+  if (s === "ausência" || s === "ausencia" || s === "absence" || s === "no-show" || s === "faltou") return "Ausência"
+  if (s === "cancelado" || s === "canceled" || s === "cancelled") return "Cancelado"
+  if (s === "indisponível" || s === "indisponivel" || s === "unavailable") return "Indisponível"
+  return "Reservado"
+}
+
+async function importAppointmentBatch(
+  supabase: any,
+  admin: any,
+  partnerId: string,
+  storeId: string | null,
+  batch: Record<string, string>[],
+  rawBatch: Record<string, string>[],
+  startIndex: number,
+  staffCache: Map<string, { id: string; name: string }>,
+  serviceCache: Map<string, any>,
+  customerCache: Map<string, string>,
+  defaultStaff: { id: string; name: string },
+  duplicateStrategy: "skip" | "update",
+): Promise<{
+  success: number
+  created: number
+  updated: number
+  errors: number
+  duplicates: number
+  warnings: number
+  errorMessage?: string
+  failedRows: FailedRow[]
+}> {
+  let created = 0
+  let updated = 0
+  let errors = 0
+  let duplicates = 0
+  let warnings = 0
+  const failedRows: FailedRow[] = []
+  let errorMessage: string | undefined = undefined
+
+  // Plan limit check
+  const limitCheck = await checkLimit(partnerId, "monthly_appointments")
+  if (!limitCheck.allowed) {
+    return {
+      success: 0,
+      created: 0,
+      updated: 0,
+      errors: batch.length,
+      duplicates: 0,
+      warnings: 0,
+      errorMessage: limitCheck.message || "Limite mensal de agendamentos atingido.",
+      failedRows: batch.map((r, i) => ({
+        rowIndex: startIndex + i + 1,
+        data: rawBatch[i],
+        errorMessage: limitCheck.message || "Limite mensal de agendamentos atingido.",
+      })),
+    }
+  }
+
+  // Pre-fetch potential duplicate appointments from DB for the dates in this batch
+  const batchDates = [...new Set(batch.map((r) => parseDate(r["start_date"])).filter(Boolean))] as string[]
+  const existingApptKeyMap = new Map<string, string>() // key -> id
+
+  if (batchDates.length > 0) {
+    const { data: existingAppts } = await supabase
+      .from("appointments")
+      .select("id, customer_name, start_date, start_time")
+      .eq("partner_id", partnerId)
+      .in("start_date", batchDates)
+
+    for (const a of existingAppts || []) {
+      const key = `${String(a.customer_name || "").trim().toLowerCase()}|${a.start_date}|${String(a.start_time || "").slice(0, 5)}`
+      existingApptKeyMap.set(key, a.id)
+    }
+  }
+
+  const toInsert: any[] = []
+  const toUpdate: { id: string; data: any }[] = []
+
+  for (let i = 0; i < batch.length; i++) {
+    const row = batch[i]
+    const rawRow = rawBatch[i]
+    const rowNum = startIndex + i + 1
+
+    const customerName = (row["customer_name"] || row["name"])?.trim()
+    if (!customerName) {
+      errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: "Nome do cliente é obrigatório e está em branco.",
+      })
+      continue
+    }
+
+    const rawDate = row["start_date"]?.trim()
+    const startDate = parseDate(rawDate)
+    if (!startDate) {
+      errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: `Data do agendamento inválida ("${rawDate || ""}"). Use o formato DD/MM/AAAA.`,
+      })
+      continue
+    }
+
+    const rawTime = row["start_time"]?.trim()
+    const startTime = parseTime(rawTime)
+    if (!startTime) {
+      errors++
+      failedRows.push({
+        rowIndex: rowNum,
+        data: rawRow,
+        errorMessage: `Horário de início inválido ("${rawTime || ""}"). Use o formato HH:MM.`,
+      })
+      continue
+    }
+
+    const serviceName = (row["service_name"] || row["service"])?.trim() || "Atendimento Geral"
+    const normalizedServiceKey = serviceName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const matchedService = serviceCache.get(normalizedServiceKey)
+
+    const rawEndTime = parseTime(row["end_time"])
+    let durationMinutes = parseNumber(row["duration_minutes"])
+
+    if (!durationMinutes && rawEndTime) {
+      const [sh, sm] = startTime.split(":").map(Number)
+      const [eh, em] = rawEndTime.split(":").map(Number)
+      const diff = (eh * 60 + em) - (sh * 60 + sm)
+      durationMinutes = diff > 0 ? diff : 60
+    } else if (!durationMinutes) {
+      durationMinutes = matchedService?.duration_minutes ?? 60
+    }
+    const finalDuration = Math.min(525600, Math.max(1, Number(durationMinutes || 60)))
+
+    const derivedEndTime = rawEndTime || addMinutesToTimeStr(startTime, finalDuration)
+
+    // Resolve Staff
+    let staffId = defaultStaff.id
+    let staffName = defaultStaff.name
+    const rawStaff = row["staff_name"]?.trim()
+    if (rawStaff) {
+      const normStaff = rawStaff.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+      const found = staffCache.get(normStaff)
+      if (found) {
+        staffId = found.id
+        staffName = found.name
+      } else {
+        staffName = rawStaff
+      }
+    }
+
+    // Resolve Customer
+    let customerId: string | null = null
+    const rawPhone = row["customer_phone"]?.replace(/\D/g, "")
+    const rawEmail = row["customer_email"]?.trim().toLowerCase()
+    const normCustName = customerName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+
+    if (rawPhone && customerCache.has(`phone:${rawPhone}`)) {
+      customerId = customerCache.get(`phone:${rawPhone}`)!
+    } else if (rawEmail && customerCache.has(`email:${rawEmail}`)) {
+      customerId = customerCache.get(`email:${rawEmail}`)!
+    } else if (customerCache.has(`name:${normCustName}`)) {
+      customerId = customerCache.get(`name:${normCustName}`)!
+    }
+
+    // Price
+    let price = parseNumber(row["price"])
+    if (price === null) {
+      price = matchedService?.price ?? 0
+    }
+    const finalPrice = Math.max(0, Number(price || 0))
+
+    const apptData: any = {
+      partner_id: partnerId,
+      store_id: storeId || null,
+      customer_id: customerId,
+      customer_name: customerName,
+      service_name: serviceName,
+      service_id: matchedService?.id || null,
+      category_id: matchedService?.category_id || null,
+      start_date: startDate,
+      start_time: startTime,
+      end_date: startDate,
+      end_time: derivedEndTime,
+      duration_minutes: finalDuration,
+      staff_partner_user_id: staffId,
+      staff_name: staffName,
+      price: finalPrice,
+      pricing_unit: "Por Serviço",
+      notes: row["notes"] || null,
+      status: sanitizeAppointmentStatus(row["status"]),
+      source: "appointment",
+    }
+
+    const dupKey = `${customerName.toLowerCase()}|${startDate}|${startTime.slice(0, 5)}`
+    const existingId = existingApptKeyMap.get(dupKey)
+
+    if (existingId) {
+      if (duplicateStrategy === "update") {
+        toUpdate.push({ id: existingId, data: apptData })
+      } else {
+        duplicates++
+      }
+    } else {
+      toInsert.push(apptData)
+    }
+  }
+
+  // Execute inserts
+  if (toInsert.length > 0) {
+    const { data: inserted, error } = await supabase
+      .from("appointments")
+      .insert(toInsert)
+      .select("id")
+
+    if (error) {
+      console.error("[BatchImport] Erro ao inserir agendamentos:", error)
+      errors += toInsert.length
+      errorMessage = error.message
+    } else {
+      const insertedCount = inserted?.length ?? 0
+      created += insertedCount
+      try {
+        await increment_usage_counter(partnerId, "monthly_appointments", insertedCount)
+      } catch (err: any) {
+        console.warn("[BatchImport] Erro ao incrementar contador mensal de agendamentos:", err.message)
+      }
+    }
+  }
+
+  // Execute updates
+  if (toUpdate.length > 0) {
+    for (const item of toUpdate) {
+      const { error } = await supabase
+        .from("appointments")
         .update(item.data)
         .eq("id", item.id)
         .eq("partner_id", partnerId)

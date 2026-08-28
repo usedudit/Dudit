@@ -12,6 +12,10 @@ import {
  * Retorna os itens do checklist de onboarding dinâmico e inteligente
  */
 export function getChecklistItems(ctx: DashboardContext): DashboardChecklistItem[] {
+  if (ctx.isDesapego) {
+    return [];
+  }
+
   const items: DashboardChecklistItem[] = [];
 
   // 1. Dados Básicos da Loja (Nome + WhatsApp + Categoria + Endereço)

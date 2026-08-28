@@ -128,6 +128,7 @@ interface DatePickerProps {
     mode?: "single" | "range"
     error?: boolean
     errorMessage?: string
+    dataField?: string
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({
@@ -141,6 +142,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     mode = "single",
     error,
     errorMessage,
+    dataField,
 }) => {
     const [open, setOpen] = React.useState(false)
     const isMobile = useIsMobile()
@@ -230,7 +232,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     )
 
     return (
-        <div className={cn("flex-1 w-full", className)}>
+        <div className={cn("flex-1 w-full", className)} {...(dataField ? { "data-field": dataField } : {})}>
             {label && (
                 <div className="flex items-center gap-2 mb-1.5">
                     <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">

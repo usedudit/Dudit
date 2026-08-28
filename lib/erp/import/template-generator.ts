@@ -7,6 +7,7 @@ const ENTITY_SHEET_NAMES: Record<EntityType, string> = {
   products: "Produtos",
   customers: "Clientes",
   services: "Serviços",
+  appointments: "Agendamentos",
 }
 
 const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
@@ -130,6 +131,50 @@ const ENTITY_SAMPLE_ROWS: Record<EntityType, Record<string, any>[]> = {
       status: "Ativo",
       unit: "Hora",
       description: "Análise de campanhas de tráfego pago, funil de vendas e posicionamento de marca.",
+    },
+  ],
+  appointments: [
+    {
+      customer_name: "Mariana Souza",
+      customer_phone: "(11) 98765-4321",
+      customer_email: "mariana.souza@email.com",
+      service_name: "Corte e Escova",
+      start_date: "28/08/2026",
+      start_time: "14:00",
+      end_time: "15:00",
+      duration_minutes: 60,
+      staff_name: "Carlos Silva",
+      price: 120.00,
+      status: "Confirmado",
+      notes: "Cliente prefere corte em camadas",
+    },
+    {
+      customer_name: "Lucas Oliveira",
+      customer_phone: "(11) 99876-5432",
+      customer_email: "lucas.oliveira@email.com",
+      service_name: "Barba Terapia e Hidratação",
+      start_date: "28/08/2026",
+      start_time: "15:30",
+      end_time: "16:15",
+      duration_minutes: 45,
+      staff_name: "João Barbeiro",
+      price: 65.00,
+      status: "Reservado",
+      notes: "Toalha quente e óleo essencial de hortelã",
+    },
+    {
+      customer_name: "Beatriz Lima",
+      customer_phone: "(21) 97654-3210",
+      customer_email: "beatriz.lima@email.com",
+      service_name: "Manicure Completa",
+      start_date: "29/08/2026",
+      start_time: "10:00",
+      end_time: "11:00",
+      duration_minutes: 60,
+      staff_name: "Ana Paula",
+      price: 55.00,
+      status: "Concluído",
+      notes: "Esmaltação em gel",
     },
   ],
 }
@@ -286,7 +331,14 @@ export async function generateImportTemplate(
 
   const raw = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
   const buffer = Buffer.from(raw)
-  const entitySlug = entityType === "products" ? "produtos" : entityType === "services" ? "servicos" : "clientes"
+  const entitySlug =
+    entityType === "products"
+      ? "produtos"
+      : entityType === "services"
+        ? "servicos"
+        : entityType === "appointments"
+          ? "agendamentos"
+          : "clientes"
   const filename = `modelo-importacao-${entitySlug}.xlsx`
 
   return {

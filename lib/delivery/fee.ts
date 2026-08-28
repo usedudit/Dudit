@@ -154,7 +154,8 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
   const roundedFee = roundMoney(fee)
   const preTimeFee = baseFee + distanceFee
 
-  const freeDeliveryThreshold = input.settings.freeDeliveryThreshold == null ? null : Math.max(0, Number(input.settings.freeDeliveryThreshold))
+  const rawFreeThreshold = input.settings.freeDeliveryThreshold == null ? null : Number(input.settings.freeDeliveryThreshold)
+  const freeDeliveryThreshold = rawFreeThreshold != null && !Number.isNaN(rawFreeThreshold) && rawFreeThreshold > 0 ? rawFreeThreshold : null
   const orderSubtotal = input.orderSubtotal == null ? null : Math.max(0, Number(input.orderSubtotal))
   const isFreeByThreshold = freeDeliveryThreshold !== null && orderSubtotal !== null && orderSubtotal >= freeDeliveryThreshold
 
@@ -203,6 +204,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
         isOutsideRadius,
         maxDeliveryKm: effectiveMaxKm,
         outsideRadiusWarning,
+        isFreeByThreshold: false,
         hasRatesConfigured,
       },
     }
@@ -223,6 +225,7 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
       isOutsideRadius,
       maxDeliveryKm: effectiveMaxKm,
       outsideRadiusWarning,
+      isFreeByThreshold: false,
       hasRatesConfigured,
     },
   }

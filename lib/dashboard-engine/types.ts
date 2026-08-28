@@ -1,6 +1,8 @@
 export interface DashboardContext {
   partnerId: string;
   storeName: string;
+  businessMode?: "desapego" | "quick" | "showcase" | "erp";
+  isDesapego?: boolean;
   isQuickMode: boolean; // true = quick, false = erp
   sellsProducts: boolean;
   sellsServices: boolean;
@@ -94,6 +96,8 @@ export interface DashboardRecommendation {
 export interface DashboardLayout {
   storeName: string;
   partnerUrl: string;
+  businessMode?: "desapego" | "quick" | "showcase" | "erp";
+  isDesapego?: boolean;
   isQuickMode: boolean;
   planSlug: "free" | "crescer" | "escalar";
   sellsProducts: boolean;

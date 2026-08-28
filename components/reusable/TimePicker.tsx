@@ -27,6 +27,7 @@ interface TimePickerProps {
     error?: boolean
     errorMessage?: string
     interval?: 1 | 5 | 10 | 15 | 30
+    dataField?: string
 }
 
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"))
@@ -49,6 +50,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
     error,
     errorMessage,
     interval = 1,
+    dataField,
 }) => {
     const [open, setOpen] = React.useState(false)
     const isMobile = useIsMobile()
@@ -148,7 +150,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
     )
 
     return (
-        <div className={cn("flex-1 w-full", className)}>
+        <div className={cn("flex-1 w-full", className)} {...(dataField ? { "data-field": dataField } : {})}>
             {label && (
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                     <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">

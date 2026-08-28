@@ -233,12 +233,9 @@ export function getDefaultResourcesForModeAndCategory(mode?: string, categorySlu
   const isFoodOrRetail = slug.includes("alimentacao") || slug.includes("alimentação") || slug.includes("varejo") || slug.includes("mercado")
   const isServicesCategory = slug.includes("servicos") || slug.includes("serviços") || slug.includes("profissional") || slug.includes("consultoria") || slug.includes("educacao") || slug.includes("educação") || slug.includes("beleza") || slug.includes("estetica") || slug.includes("estética") || slug.includes("saude") || slug.includes("saúde")
 
-  // 1. Modo Desapego / Anúncio Rápido (recursos mínimos)
+  // 1. Modo Desapego / Anúncio Rápido (produtos, serviços e vitrine básicos)
   if (normalizedMode === "desapego") {
-    if (isServicesCategory) {
-      return ["services", "showcase"]
-    }
-    return ["products", "showcase"]
+    return ["products", "services", "showcase"]
   }
 
   // 2. Modo Vitrine Rápida / Showcase (recursos comerciais essenciais, sem complexidade de ERP)

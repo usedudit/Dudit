@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Input } from "@/components/reusable"
 import { Spinner } from "@/components/reusable/Spinner"
 import { Button } from "@/components/reusable/Button"
@@ -19,62 +19,86 @@ interface CepResponse {
     error?: string
 }
 
+export interface FetchedAddressData {
+    street: string
+    neighborhood: string
+    city: string
+    state: string
+    number: string
+    ibge?: string
+    latitude?: number | null
+    longitude?: number | null
+}
+
 interface CepInputProps extends Omit<React.ComponentProps<typeof Input>, "onChange" | "onBlur"> {
     value: string
     onChange: (value: string) => void
-    onAddressFetched?: (addressData: {
-        street: string
-        neighborhood: string
-        city: string
-        state: string
-        number: string
-        ibge?: string
-        latitude?: number | null
-        longitude?: number | null
-    }) => void
+    onAddressFetched?: (addressData: FetchedAddressData) => void
+    onLoadingChange?: (loading: boolean) => void
 }
 
 export const CepInput: React.FC<CepInputProps> = ({
     value,
     onChange,
     onAddressFetched,
+    onLoadingChange,
     label = "CEP",
     placeholder = "00000-000",
+    disabled,
     ...props
 }) => {
     const [loading, setLoading] = useState(false)
-    const lastFetchedCepRef = useRef<string>(value?.replace(/\D/g, "") || "")
-    const fetchingCepRef = useRef<string>("")
+    const lastFetchedCepRef = useRef<string>("")
+    const abortControllerRef = useRef<AbortController | null>(null)
     const onAddressFetchedRef = useRef(onAddressFetched)
+    const onLoadingChangeRef = useRef(onLoadingChange)
 
-    // Manter callback sempre atualizado via ref sem disparar re-renders ou efeitos colaterais
     useEffect(() => {
         onAddressFetchedRef.current = onAddressFetched
     }, [onAddressFetched])
 
-    // Sincronizar o último CEP buscado caso o valor inicial já venha preenchido da base
+    useEffect(() => {
+        onLoadingChangeRef.current = onLoadingChange
+    }, [onLoadingChange])
+
+    // Sincronizar / resetar o último CEP se o valor mudar externamente para menos de 8 dígitos
     useEffect(() => {
         const clean = value?.replace(/\D/g, "") || ""
-        if (clean.length === 8 && !lastFetchedCepRef.current) {
-            lastFetchedCepRef.current = clean
+        if (clean.length < 8) {
+            lastFetchedCepRef.current = ""
         }
     }, [value])
 
+    // Cleanup abort controller on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
+        }
+    }, [])
+
     // Busca o endereço pelo CEP via /api/cep
-    const fetchAddressByCep = async (cepToFetch: string) => {
+    const fetchAddressByCep = useCallback(async (cepToFetch: string) => {
         const cleanCep = cepToFetch.replace(/\D/g, "")
-        if (
-            cleanCep.length !== 8 ||
-            cleanCep === lastFetchedCepRef.current ||
-            cleanCep === fetchingCepRef.current
-        ) {
+        if (cleanCep.length !== 8 || cleanCep === lastFetchedCepRef.current) {
             return
         }
 
-        fetchingCepRef.current = cleanCep
+        // Abort previous in-flight request if any
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+        }
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+
         setLoading(true)
+        onLoadingChangeRef.current?.(true)
+
         try {
-            const response = await fetch(`/api/cep?cep=${cleanCep}`)
+            const response = await fetch(`/api/cep?cep=${cleanCep}`, {
+                signal: controller.signal,
+            })
             const data: CepResponse = await response.json()
 
             if (data && !data.error && !data.erro) {
@@ -89,35 +113,51 @@ export const CepInput: React.FC<CepInputProps> = ({
                     latitude: data.latitude ?? null,
                     longitude: data.longitude ?? null,
                 })
+            } else {
+                // Se a API retornar erro ou não encontrar, libera o ref para permitir retentativa
+                lastFetchedCepRef.current = ""
             }
-        } catch (e) {
-            console.error("Erro ao buscar CEP:", e)
+        } catch (e: any) {
+            if (e?.name !== "AbortError") {
+                console.error("Erro ao buscar CEP:", e)
+                lastFetchedCepRef.current = ""
+            }
         } finally {
-            fetchingCepRef.current = ""
-            setLoading(false)
+            if (abortControllerRef.current === controller) {
+                abortControllerRef.current = null
+                setLoading(false)
+                onLoadingChangeRef.current?.(false)
+            }
         }
-    }
+    }, [])
 
-    // Chamado EXCLUSIVAMENTE quando o usuário digita no input do CEP
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         let text = e.target.value.replace(/\D/g, "")
         if (text.length > 8) text = text.substring(0, 8)
-        if (text.length > 5) {
-            text = `${text.substring(0, 5)}-${text.substring(5, 8)}`
-        }
-        onChange(text)
 
-        // Se o usuário digitou/colou exatamente 8 dígitos no campo CEP, busca o endereço
-        if (text.replace(/\D/g, "").length === 8) {
-            fetchAddressByCep(text)
+        let formatted = text
+        if (text.length > 5) {
+            formatted = `${text.substring(0, 5)}-${text.substring(5, 8)}`
+        }
+        onChange(formatted)
+
+        if (text.length < 8) {
+            lastFetchedCepRef.current = ""
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+                abortControllerRef.current = null
+                setLoading(false)
+                onLoadingChangeRef.current?.(false)
+            }
+        } else if (text.length === 8) {
+            void fetchAddressByCep(text)
         }
     }
 
-    // Chamado EXCLUSIVAMENTE quando o foco sai do input de CEP
     const handleBlur = () => {
         const clean = value?.replace(/\D/g, "") || ""
         if (clean.length === 8 && clean !== lastFetchedCepRef.current) {
-            fetchAddressByCep(clean)
+            void fetchAddressByCep(clean)
         }
     }
 
@@ -140,11 +180,13 @@ export const CepInput: React.FC<CepInputProps> = ({
                 value={value}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                disabled={loading || props.disabled}
+                disabled={disabled}
                 maxLength={9}
             />
             {loading && (
-                <Spinner className="absolute right-3 top-9 w-4 h-4 text-gray-400" size={16} />
+                <div className="absolute right-3 top-[38px] flex items-center pointer-events-none">
+                    <Spinner size={16} className="text-brand-green" />
+                </div>
             )}
         </div>
     )

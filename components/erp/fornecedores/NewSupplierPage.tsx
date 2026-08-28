@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import {
     Tabs,
     TabsList,
@@ -207,6 +208,14 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
     }, [fieldErrors])
 
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
+
     const handleCnpjBlur = useCallback(async () => {
         const cleanCnpj = cnpj.replace(/\D/g, "")
         if (cleanCnpj.length === 14) {
@@ -287,6 +296,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
 
         if (errors.size > 0) {
             setFieldErrors(errors)
+            scrollToFirstError()
             notifyError("Corrija os erros no formulário antes de salvar.")
             return
         }
@@ -487,6 +497,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 label="Nome ou Razão Social"
                                                                 placeholder="Ex: João da Silva ou Empresa LTDA"
                                                                 value={supplierName}
+                                                                dataField="supplierName"
                                                                 onChange={(e) => {
                                                                     setSupplierName(e.target.value)
                                                                     setFieldErrors(prev => {
@@ -562,6 +573,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                             label="CNPJ"
                                                                             placeholder="00.000.000/0000-00"
                                                                             value={cnpj}
+                                                                            dataField="cnpj"
                                                                             onChange={(e) => {
                                                                                 setCnpj(e.target.value)
                                                                                 setFieldErrors(prev => {
@@ -623,6 +635,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                     label="CPF"
                                                                     placeholder="000.000.000-00"
                                                                     value={cpf}
+                                                                    dataField="cpf"
                                                                     onChange={(e) => {
                                                                         setCpf(e.target.value)
                                                                         setFieldErrors(prev => {
@@ -646,6 +659,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         <EmailInput
                                                             label="E-mail"
                                                             value={email}
+                                                            dataField="email"
                                                             onChange={(e) => {
                                                                 setEmail(e.target.value)
                                                                 setFieldErrors(prev => {
@@ -660,6 +674,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         <PhoneInput
                                                             label="Celular (WhatsApp)"
                                                             value={mobile}
+                                                            dataField="mobile"
                                                             onChange={(e) => {
                                                                 setMobile(e.target.value)
                                                                 setFieldErrors(prev => {
@@ -674,6 +689,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                         <FixedPhoneInput
                                                             label="Telefone Fixo"
                                                             value={phone}
+                                                            dataField="phone"
                                                             onChange={(e) => {
                                                                 setPhone(e.target.value)
                                                                 setFieldErrors(prev => {
@@ -712,6 +728,7 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             label="CEP"
                                                             placeholder="00000-000"
                                                             value={cep}
+                                                            dataField="cep"
                                                             onChange={(val) => {
                                                                 setCep(val)
                                                                 setFieldErrors(prev => {

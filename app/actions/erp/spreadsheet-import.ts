@@ -285,6 +285,9 @@ export async function confirmImportAction(
       } else if (session.entityType === "customers") {
         await revalidateCustomers(canonicalPartnerId)
         revalidatePath("/erp/clientes")
+      } else if (session.entityType === "appointments") {
+        await safeRevalidateTag(TAGS.appointments(canonicalPartnerId))
+        revalidatePath("/erp/agendamentos")
       }
     }
 
@@ -425,6 +428,27 @@ function rowToPreviewEntity(
       inscricao_estadual: get("inscricao_estadual"),
       status,
       is_active: status === "ativo",
+      created_at: new Date().toISOString(),
+    }
+  }
+
+  if (entityType === "appointments") {
+    const priceStr = get("price")
+    const price = priceStr ? parseFloat(priceStr.replace(/R\$/gi, "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.\-]/g, "")) || 0 : 0
+    return {
+      id: `import-${Date.now()}-${index}`,
+      customer_name: get("customer_name") || name || "Cliente Sem Nome",
+      customer_phone: get("customer_phone"),
+      customer_email: get("customer_email"),
+      service_name: get("service_name") || "Atendimento Geral",
+      start_date: get("start_date") || new Date().toISOString().split("T")[0],
+      start_time: get("start_time") || "09:00",
+      end_time: get("end_time") || "10:00",
+      duration_minutes: get("duration_minutes") ? parseInt(get("duration_minutes")!.replace(/\D/g, "")) : 60,
+      staff_name: get("staff_name") || "Profissional",
+      price,
+      status: get("status") || "Confirmado",
+      notes: get("notes"),
       created_at: new Date().toISOString(),
     }
   }

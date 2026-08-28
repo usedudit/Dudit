@@ -551,10 +551,156 @@ const serviceFields: FieldDef[] = [
   },
 ]
 
+const appointmentFields: FieldDef[] = [
+  {
+    name: "customer_name",
+    label: "Nome do Cliente",
+    type: "string",
+    required: true,
+    example: "Mariana Souza",
+    description: "Nome completo do cliente",
+    synonyms: [
+      "nome do cliente", "nome cliente", "cliente nome", "cliente", "nome",
+      "paciente", "client", "customer", "customer name", "attendee", "aluno",
+      "contato", "solicitante"
+    ]
+  },
+  {
+    name: "customer_phone",
+    label: "Telefone / Celular",
+    type: "phone",
+    example: "(11) 98765-4321",
+    description: "Telefone de contato ou WhatsApp do cliente",
+    synonyms: [
+      "telefone", "celular", "whatsapp", "whats", "phone", "tel", "contato",
+      "telefone cliente", "celular cliente", "phone number", "mobile", "fone"
+    ]
+  },
+  {
+    name: "customer_email",
+    label: "E-mail do Cliente",
+    type: "email",
+    example: "mariana.souza@email.com",
+    description: "E-mail de contato do cliente",
+    synonyms: [
+      "email", "e-mail", "email do cliente", "e-mail do cliente", "email cliente",
+      "client email", "customer email", "mail"
+    ]
+  },
+  {
+    name: "service_name",
+    label: "Nome do Serviço",
+    type: "string",
+    required: true,
+    example: "Corte e Escova",
+    description: "Nome do serviço ou procedimento agendado",
+    synonyms: [
+      "nome do serviço", "nome do servico", "nome serviço", "nome servico",
+      "serviço", "servico", "service", "service name", "procedimento", "item",
+      "resumo", "summary", "título", "titulo", "subject", "assunto", "tratamento"
+    ]
+  },
+  {
+    name: "start_date",
+    label: "Data",
+    type: "date",
+    required: true,
+    example: "25/08/2026",
+    description: "Data do agendamento (DD/MM/AAAA ou AAAA-MM-DD)",
+    synonyms: [
+      "data", "data do agendamento", "data agendamento", "data início",
+      "data inicio", "start date", "date", "dia", "data da reserva", "dt agendamento"
+    ]
+  },
+  {
+    name: "start_time",
+    label: "Horário de Início",
+    type: "string",
+    required: true,
+    example: "14:30",
+    description: "Horário inicial do atendimento (formato HH:MM)",
+    synonyms: [
+      "horário de início", "horario de inicio", "hora início", "hora inicio",
+      "horário", "horario", "hora", "hora inicial", "horário inicial",
+      "start time", "time", "hora agendamento", "início", "inicio"
+    ]
+  },
+  {
+    name: "end_time",
+    label: "Horário de Término",
+    type: "string",
+    example: "15:30",
+    description: "Horário final do atendimento (formato HH:MM)",
+    synonyms: [
+      "horário de término", "horario de termino", "hora término", "hora termino",
+      "hora final", "horário final", "end time", "término", "termino", "fim", "hora fim"
+    ]
+  },
+  {
+    name: "duration_minutes",
+    label: "Duração (minutos)",
+    type: "number",
+    example: "60",
+    description: "Duração estimada do atendimento em minutos",
+    synonyms: [
+      "duração", "duracao", "duração (minutos)", "duracao (minutos)", "duração (min)",
+      "duracao (min)", "tempo", "minutos", "duration", "duration (min)", "tempo estimado"
+    ]
+  },
+  {
+    name: "staff_name",
+    label: "Profissional / Atendente",
+    type: "string",
+    example: "Carlos Silva",
+    description: "Nome do colaborador ou profissional responsável",
+    synonyms: [
+      "profissional", "atendente", "colaborador", "prestador", "especialista",
+      "staff", "staff name", "barbeiro", "cabeleireiro", "médico", "medico",
+      "terapeuta", "funcionário", "funcionario", "responsável", "responsavel"
+    ]
+  },
+  {
+    name: "price",
+    label: "Valor / Preço",
+    type: "number",
+    example: "85.00",
+    description: "Valor cobrado pelo agendamento",
+    synonyms: [
+      "valor", "preço", "preco", "valor do serviço", "valor do servico",
+      "preço do serviço", "preco do servico", "valor total", "total",
+      "price", "amount", "valor cobrado"
+    ]
+  },
+  {
+    name: "status",
+    label: "Status / Situação",
+    type: "enum",
+    options: ["Reservado", "Confirmado", "Aguardando", "Em andamento", "Iniciado", "Concluído", "Pago", "Ausência", "Cancelado"],
+    example: "Confirmado",
+    description: "Situação atual do agendamento",
+    synonyms: [
+      "status", "situação", "situacao", "estado", "state", "status agendamento",
+      "situação agendamento", "situacao agendamento", "status do agendamento"
+    ]
+  },
+  {
+    name: "notes",
+    label: "Observações",
+    type: "string",
+    example: "Cliente prefere corte na tesoura",
+    description: "Notas adicionais, preferências ou histórico",
+    synonyms: [
+      "observações", "observacoes", "notas", "notes", "obs", "anotações",
+      "anotacoes", "description", "descrição", "descricao", "detalhes", "informações adicionais"
+    ]
+  },
+]
+
 export const fieldRegistry: Record<EntityType, FieldDef[]> = {
   products: productFields,
   customers: customerFields,
   services: serviceFields,
+  appointments: appointmentFields,
 }
 
 export function getFieldsForEntity(entity: EntityType): FieldDef[] {
@@ -570,3 +716,4 @@ export function getRequiredFields(entity: EntityType): string[] {
     .filter((f) => f.required)
     .map((f) => f.name)
 }
+

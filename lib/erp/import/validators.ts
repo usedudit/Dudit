@@ -131,6 +131,42 @@ export function parseDate(v: any): string | null {
   return null
 }
 
+export function parseTime(v: any): string | null {
+  if (v === null || v === undefined) return null
+  const str = String(v).trim().toLowerCase()
+  if (!str) return null
+
+  // If decimal fraction between 0 and 1 (Excel time serial)
+  if (!isNaN(Number(str)) && Number(str) >= 0 && Number(str) < 1) {
+    const totalMinutes = Math.round(Number(str) * 24 * 60)
+    const hours = Math.floor(totalMinutes / 60) % 24
+    const minutes = totalMinutes % 60
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+  }
+
+  // Handle "14h30", "14h", "9h", "14:30", "14:30:00", "09:00", "2:30 pm"
+  let clean = str.replace(/h/gi, ":").replace(/\s+/g, "")
+  if (clean.endsWith(":")) {
+    clean = clean.slice(0, -1)
+  }
+
+  const match = clean.match(/^(\d{1,2})(?::(\d{2}))?(?::\d{2})?(am|pm)?$/i)
+  if (match) {
+    let hours = parseInt(match[1], 10)
+    const minutes = match[2] ? parseInt(match[2], 10) : 0
+    const ampm = match[3]?.toLowerCase()
+
+    if (ampm === "pm" && hours < 12) hours += 12
+    if (ampm === "am" && hours === 12) hours = 0
+
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+    }
+  }
+
+  return null
+}
+
 export function validateRow(
   rowData: Record<string, string>,
   rowIndex: number,
@@ -177,7 +213,7 @@ export function validateRow(
   }
 
   // Length & format specific checks
-  const nameVal = rowData["name"]?.trim()
+  const nameVal = (rowData["name"] || rowData["customer_name"])?.trim()
   if (nameVal && nameVal.length > 150) {
     warnings.push({
       row: rowIndex + 1,
@@ -222,6 +258,73 @@ export function validateRow(
       const cleanCep = cep.replace(/\D/g, "")
       if (cleanCep.length > 0 && cleanCep.length !== 8) {
         warnings.push({ row: rowIndex + 1, field: "CEP", message: "CEP deve conter 8 dígitos" })
+      }
+    }
+  }
+
+  if (entityType === "appointments") {
+    const startTime = rowData["start_time"]?.trim()
+    if (startTime) {
+      const parsedStart = parseTime(startTime)
+      if (!parsedStart) {
+        errors.push({
+          row: rowIndex + 1,
+          field: "Horário de Início",
+          message: "Horário de Início inválido (use o formato HH:MM)",
+        })
+      }
+    }
+
+    const endTime = rowData["end_time"]?.trim()
+    if (endTime) {
+      const parsedEnd = parseTime(endTime)
+      if (!parsedEnd) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Horário de Término",
+          message: "Horário de Término inválido (use o formato HH:MM)",
+        })
+      }
+    }
+
+    const startDate = rowData["start_date"]?.trim()
+    if (startDate) {
+      const parsedDate = parseDate(startDate)
+      if (!parsedDate) {
+        errors.push({
+          row: rowIndex + 1,
+          field: "Data",
+          message: "Data inválida (use o formato DD/MM/AAAA ou AAAA-MM-DD)",
+        })
+      }
+    }
+
+    const email = rowData["customer_email"]?.trim()
+    if (email && !validateEmail(email)) {
+      warnings.push({ row: rowIndex + 1, field: "E-mail do Cliente", message: "E-mail com formato inválido" })
+    }
+
+    const price = rowData["price"]
+    if (price) {
+      const num = parseNumber(price)
+      if (num !== null && num < 0) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Valor / Preço",
+          message: "Valor não pode ser negativo",
+        })
+      }
+    }
+
+    const duration = rowData["duration_minutes"]
+    if (duration) {
+      const num = parseNumber(duration)
+      if (num !== null && num <= 0) {
+        warnings.push({
+          row: rowIndex + 1,
+          field: "Duração",
+          message: "Duração deve ser maior que zero",
+        })
       }
     }
   }

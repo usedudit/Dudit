@@ -1055,10 +1055,31 @@ export async function getERPCustomersPageAction(
         const hasMore = rows.length > limit
         const items: any[] = hasMore ? rows.slice(0, limit) : rows
 
-        // Aggregate order stats only for the visible page, then cache the
-        // result together with the list so revisiting the route is one hit.
         const customerIds = items.map((c: any) => c.id).filter(Boolean)
+
         if (customerIds.length > 0) {
+          // Fetch address info (city, state) for all customers on this page
+          const { data: addrRows } = await supabase
+            .from("addresses")
+            .select("customer_id, city, state")
+            .in("customer_id", customerIds)
+
+          if (addrRows) {
+            const addrMap = new Map<string, { city: string | null; state: string | null }>()
+            for (const a of addrRows) {
+              if (!addrMap.has(a.customer_id)) {
+                addrMap.set(a.customer_id, { city: a.city, state: a.state })
+              }
+            }
+            for (const item of items) {
+              const addr = addrMap.get(item.id)
+              item.city = addr?.city || null
+              item.state = addr?.state || null
+            }
+          }
+
+          // Aggregate order stats only for the visible page, then cache the
+          // result together with the list so revisiting the route is one hit.
           const { data: orderAgg } = await supabase
             .from("orders")
             .select("buyer_id, customer_id, total_amount, created_at")

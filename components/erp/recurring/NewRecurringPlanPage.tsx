@@ -23,6 +23,7 @@ import {
 import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ChevronLeftIcon, SaveIcon, TrashIcon, PlusIcon, ArrowUpDownIcon, BoxIcon, ClockIcon, SearchIcon } from "@/lib/icons"
 import { useNotification } from "@/hooks/use-notification"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
@@ -250,6 +251,14 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
     }, [fieldErrors])
 
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
+
     const handleAddItemTrigger = () => {
         setEditingItem(null)
         setIsSheetOpen(true)
@@ -316,6 +325,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 
         if (errors.size > 0) {
             setFieldErrors(errors)
+            scrollToFirstError()
             notifyError("Preencha todos os campos obrigatórios e verifique os itens do plano.")
             return
         }
@@ -609,6 +619,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                             maxLength={150}
                                                             error={fieldErrors.has("name")}
                                                             errorMessage={fieldErrors.has("name") ? "Nome é obrigatório" : undefined}
+                                                            dataField="name"
                                                         />
                                                     </div>
                                                     <div className="col-span-12 md:col-span-4 mt-[1px]">
@@ -668,6 +679,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         min={1}
                                                         error={fieldErrors.has("frequencyInterval")}
                                                         errorMessage={fieldErrors.has("frequencyInterval") ? "Intervalo inválido" : undefined}
+                                                        dataField="frequencyInterval"
                                                     />
 
                                                     <DatePicker
@@ -684,6 +696,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                         required
                                                         error={fieldErrors.has("startDate")}
                                                         errorMessage={fieldErrors.has("startDate") ? "Data de início é obrigatória" : undefined}
+                                                        dataField="startDate"
                                                     />
 
                                                     <DatePicker

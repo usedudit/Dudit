@@ -239,15 +239,15 @@ export function ServiceDetailsPageClient({
         const p = Array.isArray(service.partners) ? service.partners[0] : service.partners
         const store = service?.stores || p?.stores || p?.store
         const address = store?.addresses?.[0] || p?.addresses?.[0] || {}
-        const storeId = store?.id || p?.store_id || service.store_id || null
-        const partnerId = p?.id || service.partner_id
+        const realPartnerId = p?.id || service.partner_id || "1"
+        const storeId = store?.id || p?.store_id || service.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
 
         return {
-            id: storeId || partnerId,
+            id: realPartnerId,
             short_id: store?.short_id || p?.short_id || service.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
-            partner_id: partnerId,
+            partner_id: realPartnerId,
             store_id: storeId,
             name: storeName,
             user_id: p?.user_id,
@@ -474,9 +474,57 @@ export function ServiceDetailsPageClient({
         setDeliveryLoading(false)
     }
 
+    const pricing = useMemo(() => {
+        const base = Number(service.price) || 0
+        const promo = Number(service.promotional_price) || 0
+        const hasPromo = promo > 0 && promo < base
+        const effective = hasPromo ? promo : base
+
+        // Compute best price: compares manual promo vs campaign discount
+        const campaignPricingResult = computeItemDisplayPrice(
+            base, hasPromo ? promo : null,
+            activePromotions,
+            { productId: service.id, serviceId: service.id, categoryId: service.category_id || undefined },
+        )
+
+        const bestPrice = campaignPricingResult.bestPrice
+        const discountSource = campaignPricingResult.discountSource
+        const hasCampaignDiscount = discountSource === "campaign"
+        const hasManualPromo = discountSource === "manual"
+        const total = bestPrice
+
+        // Real Pix Discount from Partner's payment methods
+        const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
+        const pixDiscountPercent = pixMethod?.discount_percent || 0
+        const pixTotal = bestPrice * (1 - (pixDiscountPercent / 100))
+
+        // Real Installments from Partner's credit card method
+        const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
+        const hasCC = !!ccMethod
+        const maxInstallments = ccMethod?.max_installments || 1
+        const installmentPrice = bestPrice / maxInstallments
+
+        const campaignDiscountLabel = hasCampaignDiscount && activePromo
+            ? activePromo.discountType === "percentage"
+                ? `${activePromo.discountValue}%`
+                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
+            : ""
+
+        return {
+            current: effective, bestPrice, original: base,
+            hasCampaignDiscount, hasManualPromo, total,
+            pix: pixTotal,
+            pixDiscountPercent,
+            hasCC, maxInstallments, installment: installmentPrice,
+            discountPercent: Math.round(((base - promo) / base) * 100),
+            campaignDiscountLabel,
+        }
+    }, [service, partner, activePromo, activePromotions])
+
     // Automatically calculate delivery when selectedAddress changes (for logged in users)
     useEffect(() => {
-        if (!selectedAddress || !partner.id) return
+        const targetPartnerId = partner.partner_id || partner.id
+        if (!selectedAddress || !targetPartnerId) return
         let active = true
 
         async function calculateForAddress() {
@@ -489,8 +537,8 @@ export function ServiceDetailsPageClient({
                 setCep(selectedAddress.zip_code || "")
 
                 const quote = await quoteDeliveryFeeAction({
-                    partnerId: partner.id,
-                    storeId: (service as any)?.store_id || (service as any)?.stores?.id || null,
+                    partnerId: targetPartnerId,
+                    storeId: partner.store_id || (service as any)?.store_id || (service as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
@@ -515,7 +563,7 @@ export function ServiceDetailsPageClient({
 
         calculateForAddress()
         return () => { active = false }
-    }, [selectedAddress, partner.id])
+    }, [selectedAddress, partner.partner_id, partner.id, partner.store_id, pricing.total])
 
     // Automatically calculate delivery when CEP becomes 8 digits (for logged out users)
     useEffect(() => {
@@ -530,6 +578,9 @@ export function ServiceDetailsPageClient({
             }
             return
         }
+
+        const targetPartnerId = partner.partner_id || partner.id
+        if (!targetPartnerId) return
 
         let active = true
         async function calculateForCep() {
@@ -552,8 +603,8 @@ export function ServiceDetailsPageClient({
                 setShippingState("calculated")
 
                 const quote = await quoteDeliveryFeeAction({
-                    partnerId: partner.id,
-                    storeId: (service as any)?.store_id || (service as any)?.stores?.id || null,
+                    partnerId: targetPartnerId,
+                    storeId: partner.store_id || (service as any)?.store_id || (service as any)?.stores?.id || null,
                     destinationAddress: addressStr,
                     orderSubtotal: pricing.total,
                 })
@@ -578,7 +629,7 @@ export function ServiceDetailsPageClient({
 
         calculateForCep()
         return () => { active = false }
-    }, [cep, partner.id, userId])
+    }, [cep, partner.partner_id, partner.id, partner.store_id, userId, pricing.total])
 
     useEffect(() => { setIsMounted(true) }, [])
     useEffect(() => { if (!userId && user?.id) setUserId(user.id) }, [userId, user])
@@ -632,53 +683,6 @@ export function ServiceDetailsPageClient({
     const isFree = service.price_type === "free"
     const pricePrefix = isStartingAt ? "A partir de " : ""
     const billingSuffix = getBillingUnitSuffix(service.billing_unit)
-
-    const pricing = useMemo(() => {
-        const base = Number(service.price) || 0
-        const promo = Number(service.promotional_price) || 0
-        const hasPromo = promo > 0 && promo < base
-        const effective = hasPromo ? promo : base
-
-        // Compute best price: compares manual promo vs campaign discount
-        const campaignPricingResult = computeItemDisplayPrice(
-            base, hasPromo ? promo : null,
-            activePromotions,
-            { productId: service.id, serviceId: service.id, categoryId: service.category_id || undefined },
-        )
-
-        const bestPrice = campaignPricingResult.bestPrice
-        const discountSource = campaignPricingResult.discountSource
-        const hasCampaignDiscount = discountSource === "campaign"
-        const hasManualPromo = discountSource === "manual"
-        const total = bestPrice
-
-        // Real Pix Discount from Partner's payment methods
-        const pixMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "pix" && m.is_active)
-        const pixDiscountPercent = pixMethod?.discount_percent || 0
-        const pixTotal = bestPrice * (1 - (pixDiscountPercent / 100))
-
-        // Real Installments from Partner's credit card method
-        const ccMethod = partner.paymentMethods?.find((m: any) => m.payment_type === "credito" && m.is_active)
-        const hasCC = !!ccMethod
-        const maxInstallments = ccMethod?.max_installments || 1
-        const installmentPrice = bestPrice / maxInstallments
-
-        const campaignDiscountLabel = hasCampaignDiscount && activePromo
-            ? activePromo.discountType === "percentage"
-                ? `${activePromo.discountValue}%`
-                : `${formatCurrency(campaignPricingResult.campaignDiscount)}`
-            : ""
-
-        return {
-            current: effective, bestPrice, original: base,
-            hasCampaignDiscount, hasManualPromo, total,
-            pix: pixTotal,
-            pixDiscountPercent,
-            hasCC, maxInstallments, installment: installmentPrice,
-            discountPercent: Math.round(((base - promo) / base) * 100),
-            campaignDiscountLabel,
-        }
-    }, [service, partner, activePromo, activePromotions])
 
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
         products: [{
@@ -1821,20 +1825,33 @@ export function ServiceDetailsPageClient({
                 title="Adicionar novo endereço"
             >
                 <div className="flex flex-col gap-4">
-                    <div onBlur={handleCepBlur}>
+                    <div>
                         <CepInput
                             value={newAddressData.zipCode}
-                            onChange={(val) => setNewAddressData({ ...newAddressData, zipCode: val })}
-                            disabled={loadingCep}
+                            onChange={(val) => setNewAddressData(prev => ({ ...prev, zipCode: val }))}
+                            onAddressFetched={(addr) => {
+                                setNewAddressData(prev => ({
+                                    ...prev,
+                                    street: addr.street || prev.street,
+                                    number: addr.number || prev.number,
+                                    noNumber: addr.number ? addr.number === "S/N" : prev.noNumber,
+                                    neighborhood: addr.neighborhood || prev.neighborhood,
+                                    city: addr.city || prev.city,
+                                    state: addr.state || prev.state,
+                                    latitude: addr.latitude ?? prev.latitude,
+                                    longitude: addr.longitude ?? prev.longitude,
+                                }))
+                                setDeliveryError(null)
+                            }}
+                            onLoadingChange={setLoadingCep}
                         />
                     </div>
                     <div>
                         <Input
                             label="Rua/Avenida"
                             value={newAddressData.street}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, street: e.target.value })}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
                             placeholder="Rua, Avenida, etc."
-                            disabled={loadingCep}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -1843,8 +1860,8 @@ export function ServiceDetailsPageClient({
                                 label="Número"
                                 number={newAddressData.number}
                                 noNumber={newAddressData.noNumber}
-                                onNumberChange={(val) => setNewAddressData({ ...newAddressData, number: val })}
-                                onNoNumberChange={(checked) => setNewAddressData({ ...newAddressData, noNumber: checked, number: checked ? "S/N" : "" })}
+                                onNumberChange={(val) => setNewAddressData(prev => ({ ...prev, number: val }))}
+                                onNoNumberChange={(checked) => setNewAddressData(prev => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
                                 placeholder="123"
                             />
                         </div>
@@ -1852,7 +1869,7 @@ export function ServiceDetailsPageClient({
                             <Input
                                 label="Complemento"
                                 value={newAddressData.complement}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, complement: e.target.value })}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
                                 placeholder="Apto, Bloco, etc."
                             />
                         </div>
@@ -1861,8 +1878,7 @@ export function ServiceDetailsPageClient({
                         <Input
                             label="Bairro"
                             value={newAddressData.neighborhood}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, neighborhood: e.target.value })}
-                            disabled={loadingCep}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
                             placeholder="Nome do bairro"
                         />
                     </div>
@@ -1871,15 +1887,14 @@ export function ServiceDetailsPageClient({
                             <Input
                                 label="Cidade"
                                 value={newAddressData.city}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, city: e.target.value })}
-                                disabled={loadingCep}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="Nome da cidade"
                             />
                         </div>
                         <div>
                             <StateComboBox
                                 value={newAddressData.state}
-                                onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
+                                onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
                             />
                         </div>
                     </div>
@@ -2129,7 +2144,17 @@ export function ServiceDetailsPageClient({
                                         </div>
                                     </div>
 
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center self-stretch">
+                                    {/* Desktop Next Button */}
+                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                        {galleryItems.length > 1 && (
+                                            <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Desktop Right Column (Actions) */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center">
                                         {(() => {
                                             const isFavService = isFav(service.id, "servico")
                                             return (
@@ -2147,14 +2172,6 @@ export function ServiceDetailsPageClient({
                                         <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
                                             <PlusIcon size={18} className="text-brand-green" />
                                         </Button>
-
-                                        <div className="flex-1 flex items-center">
-                                            {galleryItems.length > 1 && (
-                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                                </Button>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -394,6 +394,7 @@ export function CheckoutPageClient() {
     const [selectedAddressId, setSelectedAddressId] = useState<string>("")
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [showAddressForm, setShowAddressForm] = useState(false)
+    const [addressFormError, setAddressFormError] = useState<string | null>(null)
     const [loadingAddresses, setLoadingAddresses] = useState(false)
     const [loadingCep, setLoadingCep] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
@@ -591,17 +592,28 @@ export function CheckoutPageClient() {
         setStorefrontMethodsLoading(false)
 
         const addresses = checkoutContext.userAddresses as unknown as UserAddress[]
-        if (addresses.length > 0) {
-            setUserAddresses(addresses)
-            const defaultAddress = addresses.find((a) => a.is_default)
-            if (defaultAddress) {
-                setSelectedAddressId(defaultAddress.id)
-                const addressStr = buildAddressString(defaultAddress)
-                setFormData((prev) => ({
-                    ...prev,
-                    deliveryAddress: addressStr,
-                }))
-            }
+        if (addresses && addresses.length > 0) {
+            setUserAddresses(prev => {
+                if (prev.length > 0) {
+                    const existingIds = new Set(prev.map(a => a.id))
+                    const additions = addresses.filter(a => !existingIds.has(a.id))
+                    return additions.length > 0 ? [...prev, ...additions] : prev
+                }
+                return addresses
+            })
+            setSelectedAddressId(prevId => {
+                if (prevId) return prevId
+                const defaultAddress = addresses.find((a) => a.is_default) || addresses[0]
+                if (defaultAddress) {
+                    const addressStr = buildAddressString(defaultAddress)
+                    setFormData((prev) => ({
+                        ...prev,
+                        deliveryAddress: addressStr,
+                    }))
+                    return defaultAddress.id
+                }
+                return prevId
+            })
         }
         setLoadingAddresses(false)
 
@@ -632,29 +644,33 @@ export function CheckoutPageClient() {
         }
     }, [user])
 
-    const loadUserAddresses = async () => {
+    const loadUserAddresses = async (targetSelectedId?: string) => {
         if (!userId) return
         setLoadingAddresses(true)
         try {
             const result = await getAddressesAction(userId, "user")
             if (result.addresses) {
-                setUserAddresses(result.addresses as UserAddress[])
-                const defaultAddress = (result.addresses as UserAddress[]).find((a: UserAddress) => a.is_default)
-                if (defaultAddress) {
-                    const addressStr = buildAddressString(defaultAddress)
-                    setSelectedAddressId(defaultAddress.id)
+                const list = result.addresses as UserAddress[]
+                setUserAddresses(list)
+
+                const activeId = targetSelectedId || selectedAddressId
+                const matchSelected = list.find((a) => a.id === activeId)
+                const defaultAddress = list.find((a) => a.is_default)
+                const chosen = matchSelected || defaultAddress || list[0]
+
+                if (chosen) {
+                    setSelectedAddressId(chosen.id)
                     setFormData(prev => ({
                         ...prev,
-                        deliveryAddress: addressStr,
-                        // Se houver endereço e a loja permitir entrega (verificado no outro effect), 
-                        // o deliveryType será atualizado lá.
+                        deliveryAddress: buildAddressString(chosen),
                     }))
                 }
             }
         } catch (err) {
             console.error("Error loading addresses:", err)
+        } finally {
+            setLoadingAddresses(false)
         }
-        setLoadingAddresses(false)
     }
 
     const buildAddressString = (a: UserAddress) =>
@@ -666,64 +682,64 @@ export function CheckoutPageClient() {
         if (address) setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(address) }))
     }
 
-    const handleCepBlur = async () => {
-        const cep = newAddressData.zipCode.replace(/\D/g, "")
-        if (cep.length !== 8) return
-        setLoadingCep(true)
-        try {
-            const response = await fetch(`/api/cep?cep=${cep}`)
-            const data = await response.json()
-            if (!data.erro && !data.error) {
-                setNewAddressData(prev => ({
-                    ...prev,
-                    street: data.logradouro || prev.street,
-                    number: data.numero || prev.number,
-                    noNumber: data.numero ? data.numero === "S/N" : prev.noNumber,
-                    neighborhood: data.bairro || prev.neighborhood,
-                    city: data.localidade || data.municipio || prev.city,
-                    state: data.uf || prev.state,
-                    latitude: typeof data.latitude === "number" ? data.latitude : prev.latitude,
-                    longitude: typeof data.longitude === "number" ? data.longitude : prev.longitude,
-                }))
-            }
-        } catch (err) {
-            console.error("Erro ao buscar CEP:", err)
-        } finally {
-            setLoadingCep(false)
-        }
-    }
-
     const handleSaveNewAddress = async () => {
         if (!userId) return
         const { zipCode, street, number, neighborhood, city, state, noNumber } = newAddressData
         const finalNumber = noNumber ? "S/N" : number
         if (!zipCode || !street || !finalNumber || !neighborhood || !city || !state) {
-            setDeliveryError("Preencha todos os campos obrigatórios do endereço")
+            setAddressFormError("Preencha todos os campos obrigatórios do endereço.")
             return
         }
         setIsLoading(true)
-        let token = csrfToken || await fetchCSRFTokenSingleton() || ""
-        const result = await createAddressAction({
-            entityId: userId, entityType: "user",
-            street, number: finalNumber, complement: newAddressData.complement,
-            neighborhood, city, state, zipCode,
-            isDefault: userAddresses.length === 0,
-            latitude: newAddressData.latitude ?? null,
-            longitude: newAddressData.longitude ?? null,
-            csrf_token: token,
-        })
-        if (result.error) {
-            setDeliveryError(result.error)
-        } else {
-            await loadUserAddresses()
-            if (result.address) {
-                setSelectedAddressId(result.address.id)
-                setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(result.address) }))
+        setAddressFormError(null)
+        try {
+            let token = csrfToken || await fetchCSRFTokenSingleton() || ""
+            const result = await createAddressAction({
+                entityId: userId,
+                entityType: "user",
+                street,
+                number: finalNumber,
+                complement: newAddressData.complement,
+                neighborhood,
+                city,
+                state,
+                zipCode,
+                isDefault: userAddresses.length === 0,
+                latitude: newAddressData.latitude ?? null,
+                longitude: newAddressData.longitude ?? null,
+                csrf_token: token,
+            })
+            if (result.error) {
+                setAddressFormError(result.error)
+            } else if (result.address) {
+                const savedAddr = result.address as UserAddress
+
+                // Atualizar estado local imediatamente para refletir na UI sem reload
+                setUserAddresses(prev => {
+                    const withoutSaved = prev.filter(a => a.id !== savedAddr.id)
+                    if (savedAddr.is_default || prev.length === 0) {
+                        return [savedAddr, ...withoutSaved.map(a => ({ ...a, is_default: false }))]
+                    }
+                    return [savedAddr, ...withoutSaved]
+                })
+
+                setSelectedAddressId(savedAddr.id)
+                setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
+
+                setShowAddressForm(false)
+                setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+                setDeliveryError(null)
+                setAddressFormError(null)
+
+                // Atualizar contexto e carregar do servidor em background
+                setRefreshTrigger(prev => prev + 1)
+                void loadUserAddresses(savedAddr.id)
             }
-            setShowAddressForm(false)
-            setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })
+        } catch (err) {
+            setAddressFormError("Erro ao salvar endereço. Tente novamente.")
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }
 
     const isPickup = formData.deliveryType === "pickup"
@@ -2052,7 +2068,7 @@ export function CheckoutPageClient() {
                                     quantities[item.cartItemId]
                                     || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
                                     || item.quantity,
-                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                                fulfillmentMode: item.productId ? (formData.deliveryType === "delivery" ? "delivery" : "pickup") : (matchedLine?.fulfillmentMode || undefined),
                             }
                         }),
                         formData.deliveryType,
@@ -2097,7 +2113,7 @@ export function CheckoutPageClient() {
                                     quantities[item.cartItemId]
                                     || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
                                     || item.quantity,
-                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                                fulfillmentMode: item.productId ? (formData.deliveryType === "delivery" ? "delivery" : "pickup") : (matchedLine?.fulfillmentMode || undefined),
                             }
                         }),
                         formData.deliveryType,
@@ -2217,7 +2233,7 @@ export function CheckoutPageClient() {
                                     quantities[item.cartItemId]
                                     || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
                                     || item.quantity,
-                                fulfillmentMode: matchedLine?.fulfillmentMode || undefined,
+                                fulfillmentMode: item.productId ? (formData.deliveryType === "delivery" ? "delivery" : "pickup") : (matchedLine?.fulfillmentMode || undefined),
                             }
                         }),
                         formData.deliveryType,
@@ -2863,7 +2879,7 @@ export function CheckoutPageClient() {
                         <div className="col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
                             {renderFreeDeliveryProgressCard()}
                             <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
-                                <div className="text-md bg-brand-gray/50 dark:bg-emerald-900/10 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
                                     Resumo do Pedido
                                 </div>
                                 <div className="p-6">
@@ -3529,24 +3545,46 @@ export function CheckoutPageClient() {
 
             <DefaultModal
                 isOpen={showAddressForm}
-                onClose={() => setShowAddressForm(false)}
+                onClose={() => {
+                    setShowAddressForm(false)
+                    setAddressFormError(null)
+                }}
                 title="Adicionar novo endereço"
             >
                 <div className="flex flex-col gap-4">
-                    <div onBlur={handleCepBlur}>
+                    {addressFormError && (
+                        <InfoCard message={addressFormError} color="red" />
+                    )}
+                    <div>
                         <CepInput
                             value={newAddressData.zipCode}
-                            onChange={(val) => setNewAddressData({ ...newAddressData, zipCode: val })}
-                            disabled={loadingCep}
+                            onChange={(val) => {
+                                setNewAddressData(prev => ({ ...prev, zipCode: val }))
+                                if (addressFormError) setAddressFormError(null)
+                            }}
+                            onAddressFetched={(addr) => {
+                                setNewAddressData(prev => ({
+                                    ...prev,
+                                    street: addr.street || prev.street,
+                                    number: addr.number || prev.number,
+                                    noNumber: addr.number ? addr.number === "S/N" : prev.noNumber,
+                                    neighborhood: addr.neighborhood || prev.neighborhood,
+                                    city: addr.city || prev.city,
+                                    state: addr.state || prev.state,
+                                    latitude: addr.latitude ?? prev.latitude,
+                                    longitude: addr.longitude ?? prev.longitude,
+                                }))
+                                setAddressFormError(null)
+                            }}
+                            onLoadingChange={setLoadingCep}
                         />
                     </div>
                     <div>
                         <Input
                             label="Rua/Avenida"
                             value={newAddressData.street}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, street: e.target.value })}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, street: e.target.value }))}
                             placeholder="Rua, Avenida, etc."
-                            disabled={loadingCep}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -3555,8 +3593,8 @@ export function CheckoutPageClient() {
                                 label="Número"
                                 number={newAddressData.number}
                                 noNumber={newAddressData.noNumber}
-                                onNumberChange={(val) => setNewAddressData({ ...newAddressData, number: val })}
-                                onNoNumberChange={(checked) => setNewAddressData({ ...newAddressData, noNumber: checked, number: checked ? "S/N" : "" })}
+                                onNumberChange={(val) => setNewAddressData(prev => ({ ...prev, number: val }))}
+                                onNoNumberChange={(checked) => setNewAddressData(prev => ({ ...prev, noNumber: checked, number: checked ? "S/N" : "" }))}
                                 placeholder="123"
                             />
                         </div>
@@ -3564,7 +3602,7 @@ export function CheckoutPageClient() {
                             <Input
                                 label="Complemento"
                                 value={newAddressData.complement}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, complement: e.target.value })}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, complement: e.target.value }))}
                                 placeholder="Apto, Bloco, etc."
                             />
                         </div>
@@ -3573,8 +3611,7 @@ export function CheckoutPageClient() {
                         <Input
                             label="Bairro"
                             value={newAddressData.neighborhood}
-                            onChange={(e) => setNewAddressData({ ...newAddressData, neighborhood: e.target.value })}
-                            disabled={loadingCep}
+                            onChange={(e) => setNewAddressData(prev => ({ ...prev, neighborhood: e.target.value }))}
                             placeholder="Nome do bairro"
                         />
                     </div>
@@ -3583,15 +3620,14 @@ export function CheckoutPageClient() {
                             <Input
                                 label="Cidade"
                                 value={newAddressData.city}
-                                onChange={(e) => setNewAddressData({ ...newAddressData, city: e.target.value })}
-                                disabled={loadingCep}
+                                onChange={(e) => setNewAddressData(prev => ({ ...prev, city: e.target.value }))}
                                 placeholder="Nome da cidade"
                             />
                         </div>
                         <div>
                             <StateComboBox
                                 value={newAddressData.state}
-                                onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
+                                onChange={(val) => setNewAddressData(prev => ({ ...prev, state: val }))}
                             />
                         </div>
                     </div>

@@ -140,7 +140,7 @@ export async function getServiceReviews(serviceId: string, storeId?: string | nu
   let query = supabase
     .from("reviews")
     .select(`
-id, rating, comment, created_at, product_id, service_id, store_id,
+      id, rating, comment, created_at, user_id, order_id, product_id, service_id, store_id,
       products:product_id(name, images, unit),
       services:service_id(name, images, unit)
     `)
@@ -172,10 +172,51 @@ id, rating, comment, created_at, product_id, service_id, store_id,
     }
   }
 
-  return reviewsData.map((r: any) => ({
-    ...r,
-    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
-  }))
+  const orderIds = Array.from(new Set(reviewsData.map((r: any) => r.order_id).filter(Boolean)))
+  let orderItemsMap = new Map<string, { quantity: number | null; variant_name: string | null; variant_options: any }>()
+
+  if (orderIds.length > 0) {
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select(`
+        id, order_id, quantity, product_id, service_id,
+        product_variants(id, variant_name, variant_options)
+      `)
+      .in("order_id", orderIds)
+
+    if (itemsData) {
+      itemsData.forEach((item: any) => {
+        const key = `${item.order_id}_${item.product_id || item.service_id}`
+        orderItemsMap.set(key, {
+          quantity: item.quantity,
+          variant_name: item.product_variants?.variant_name || null,
+          variant_options: item.product_variants?.variant_options || null,
+        })
+      })
+    }
+  }
+
+  return reviewsData.map((r: any) => {
+    const itemKey = `${r.order_id}_${r.product_id || r.service_id}`
+    const orderItem = orderItemsMap.get(itemKey)
+    const product = r.products || null
+    const service = r.services || null
+    return {
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at,
+      product_name: product?.name || null,
+      service_name: service?.name || null,
+      quantity: orderItem?.quantity || null,
+      variant_name: orderItem?.variant_name || null,
+      variant_options: orderItem?.variant_options || null,
+      unit: product?.unit || service?.unit || null,
+      products: product ? { name: product.name, images: product.images, unit: product.unit } : null,
+      services: service ? { name: service.name, images: service.images, unit: service.unit } : null,
+      profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
+    }
+  })
 }
 
 /**

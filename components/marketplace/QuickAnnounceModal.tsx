@@ -4,6 +4,7 @@ import React from "react"
 import { useRouter } from "next/navigation"
 import { DefaultModal, ListItem } from "@/components/reusable"
 import { Package, WrenchIcon, ChevronRightIcon } from "@/lib/icons"
+import { getUserHasAnyPartnerAccess } from "@/app/actions/auth/partner-access"
 
 interface QuickAnnounceModalProps {
     isOpen: boolean
@@ -14,9 +15,16 @@ interface QuickAnnounceModalProps {
 export function QuickAnnounceModal({ isOpen, onClose, userProfile }: QuickAnnounceModalProps) {
     const router = useRouter()
 
-    const handleSelect = (type: "product" | "service") => {
+    const handleSelect = async (type: "product" | "service") => {
         onClose()
-        if (userProfile) {
+        let hasPartner = false
+        try {
+            hasPartner = await getUserHasAnyPartnerAccess()
+        } catch {
+            hasPartner = false
+        }
+
+        if (hasPartner) {
             if (type === "product") {
                 router.push("/erp/produtos?create=true")
             } else {

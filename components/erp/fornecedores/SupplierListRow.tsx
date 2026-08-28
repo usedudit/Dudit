@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
@@ -71,17 +71,17 @@ const SupplierListRow = React.memo(
             </div>
           )
 
-        case "imports":
+        case "city":
           return (
             <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-              {supplier.xml_count || 0}
+              {supplier.city && supplier.state ? `${supplier.city}, ${supplier.state}` : supplier.city || supplier.state || "-"}
             </span>
           )
 
-        case "total":
+        case "last_purchase":
           return (
-            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
-              {supplier.total_imported_value ? formatCurrency(supplier.total_imported_value) : "-"}
+            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+              {supplier.last_import_at ? formatDate(supplier.last_import_at) : "-"}
             </span>
           )
 
@@ -90,13 +90,6 @@ const SupplierListRow = React.memo(
             <Badge variant={supplier.status === "ativo" ? "green" : "gray"}>
               {supplier.status === "ativo" ? "Ativo" : "Inativo"}
             </Badge>
-          )
-
-        case "code":
-          return (
-            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
-              {supplier.supplier_code || "-"}
-            </span>
           )
 
         case "actions":
@@ -163,8 +156,9 @@ const SupplierListRow = React.memo(
     prev.supplier.id === next.supplier.id &&
     prev.supplier.name === next.supplier.name &&
     prev.supplier.status === next.supplier.status &&
-    prev.supplier.xml_count === next.supplier.xml_count &&
-    prev.supplier.total_imported_value === next.supplier.total_imported_value &&
+    prev.supplier.city === next.supplier.city &&
+    prev.supplier.state === next.supplier.state &&
+    prev.supplier.last_import_at === next.supplier.last_import_at &&
     (prev.supplier.image_url || null) === (next.supplier.image_url || null) &&
     prev.selected === next.selected &&
     prev.columns === next.columns

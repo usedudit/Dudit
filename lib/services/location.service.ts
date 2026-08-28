@@ -80,9 +80,9 @@ export function formatDistance(distanceKm: number | null | undefined): string | 
  */
 export function formatDistanceLabel(distanceKm: number | null | undefined): string | null {
     if (!isFiniteNumber(distanceKm) || distanceKm < 0) return null
-    if (distanceKm < 1) return `A ${Math.round(distanceKm * 1000)}m`
-    if (distanceKm <= 10) return `A ${distanceKm.toFixed(1)} km`
-    return `A ${Math.round(distanceKm)} km`
+    if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`
+    if (distanceKm <= 10) return `${distanceKm.toFixed(1)} km`
+    return `${Math.round(distanceKm)} km`
 }
 
 export function estimateDeliveryTime(distanceKm: number | null | undefined): number | null {
@@ -120,6 +120,58 @@ export function estimateDeliveryTimeRange(distanceKm: number | null | undefined)
         const roundedMax = roundedMin + 15
         return `${roundedMin}-${roundedMax} min`
     }
+}
+
+/**
+ * Estima o tempo médio pontual de entrega (ex: "25 min", "30 min", "45 min")
+ */
+export function estimateAverageDeliveryTime(distanceKm: number | null | undefined): string | null {
+    if (!isFiniteNumber(distanceKm) || distanceKm <= 0) return null
+
+    if (distanceKm < 1.5) {
+        return "25 min"
+    } else if (distanceKm <= 3.5) {
+        return "30 min"
+    } else if (distanceKm <= 6) {
+        return "35 min"
+    } else if (distanceKm <= 10) {
+        return "45 min"
+    } else if (distanceKm <= 16) {
+        return "55 min"
+    } else {
+        const basePrepMin = 15
+        const travelMin = (distanceKm / 22) * 60
+        const totalMin = Math.round(basePrepMin + travelMin)
+        return `${totalMin} min`
+    }
+}
+
+/**
+ * Converte faixas de tempo "20-30 min" para média pontual "25 min"
+ */
+export function formatAverageDeliveryTimeFromRange(timeStr: string | null | undefined): string | null {
+    if (!timeStr) return null
+    if (!timeStr.includes("-")) return timeStr
+    const match = timeStr.match(/(\d+)\s*-\s*(\d+)/)
+    if (match) {
+        const min = Number(match[1])
+        const max = Number(match[2])
+        const avg = Math.round((min + max) / 2)
+        return `${avg} min`
+    }
+    return timeStr
+}
+
+/**
+ * Formata a duração do serviço (ex: "30 min", "1h", "1h 30m", "2h")
+ */
+export function formatServiceDuration(minutes: number | null | undefined): string | null {
+    if (!minutes || typeof minutes !== "number" || minutes <= 0) return null
+    if (minutes < 60) return `${minutes} min`
+    const hours = Math.floor(minutes / 60)
+    const rem = minutes % 60
+    if (rem === 0) return `${hours}h`
+    return `${hours}h ${rem}m`
 }
 
 export interface DeliveryFeeEstimateParams {

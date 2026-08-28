@@ -159,10 +159,11 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                     const itemImages = rev.products?.images || rev.services?.images || null
                     const unit = rev.unit || rev.products?.unit || rev.services?.unit
                     const variantLabel = rev.variant_name || getVariantLabel(rev.variant_options)
+                    const fallbackVariantImg = rev.variant_options?.image || null
                     const itemImage = getPrimaryProductDisplayImage({
                         images: itemImages,
                         video_thumbnail: null,
-                        fallback_variant_image: null,
+                        fallback_variant_image: fallbackVariantImg,
                     })
 
                     return (
@@ -195,7 +196,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                 </div>
                             </div>
                             {rev.comment && (
-                                <p className="text-brand-ianctive-text text-sm">{rev.comment}</p>
+                                <p className="text-brand-inactive-text dark:text-dark-body text-sm">{rev.comment}</p>
                             )}
 
                             {showItemInfo && itemName && (

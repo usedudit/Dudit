@@ -69,8 +69,8 @@ Na raiz do projeto, execute:
 
 ```powershell
 node scripts/decrypt-database-backup.mjs `
-  "C:\Users\MURILO\Downloads\arquivo-baixado.dump.gz.enc" `
-  "C:\Users\MURILO\Downloads\dudit-restore.dump"
+  "C:\Users\MuriloSTR\Downloads\arquivo-baixado.dump.gz.enc" `
+  "C:\Users\MuriloSTR\Downloads\dudit-restore.dump"
 ```
 
 O script lê `BACKUP_ENCRYPTION_KEY_BASE64` do `.env`, valida o cabeçalho, autentica o AES-GCM, descomprime o gzip e confirma o formato custom do PostgreSQL.
@@ -137,7 +137,7 @@ Execute o restore apontando diretamente para o Supabase de teste. O `pg_restore`
 ```powershell
 pg_restore --verbose --exit-on-error --no-owner --no-acl `
   -h $testHost -p $testPort -U $testUser -d $testDatabase `
-  "C:\Users\MURILO\Downloads\dudit-restore.dump"
+  "C:\Users\MuriloSTR\Downloads\dudit-restore.dump"
 ```
 
 Para o primeiro teste, use um projeto Supabase de teste recém-criado. Não use `--clean` em um projeto que contenha dados que você queira manter. Se precisar repetir o teste depois de uma falha parcial, crie outro projeto de teste ou limpe o destino somente depois de confirmar que ele é descartável.

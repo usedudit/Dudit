@@ -73,6 +73,7 @@ export const ProductFiscalTab: React.FC<ProductFiscalTabProps> = ({
                 }}
                 disabled={!isEditing}
                 error={fieldErrors?.has("origin")}
+                dataField="origin"
               />
               {fieldErrors?.has("origin") && <span className="text-xs text-brand-red">Obrigatório</span>}
             </div>
@@ -108,6 +109,7 @@ export const ProductFiscalTab: React.FC<ProductFiscalTabProps> = ({
                 // Padding right garante que o texto não fique atrás do botão
                 className="mb-0 pr-[70px]"
                 error={fieldErrors?.has("ncm")}
+                dataField="ncm"
               />
 
               {/* Botão Sugerir IA posicionado dentro do input */}
@@ -153,6 +155,7 @@ export const ProductFiscalTab: React.FC<ProductFiscalTabProps> = ({
                 maxLength={7}
                 className="mb-0"
                 error={fieldErrors?.has("cest")}
+                dataField="cest"
               />
             </div>
           </div>

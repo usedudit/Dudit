@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { SearchIcon, UserIcon, PlusIcon, XIcon } from "@/lib/icons"
-import { Button, Input, IconPlaceholder, EmailInput, PhoneInput, Checkbox, RadioButton } from "@/components/reusable"
+import { Button, Input, IconPlaceholder, EmailInput, PhoneInput, Checkbox } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery, usePickerBucket } from "@/components/erp/hooks"
@@ -24,7 +24,8 @@ export type PinnedSupplierSummary = {
 interface SelectSupplierSheetProps {
     isOpen: boolean
     onClose: () => void
-    onSelect: (supplier: PartnerSupplierBucketItem | PinnedSupplierSummary) => void
+    onSelect?: (supplier: PartnerSupplierBucketItem | PinnedSupplierSummary) => void
+    onSaveSelectedSuppliers?: (suppliers: PartnerSupplierBucketItem[]) => void
     onCreateSupplier?: (payload: {
         name: string
         email?: string
@@ -46,11 +47,12 @@ interface SelectSupplierSheetProps {
 function SupplierRowSkeleton() {
     return (
         <div className="flex animate-pulse items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border">
-            <div className="h-12 w-12 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
+            <div className="h-11 w-11 shrink-0 rounded-full bg-gray-100 dark:bg-dark-border" />
             <div className="min-w-0 flex-1 space-y-2">
                 <div className="h-4 w-2/3 rounded bg-gray-100 dark:bg-dark-border" />
                 <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-dark-border" />
             </div>
+            <div className="h-5 w-5 rounded bg-gray-100 dark:bg-dark-border shrink-0" />
         </div>
     )
 }
@@ -59,13 +61,14 @@ const SelectSupplierSheet = ({
     isOpen,
     onClose,
     onSelect,
+    onSaveSelectedSuppliers,
     onCreateSupplier,
     partnerId,
     selectedSupplierId,
     selectedSupplierIds,
     pinnedSupplier,
     onRequestRemoveSelected,
-    title = "Selecionar Fornecedor",
+    title = "Selecionar Fornecedores",
 }: SelectSupplierSheetProps) => {
     const [appendPulse, setAppendPulse] = useState(false)
     const [isNewSupplierSheetOpen, setIsNewSupplierSheetOpen] = useState(false)
@@ -76,12 +79,17 @@ const SelectSupplierSheet = ({
     const [nameError, setNameError] = useState<string | null>(null)
     const [emailError, setEmailError] = useState<string | null>(null)
     const [phoneError, setPhoneError] = useState<string | null>(null)
-    const [tempSelectedSupplier, setTempSelectedSupplier] = useState<PartnerSupplierBucketItem | PinnedSupplierSummary | null>(null)
+
+    // Temporary selection state during modal interaction
+    const [tempSelectedIds, setTempSelectedIds] = useState<Set<string>>(new Set())
+    const selectedSuppliersMapRef = useRef<Map<string, PartnerSupplierBucketItem>>(new Map())
+
     const loadMoreLock = useRef(false)
     const listScrollRef = useRef<HTMLDivElement>(null)
     const sentinelRef = useRef<HTMLDivElement>(null)
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const isCloseLocked = isCreatingSupplier
+
     const handleSafeClose = useCallback(() => {
         if (isCloseLocked) return
         onClose()
@@ -106,19 +114,6 @@ const SelectSupplierSheet = ({
         }
         return result.data
     }, [onCreateSupplier, partnerId])
-
-    const handleSaveSelection = useCallback(() => {
-        if (!selectedSupplierIds) {
-            if (tempSelectedSupplier) {
-                onSelect(tempSelectedSupplier)
-            } else if (onRequestRemoveSelected) {
-                onRequestRemoveSelected()
-            }
-        }
-        onClose()
-    }, [tempSelectedSupplier, onSelect, onRequestRemoveSelected, onClose, selectedSupplierIds])
-
-    const canSave = selectedSupplierIds || tempSelectedSupplier !== null || !!onRequestRemoveSelected
 
     const matchesSearch = useCallback((item: PartnerSupplierBucketItem, q: string) => {
         return (
@@ -150,7 +145,7 @@ const SelectSupplierSheet = ({
 
     const pickerOptions = useMemo(
         () => ({
-            pageSize: 8,
+            pageSize: 12,
             postFilter,
             resetPagingKey: `${selectedSupplierId ?? ""}-${pinnedSupplier?.id ?? ""}`,
         }),
@@ -163,14 +158,31 @@ const SelectSupplierSheet = ({
     )
 
     const picker = usePickerBucket(loadSuppliersBucket, matchesSearch, pickerOptions)
-
     const pickerRef = useRef(picker)
     pickerRef.current = picker
 
+    // Sync items to reference map for instant access on submit
+    useEffect(() => {
+        if (picker.displayed) {
+            picker.displayed.forEach((item) => {
+                selectedSuppliersMapRef.current.set(item.id, item)
+            })
+        }
+    }, [picker.displayed])
+
+    // Initialize temporary selections when opening
     useEffect(() => {
         if (!isOpen) return
         void pickerRef.current.loadBucket(pickerRef.current.isLoaded)
-    }, [isOpen])
+
+        const initialIds = new Set<string>()
+        if (selectedSupplierIds && selectedSupplierIds.length > 0) {
+            selectedSupplierIds.forEach(id => initialIds.add(id))
+        } else if (selectedSupplierId) {
+            initialIds.add(selectedSupplierId)
+        }
+        setTempSelectedIds(initialIds)
+    }, [isOpen, selectedSupplierId, selectedSupplierIds])
 
     useEffect(() => {
         if (isOpen) return
@@ -184,33 +196,7 @@ const SelectSupplierSheet = ({
         setPhoneError(null)
     }, [isOpen])
 
-    useEffect(() => {
-        if (!isOpen) return
-        if (selectedSupplierId) {
-            if (pinnedSupplier && pinnedSupplier.id === selectedSupplierId) {
-                setTempSelectedSupplier(pinnedSupplier)
-            } else {
-                const found = picker.displayed.find((c) => c.id === selectedSupplierId)
-                if (found) {
-                    setTempSelectedSupplier(found)
-                } else {
-                    setTempSelectedSupplier({ id: selectedSupplierId, name: "Carregando..." })
-                }
-            }
-        } else {
-            setTempSelectedSupplier(null)
-        }
-    }, [isOpen, selectedSupplierId, pinnedSupplier])
-
-    useEffect(() => {
-        if (isOpen && selectedSupplierId && (!tempSelectedSupplier || tempSelectedSupplier.name === "Carregando...")) {
-            const found = picker.displayed.find((c) => c.id === selectedSupplierId)
-            if (found) {
-                setTempSelectedSupplier(found)
-            }
-        }
-    }, [isOpen, selectedSupplierId, picker.displayed, tempSelectedSupplier])
-
+    // Infinite scroll observer
     useEffect(() => {
         const root = listScrollRef.current
         const target = sentinelRef.current
@@ -233,16 +219,74 @@ const SelectSupplierSheet = ({
         return () => obs.disconnect()
     }, [isOpen, picker.hasMore, picker.loadMore, picker.displayed.length, picker.filtered.length])
 
+    const handleToggleSupplier = useCallback((supplier: PartnerSupplierBucketItem) => {
+        selectedSuppliersMapRef.current.set(supplier.id, supplier)
+        setTempSelectedIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(supplier.id)) {
+                next.delete(supplier.id)
+            } else {
+                next.add(supplier.id)
+            }
+            return next
+        })
+    }, [])
+
+    const handleSaveSelection = useCallback(() => {
+        const selectedList: PartnerSupplierBucketItem[] = []
+        tempSelectedIds.forEach((id) => {
+            const item = selectedSuppliersMapRef.current.get(id)
+            if (item) {
+                selectedList.push(item)
+            } else {
+                selectedList.push({
+                    id,
+                    name: "Fornecedor",
+                    email: null,
+                    phone: null,
+                    cnpj: null,
+                    avatar_url: null,
+                })
+            }
+        })
+
+        if (onSaveSelectedSuppliers) {
+            onSaveSelectedSuppliers(selectedList)
+        } else if (onSelect && selectedList.length > 0) {
+            onSelect(selectedList[0])
+        } else if (onRequestRemoveSelected && selectedList.length === 0) {
+            onRequestRemoveSelected()
+        }
+
+        onClose()
+    }, [tempSelectedIds, onSaveSelectedSuppliers, onSelect, onRequestRemoveSelected, onClose])
+
     const showEmpty =
         !picker.isLoadingBucket &&
         picker.isLoaded &&
         picker.displayed.length === 0 &&
         picker.filtered.length === 0
 
+    const newlySelectedCount = useMemo(() => {
+        const initialSet = new Set(selectedSupplierIds || (selectedSupplierId ? [selectedSupplierId] : []))
+        let added = 0
+        tempSelectedIds.forEach(id => {
+            if (!initialSet.has(id)) added++
+        })
+        return added
+    }, [tempSelectedIds, selectedSupplierIds, selectedSupplierId])
+
     const content = (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
+                <div>
+                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h2>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        {tempSelectedIds.size === 1
+                            ? "1 fornecedor selecionado"
+                            : `${tempSelectedIds.size} fornecedores selecionados`}
+                    </p>
+                </div>
                 <Button variant="filled" onClick={handleSafeClose} size="icon" disabled={isCloseLocked} className="hidden lg:flex">
                     <XIcon className="h-5 w-5" />
                 </Button>
@@ -253,7 +297,7 @@ const SelectSupplierSheet = ({
                     <Input
                         label=""
                         name="supplierSearch"
-                        placeholder="Buscar por nome, email ou telefone..."
+                        placeholder="Buscar por nome, CNPJ, e-mail..."
                         value={picker.searchQuery}
                         onChange={(e) => picker.setSearchQuery(e.target.value)}
                         prefix={<SearchIcon size={18} className="text-brand-inactive-text" />}
@@ -286,84 +330,55 @@ const SelectSupplierSheet = ({
                 ) : picker.displayed.length > 0 ? (
                     <div className="flex flex-col px-2 pb-2">
                         {picker.displayed.map((supplier) => {
-                            const isCurrentlySelected = selectedSupplierIds
-                                ? selectedSupplierIds.includes(supplier.id)
-                                : tempSelectedSupplier?.id === supplier.id
+                            const isCurrentlySelected = tempSelectedIds.has(supplier.id)
                             return (
                                 <div
                                     key={supplier.id}
                                     role="button"
                                     tabIndex={0}
-                                    onClick={() => {
-                                        if (selectedSupplierIds) {
-                                            onSelect(supplier)
-                                        } else {
-                                            if (tempSelectedSupplier?.id === supplier.id) {
-                                                setTempSelectedSupplier(null)
-                                            } else {
-                                                setTempSelectedSupplier(supplier)
-                                            }
-                                        }
-                                    }}
+                                    onClick={() => handleToggleSupplier(supplier)}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" || e.key === " ") {
                                             e.preventDefault()
-                                            if (selectedSupplierIds) {
-                                                onSelect(supplier)
-                                            } else {
-                                                if (tempSelectedSupplier?.id === supplier.id) {
-                                                    setTempSelectedSupplier(null)
-                                                } else {
-                                                    setTempSelectedSupplier(supplier)
-                                                }
-                                            }
+                                            handleToggleSupplier(supplier)
                                         }
                                     }}
-                                    className={`group flex items-center gap-4 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer ${isCurrentlySelected
-                                        ? "bg-brand-primary/5 dark:bg-brand-primary/10"
-                                        : "hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                                        }`}
+                                    className={`group flex items-center gap-3.5 border-b border-brand-border p-3.5 transition-colors last:border-0 dark:border-dark-border cursor-pointer select-none rounded-xl mx-1 my-0.5 ${
+                                        isCurrentlySelected
+                                            ? "bg-brand-green/5 dark:bg-brand-green/10"
+                                            : "hover:bg-gray-50 dark:hover:bg-dark-border/40"
+                                    }`}
                                 >
-                                    {selectedSupplierIds && (
-                                        <div onClick={(e) => e.stopPropagation()}>
-                                            <Checkbox
-                                                checked={isCurrentlySelected}
-                                                onChange={() => onSelect(supplier)}
-                                            />
-                                        </div>
-                                    )}
                                     <UserProfileImage
                                         fullName={supplier.name || "Fornecedor"}
                                         imageUrl={(supplier as any).image_url || (supplier as any).imageUrl || (supplier as any).avatar_url}
-                                        className="h-12 w-12 shrink-0 text-lg"
+                                        className="h-11 w-11 shrink-0 text-base"
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                            <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                {supplier.name}
-                                            </span>
-                                        </div>
-                                        {supplier.phone ? (
-                                            <p className="truncate text-sm font-medium text-brand-inactive-text dark:text-dark-body">
+                                        <span className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading block">
+                                            {supplier.name}
+                                        </span>
+                                        {supplier.cnpj || (supplier as any).cpf ? (
+                                            <p className="truncate text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                {supplier.cnpj || (supplier as any).cpf}
+                                            </p>
+                                        ) : supplier.phone ? (
+                                            <p className="truncate text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                 {formatBrazilPhone(supplier.phone) || supplier.phone}
+                                            </p>
+                                        ) : supplier.email ? (
+                                            <p className="truncate text-xs font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                {supplier.email}
                                             </p>
                                         ) : null}
                                     </div>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                        {!selectedSupplierIds ? (
-                                            <RadioButton
-                                                name="selectedSupplier"
-                                                value={supplier.id}
-                                                checked={tempSelectedSupplier?.id === supplier.id}
-                                                onChange={() => {
-                                                    if (tempSelectedSupplier?.id === supplier.id) {
-                                                        setTempSelectedSupplier(null)
-                                                    } else {
-                                                        setTempSelectedSupplier(supplier)
-                                                    }
-                                                }}
-                                            />
-                                        ) : null}
+
+                                    {/* Right-aligned Checkbox */}
+                                    <div className="flex shrink-0 items-center pl-2" onClick={(e) => e.stopPropagation()}>
+                                        <Checkbox
+                                            checked={isCurrentlySelected}
+                                            onChange={() => handleToggleSupplier(supplier)}
+                                        />
                                     </div>
                                 </div>
                             )
@@ -399,9 +414,9 @@ const SelectSupplierSheet = ({
                     <Button
                         className="h-12 flex-1"
                         onClick={handleSaveSelection}
-                        disabled={isCloseLocked || !canSave}
+                        disabled={isCloseLocked}
                     >
-                        Salvar
+                        {newlySelectedCount > 0 ? `Salvar (${newlySelectedCount})` : "Salvar"}
                     </Button>
                 </div>
             </footer>
@@ -506,21 +521,15 @@ const SelectSupplierSheet = ({
                                     avatar_url: (created as any).image_url || (created as any).avatar_url || null,
                                 }
                                 picker.prependItem(newSupplierItem)
+                                selectedSuppliersMapRef.current.set(newSupplierItem.id, newSupplierItem)
+
+                                // Auto-select the newly created supplier
+                                setTempSelectedIds((prev) => new Set(prev).add(newSupplierItem.id))
 
                                 setNewSupplierName("")
                                 setNewSupplierEmail("")
                                 setNewSupplierPhone("")
                                 setIsNewSupplierSheetOpen(false)
-
-                                if (selectedSupplierIds) {
-                                    if (!selectedSupplierIds.includes(created.id)) {
-                                        onSelect(created)
-                                    }
-                                } else {
-                                    setTempSelectedSupplier(created)
-                                    onSelect(created)
-                                    onClose()
-                                }
                             } catch (error) {
                                 const errorMsg = error instanceof Error ? error.message : "Não foi possível criar o fornecedor."
                                 const lowerMsg = errorMsg.toLowerCase()
@@ -542,7 +551,7 @@ const SelectSupplierSheet = ({
                     </Button>
                 </div>
             </footer>
-        </div >
+        </div>
     )
 
     if (isMobile) {

@@ -65,12 +65,13 @@ interface ServiceGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details"
     isQuickMode?: boolean
+    isDesapego?: boolean
     isGeneratingDetails?: boolean
     onGenerateDetails?: () => void
 }
 
 export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
-    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isGeneratingDetails = false, onGenerateDetails
+    serviceData, handleInputChange, generateRandomCode, categories, subCategories, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isDesapego = false, isGeneratingDetails = false, onGenerateDetails
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const handleFieldChange = (e: any) => { if (onFieldChange && e.target.name) onFieldChange(e.target.name); handleInputChange(e) }
@@ -393,6 +394,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     maxLength={150}
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                    dataField="name"
                                     labelAddon={
                                         isEditing && onGenerateDetails && (
                                             <button
@@ -479,6 +481,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                         required={showPrice}
                                         error={fieldErrors?.has("price")}
                                         errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
+                                        dataField="price"
                                     />
                                     {isEditing && showPrice && (
                                         <SalePriceCalculator
@@ -524,6 +527,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     required={showPrice}
                                     error={fieldErrors?.has("price")}
                                     errorMessage={fieldErrors?.has("price") ? "Preço é obrigatório" : undefined}
+                                    dataField="price"
                                 />
                                 {isEditing && showPrice && (
                                     <SalePriceCalculator
@@ -596,6 +600,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                         ? "Duração é obrigatória (máx. 525.600 min)"
                                         : undefined
                                 }
+                                dataField="duration_minutes"
                             />
                             {!isQuickMode && (
                                 <Input

@@ -462,12 +462,14 @@ export async function resolveCheckoutCartLines(
   return { success: true, lines, partnerId, hasProducts, hasDeliveryLines }
 }
 
-/** Legacy order-level delivery fields: derived from product/subscription lines that use delivery. */
+/** Legacy order-level delivery fields: derived from product/subscription lines that use delivery or order-level deliveryType. */
 export function deriveOrderDeliveryFields(
   lines: ResolvedCartLine[],
   deliveryAddress: string,
+  requestedDeliveryType?: "delivery" | "pickup",
 ): { deliveryType: "delivery" | "pickup"; deliveryAddress: string } {
-  const anyDelivery = lines.some((l) => l.lineRequiresDelivery)
+  const hasProducts = lines.some((l) => l.itemType === "product")
+  const anyDelivery = lines.some((l) => l.lineRequiresDelivery) || (hasProducts && requestedDeliveryType === "delivery") || requestedDeliveryType === "delivery"
   return {
     deliveryType: anyDelivery ? "delivery" : "pickup",
     deliveryAddress: anyDelivery ? deliveryAddress : "",
@@ -479,8 +481,9 @@ export function buildFulfillmentPayload(
   partnerId: string,
   lines: ResolvedCartLine[],
   deliveryAddress: string,
+  requestedDeliveryType?: "delivery" | "pickup",
 ): CheckoutFulfillmentPayload {
-  const { deliveryType, deliveryAddress: address } = deriveOrderDeliveryFields(lines, deliveryAddress)
+  const { deliveryType, deliveryAddress: address } = deriveOrderDeliveryFields(lines, deliveryAddress, requestedDeliveryType)
 
   return {
     version: 1,

@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 
 interface SupplierGridCardProps {
@@ -72,35 +72,32 @@ const SupplierGridCard = React.memo(
               </div>
             </div>
 
-            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-              <span>{supplier.cnpj || supplier.cpf || "-"}</span>
-            </div>
+            {supplier.supplier_code && (
+              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+                <span>{supplier.supplier_code}</span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total NF-e</span>
-              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                {supplier.total_imported_value ? formatCurrency(supplier.total_imported_value) : "-"}
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Cidade</span>
+              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                {supplier.city && supplier.state ? `${supplier.city}, ${supplier.state}` : supplier.city || supplier.state || "-"}
               </span>
             </div>
 
-            <div className="flex flex-col gap-0.5 items-end">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Importações</span>
-              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
-                {supplier.xml_count || 0}
+            <div className="flex flex-col gap-0.5 items-end min-w-0">
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Última Compra</span>
+              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
+                {supplier.last_import_at ? formatDate(supplier.last_import_at) : "-"}
               </span>
             </div>
           </div>
 
-          <div className="flex items-end justify-between mt-1">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Código</span>
-              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.supplier_code || "-"}</span>
-            </div>
-
+          <div className="flex items-end justify-end mt-1">
             <div
               className="shrink-0"
               onClick={(e) => e.stopPropagation()}
@@ -120,8 +117,10 @@ const SupplierGridCard = React.memo(
     prev.supplier.id === next.supplier.id &&
     prev.supplier.name === next.supplier.name &&
     prev.supplier.status === next.supplier.status &&
-    prev.supplier.xml_count === next.supplier.xml_count &&
-    prev.supplier.total_imported_value === next.supplier.total_imported_value &&
+    prev.supplier.supplier_code === next.supplier.supplier_code &&
+    prev.supplier.city === next.supplier.city &&
+    prev.supplier.state === next.supplier.state &&
+    prev.supplier.last_import_at === next.supplier.last_import_at &&
     (prev.supplier.image_url || null) === (next.supplier.image_url || null)
 )
 

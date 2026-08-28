@@ -21,6 +21,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { getCitiesData } from "@/lib/data/cities-loader"
 import { IconPlaceholder } from "../reusable"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
+import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -182,6 +183,13 @@ const Header: React.FC<HeaderProps> = ({
     const [visitorSearchQuery, setVisitorSearchQuery] = useState("")
     const [isIpLoading, setIsIpLoading] = useState(false)
     const [citiesList, setCitiesList] = useState<string[]>([])
+    const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
+
+    const handleOpenAnnounceModal = useCallback((e?: React.MouseEvent) => {
+        if (e) e.preventDefault()
+        setIsMobileCategoryMenuOpen(false)
+        setIsAnnounceModalOpen(true)
+    }, [])
 
     useEffect(() => {
         if (isVisitorModalOpen && citiesList.length === 0) {
@@ -973,15 +981,14 @@ const Header: React.FC<HeaderProps> = ({
                             </Link>
                         ))}
                         <div className="border-t border-gray-100 mt-2 pt-2">
-                            <Link
-                                href="/auth/login?mode=partner"
-                                prefetch={false}
-                                onClick={() => setIsMobileCategoryMenuOpen(false)}
-                                className="px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center gap-1 transition-colors"
+                            <button
+                                type="button"
+                                onClick={handleOpenAnnounceModal}
+                                className="w-full text-left px-6 py-3 font-bold text-brand-orange hover:bg-brand-gray cursor-pointer text-[15px] flex items-center justify-between transition-colors"
                             >
                                 <span>Anunciar grátis</span>
                                 <ChevronRightIcon size={16} />
-                            </Link>
+                            </button>
                         </div>
                     </div>
                 </BottomSheet>
@@ -1191,16 +1198,22 @@ const Header: React.FC<HeaderProps> = ({
                         ))}
                     </div>
 
-                    <Link
-                        href="/auth/login?mode=partner"
-                        prefetch={false}
+                    <button
+                        type="button"
+                        onClick={handleOpenAnnounceModal}
                         className="ml-auto font-bold text-brand-orange hover:text-brand-orange/70 cursor-pointer text-[13px] flex items-center gap-1 py-1"
                     >
                         <span>Anunciar grátis</span>
                         <ChevronRightIcon size={14} />
-                    </Link>
+                    </button>
                 </div>
             </header>
+
+            <QuickAnnounceModal
+                isOpen={isAnnounceModalOpen}
+                onClose={() => setIsAnnounceModalOpen(false)}
+                userProfile={profile}
+            />
 
             {renderVisitorModal()}
             <GeneralFeedbackModal

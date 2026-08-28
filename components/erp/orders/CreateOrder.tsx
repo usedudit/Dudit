@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent, Button, AlertModal, ThreeDotsLoader, Input, MoneyInput, Combobox, Checkbox, ListItem, RadioButton, InfoCard, PercentageInput } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
@@ -1522,6 +1523,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
     }, [fieldErrors])
 
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
+
     const salesChannelOptions = [
         { value: "Manual", label: "Manual" },
         { value: "Loja Online", label: "Loja Online" },
@@ -2148,7 +2157,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                 <AlertModal
                     isOpen={showValidationModal}
-                    onClose={() => setShowValidationModal(false)}
+                    onClose={() => {
+                        setShowValidationModal(false)
+                        scrollToFirstError()
+                    }}
                     title="Campos obrigatórios pendentes"
                     message={validationMessage || "Revise os campos obrigatórios antes de salvar a venda."}
                     confirmText="Ok, entendi"

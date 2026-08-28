@@ -119,6 +119,15 @@ function AuthContent() {
       .then((has) => {
         if (gone) return
         if (has) {
+          const announce = searchParams.get("announce")
+          if (announce === "product") {
+            router.replace("/erp/produtos?create=true")
+            return
+          }
+          if (announce === "service") {
+            router.replace("/erp/servicos?create=true")
+            return
+          }
           router.replace("/erp/inicio")
           return
         }

@@ -17,13 +17,13 @@ import {
     SparklesIcon,
     WhatsappIcon,
     FacebookIcon,
-    XIcon,
-    TelegramIcon,
-    LinkedinIcon,
     QRCodeIcon,
     EyeIcon,
+    Package,
+    WrenchIcon,
+    Store,
 } from "@/lib/icons";
-import { Button, ListItem, FormSection, DefaultModal, InfoCard } from "@/components/reusable";
+import { Button, ListItem, FormSection, DefaultModal, InfoCard, RadioButton } from "@/components/reusable";
 import { useToast } from "@/hooks/use-toast";
 import { deleteProductAction } from "@/app/actions/erp/products";
 import { deleteServiceAction } from "@/app/actions/erp/servicos";
@@ -650,30 +650,121 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
     );
 }
 
-// ============================================
-// MODE CARD (Switch to ERP)
-// ============================================
-
-function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () => void }) {
+function ModeCard({
+    partnerId,
+    isDesapego,
+    onSuccess
+}: {
+    partnerId: string;
+    isDesapego?: boolean;
+    onSuccess: () => void;
+}) {
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedMode, setSelectedMode] = useState<"quick" | "erp">("quick");
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
 
-    const handleUpgrade = async () => {
+    const handleUpgrade = async (modeToSet: "quick" | "erp") => {
         setLoading(true);
         try {
-            const { upgradeToERPAction } = await import("@/app/actions/erp/quick-mode");
-            const res = await upgradeToERPAction(partnerId);
+            const { switchBusinessModeAction } = await import("@/app/actions/erp/quick-mode");
+            const res = await switchBusinessModeAction(partnerId, modeToSet);
             if (res.success) {
-                toast({ title: "Modo ERP ativado!", description: "Bem-vindo ao modo ERP completo." });
+                toast({
+                    title: modeToSet === "erp" ? "Modo ERP ativado!" : "Vitrine Online ativada!",
+                    description: modeToSet === "erp" ? "Bem-vindo ao modo ERP completo." : "Sua vitrine online e catálogo comercial estão prontos."
+                });
+                setModalOpen(false);
                 onSuccess();
             } else {
                 toast({ title: "Erro", description: res.error, variant: "destructive" });
             }
         } catch {
-            toast({ title: "Erro", description: "Não foi possível ativar o modo ERP", variant: "destructive" });
+            toast({ title: "Erro", description: "Não foi possível alterar o modo", variant: "destructive" });
         }
         setLoading(false);
     };
+
+    if (isDesapego) {
+        return (
+            <>
+                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                        <RocketIcon size={20} className="text-brand-green" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                Evoluir negócio
+                            </span>
+                            <p className="text-sm text-brand-dark dark:text-dark-heading">
+                                Ative a Vitrine Online ou o Gerenciador Completo (ERP) para desbloquear pedidos, catálogo comercial e mais.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-4 text-xs font-bold shrink-0"
+                        onClick={() => setModalOpen(true)}
+                    >
+                        Evoluir
+                    </Button>
+                </div>
+
+                <DefaultModal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    title="Escolha como deseja evoluir"
+                    description="Selecione o modo ideal para o seu negócio. Você poderá alternar quando quiser."
+                    maxWidth="md"
+                >
+                    <div className="space-y-4">
+                        <ListItem
+                            title="Vitrine Online & WhatsApp"
+                            description="Catálogo e vitrine profissional com sua marca para vender no WhatsApp e Marketplace."
+                            icon={<Store className="text-brand-green w-5 h-5" />}
+                            onClick={() => setSelectedMode("quick")}
+                            left={
+                                <RadioButton
+                                    name="evolveMode"
+                                    value="quick"
+                                    checked={selectedMode === "quick"}
+                                    onChange={() => setSelectedMode("quick")}
+                                />
+                            }
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                        />
+
+                        <ListItem
+                            title="Gerenciar meu negócio (ERP)"
+                            description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
+                            icon={<RocketIcon className="text-brand-green w-5 h-5" />}
+                            onClick={() => setSelectedMode("erp")}
+                            left={
+                                <RadioButton
+                                    name="evolveMode"
+                                    value="erp"
+                                    checked={selectedMode === "erp"}
+                                    onChange={() => setSelectedMode("erp")}
+                                />
+                            }
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                        />
+
+                        <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">
+                            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={loading}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={() => handleUpgrade(selectedMode)} disabled={loading}>
+                                {loading ? "Ativando..." : "Confirmar e Ativar"}
+                            </Button>
+                        </div>
+                    </div>
+                </DefaultModal>
+            </>
+        );
+    }
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
@@ -694,7 +785,7 @@ function ModeCard({ partnerId, onSuccess }: { partnerId: string; onSuccess: () =
                 variant="default"
                 size="sm"
                 className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-4 text-xs font-bold shrink-0"
-                onClick={handleUpgrade}
+                onClick={() => handleUpgrade("erp")}
                 disabled={loading}
             >
                 {loading ? "Ativando..." : "Ativar"}
@@ -901,13 +992,35 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
 
                 {/* Cards Grid */}
                 <div className="flex flex-col gap-6">
-                    {/* Onboarding - Full Width */}
-                    {data.checklist && (
-                        <ProgressCard
-                            checklist={data.checklist}
-                            onItemClick={handleChecklistItemClick}
-                            onImportClick={handleImportClick}
-                        />
+                    {/* Modo Desapego: Cards Rápidos para Anunciar */}
+                    {data.isDesapego ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ListItem
+                                icon={<Package className="text-brand-green w-5 h-5" />}
+                                title="Anunciar Produto ou Desapego"
+                                description="Cadastre um item para vender no marketplace e compartilhar com seus clientes."
+                                onClick={() => router.push("/erp/produtos?create=true")}
+                                showChevron
+                                className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
+                            />
+                            <ListItem
+                                icon={<WrenchIcon className="text-brand-green w-5 h-5" />}
+                                title="Anunciar Serviço ou Atendimento"
+                                description="Divulgue seus serviços, orçamentos e agendamentos no marketplace."
+                                onClick={() => router.push("/erp/servicos?create=true")}
+                                showChevron
+                                className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
+                            />
+                        </div>
+                    ) : (
+                        /* Onboarding - Full Width */
+                        data.checklist && (
+                            <ProgressCard
+                                checklist={data.checklist}
+                                onItemClick={handleChecklistItemClick}
+                                onImportClick={handleImportClick}
+                            />
+                        )
                     )}
 
                     {/* Perfil de Vendedor + Ajuda e Suporte - 2 columns */}
@@ -919,10 +1032,10 @@ export default function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     {/* Plano + Modo ERP + Dicas + Feedback - 2 columns banners */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <PlanUpgradeCard planSlug={data.planSlug} onUpgrade={openPlanUpgrade} />
-                        {data.isQuickMode && (
-                            <ModeCard partnerId={partnerId} onSuccess={() => router.refresh()} />
+                        {(data.isQuickMode || data.isDesapego) && (
+                            <ModeCard partnerId={partnerId} isDesapego={data.isDesapego} onSuccess={() => router.refresh()} />
                         )}
-                        <TipsCard />
+                        {!data.isDesapego && <TipsCard />}
                         <FeedbackCard onOpen={() => setShowFeedbackModal(true)} />
                     </div>
                 </div>

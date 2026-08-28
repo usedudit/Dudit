@@ -41,6 +41,7 @@ interface FormInputProps {
   autoCorrect?: string
   autoCapitalize?: string
   showCharacterCount?: boolean
+  dataField?: string
 }
 
 export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInputProps>(
@@ -81,6 +82,7 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
       autoCorrect,
       autoCapitalize,
       showCharacterCount = false,
+      dataField,
     },
     ref
   ) => {
@@ -121,7 +123,7 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, FormInpu
     }
 
     return (
-      <div className={cn("flex-1 w-full", className)}>
+      <div className={cn("flex-1 w-full", className)} {...(dataField ? { "data-field": dataField } : {})}>
         {label && (
           <div className="flex items-center justify-between gap-2 mb-1.5">
             <label

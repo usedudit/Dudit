@@ -49,6 +49,7 @@ interface Customer {
     originalId: string;
     name: string;
     avatar: string;
+    email?: string;
     phone?: string;
     orders: number;
     totalOrderValue: number;
@@ -60,6 +61,8 @@ interface Customer {
     createdAt?: string;
     address?: string;
     birth_date?: string | null;
+    city?: string | null;
+    state?: string | null;
 }
 
 interface FilterState {
@@ -89,7 +92,8 @@ interface Column {
 // --- CONFIGURAÇÃO DE COLUNAS ---
 const COLUMNS: Column[] = [
     { id: "name", label: "Cliente", align: "left", width: "300px" },
-    { id: "phone", label: "Telefone", align: "left", width: "170px" },
+    { id: "contact", label: "Contato", align: "left", width: "220px" },
+    { id: "city", label: "Cidade", align: "left", width: "180px" },
     { id: "orders", label: "Pedidos", align: "center", width: "100px" },
     { id: "last_order", label: "Último Pedido", align: "left", width: "160px" },
     { id: "status", label: "Status", align: "center", width: "120px" },
@@ -280,6 +284,7 @@ export default function CustomersPage({
                 originalId: c.id,
                 name: c.name || 'Cliente Sem Nome',
                 avatar: c.image_url || c.avatar_url || '',
+                email: c.email || "",
                 phone: c.phone || c.phone_fixed || "",
                 orders: c.orders_count || 0,
                 totalOrderValue: c.total_spent || 0.00,
@@ -290,7 +295,9 @@ export default function CustomersPage({
                 storeCredit: c.store_credit || 0,
                 createdAt: c.created_at,
                 address: c.address,
-                birth_date: c.birth_date
+                birth_date: c.birth_date,
+                city: c.city || null,
+                state: c.state || null,
             }))
 
         const result = [...filtered]
@@ -680,7 +687,7 @@ export default function CustomersPage({
                                                     <div className={`absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${scrollState.right ? "opacity-100" : "opacity-0"}`} />
 
                                                     <div className="overflow-x-auto pb-4 custom-scrollbar" ref={tableContainerRef} onScroll={handleScroll}>
-                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1200px]">
+                                                        <table className="w-full text-left border-separate border-spacing-0 min-w-[1380px]">
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                     <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">

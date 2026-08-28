@@ -227,7 +227,8 @@ export function ERPSidebar() {
 
     const sellsProducts = isSystemResourceActive(businessInfo, "products")
     const sellsServices = isSystemResourceActive(businessInfo, "services")
-    const isQuick = businessInfo.mode === "quick"
+    const isDesapego = businessInfo.mode === "desapego"
+    const isQuick = businessInfo.mode === "quick" || businessInfo.mode === "showcase"
     const ordersResourceActive = isSystemResourceActive(businessInfo, "orders")
     const productsResourceActive = isSystemResourceActive(businessInfo, "products")
     const servicesResourceActive = isSystemResourceActive(businessInfo, "services")
@@ -250,6 +251,7 @@ export function ERPSidebar() {
     const showcaseResourceActive = isSystemResourceActive(businessInfo, "showcase")
     const productivityResourceActive = isSystemResourceActive(businessInfo, "productivity")
     const communityVideosResourceActive = isSystemResourceActive(businessInfo, "communityVideos")
+    const marketingGroupActive = marketingResourceActive || couponsResourceActive || campaignsResourceActive || communityVideosResourceActive
     const salesGroupActive = ordersResourceActive || quotesResourceActive || returnsResourceActive || posResourceActive || deliveriesResourceActive
     const servicesGroupActive = servicesResourceActive || appointmentsResourceActive || serviceOrdersResourceActive || serviceCadastrosResourceActive
 
@@ -285,31 +287,43 @@ export function ERPSidebar() {
                 if (item.href === "/erp/servicos" && !servicesGroupActive) return null;
                 if (item.label === "Financeiro" && !financialResourceActive) return null;
                 if (item.href === "/erp/clientes" && !customersResourceActive) return null;
-                if (item.label === "Marketing" && !marketingResourceActive) return null;
+                if (item.label === "Marketing" && !marketingGroupActive) return null;
                 if (item.label === "Minha Vitrine" && !showcaseResourceActive) return null;
                 if (item.label === "Produtos" && !sellsProducts && !sellsServices) return null; // Only show if they sell anything at all (but usually products. The label is Produtos for the catalogue.)
                 if (item.label === "Produtos" && !sellsProducts && sellsServices) return null; // Don't show products if they only sell services
                 if (item.label === "Serviços" && !sellsServices) return null;
                 if (item.label === "Desempenho" && !productivityResourceActive && !reportsResourceActive) return null;
-                if (isQuick) {
-                    // Quick mode navigation: simplified, no advanced modules
-                    const allowed = new Set(["Início", "Vendas", "Produtos", "Serviços", "Configurações"])
+
+                if (isDesapego) {
+                    // Desapego / Anúncio Rápido navigation: strictly Início, Produtos, Serviços, Configurações (direct links only)
+                    const allowed = new Set(["Início", "Produtos", "Serviços", "Configurações"])
                     if (!allowed.has(item.label)) return null
-                    // Strip submenus in quick mode to avoid exposing deep routes
                     if (item.submenu) {
                         return {
                             ...item,
                             submenu: undefined,
-                            href: item.href || (item.label === "Vendas" ? "/erp/pedidos" : item.href),
+                            href: item.href,
                             directAccess: true,
                         }
                     }
+                }
+
+                if (isQuick) {
+                    // Vitrine Online / Catálogo navigation: Início, Vendas, Produtos, Serviços, Clientes, Marketing, Configurações
+                    const allowed = new Set(["Início", "Vendas", "Produtos", "Serviços", "Clientes", "Marketing", "Configurações"])
+                    if (!allowed.has(item.label)) return null
                 }
 
                 // Clone item to avoid mutating the original navItems
                 const newItem = { ...item };
                 if (newItem.submenu) {
                     newItem.submenu = newItem.submenu.filter((sub) => {
+                        if (isQuick) {
+                            if (sub.href === "/erp/pdv" || sub.href === "/erp/devolucoes") return false
+                            if (sub.href === "/erp/movimentacao-estoque" || sub.href === "/erp/importacao-xml" || sub.href === "/erp/fornecedores" || sub.label === "Notas de Entrada") return false
+                            if (sub.href === "/erp/ordens-de-servico") return false
+                        }
+
                         if (item.href === "/erp/pedidos") {
                             if (sub.href === "/erp/pedidos") return ordersResourceActive
                             if (sub.href === "/erp/devolucoes") return returnsResourceActive
@@ -348,7 +362,7 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/cupons") return couponsResourceActive
                             if (sub.href === "/erp/promocoes") return campaignsResourceActive
                             if (sub.href === "/erp/videos") return communityVideosResourceActive
-                            return marketingResourceActive
+                            return marketingGroupActive
                         }
                         if (item.label === "Desempenho") {
                             if (sub.href === "/erp/estatisticas" || sub.href === "/erp/relatorios") return reportsResourceActive
@@ -382,7 +396,7 @@ export function ERPSidebar() {
                 return newItem
             })
             .filter((item): item is NavItem => item !== null)
-    }, [canAccess, planSlug, sellsProducts, sellsServices, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive, communityVideosResourceActive, productivityResourceActive])
+    }, [canAccess, planSlug, sellsProducts, sellsServices, isDesapego, isQuick, salesGroupActive, productsResourceActive, servicesGroupActive, financialResourceActive, ordersResourceActive, quotesResourceActive, goalsResourceActive, returnsResourceActive, posResourceActive, stockMovementsResourceActive, productCadastrosResourceActive, deliveriesResourceActive, servicesResourceActive, appointmentsResourceActive, serviceCadastrosResourceActive, customersResourceActive, reportsResourceActive, marketingResourceActive, couponsResourceActive, campaignsResourceActive, showcaseResourceActive, communityVideosResourceActive, productivityResourceActive])
 
     useEffect(() => {
         setIsMounted(true)

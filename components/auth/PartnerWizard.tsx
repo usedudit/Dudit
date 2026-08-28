@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { Upload, Briefcase, Tag, ChevronRight, Store } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "@/hooks/use-notification"
 import { cn, generateNameFromEmail } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -75,6 +75,7 @@ const variants = {
 export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; isUserLoggedIn: boolean }) => {
     const { user } = useSupabase()
     const router = useRouter()
+    const searchParams = useSearchParams()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Step 1: Conta (se não logado). Step 2: Escolha de Modo.
@@ -340,7 +341,14 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             if (!res.success) throw new Error(res.error)
 
             if (isUserLoggedIn || createdSession) {
-                router.push("/erp/inicio")
+                const announce = searchParams.get("announce")
+                if (announce === "product") {
+                    router.push("/erp/produtos?create=true")
+                } else if (announce === "service") {
+                    router.push("/erp/servicos?create=true")
+                } else {
+                    router.push("/erp/inicio")
+                }
             } else {
                 router.push(`/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
             }

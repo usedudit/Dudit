@@ -91,12 +91,18 @@ export async function getQuickModeHomeDataAction(partnerId: string) {
     }
 }
 
+import { getDefaultResourcesForModeAndCategory } from "@/lib/system-resources"
+import type { BusinessMode } from "@/lib/business-info"
+
 export async function upgradeToERPAction(partnerId: string) {
+    return switchBusinessModeAction(partnerId, "erp")
+}
+
+export async function switchBusinessModeAction(partnerId: string, targetMode: BusinessMode) {
     try {
         const user = await requireUser()
         if (!user) return { success: false, error: "Não autenticado" }
 
-        // Only owners should upgrade
         const supabase = createAdminClient()
         const { data: partnerAccess } = await supabase
             .from("partner_users")
@@ -108,7 +114,7 @@ export async function upgradeToERPAction(partnerId: string) {
         // If not found in partner_users, check if they are the direct owner in partners table
         const { data: partnerData } = await supabase
             .from("partners")
-            .select("user_id, business_info")
+            .select("user_id, business_info, category:category_id(name)")
             .eq("id", partnerId)
             .single()
 
@@ -117,9 +123,11 @@ export async function upgradeToERPAction(partnerId: string) {
         if (!isOwner) return { success: false, error: "Apenas o proprietário pode alterar o modo de negócio." }
 
         const businessInfo = normalizeBusinessInfo(partnerData?.business_info)
+        const defaultResources = getDefaultResourcesForModeAndCategory(targetMode, (partnerData as any)?.category?.name || "")
         const updatedInfo = {
             ...businessInfo,
-            mode: "erp"
+            mode: targetMode,
+            activeResources: defaultResources,
         }
 
         const { error: updateError } = await supabase
@@ -133,7 +141,7 @@ export async function upgradeToERPAction(partnerId: string) {
         return { success: true }
 
     } catch (e: any) {
-        return { success: false, error: e.message || "Erro ao atualizar para modo ERP" }
+        return { success: false, error: e.message || "Erro ao alterar modo de negócio" }
     }
 }
 

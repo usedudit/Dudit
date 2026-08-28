@@ -16,6 +16,7 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { UnsavedChangesDialog } from "@/components/reusable/UnsavedChangesDialog"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence, motion } from "framer-motion"
 import { useProductBucket, type ProductBucketItem } from "../hooks"
 import { fetchPartnerServicesBucket, fetchPartnerProductsBucket, type PartnerServiceBucketItem } from "@/app/actions/erp/client-loaders"
@@ -125,6 +126,16 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
         }
         return count
     }, [fieldErrors, manualServiceNameError, manualProductNameError])
+
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
 
     const [title, setTitle] = useState(editData?.title || "")
     const [description, setDescription] = useState(editData?.description || "")
@@ -285,7 +296,6 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
     const paginatedProducts = products.slice((productsPage - 1) * productsItemsPerPage, productsPage * productsItemsPerPage)
 
     const [isScrolled, setIsScrolled] = useState(false)
-    const scrollContainerRef = useRef<HTMLDivElement>(null)
     const pendingSpecsRef = useRef<{ name: string; value: string }[] | null>(null)
 
     const handleScroll = useCallback(() => {
@@ -508,6 +518,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
 
         if (newErrors.size > 0) {
             setFieldErrors(newErrors)
+            scrollToFirstError()
             if (hasEmptyService || hasEmptyProduct) {
                 toast({ description: "Por favor, preencha o nome de todos os itens manuais." })
             } else {
@@ -1001,6 +1012,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                     error={fieldErrors.has("title")}
                                                     errorMessage={fieldErrors.has("title") ? "O título é obrigatório" : undefined}
                                                     maxLength={150}
+                                                    dataField="title"
                                                 />
                                             </FormSection>
 
@@ -1103,6 +1115,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                         placeholder="Selecione um responsável"
                                                         error={fieldErrors.has("assignedUserId")}
                                                         errorMessage={fieldErrors.has("assignedUserId") ? "Selecione um responsável" : undefined}
+                                                        dataField="assignedUserId"
                                                     />
 
                                                     <HourInput
@@ -1153,6 +1166,7 @@ export default function ServiceOrderForm({ partnerId, storeId, onBack, onSaved, 
                                                             ? "border-brand-red dark:border-brand-red-dark"
                                                             : "border-brand-border dark:border-dark-border"
                                                             }`}
+                                                        data-field="customerId"
                                                         onClick={isLocked ? undefined : () => setShowCustomerSheet(true)}
                                                     >
                                                         <div className={`absolute top-0 left-0 w-full h-1 ${fieldErrors.has("customerId") ? "bg-brand-red" : "bg-brand-dark dark:bg-dark-border"

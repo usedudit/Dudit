@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
       rating,
       comment,
       created_at,
+      user_id,
       product_id,
       service_id,
       partner_id,
@@ -118,6 +119,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const reviewUserIds = Array.from(new Set((reviews || []).map((r: any) => r.user_id).filter(Boolean)))
+  let profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null; profile_image_url: string | null }>()
+
+  if (reviewUserIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from("user_profiles")
+      .select("user_id, full_name, avatar_url, profile_image_url")
+      .in("user_id", reviewUserIds)
+
+    if (profilesData) {
+      profilesData.forEach((p: any) => {
+        profilesMap.set(p.user_id, {
+          full_name: p.full_name,
+          avatar_url: p.avatar_url,
+          profile_image_url: p.profile_image_url,
+        })
+      })
+    }
+  }
+
   const enriched = (reviews || []).map((review: any) => {
     const itemKey = `${review.order_id}_${review.product_id || review.service_id}`
     const orderItem = orderItemsMap.get(itemKey)
@@ -136,6 +157,7 @@ export async function GET(request: NextRequest) {
       unit: product?.unit || service?.unit || null,
       products: product ? { name: product.name, images: product.images, unit: product.unit } : null,
       services: service ? { name: service.name, images: service.images, unit: service.unit } : null,
+      profiles: profilesMap.get(review.user_id) || { full_name: "Usuário", avatar_url: null, profile_image_url: null },
     }
   })
 

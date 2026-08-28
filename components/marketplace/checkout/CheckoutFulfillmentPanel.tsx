@@ -29,10 +29,11 @@ function AddressBlock({
   onOpenForm,
   title = "Endereço",
 }: AddressBlockProps) {
-  if (loadingAddresses) {
+  if (loadingAddresses && userAddresses.length === 0) {
     return <div className="py-8 text-center text-sm text-gray-400">Carregando endereços...</div>
   }
-  if (userAddresses.length > 0 && selectedAddress) {
+  const currentAddress = selectedAddress || (userAddresses.length > 0 ? userAddresses[0] : null)
+  if (userAddresses.length > 0 && currentAddress) {
     return (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-stretch gap-3">
@@ -44,8 +45,8 @@ function AddressBlock({
           <div className="flex flex-col justify-center">
             <p className="text-md font-bold text-brand-dark dark:text-dark-heading">{title}</p>
             <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-              {selectedAddress.street}, {selectedAddress.number}
-              {selectedAddress.neighborhood ? ` - ${selectedAddress.neighborhood}` : ""}
+              {currentAddress.street}, {currentAddress.number}
+              {currentAddress.neighborhood ? ` - ${currentAddress.neighborhood}` : ""}
             </p>
           </div>
         </div>
@@ -56,7 +57,7 @@ function AddressBlock({
     )
   }
   return (
-    <div className="flex flex-col items-center border-t border-brand-border dark:border-dark-border pt-6">
+    <div className="flex flex-col items-center">
       <IconPlaceholder
         icon={MapPinIcon}
         title="Nenhum endereço cadastrado"

@@ -28,7 +28,16 @@ const patterns: Record<EntityType, { keywords: string[] }> = {
     keywords: [
       "duração", "duracao", "duration", "minutos", "serviço", "servico",
       "service", "categoria serviço", "categoria servico", "tempo",
-      "agendamento", "scheduling",
+      "scheduling", "tipo atendimento", "modo atendimento",
+    ],
+  },
+  appointments: {
+    keywords: [
+      "agendamento", "agendamentos", "booking", "appointment", "hora inicio",
+      "hora início", "horario inicio", "horário início", "hora fim", "hora término",
+      "hora termino", "start time", "end time", "horário", "horario",
+      "profissional", "atendente", "colaborador", "prestador", "staff",
+      "data agendamento", "data início", "data inicio", "barbeiro", "cabeleireiro",
     ],
   },
 }

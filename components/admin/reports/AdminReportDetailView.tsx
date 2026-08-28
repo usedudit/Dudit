@@ -445,10 +445,10 @@ export function AdminReportDetailView({
                                                                 const marketplaceUrl = targetType === "product" && target
                                                                     ? getProductUrl(target, target.store)
                                                                     : targetType === "service" && target
-                                                                    ? getServiceUrl(target, target.store)
-                                                                    : (targetType === "partner" || targetType === "store") && target
-                                                                    ? getStoreUrl(target)
-                                                                    : null
+                                                                        ? getServiceUrl(target, target.store)
+                                                                        : (targetType === "partner" || targetType === "store") && target
+                                                                            ? getStoreUrl(target)
+                                                                            : null
 
                                                                 if (!marketplaceUrl) return null
 
@@ -524,7 +524,7 @@ export function AdminReportDetailView({
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Denunciante" hasSeparator description="Identificação do usuário autor da denúncia">
+                                                    <FormSection title="Denunciante">
                                                         <ListItem
                                                             left={
                                                                 <UserProfileAvatar reporter={reporter} name={report.reporter_name} />
@@ -583,7 +583,7 @@ export function AdminReportDetailView({
                                                                 </div>
                                                                 {target.store.id && (
                                                                     <Link
-                                                                        href={getStoreUrl(target)}
+                                                                        href={getStoreUrl(target.store)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="inline-block text-xs font-bold text-brand-green hover:underline"
@@ -606,7 +606,7 @@ export function AdminReportDetailView({
                                     {/* Aba 3: Auditoria */}
                                     <TabsContent value="timeline" className="mt-0">
                                         <FadeIn key="timeline">
-                                            <FormSection title="Histórico de Auditoria" hasSeparator description="Eventos registrados para este alvo">
+                                            <FormSection title="Histórico de Auditoria">
                                                 {auditEvents.length === 0 ? (
                                                     <div className="py-6">
                                                         <IconPlaceholder

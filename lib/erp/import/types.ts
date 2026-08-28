@@ -1,4 +1,4 @@
-export type EntityType = "products" | "customers" | "services"
+export type EntityType = "products" | "customers" | "services" | "appointments"
 
 export type SemanticFieldType =
   | "string"

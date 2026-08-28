@@ -248,6 +248,7 @@ const QuoteEditor = (props: QuoteEditorProps) => {
                                     className="mb-0"
                                     error={props.fieldErrors?.has("productSearch")}
                                     errorMessage={props.fieldErrors?.has("productSearch") ? "Adicione um item" : undefined}
+                                    dataField="productSearch"
                                 />
                             )}
 

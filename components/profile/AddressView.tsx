@@ -207,7 +207,7 @@ export const AddressView = ({
 
     const renderForm = () => (
         <motion.div key="form" {...fade} className="space-y-4">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 pb-2 border-b border-brand-border dark:border-dark-border">
                 {ADDRESS_TYPE_OPTIONS.map(opt => (
                     <button
                         key={opt.value}
@@ -263,12 +263,6 @@ export const AddressView = ({
                 <StateComboBox value={form.state} onChange={v => setForm(f => ({ ...f, state: v }))} className="w-full" />
             </div>
             <Feedback error={error} success={success} />
-            <div className="flex gap-2">
-                <Button type="button" onClick={handleSave} disabled={isLoading}>
-                    {isLoading ? "Salvando..." : editingId === "new" ? "Adicionar" : "Salvar"}
-                </Button>
-                <Button type="button" variant="outline" onClick={cancel}>Cancelar</Button>
-            </div>
         </motion.div>
     )
 

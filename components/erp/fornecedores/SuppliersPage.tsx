@@ -46,12 +46,13 @@ interface Supplier {
     email: string
     phone: string
     document: string
-    xml_count: number
-    total_imported_value: number
     status: string
     supplier_code: string
     created_at: string
     image_url: string | null
+    city: string | null
+    state: string | null
+    last_import_at: string | null
 }
 
 interface FilterState {
@@ -60,15 +61,14 @@ interface FilterState {
 
 const INITIAL_FILTERS: FilterState = { status: [] }
 
-type SortKey = "name" | "imports" | "total" | "status" | "code"
+type SortKey = "name" | "status" | "city" | "last_purchase"
 type SortDirection = "asc" | "desc"
 
 const COLUMNS = [
     { id: "name", label: "Fornecedor", align: "left" as const, width: "300px" },
     { id: "contacts", label: "Contato", align: "left" as const, width: "220px" },
-    { id: "imports", label: "XMLs", align: "center" as const, width: "80px" },
-    { id: "total", label: "Total NF-e", align: "right" as const, width: "150px" },
-    { id: "code", label: "Código", align: "center" as const, width: "120px" },
+    { id: "city", label: "Cidade", align: "left" as const, width: "180px" },
+    { id: "last_purchase", label: "Última Compra", align: "left" as const, width: "160px" },
     { id: "status", label: "Status", align: "center" as const, width: "120px" },
     { id: "actions", label: "Ações", align: "center" as const, width: "80px" },
 ]
@@ -230,12 +230,13 @@ export default function SuppliersPage({
                 email: s.email || "",
                 phone: s.phone || "",
                 document: s.cnpj || s.cpf || "",
-                xml_count: s.xml_count || 0,
-                total_imported_value: s.total_imported_value || 0,
                 status: s.status || "ativo",
                 supplier_code: s.supplier_code || "",
                 created_at: s.created_at,
                 image_url: s.image_url || s.imageUrl || s.avatar_url || null,
+                city: s.city || null,
+                state: s.state || null,
+                last_import_at: s.last_import_at || null,
             }))
 
         const result = [...filtered]
@@ -246,10 +247,9 @@ export default function SuppliersPage({
                 let aVal: any, bVal: any
                 switch (key) {
                     case "name": aVal = a.name; bVal = b.name; break
-                    case "imports": aVal = a.xml_count; bVal = b.xml_count; break
-                    case "total": aVal = a.total_imported_value; bVal = b.total_imported_value; break
                     case "status": aVal = a.status; bVal = b.status; break
-                    case "code": aVal = a.supplier_code; bVal = b.supplier_code; break
+                    case "city": aVal = a.city || ""; bVal = b.city || ""; break
+                    case "last_purchase": aVal = a.last_import_at || ""; bVal = b.last_import_at || ""; break
                     default: aVal = (a as any)[key]; bVal = (b as any)[key]
                 }
                 if (aVal === bVal) return 0
@@ -579,7 +579,7 @@ export default function SuppliersPage({
                                                                                     }))
                                                                                 }}
                                                                             >
-                                                                                <div className={`relative flex items-center ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
+                                                                                <div className={`relative flex items-center ${(col.align as string) === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}>
                                                                                     <span>{col.label}</span>
                                                                                     {isSortable && (
                                                                                         <div className={`flex items-center ${col.align === "center" ? "absolute -right-5" : "ml-1.5"}`}>

@@ -14,6 +14,7 @@ import {
     Users,
     Settings2Icon,
     ExportFileIcon,
+    UploadIcon,
 } from "@/lib/icons";
 import { CalendarOff, RefreshCw } from "lucide-react";
 
@@ -47,6 +48,7 @@ interface AppointmentsPageControlsProps {
     onResetView: () => void;
     onExport: () => void;
     isExporting: boolean;
+    onImport?: () => void;
 }
 
 const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
@@ -70,6 +72,7 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
     onResetView,
     onExport,
     isExporting,
+    onImport,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null);
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false });
@@ -315,6 +318,14 @@ const AppointmentsPageControls: React.FC<AppointmentsPageControlsProps> = ({
                                 >
                                     <ExportFileIcon size={16} /> {isExporting ? "Exportando..." : "Exportar"}
                                 </button>
+                                {onImport && (
+                                    <button
+                                        onClick={onImport}
+                                        className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-semibold text-gray-750 hover:bg-gray-50 dark:text-dark-body dark:hover:bg-zinc-800 rounded-md"
+                                    >
+                                        <UploadIcon size={16} /> Importar agendamentos
+                                    </button>
+                                )}
                             </div>
                         </Dropdown>
 

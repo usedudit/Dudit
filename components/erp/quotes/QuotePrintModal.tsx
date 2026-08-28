@@ -42,11 +42,12 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
             const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser
             const storeId = selectedStore?.id
 
-            const [quoteDetailsRes, storeRes, addressRes] = await Promise.all([
+            const [quoteDetailsRes, storeRes, partnerRes, addressRes] = await Promise.all([
                 getQuoteDetailsAction(quoteId, partnerId),
                 storeId
                     ? supabase.from("stores").select("name, logo_url, image_url, phone").eq("id", storeId).maybeSingle()
                     : supabase.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", partnerId).limit(1).maybeSingle(),
+                supabase.from("partners").select("name, store_name, logo_url, store_image_url, phone, address").eq("id", partnerId).maybeSingle(),
                 getPartnerAddressAction(partnerId, storeId),
             ])
 
@@ -57,11 +58,11 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
 
             const quoteDetails = quoteDetailsRes.data
 
-            const partnerName = storeRes.data?.name || "Parceiro"
-            const rawAvatar = storeRes.data?.logo_url || storeRes.data?.image_url || selectedStore?.logo_url || selectedStore?.image_url || undefined
+            const partnerName = storeRes.data?.name || partnerRes.data?.store_name || partnerRes.data?.name || "Parceiro"
+            const rawAvatar = storeRes.data?.logo_url || storeRes.data?.image_url || partnerRes.data?.logo_url || partnerRes.data?.store_image_url || selectedStore?.logo_url || selectedStore?.image_url || undefined
             const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
-            const partnerAddress = addressRes.success && addressRes.data ? addressRes.data.formatted : undefined
-            const partnerPhone = storeRes.data?.phone || undefined
+            const partnerAddress = (addressRes.success && addressRes.data?.formatted) || partnerRes.data?.address || undefined
+            const partnerPhone = storeRes.data?.phone || partnerRes.data?.phone || undefined
 
             const formattedItems = (quoteDetails.items || []).map((item: any) => ({
                 name: item.custom_name || item.products?.name || "Produto sem nome",

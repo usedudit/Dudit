@@ -761,8 +761,9 @@ export async function checkoutCartAction(
     partnerId,
     resolvedLines,
     deliveryAddress,
+    deliveryType,
   )
-  const orderDelivery = fulfillmentPayload.deliveryType || deliveryType
+  const orderDelivery = deliveryType || fulfillmentPayload.deliveryType
 
   const productIds = resolvedLines
     .filter((l) => l.productId)
@@ -771,6 +772,8 @@ export async function checkoutCartAction(
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
 
   const targetStoreId = storeId || resolvedLines.find((l) => l.storeId)?.storeId || null
+
+  const shouldQuoteDelivery = (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
 
   // 1. Parallel independent reads block
   const [
@@ -800,7 +803,7 @@ export async function checkoutCartAction(
       .order("is_headquarters", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    hasDeliveryLines && deliveryAddress && orderDelivery === "delivery"
+    shouldQuoteDelivery
       ? quoteDeliveryFeeAction({
         partnerId,
         storeId: targetStoreId,
@@ -835,7 +838,7 @@ export async function checkoutCartAction(
   let deliveryFee = 0
   let distanceKm: number | null = null
   let deliveryBreakdown: Record<string, unknown> | null = null
-  if (hasDeliveryLines && deliveryAddress && orderDelivery === "delivery") {
+  if (shouldQuoteDelivery) {
     if (!deliveryQuote.success) return { error: (deliveryQuote as any).error }
     deliveryFee = Number(deliveryQuote.fee || 0)
     distanceKm = Number(deliveryQuote.distanceKm || 0)

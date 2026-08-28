@@ -91,17 +91,10 @@ export default function DeliveryDetailPage({
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-
-    useEffect(() => {
-        if (selectedLink) {
-            setActiveLink(selectedLink)
-        }
-    }, [selectedLink])
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
-    const isMobile = useMediaQuery("(max-width: 768px)")
     const [activeTab, setActiveTab] = useState<string>("dados_gerais")
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const mounted = useRef(true)
@@ -109,6 +102,29 @@ export default function DeliveryDetailPage({
     const handleBack = useCallback(() => onBack(), [onBack])
 
     const { setHeaderOverride } = useSidebar()
+
+    const handleStatusChange = useCallback(async () => {
+        if (!delivery || selectedNewStatus === delivery.status) return
+        const prevDelivery = delivery
+        setDelivery((current: any) => current ? { ...current, status: selectedNewStatus } : current)
+        try {
+            const res = await updateERPDeliveryStatusAction({
+                deliveryId: delivery.id,
+                partnerId,
+                status: selectedNewStatus as any,
+            })
+            if (res.success) {
+                toast.success("Status da entrega atualizado com sucesso!")
+            } else {
+                setDelivery(prevDelivery)
+                toast.error(res.error || "Erro ao atualizar status da entrega.")
+            }
+        } catch (err: any) {
+            setDelivery(prevDelivery)
+            toast.error(err?.message || "Erro inesperado ao atualizar status.")
+        }
+        setIsStatusModalOpen(false)
+    }, [delivery, selectedNewStatus, partnerId])
 
     useEffect(() => {
         setHeaderOverride({
@@ -477,8 +493,8 @@ export default function DeliveryDetailPage({
                 </div>
             </div>
 
-            {/* Tabs - visible on all screen sizes */}
-            <div className="w-full border-b border-brand-border dark:border-dark-border">
+            {/* Mobile/Tablet Tabs - only visible on <lg */}
+            <div className="lg:hidden border-b border-brand-border dark:border-dark-border">
                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 max-w-[1300px] mx-auto px-4 md:px-6">
                     <TabsTrigger value="dados_gerais">
                         Dados Gerais
@@ -496,30 +512,59 @@ export default function DeliveryDetailPage({
         <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Sticky Header with Tabs */}
+                    {/* Sticky Header */}
                     <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
                         {pageHeader}
                     </div>
 
-                    {/* Tab Content */}
+                    {/* Content - Desktop: split view, Mobile: tabs */}
                     <div className="flex-1 overflow-hidden relative">
-                        {/* DADOS GERAIS TAB */}
-                        <TabsContent value="dados_gerais" className="flex-1 h-full overflow-y-auto no-scrollbar custom-scrollbar">
-                            <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative">
-                                {linkedOrdersCard}
-                                {deliveryInfoMetrics}
-                                {notesSection}
-                            </div>
-                        </TabsContent>
-
-                        {/* MAPA DA ROTA TAB */}
-                        <TabsContent value="mapa_rota" className="flex-1 h-full overflow-hidden">
-                            <div className="h-full w-full p-4 md:p-6">
-                                <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                                    {mapContent}
+                        {/* DESKTOP: Split view - left content, right map (always visible) */}
+                        <div className="hidden lg:flex lg:flex-row w-full h-full">
+                            {/* LEFT SIDE - CONTENT */}
+                            <div className="w-1/2 flex flex-col flex-1 min-h-0 shrink-0 h-full border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
+                                <div className="flex-1 overflow-y-auto no-scrollbar relative">
+                                    <div className="flex-1 pt-4 pb-12 px-4 md:px-6 space-y-8">
+                                        {linkedOrdersCard}
+                                        {deliveryInfoMetrics}
+                                        {notesSection}
+                                    </div>
                                 </div>
                             </div>
-                        </TabsContent>
+
+                            {/* RIGHT SIDE - ROUTE MAP */}
+                            <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar">
+                                <div className="p-4 md:p-6 flex flex-col h-full">
+                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Mapa da Rota</h3>
+                                    <div className="flex-1 min-h-[300px] w-full">
+                                        <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+                                            {mapContent}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* MOBILE/TABLET: Tabbed view */}
+                        <div className="lg:hidden flex-1 overflow-hidden">
+                            {/* DADOS GERAIS TAB */}
+                            <TabsContent value="dados_gerais" className="flex-1 h-full overflow-y-auto no-scrollbar custom-scrollbar" forceMount>
+                                <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative">
+                                    {linkedOrdersCard}
+                                    {deliveryInfoMetrics}
+                                    {notesSection}
+                                </div>
+                            </TabsContent>
+
+                            {/* MAPA DA ROTA TAB */}
+                            <TabsContent value="mapa_rota" className="flex-1 h-full overflow-hidden" forceMount>
+                                <div className="h-full w-full p-4 md:p-6">
+                                    <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+                                        {mapContent}
+                                    </div>
+                                </div>
+                            </TabsContent>
+                        </div>
                     </div>
                 </div>
 
@@ -619,489 +664,68 @@ export default function DeliveryDetailPage({
                 cancelText="Cancelar"
             />
 
-            {/* Helper payment code */}
-            {
-                (() => {
-                    const getPaymentTypeLabel = (o: any) => {
-                        const pm = String(o.payment_method || "").toLowerCase();
-                        if (pm === "exchange") return "Crédito de troca";
-                        if (pm === "store_credit" || pm === "store-credit") return "Vale-compra";
-                        if (pm === "pix" || pm === "bank_transfer") return "Pix";
-                        if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) return "Cartão de Crédito";
-                        if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) return "Cartão de Débito";
-                        if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) return "Dinheiro";
-                        if (pm.includes("boleto")) return "Boleto";
-                        return o.payment_method || "Não informado";
-                    }
-
-                    const getPaymentIcon = (o: any) => {
-                        const subMethod = String(o.payment_method || "").toLowerCase();
-                        let iconName = null;
-                        if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
-                            iconName = "Pix.png";
-                        } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
-                            iconName = "CreditCard.png";
-                        } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
-                            iconName = "DebitCard.png";
-                        } else if (subMethod.includes("boleto")) {
-                            iconName = "Boleto.png";
-                        }
-
-                        if (iconName) {
-                            return (
-                                <img src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Payment icon" className="w-5 h-5 object-contain shrink-0" />
-                            );
-                        }
-                        return <span className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>;
-                    }
-
-                    const getPaymentStatusDisplay = (situation: string) => {
-                        switch (situation) {
-                            case "paid":
-                                return {
-                                    label: "Pago",
-                                    color: "text-green-700 dark:text-green-400",
-                                };
-                            case "partially_paid":
-                                return {
-                                    label: "Parcialmente Pago",
-                                    color: "text-brand-orange dark:text-orange-400",
-                                };
-                            case "pending":
-                            case "unpaid":
-                                return {
-                                    label: "Pendente",
-                                    color: "text-brand-orange dark:text-orange-400",
-                                };
-                            case "cancelled":
-                                return {
-                                    label: "Cancelado",
-                                    color: "text-red-700 dark:text-red-400",
-                                };
-                            default:
-                                const meta = getPaymentStatusMeta(situation);
-                                return {
-                                    label: meta.label,
-                                    color: "text-gray-700 dark:text-gray-400",
-                                };
-                        }
-                    }
-
-                    const isOpen = !!selectedLink;
-                    const handleClose = () => setSelectedLink(null);
-
-                    if (!activeLink) return null;
-
-                    const order = activeLink.orders;
-                    if (!order) return null;
-
-                    const paymentBreakdown = Array.isArray(order.payment_breakdown) && order.payment_breakdown.length > 0
-                        ? order.payment_breakdown.filter((entry: any) => entry?.method)
-                        : Number(order.paid_amount || 0) > 0 && order.payment_method
-                            ? [{ method: order.payment_method, amount: Number(order.paid_amount || 0) }]
-                            : []
-                    const couponDiscountAmount = Math.max(0, Number(order.coupon_discount_amount || 0))
-                    const paymentMethodDiscountAmount = Math.max(0, Number(order.payment_method_discount_amount || 0))
-                    const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
-                    const subtotalValue = Number(order.subtotal_value || 0) > 0
-                        ? Number(order.subtotal_value || 0)
-                        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
-                    const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
-                    const cashEntry = Array.isArray(order.payment_breakdown)
-                        ? order.payment_breakdown.find((entry: any) => entry?.method === "cash")
-                        : null
-                    const wantsChange = cashEntry?.wantsChange ?? String(order.payment_method || "").toLowerCase().includes("troco para")
-                    const payWithAmount = cashEntry?.payWithAmount ?? (() => {
-                        const match = String(order.payment_method || "").match(/troco para R\$\s*([\d,.]+)/i)
-                        if (match) {
-                            const cleanNum = match[1].replace(/\./g, "").replace(',', '.')
-                            return Number(cleanNum)
-                        }
-                        return null
-                    })()
-                    const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(order.total_amount || 0) : 0
-
-                    const statusDisplay = getPaymentStatusDisplay(order.situation);
-
-                    const sheetContent = (
-                        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                                <Button variant="filled" onClick={handleClose} size="icon">
-                                    <XIcon className="h-5 w-5" />
-                                </Button>
-                            </header>
-
-                            <Tabs defaultValue="dados_gerais" className="flex flex-col flex-1 overflow-hidden">
-                                <div className="px-6 border-b border-brand-border dark:border-dark-border shrink-0">
-                                    <TabsList className="mt-6">
-                                        <TabsTrigger value="dados_gerais">
-                                            Dados Gerais
-                                        </TabsTrigger>
-                                        <TabsTrigger value="itens">
-                                            Itens do Pedido
-                                        </TabsTrigger>
-                                        <TabsTrigger value="pagamento">
-                                            Pagamento
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {formatCurrency(order.total_amount || 0)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {order.created_at ? formatDateTime(order.created_at) : "-"}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Canal de Venda</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                    {order.order_source || "Manual"}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                                <Badge variant={getDeliveryStatusMeta(activeLink.status || order.delivery_status).variant} icon={getDeliveryStatusIcon(activeLink.status || order.delivery_status)}>
-                                                    {getDeliveryStatusMeta(activeLink.status || order.delivery_status).label}
-                                                </Badge>
-                                            </div>
-                                        </div>
-
-                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                        <CustomerCard
-                                            customer={order.customer || {
-                                                name: order.customer_name || "Cliente",
-                                                email: "",
-                                                phone: "",
-                                            }}
-                                            address={order.customerAddress || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
-                                            showMap={false}
-                                            chrome="minimal"
-                                        />
-                                    </TabsContent>
-
-                                    <TabsContent value="itens" className="mt-0">
-                                        {(() => {
-                                            const filteredItems = (order.order_items || []).filter((item: any) => {
-                                                const pType = String(item.products?.product_type || "").toLowerCase()
-                                                return pType !== "serviço" && pType !== "servico" && pType !== "service"
-                                            })
-                                            if (filteredItems.length === 0) {
-                                                return (
-                                                    <div className="p-5 text-sm text-brand-inactive-text border border-brand-border dark:border-dark-border rounded-2xl">
-                                                        Nenhum item detalhado foi retornado para o pedido selecionado.
-                                                    </div>
-                                                )
-                                            }
-                                            return (
-                                                <div className="space-y-4">
-                                                    {filteredItems.map((item: any) => {
-                                                        const itemImage = getR2ImageUrl(item.products?.images || item.image || null, "thumbnail")
-                                                        const itemSku = item.products?.sku || item.sku || "N/A"
-                                                        const itemPrice = Number(item.product_price || item.price || 0)
-                                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                        return (
-                                                            <div key={item.id} className="flex items-start gap-4">
-                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-xl"
-                                                                        alt={item.product_name || "Produto sem nome"}
-                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                    />
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {item.product_name || "Produto sem nome"}
-                                                                        </h4>
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(itemSubtotal)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                        SKU: {itemSku}
-                                                                    </div>
-                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {formatQuantityWithUnit(item.quantity, item.unit)} • {formatUnitPriceWithUnit(itemPrice, item.unit)}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )
-                                        })()}
-                                    </TabsContent>
-
-                                    <TabsContent value="pagamento" className="mt-0 space-y-3">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Método de Pagamento</span>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-4 h-4 flex items-center justify-center overflow-hidden shrink-0">
-                                                    {getPaymentIcon(order)}
-                                                </div>
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                    {getPaymentTypeLabel(order)}
-                                                </span>
-                                                <span className="text-brand-border dark:text-dark-border">|</span>
-                                                <span className={`font-bold ${statusDisplay.color}`}>
-                                                    {statusDisplay.label}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {paymentBreakdown.length > 1 && (
-                                            <div className="flex justify-between items-start text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
-                                                <div className="flex flex-col gap-1 text-right">
-                                                    {paymentBreakdown.map((entry: any, index: number) => (
-                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Original</span>
-                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotalValue)}</span>
-                                        </div>
-
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Tipo de Entrega</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                {order.delivery_type === "pickup" ? "Retirada no local" : "Entrega no endereço"}
-                                            </span>
-                                        </div>
-
-                                        {(Number(order.delivery_fee || 0) > 0 || order.delivery_payer === "seller" || Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0) > 0) && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor da Entrega</span>
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5 flex-wrap">
-                                                    {Number(order.delivery_fee || 0) > 0
-                                                        ? formatCurrency(order.delivery_fee)
-                                                        : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
-                                                    {Number(order.delivery_fee || 0) === 0 && (
-                                                        <span className="text-xs font-semibold text-orange-600 bg-orange-100 dark:bg-orange-950/40 dark:text-orange-400 px-2 py-0.5 rounded-full">Frete Grátis</span>
-                                                    )}
-                                                    {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
-                                                        <span className="text-xs font-semibold text-orange-600 bg-orange-100 dark:bg-orange-950/40 dark:text-orange-400 px-2 py-0.5 rounded-full">Subsidiado</span>
-                                                    )}
-                                                    {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
-                                                        <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
-                                                    )}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        {Number(order.additional_costs || 0) > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Outros Custos</span>
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.additional_costs)}</span>
-                                            </div>
-                                        )}
-
-                                        {Number(order.discount_value || 0) > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto do Pedido</span>
-                                                <span className="text-brand-green font-bold">- {formatCurrency(order.discount_value)}</span>
-                                            </div>
-                                        )}
-
-                                        {couponDiscountAmount > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto por Cupom</span>
-                                                <span className="text-brand-green font-bold">- {formatCurrency(couponDiscountAmount)}</span>
-                                            </div>
-                                        )}
-
-                                        {paymentMethodDiscountAmount > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                                    {order.payment_method === "exchange" ? "Crédito de troca" :
-                                                        order.payment_method === "store_credit" ? "Vale-compra" :
-                                                            "Desconto do Método"}
-                                                </span>
-                                                <span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>
-                                            </div>
-                                        )}
-
-                                        {paymentMethodExtraAmount > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
-                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>
-                                            </div>
-                                        )}
-
-                                        {changeAmount > 0.009 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Troco</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(changeAmount)}</span>
-                                            </div>
-                                        )}
-
-                                        {wantsChange && payWithAmount !== null && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Troco Solicitado</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">{formatCurrency(cashChangeAmount)} (para {formatCurrency(payWithAmount)})</span>
-                                            </div>
-                                        )}
-
-                                        {order.is_refunded && Number(order.refunded_amount || 0) > 0 && (
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Reembolsado</span>
-                                                <span className="text-brand-red font-bold">- {formatCurrency(order.refunded_amount || 0)}</span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                            <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
-                                            <span className="font-bold text-xl text-brand-dark dark:text-dark-heading">{formatCurrency(order.total_amount)}</span>
-                                        </div>
-
-                                        {order.situation !== "paid" && (
-                                            <div className="pt-4 flex justify-end">
-                                                <Button
-                                                    className="w-full h-12"
-                                                    onClick={() => setIsPaymentModalOpen(true)}
-                                                >
-                                                    Registrar Recebimento
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </TabsContent>
-                                </div>
-                            </Tabs>
-
-                            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3">
-                                <Button variant="outline" className="flex-1 h-12" onClick={handleClose}>
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    className="flex-1 h-12"
-                                    onClick={() => {
-                                        setSelectedNewStatus(activeLink.status || order.delivery_status || "pending");
-                                        setIsStatusModalOpen(true);
-                                    }}
-                                >
-                                    Alterar Status
-                                </Button>
-                            </footer>
-                        </div>
-                    );
-
-                    return isMobile ? (
-                        <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                            {sheetContent}
-                        </BottomSheet>
-                    ) : (
-                        <Portal>
-                            <div
-                                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                                onClick={handleClose}
-                            >
-                                <div
-                                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {sheetContent}
-                                </div>
-                            </div>
-                        </Portal>
-                    );
-                })()
-            }
-
             <DefaultModal
                 isOpen={isStatusModalOpen}
                 onClose={() => setIsStatusModalOpen(false)}
-                title="Alterar Status de Entrega"
-                maxWidth="sm"
+                title="Alterar Status da Entrega"
+                maxWidth="md"
                 footer={
-                    <div className="flex gap-3 justify-end w-full">
-                        <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={async () => {
-                                if (selectedLink && selectedNewStatus) {
-                                    setIsStatusModalOpen(false);
-                                    await handleOrderDeliveryStatusChange(selectedLink.orders.id, selectedNewStatus);
-                                }
-                            }}
-                            disabled={!selectedNewStatus}
-                        >
-                            Confirmar
-                        </Button>
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button variant="outline" onClick={() => setIsStatusModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={() => void handleStatusChange()} disabled={selectedNewStatus === delivery?.status}>Salvar</Button>
                     </div>
                 }
             >
-                <div className="p-4 space-y-4">
+                <div className="space-y-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">Selecione o novo status para esta entrega.</p>
                     <FormDropdown
-                        label="Status da entrega"
+                        label="Status"
                         value={selectedNewStatus}
                         setValue={setSelectedNewStatus}
                         options={[
-                            { value: "delivered", label: "Entregue" },
-                            { value: "delivery_failed", label: "Falha na entrega" },
-                            { value: "pending", label: "Não enviado" },
-                            { value: "preparing", label: "Em preparação" },
-                            { value: "sent", label: "Enviado" },
-                            { value: "cancelled", label: "Cancelada" },
+                            { value: 'pending', label: 'Pendente' },
+                            { value: 'not_sent', label: 'Não Enviado' },
+                            { value: 'preparing', label: 'Preparando' },
+                            { value: 'pickup_available', label: 'Disponível para Retirada' },
+                            { value: 'sent', label: 'Enviado' },
+                            { value: 'delivered', label: 'Entregue' },
+                            { value: 'delivery_failed', label: 'Falha na Entrega' },
+                            { value: 'cancelled', label: 'Cancelado' }
                         ]}
-                        placeholder="Selecione o status"
                     />
                 </div>
             </DefaultModal>
 
-            <AlertModal
-                isOpen={simpleConfirmModal?.isOpen ?? false}
-                title="Confirmar Alteração de Status"
-                description={`Tem certeza que deseja alterar o status da entrega deste pedido para ${getDeliveryStatusLabel(simpleConfirmModal?.nextStatus)}?`}
-                confirmText="Confirmar"
-                cancelText="Cancelar"
-                onClose={() => setSimpleConfirmModal(null)}
-                onConfirm={async () => {
-                    if (simpleConfirmModal) {
-                        const { orderId, nextStatus } = simpleConfirmModal;
-                        setSimpleConfirmModal(null);
-                        await handleOrderDeliveryStatusChange(orderId, nextStatus, undefined, true);
-                    }
-                }}
-                variant="info"
-            />
-
-            {
-                isPaymentModalOpen && activeLink?.orders && (
-                    <PaymentStatusModal
-                        isOpen={isPaymentModalOpen}
-                        onClose={() => setIsPaymentModalOpen(false)}
-                        order={activeLink.orders}
-                        partnerId={partnerId}
-                        onSuccess={loadDeliveryDetails}
-                    />
-                )
-            }
-
-            <DuditDriverDetailsModal
+            <DefaultModal
                 isOpen={isDriverModalOpen}
                 onClose={() => setIsDriverModalOpen(false)}
-                driver={platformDriver}
-                deliveryNumber={delivery?.delivery_number}
+                title="Detalhes do Entregador"
+                maxWidth="md"
+            >
+                <DuditDriverDetailsModal isOpen={isDriverModalOpen} onClose={() => setIsDriverModalOpen(false)} driver={platformDriver} />
+            </DefaultModal>
+
+            <PaymentStatusModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                order={activeLink?.orders}
+                partnerId={partnerId}
             />
-        </FadeIn >
+
+            {simpleConfirmModal && (
+                <AlertModal
+                    isOpen={simpleConfirmModal.isOpen}
+                    onClose={() => setSimpleConfirmModal(null)}
+                    onConfirm={() => {
+                        handleOrderDeliveryStatusChange(simpleConfirmModal.orderId, simpleConfirmModal.nextStatus, undefined, true)
+                        setSimpleConfirmModal(null)
+                    }}
+                    title="Confirmar alteração de status"
+                    message="Tem certeza que deseja alterar o status deste pedido?"
+                    confirmText="Confirmar"
+                    cancelText="Cancelar"
+                />
+            )}
+        </FadeIn>
     )
 }

@@ -1211,7 +1211,7 @@ export async function getServiceOrderByTokenAction(
     let { data: row, error } = await admin
       .from("service_orders")
       .select(`
-        id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+        id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
         customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -1228,7 +1228,7 @@ export async function getServiceOrderByTokenAction(
         const { data: byId } = await admin
           .from("service_orders")
           .select(`
-            id, store_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
+            id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
             total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
             customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
             public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
@@ -1283,7 +1283,27 @@ export async function getServiceOrderByTokenAction(
       fetchAddress(),
     ])
 
-    const customerName = (row.customer_snapshot as any)?.name || null
+    let resolvedCustomer = row.customer_snapshot
+    if (typeof resolvedCustomer === "string") {
+      try {
+        resolvedCustomer = JSON.parse(resolvedCustomer)
+      } catch {
+        resolvedCustomer = null
+      }
+    }
+
+    if ((!resolvedCustomer || !resolvedCustomer.name) && row.customer_id) {
+      const { data: dbCustomer } = await admin
+        .from("customers")
+        .select("id, name, email, phone, document, image_url, avatar_url, addresses(*)")
+        .eq("id", row.customer_id)
+        .maybeSingle()
+      if (dbCustomer) {
+        resolvedCustomer = dbCustomer
+      }
+    }
+
+    const customerName = resolvedCustomer?.name || (row.customer_snapshot as any)?.name || null
 
     let specifications = row.specifications
     if (typeof specifications === "string") {
@@ -1308,6 +1328,23 @@ export async function getServiceOrderByTokenAction(
       assignedUserName = profile?.full_name || null
     }
 
+    let storeObj = row.stores ? (Array.isArray(row.stores) ? row.stores[0] : row.stores) : null
+    if (!storeObj && row.partner_id) {
+      const { data: storeFallback } = await admin
+        .from("stores")
+        .select("id, name, logo_url, image_url, phone")
+        .eq("partner_id", row.partner_id)
+        .limit(1)
+        .maybeSingle()
+      storeObj = storeFallback
+    }
+
+    const { data: partnerRow } = await admin
+      .from("partners")
+      .select("id, name, store_name, logo_url, store_image_url, phone, address")
+      .eq("id", row.partner_id)
+      .maybeSingle()
+
     const addressesList = addressRes.data || []
     const addressRow = addressesList.find((a: any) => a.is_default) || addressesList[0]
     let partnerAddress = "Endereço não cadastrado"
@@ -1315,11 +1352,18 @@ export async function getServiceOrderByTokenAction(
       const streetNumber = [addressRow.street, addressRow.number].filter(Boolean).join(", ")
       const neighborhoodCityState = [addressRow.neighborhood, [addressRow.city, addressRow.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
       partnerAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
+    } else if (partnerRow?.address) {
+      partnerAddress = partnerRow.address
     }
+
+    const resolvedPartnerName = storeObj?.name || partnerRow?.store_name || partnerRow?.name || "Parceiro"
+    const resolvedPartnerLogo = storeObj?.logo_url || storeObj?.image_url || partnerRow?.logo_url || partnerRow?.store_image_url || null
+    const resolvedPartnerPhone = storeObj?.phone || partnerRow?.phone || ""
 
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
+      customer_id: row.customer_id || null,
       order_number: row.order_number,
       status: row.status,
       title: row.title,
@@ -1334,6 +1378,7 @@ export async function getServiceOrderByTokenAction(
       signature_image_key: row.signature_image_key,
       signed_at: row.signed_at,
       customer_name: customerName,
+      customer_snapshot: resolvedCustomer,
       sale_id: row.sale_id,
       specifications,
       metadata: row.metadata,
@@ -1346,11 +1391,13 @@ export async function getServiceOrderByTokenAction(
       priority: row.priority,
       estimated_hours: row.estimated_hours,
       expected_completion_time: row.expected_completion_time,
-      partners: row.stores ? {
-        ...(Array.isArray(row.stores) ? row.stores[0] : row.stores),
+      partners: {
+        name: resolvedPartnerName,
+        logo_url: resolvedPartnerLogo,
+        phone: resolvedPartnerPhone,
         address: partnerAddress,
         plan_tier: planTier,
-      } : null,
+      },
     }
 
     return {

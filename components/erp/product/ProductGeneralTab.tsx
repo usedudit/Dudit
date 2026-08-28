@@ -28,7 +28,8 @@ const FormCombobox = ({
     creatable = false,
     createLabel,
     searchPlaceholder,
-    placeholder
+    placeholder,
+    dataField
 }: {
     label: string,
     value: any,
@@ -40,9 +41,10 @@ const FormCombobox = ({
     creatable?: boolean,
     createLabel?: (search: string) => React.ReactNode,
     searchPlaceholder?: string,
-    placeholder?: string
+    placeholder?: string,
+    dataField?: string
 }) => (
-    <div className={`flex flex-col gap-1.5 ${width}`}>
+    <div className={`flex flex-col gap-1.5 ${width}`} data-field={dataField}>
         <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">
             {label}
         </label>
@@ -93,13 +95,14 @@ interface ProductGeneralTabProps {
     isSaving?: boolean
     mode?: "add" | "edit" | "details" | "duplicate"
     isQuickMode?: boolean
+    isDesapego?: boolean
     onGenerateBarcode?: () => void
     isGeneratingDetails?: boolean
     onGenerateDetails?: () => void
 }
 
 export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
-    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails
+    productData, handleInputChange, generateRandomCode, categories, subCategories, brands, locations, unidadesMedida, openAddItemModal, metadataPlanBlocked = false, isEditing, images, onImageUpload, onRemoveImage, onSetPrimaryImage, fieldErrors, onFieldChange, uploadingImages, blockedImages, isSaving, mode = "edit", isQuickMode = false, isDesapego = false, onGenerateBarcode, isGeneratingDetails = false, onGenerateDetails
 }) => {
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
@@ -506,6 +509,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     maxLength={150}
                                     error={fieldErrors?.has("name")}
                                     errorMessage={fieldErrors?.has("name") ? "Nome é obrigatório" : undefined}
+                                    dataField="name"
                                     labelAddon={
                                         isEditing && onGenerateDetails && (
                                             <button
@@ -569,7 +573,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     {!hasVariants && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
                             {!isQuickMode && (
-                                <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} />
+                                <MoneyInput label="Preço de Custo" name="costPrice" value={productData.costPrice || ""} onChange={(val) => handleFieldChange({ target: { name: "costPrice", value: val } })} disabled={!isEditing || !showPrice} dataField="costPrice" />
                             )}
                             <div className="flex flex-col">
                                 <MoneyInput
@@ -581,6 +585,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     required={showPrice}
                                     error={fieldErrors?.has("price")}
                                     errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
+                                    dataField="price"
                                 />
                                 {isEditing && showPrice && (
                                     <SalePriceCalculator
@@ -610,6 +615,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         value={productData.stock || ""}
                                         onChange={handleFieldChange}
                                         disabled={!isEditing}
+                                        dataField="stock"
                                     />
                                 ) : (
                                     <Input
@@ -618,6 +624,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         type="number"
                                         value={productData.stock || 0}
                                         readOnly
+                                        dataField="stock"
                                         suffix={
                                             <Button
                                                 type="button"
@@ -673,15 +680,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 />
                             </div>
 
-                            <div className="mt-10">
-                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Complementos e Adicionais</h3>
-                                <ProductAddonsSection
-                                    addonGroups={productData?.addon_groups || []}
-                                    onChange={(groups) => handleInputChange({ target: { name: "addon_groups", value: groups } })}
-                                    isEditing={isEditing}
-                                />
-                            </div>
+                            {!isDesapego && (
+                                <div className="mt-10">
+                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
+                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Complementos e Adicionais</h3>
+                                    <ProductAddonsSection
+                                        addonGroups={productData?.addon_groups || []}
+                                        onChange={(groups) => handleInputChange({ target: { name: "addon_groups", value: groups } })}
+                                        isEditing={isEditing}
+                                    />
+                                </div>
+                            )}
                         </>
                     )}
                 </FormSection>
@@ -707,6 +716,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         value={productData.stock || ""}
                                         onChange={handleFieldChange}
                                         disabled={!isEditing}
+                                        dataField="stock"
                                     />
                                 ) : (
                                     <Input
@@ -715,6 +725,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         type="number"
                                         value={productData.stock || 0}
                                         readOnly
+                                        dataField="stock"
                                         suffix={
                                             <Button
                                                 type="button"
@@ -835,6 +846,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     value={productData.sku}
                                     onChange={handleFieldChange}
                                     disabled={!isEditing}
+                                    dataField="sku"
                                     suffix={
                                         <div
                                             onClick={generateRandomCode}
@@ -855,6 +867,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                             value={productData.gtin || ""}
                                             onChange={handleFieldChange}
                                             disabled={!isEditing}
+                                            dataField="gtin"
                                             suffix={
                                                 <div
                                                     onClick={onGenerateBarcode}
@@ -873,6 +886,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
                                         disabled={!isEditing}
                                         width="w-full"
+                                        dataField="category_id"
                                         actionItem={{
                                             label: metadataPlanBlocked ? (
                                                 <span className="inline-flex items-center gap-1.5">
@@ -979,6 +993,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     value={productData.sku}
                                     onChange={handleFieldChange}
                                     disabled={!isEditing}
+                                    dataField="sku"
                                     suffix={
                                         <div
                                             onClick={generateRandomCode}
@@ -999,6 +1014,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                             value={productData.gtin || ""}
                                             onChange={handleFieldChange}
                                             disabled={!isEditing}
+                                            dataField="gtin"
                                             suffix={
                                                 <div
                                                     onClick={onGenerateBarcode}
@@ -1017,6 +1033,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                         onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
                                         disabled={!isEditing}
                                         width="w-full"
+                                        dataField="category_id"
                                         actionItem={{
                                             label: metadataPlanBlocked ? (
                                                 <span className="inline-flex items-center gap-1.5">

@@ -247,7 +247,6 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             technical_details: data.technical_details || data.technicalDetails || null,
             resources: data.resources || [],
             status: (data.isActive !== false && data.is_active !== false) ? "ativo" : "inativo",
-            is_active: (data.isActive !== false && data.is_active !== false),
             fulfillment_modes: Array.isArray(data.fulfillment_modes)
                 ? data.fulfillment_modes
                 : data.fulfillmentModes || ["on_site"],
@@ -375,11 +374,9 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.resources !== undefined) payload.resources = data.resources
         if (data.isActive !== undefined) {
             payload.status = data.isActive ? "ativo" : "inativo"
-            payload.is_active = Boolean(data.isActive)
         }
         if (data.is_active !== undefined) {
             payload.status = data.is_active ? "ativo" : "inativo"
-            payload.is_active = Boolean(data.is_active)
         }
         if (data.marketplace_category_id !== undefined) payload.marketplace_category_id = data.marketplace_category_id
         if (data.marketplaceCategoryId !== undefined) payload.marketplace_category_id = data.marketplaceCategoryId

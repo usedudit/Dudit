@@ -83,7 +83,32 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         })
     }, [supabase])
 
-    const customerEmail = order.customer_snapshot?.email || ""
+    const selectedCustomer = useMemo(() => {
+        let raw = order.customer_snapshot || order.customer || null
+        if (typeof raw === "string") {
+            try {
+                raw = JSON.parse(raw)
+            } catch {
+                raw = null
+            }
+        }
+        if (raw && (raw.name || raw.email || raw.phone)) {
+            return raw
+        }
+        if (order.customer_name && order.customer_name !== "Consumidor final") {
+            return {
+                name: order.customer_name,
+                email: order.customer_email || null,
+                phone: order.customer_phone || null,
+            }
+        }
+        return null
+    }, [order.customer_snapshot, order.customer, order.customer_name, order.customer_email, order.customer_phone])
+
+    const customerName = selectedCustomer?.name || order.customer_name || "Consumidor final"
+    const customerEmail = selectedCustomer?.email || order.customer_email || ""
+    const customerPhone = selectedCustomer?.phone || order.customer_phone || ""
+
     const isClientEmailMatched = useMemo(() => {
         return !!(currentUser && customerEmail && currentUser.email?.toLowerCase() === customerEmail.toLowerCase())
     }, [currentUser, customerEmail])
@@ -429,7 +454,6 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                 </div>
                                             </FormSection>
 
-
                                             <FormSection title="Cliente" hasSeparator>
                                                 {order.customer_snapshot ? (
                                                     <CustomerCard
@@ -603,35 +627,29 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                 {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
                                 <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
                                     <div className={`${activeTab === "Visualização" ? "block" : "hidden"} space-y-4`}>
-                                        {order.customer_snapshot && (
-                                            <CustomerCard
-                                                customer={order.customer_snapshot}
-                                                chrome="minimal"
-                                            />
-                                        )}
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
-<OSPreview
-                                                 invoiceNumber={order.order_number}
-                                                 orderDate={order.created_at}
-                                                 expectedCompletionDate={order.expected_completion_date}
-                                                 selectedCustomer={order.customer_snapshot}
-                                                 services={services}
-                                                 products={products}
-                                                 totalServiceAmount={Number(order.total_service_amount || 0)}
-                                                 totalProductAmount={Number(order.total_product_amount || 0)}
-                                                 totalAmount={Number(order.total_amount || 0)}
-                                                 description={order.description}
-                                                 diagnosis={order.diagnosis}
-                                                 signatureImageKey={order.signature_image_key}
-                                                 signedAt={order.signed_at}
-                                                 partnerName={partnerName}
-                                                 partnerAddress={partner?.address || undefined}
-                                                 partnerPhone={partnerPhone}
-                                                 partnerAvatar={partnerLogo || undefined}
-                                                 printMode={false}
-                                                 showCustomerContact={false}
-                                                 salespersonName={order.assigned_user_name || undefined}
-                                             />
+                                            <OSPreview
+                                                invoiceNumber={order.order_number}
+                                                orderDate={order.created_at}
+                                                expectedCompletionDate={order.expected_completion_date}
+                                                selectedCustomer={selectedCustomer}
+                                                services={services}
+                                                products={products}
+                                                totalServiceAmount={Number(order.total_service_amount || 0)}
+                                                totalProductAmount={Number(order.total_product_amount || 0)}
+                                                totalAmount={Number(order.total_amount || 0)}
+                                                description={order.description}
+                                                diagnosis={order.diagnosis}
+                                                signatureImageKey={order.signature_image_key}
+                                                signedAt={order.signed_at}
+                                                partnerName={partnerName}
+                                                partnerAddress={partner?.address || undefined}
+                                                partnerPhone={partnerPhone}
+                                                partnerAvatar={partnerLogo || undefined}
+                                                printMode={false}
+                                                showCustomerContact={false}
+                                                salespersonName={order.assigned_user_name || undefined}
+                                            />
                                         </div>
                                     </div>
                                 </TabsContent>
@@ -640,19 +658,11 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
                         {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
                         <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
-                            {order.customer_snapshot && (
-                                <div className="px-4 pt-4">
-                                    <CustomerCard
-                                        customer={order.customer_snapshot}
-                                        chrome="minimal"
-                                    />
-                                </div>
-                            )}
                             <OSPreview
                                 invoiceNumber={order.order_number}
                                 orderDate={order.created_at}
                                 expectedCompletionDate={order.expected_completion_date}
-                                selectedCustomer={order.customer_snapshot}
+                                selectedCustomer={selectedCustomer}
                                 services={services}
                                 products={products}
                                 totalServiceAmount={Number(order.total_service_amount || 0)}

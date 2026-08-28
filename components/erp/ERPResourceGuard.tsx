@@ -29,7 +29,7 @@ export function ERPResourceGuard({ children }: { children: React.ReactNode }) {
                     imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
                     imageAlt="Recurso indisponível"
                     title="Recurso indisponível"
-                    subtitle="Este recurso está desativado no seu sistema. Fale com o proprietário do negócio para reativá-lo."
+                    subtitle="Este recurso está desativado no seu sistema. Fale com o proprietário do negócio para ativá-lo ou ative caso você seja o proprietário."
                     itemButton={{
                         text: "Voltar para o Início",
                         action: "/erp/inicio"

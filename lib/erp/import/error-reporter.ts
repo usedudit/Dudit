@@ -71,7 +71,14 @@ export async function generateFailedRowsReport(
 
   const raw = (await workbook.xlsx.writeBuffer()) as ArrayBuffer
   const buffer = Buffer.from(raw)
-  const entitySlug = entityType === "products" ? "produtos" : entityType === "services" ? "servicos" : "clientes"
+  const entitySlug =
+    entityType === "products"
+      ? "produtos"
+      : entityType === "services"
+        ? "servicos"
+        : entityType === "appointments"
+          ? "agendamentos"
+          : "clientes"
   const filename = `falhas-importacao-${entitySlug}-${Date.now().toString().slice(-6)}.xlsx`
 
   return {

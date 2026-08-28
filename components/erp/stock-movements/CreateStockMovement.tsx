@@ -40,6 +40,7 @@ import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useSidebar } from "@/lib/sidebar-context"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { motion, AnimatePresence } from "framer-motion"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import SelectProductVariantSheet from "../pdv/SelectProductVariantSheet"
@@ -150,6 +151,14 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
     const getTabErrorCount = useCallback((tab: string) => {
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
     }, [fieldErrors]);
+
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
 
     const isDirty = useMemo(() => {
         return items.length > 0 || notes !== '' || reason !== 'Selecione um motivo...' || customReason !== '';
@@ -395,6 +404,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
 
         if (errors.size > 0) {
             setFieldErrors(errors);
+            scrollToFirstError();
             return;
         }
         setFieldErrors(new Set());
@@ -577,6 +587,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         suffix={focusLockSuffix}
                                                                         error={fieldErrors.has('items') && items.length === 0}
                                                                         errorMessage={fieldErrors.has('items') && items.length === 0 ? "Adicione pelo menos um produto" : undefined}
+                                                                        dataField="items"
                                                                     />
                                                                 </div>
                                                                 <Button
@@ -763,6 +774,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                     setValue={handleReasonChange}
                                                                     error={fieldErrors.has('reason')}
                                                                     errorMessage={fieldErrors.has('reason') ? 'Selecione um motivo para a movimentação.' : undefined}
+                                                                    dataField="reason"
                                                                     options={type === 'in' ? [
                                                                         { value: 'Compra de Fornecedor', label: 'Compra de Fornecedor' },
                                                                         { value: 'Devolução de Cliente', label: 'Devolução de Cliente' },
@@ -800,6 +812,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                                                         maxLength={120}
                                                                         error={fieldErrors.has('customReason')}
                                                                         errorMessage={fieldErrors.has('customReason') ? 'Informe o motivo da movimentação.' : undefined}
+                                                                        dataField="customReason"
                                                                     />
                                                                 </motion.div>
                                                             )}

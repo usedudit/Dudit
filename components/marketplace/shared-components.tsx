@@ -16,7 +16,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
-import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateDeliveryFeeLabel } from "@/lib/services/location.service"
+import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
 import Button from "../reusable/Button"
 
 const HOME_BANNERS = [
@@ -97,18 +97,26 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     }
 
     const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner.distance_km_formatted || vitrine.distance_km_formatted || null)
-    const deliveryTime = distanceKm != null ? estimateDeliveryTimeRange(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted || null)
 
     const deliverySettings = partner.delivery_settings || vitrine.delivery_settings || null
+    const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
+    const hasProducts = vitrine.has_products !== false && partner.has_products !== false && vitrine.type !== "services_only" && partner.business_type !== "services"
+
+    // Only show delivery time if the store has products and delivery is enabled (not pickup only, not services only)
+    const showDeliveryTime = isDeliveryEnabled && hasProducts
+    const deliveryTime = showDeliveryTime
+        ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : (partner.delivery_time_formatted || vitrine.delivery_time_formatted ? formatAverageDeliveryTimeFromRange(partner.delivery_time_formatted || vitrine.delivery_time_formatted) : null))
+        : null
+
     const deliveryFeeLabel = estimateDeliveryFeeLabel({
         distanceKm,
         baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
         includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
         extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
         maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
-        isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+        isDeliveryEnabled,
         deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || null
+    }) || partner.delivery_fee_formatted || vitrine.delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null)
 
     const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
 
@@ -146,43 +154,43 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[13px] text-brand-inactive-text mt-0.5 dark:text-dark-body truncate">
+                    <div className="flex items-center gap-1.5 text-[12px] md:text-[13px] text-brand-inactive-text mt-0.5 dark:text-dark-body truncate">
                         {category && (
+                            <span className="font-medium shrink-0">{category}</span>
+                        )}
+                        {category && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                        )}
+                        {locationLabel && (
                             <>
-                                <span className="font-medium shrink-0 truncate">{category}</span>
-                                {locationLabel && (
-                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text shrink-0" />
+                                <span className="shrink-0">{locationLabel}</span>
+                                {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
                                 )}
                             </>
                         )}
-                        {locationLabel && (
-                            <span className="font-medium truncate">{locationLabel}</span>
+                        {deliveryTime && (
+                            <>
+                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
+                                {(distanceLabel || deliveryFeeLabel) && (
+                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                )}
+                            </>
+                        )}
+                        {distanceLabel && (
+                            <>
+                                <span className="shrink-0">{distanceLabel}</span>
+                                {deliveryFeeLabel && (
+                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                )}
+                            </>
+                        )}
+                        {deliveryFeeLabel && (
+                            <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
+                                {deliveryFeeLabel}
+                            </span>
                         )}
                     </div>
-                    {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
-                        <div className="flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400 mt-1 truncate">
-                            {deliveryTime && (
-                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0 flex items-center gap-1">
-                                    <ClockIcon size={12} className="text-brand-inactive-text dark:text-dark-body" />
-                                    {deliveryTime}
-                                </span>
-                            )}
-                            {deliveryTime && (distanceLabel || deliveryFeeLabel) && (
-                                <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                            )}
-                            {distanceLabel && (
-                                <span className="font-medium shrink-0">{distanceLabel}</span>
-                            )}
-                            {distanceLabel && deliveryFeeLabel && (
-                                <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                            )}
-                            {deliveryFeeLabel && (
-                                <span className={`font-semibold shrink-0 ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
-                                    {deliveryFeeLabel}
-                                </span>
-                            )}
-                        </div>
-                    )}
                 </div>
             </div>
         </Link>
@@ -364,20 +372,32 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     }
 
     const distanceLabel = distanceKm != null ? formatDistanceLabel(distanceKm) : (partner?.distance_km_formatted || (product as any).distance_km_formatted || distance || null)
-    const deliveryTime = distanceKm != null ? estimateDeliveryTimeRange(distanceKm) : (partner?.delivery_time_formatted || (product as any).delivery_time_formatted || null)
 
     const deliverySettings = partner?.delivery_settings || (product as any).delivery_settings || null
-    const deliveryFeeLabel = estimateDeliveryFeeLabel({
+    const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false && deliverySettings?.isDeliveryEnabled !== false
+    const showDeliveryTime = itemType === "produto" && isDeliveryEnabled
+    const deliveryTime = showDeliveryTime
+        ? (distanceKm != null ? estimateAverageDeliveryTime(distanceKm) : ((product as any).delivery_time_formatted || partner?.delivery_time_formatted ? formatAverageDeliveryTimeFromRange((product as any).delivery_time_formatted || partner?.delivery_time_formatted) : null))
+        : null
+
+    const rawFee = estimateDeliveryFeeLabel({
         distanceKm,
         baseFee: deliverySettings?.base_fee ?? deliverySettings?.baseFee,
         includedKm: deliverySettings?.included_km ?? deliverySettings?.includedKm,
         extraKmPrice: deliverySettings?.extra_km_price ?? deliverySettings?.extraKmPrice,
         maxDeliveryKm: deliverySettings?.max_delivery_km ?? deliverySettings?.maxDeliveryKm,
-        isDeliveryEnabled: deliverySettings?.is_delivery_enabled ?? deliverySettings?.isDeliveryEnabled,
+        isDeliveryEnabled,
         deliveryPayer: deliverySettings?.delivery_payer ?? deliverySettings?.deliveryPayer,
-    }) || partner?.delivery_fee_formatted || (product as any).delivery_fee_formatted || (deliverySettings?.is_delivery_enabled === false ? "Retirada grátis" : null)
+    }) || partner?.delivery_fee_formatted || (product as any).delivery_fee_formatted || (!isDeliveryEnabled ? "Retirada grátis" : null)
 
-    const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
+    const isFreeDelivery = rawFee ? (rawFee.toLowerCase().includes("grátis") || rawFee.toLowerCase().includes("gratis")) : false
+    const deliveryFeeLabel = isFreeDelivery
+        ? (isDeliveryEnabled ? "Entrega grátis" : "Retirada grátis")
+        : rawFee
+
+    const serviceDuration = itemType === "servico"
+        ? formatServiceDuration((product as any).duration_minutes ?? (product as any).durationMinutes ?? (product as any).duration)
+        : null
 
     const preloadedPromos = (product as any)._promotions || preloadedPromotions
 
@@ -598,17 +618,11 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                     {sellerName}
                                 </p>
                                 {itemType === "servico" ? (
-                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        {distanceLabel ? (
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading">{distanceLabel}</span>
-                                        ) : locationLabel ? (
-                                            <span className="font-medium">{locationLabel}</span>
-                                        ) : sellerLabel ? (
-                                            <span className="font-medium">{sellerLabel}</span>
-                                        ) : (
-                                            <span>Serviço local</span>
-                                        )}
-                                    </div>
+                                    serviceDuration ? (
+                                        <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                            <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
+                                        </div>
+                                    ) : null
                                 ) : (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
                                         {deliveryTime && (

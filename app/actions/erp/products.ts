@@ -1129,7 +1129,7 @@ export async function createProductVariantAction(data: {
             sku: variantSku,
             price_adjustment: data.priceAdjustment,
             stock_quantity: data.stockQuantity,
-            is_active: true,
+            status: "ativo",
         })
 
         if (error) return { error: error.message }
@@ -1487,6 +1487,31 @@ export async function linkProductSupplierAction(productId: string, supplierId: s
             lead_time_days: supplierData?.leadTimeDays || null,
         })
         if (error && !error.message.includes("duplicate")) return { error: error.message }
+
+        revalidateSuppliers(product.partner_id)
+        revalidateProducts(product.partner_id, productId)
+        return { success: true }
+    } catch (error: any) {
+        return { error: error.message }
+    }
+}
+
+export async function linkProductSuppliersBatchAction(productId: string, supplierIds: string[]) {
+    try {
+        if (!supplierIds || supplierIds.length === 0) return { success: true }
+        const product = await fetchProductAndVerifyOwnership(productId, "edit")
+        const admin = getAdminClient()
+
+        const payload = supplierIds.map((supplierId) => ({
+            product_id: productId,
+            supplier_id: supplierId,
+        }))
+
+        const { error } = await admin
+            .from("product_suppliers")
+            .upsert(payload, { onConflict: "product_id,supplier_id", ignoreDuplicates: true })
+
+        if (error) return { error: error.message }
 
         revalidateSuppliers(product.partner_id)
         revalidateProducts(product.partner_id, productId)

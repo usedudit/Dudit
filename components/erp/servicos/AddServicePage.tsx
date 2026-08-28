@@ -12,6 +12,7 @@ import { createServiceAction, updateServiceAction, deleteServiceAction, archiveS
 import { createServiceCategoryAction, getServiceMetadataAction } from "@/app/actions/erp/service-metadata"
 import { generateSKUBase } from "@/lib/utils/code-generators"
 import { useNotification } from "@/hooks/use-notification"
+import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -92,6 +93,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const videoPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
     const isQuick = isQuickMode(businessInfo)
+    const isDesapego = businessInfo.mode === "desapego"
 
     const partnerId = propPartnerId || selectedStore?.partner_id || ""
     const storeId = propStoreId || selectedStore?.id || ""
@@ -295,6 +297,14 @@ export const AddServicePage: FC<AddServicePageProps> = ({
         return Array.from(fieldErrors).filter(field => fieldTabs[field] === tab).length
     }, [fieldErrors])
 
+    const { scrollToFirstError } = useScrollToFirstError({
+        fieldErrors,
+        REQUIRED_FIELDS,
+        scrollContainerRef,
+        activeTab,
+        setActiveTab,
+    })
+
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
@@ -357,7 +367,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
         const errors = validateServiceData()
         if (errors.length > 0) {
-            setFieldErrors(new Set(errors.map((e) => e.field))); isSubmittingRef.current = false; notifyError("Preencha os campos obrigatórios"); return
+            setFieldErrors(new Set(errors.map((e) => e.field))); scrollToFirstError(); isSubmittingRef.current = false; notifyError("Preencha os campos obrigatórios"); return
         }
         if (blockedImages.size > 0) { notifyError("Remova as imagens bloqueadas antes de salvar"); isSubmittingRef.current = false; return }
 
@@ -638,6 +648,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                             mode={internalMode === "duplicate" ? "add" : internalMode}
                                             blockedImages={blockedImages}
                                             isQuickMode={isQuick}
+                                            isDesapego={isDesapego}
                                             generateRandomCode={handleGenerateRandomCode}
                                             openAddItemModal={handleOpenMetadataModal}
                                             metadataPlanBlocked={metadataPlanBlocked}

@@ -151,6 +151,23 @@ describe("Delivery Fee Calculation & Configuration", () => {
       expect(result.breakdown.hasRatesConfigured).toBe(true)
     })
 
+    it("should NOT apply free delivery when freeDeliveryThreshold is 0 or null", () => {
+      const result = calculateDeliveryFee({
+        distanceKm: 3,
+        currentTime: new Date(),
+        settings: {
+          ...defaultSettings,
+          baseFee: 10,
+          freeDeliveryThreshold: 0,
+        },
+        rules: [],
+        orderSubtotal: 60,
+      })
+
+      expect(result.fee).toBe(10)
+      expect(result.breakdown.isFreeByThreshold).toBe(false)
+    })
+
     it("should return hasRatesConfigured: true and fee: 0 when free delivery coupon is applied", () => {
       const result = calculateDeliveryFee({
         distanceKm: 3,

@@ -418,7 +418,6 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                             )}
                         </div>
                     </div>
-                    <div className="h-[1px] bg-brand-border w-full" />
                 </>
             )}
 
