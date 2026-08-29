@@ -37,7 +37,7 @@ export interface PeriodRange {
     periodLabel: string
 }
 
-export function calculatePeriodDates(period: AnalyticsPeriod, customStart?: string, customEnd?: string): PeriodRange {
+function calculatePeriodDates(period: AnalyticsPeriod, customStart?: string, customEnd?: string): PeriodRange {
     const now = new Date()
     const endDate = new Date(now)
     let startDate = new Date(now)
