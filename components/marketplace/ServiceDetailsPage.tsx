@@ -2102,34 +2102,55 @@ export function ServiceDetailsPageClient({
                                     ))}
                                 </div>
 
-                                <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {galleryItems.length > 1 && (
-                                            <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
-                                                <ChevronLeftIcon size={20} className="text-brand-dark" />
-                                            </button>
-                                        )}
-                                    </div>
+                                <div className="flex-1 min-w-0 flex items-start gap-2 lg:gap-4">
+                                    {/* Gallery navigation + image (centered vertically) */}
+                                    <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
+                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                            {galleryItems.length > 1 && (
+                                                <button onClick={goToPrev} className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-brand-border hover:bg-brand-gray dark:hover:bg-dark-border/50 transition-colors shadow-sm">
+                                                    <ChevronLeftIcon size={20} className="text-brand-dark" />
+                                                </button>
+                                            )}
+                                        </div>
 
-                                    <div className="relative flex-1 min-w-0">
-                                        <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
-                                            <div
-                                                ref={galleryContainerRef}
-                                                className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
-                                                onClick={() => openLightbox(activeImgIndex)}
-                                                onMouseMove={(e) => {
-                                                    const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
-                                                    zoomOriginX.set(((e.clientX - left) / width) * 100)
-                                                    zoomOriginY.set(((e.clientY - top) / height) * 100)
-                                                    zoomScale.set(2.2)
-                                                }}
-                                                onMouseLeave={() => zoomScale.set(1)}
-                                            >
-                                                <AnimatePresence mode="popLayout" custom={slideDirection}>
+                                        <div className="relative flex-1 min-w-0">
+                                            <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
+                                                <div
+                                                    ref={galleryContainerRef}
+                                                    className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
+                                                    onClick={() => openLightbox(activeImgIndex)}
+                                                    onMouseMove={(e) => {
+                                                        const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
+                                                        zoomOriginX.set(((e.clientX - left) / width) * 100)
+                                                        zoomOriginY.set(((e.clientY - top) / height) * 100)
+                                                        zoomScale.set(2.2)
+                                                    }}
+                                                    onMouseLeave={() => zoomScale.set(1)}
+                                                >
+                                                    <AnimatePresence mode="popLayout" custom={slideDirection}>
+                                                        <motion.img
+                                                            key={activeImgIndex}
+                                                            src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
+                                                            className="absolute inset-0 w-full h-full object-contain cursor-pointer"
+                                                            alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
+                                                            custom={slideDirection}
+                                                            variants={slideVariants}
+                                                            initial="enter"
+                                                            animate="center"
+                                                            exit="exit"
+                                                            transition={{ duration: 0.2 }}
+                                                            style={{ transformOrigin, scale: smoothScale }}
+                                                        />
+                                                    </AnimatePresence>
+                                                </div>
+                                            </div>
+
+                                            <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
+                                                <AnimatePresence mode="wait" custom={slideDirection}>
                                                     <motion.img
                                                         key={activeImgIndex}
                                                         src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
-                                                        className="absolute inset-0 w-full h-full object-contain cursor-pointer"
+                                                        className="absolute inset-0 w-full h-full object-contain"
                                                         alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
                                                         custom={slideDirection}
                                                         variants={slideVariants}
@@ -2137,41 +2158,23 @@ export function ServiceDetailsPageClient({
                                                         animate="center"
                                                         exit="exit"
                                                         transition={{ duration: 0.2 }}
-                                                        style={{ transformOrigin, scale: smoothScale }}
                                                     />
                                                 </AnimatePresence>
                                             </div>
                                         </div>
 
-                                        <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
-                                            <AnimatePresence mode="wait" custom={slideDirection}>
-                                                <motion.img
-                                                    key={activeImgIndex}
-                                                    src={galleryItems[activeImgIndex]?.src || PLACEHOLDER}
-                                                    className="absolute inset-0 w-full h-full object-contain"
-                                                    alt={`Foto de ${service.name} em ${partner.city} - ${partner.state}`}
-                                                    custom={slideDirection}
-                                                    variants={slideVariants}
-                                                    initial="enter"
-                                                    animate="center"
-                                                    exit="exit"
-                                                    transition={{ duration: 0.2 }}
-                                                />
-                                            </AnimatePresence>
+                                        {/* Desktop Next Button */}
+                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                            {galleryItems.length > 1 && (
+                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Desktop Next Button */}
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {galleryItems.length > 1 && (
-                                            <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Desktop Right Column (Actions) - aligned to the top, same Y axis as the Next button */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center absolute top-[30px]" style={{ right: 0 }}>
+                                    {/* Desktop Right Column (Actions) - top aligned, same X axis as Next button */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center pt-1">
                                         {(() => {
                                             const isFavService = isFav(service.id, "servico")
                                             return (

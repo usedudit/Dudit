@@ -22,33 +22,13 @@ export async function preCheckLogin(email: string): Promise<{ allowed: boolean; 
             }
         }
 
-        // Check if there is an active deletion request for this email
-        const { getAdminClient } = await import("@/lib/supabase/admin")
-        const admin = getAdminClient()
-        const { data: userProfile } = await admin
-            .from("user_profiles")
-            .select("user_id")
-            .eq("email", cleanEmail)
-            .maybeSingle()
-
-        if (userProfile?.user_id) {
-            const { data: activeDeletion } = await admin
-                .from("account_deletions")
-                .select("id, status")
-                .eq("user_id", userProfile.user_id)
-                .not("status", "eq", "completed")
-                .not("status", "eq", "failed")
-                .maybeSingle()
-
-            if (activeDeletion) {
-                return {
-                    allowed: false,
-                    error: "Esta conta está em processo de exclusão definitiva e não pode mais ser acessada."
-                }
-            }
-        }
+        // Account-deletion enforcement happens after authentication through the
+        // secure runtime-status RPC and the post-login deletion check. Do not
+        // query user_profiles by email here: email is owned by Supabase Auth,
+        // not by user_profiles, and this pre-auth lookup caused a 400 on every
+        // login attempt while adding no security boundary.
     } catch (err) {
-        console.error("[PRECHECK] Error in checkAccountLockout/deletion:", err)
+        console.error("[PRECHECK] Error in checkAccountLockout:", err)
     }
 
     return { allowed: true }

@@ -56,33 +56,40 @@ export function StoreProvider({
   children,
   partnerId: propPartnerId,
   activeStoreId: propActiveStoreId,
-  initialStores = [],
+  initialStores,
 }: {
   children: React.ReactNode
   partnerId?: string
   activeStoreId?: string | null
   initialStores?: Store[]
 }) {
+  // When the ERP layout supplies initialStores, it has already performed the
+  // authenticated/authorized server fetch. Treat even an empty array as a
+  // valid snapshot so the provider does not immediately fetch the same data
+  // again after hydration.
+  const hasInitialStores = initialStores !== undefined
+  const initialStoreList = initialStores ?? []
+
   const initialSelected = useMemo(() => {
-    if (initialStores && initialStores.length > 0) {
+    if (initialStoreList.length > 0) {
       if (propActiveStoreId) {
-        const found = initialStores.find((s) => s.id === propActiveStoreId)
+        const found = initialStoreList.find((s) => s.id === propActiveStoreId)
         if (found) return found
       }
-      return initialStores[0]
+      return initialStoreList[0]
     }
     return null
-  }, [initialStores, propActiveStoreId])
+  }, [initialStoreList, propActiveStoreId])
 
   const [selectedStore, setSelectedStore] = useState<Store | null>(initialSelected)
-  const [stores, setStores] = useState<Store[]>(initialStores || [])
-  const [isLoading, setIsLoading] = useState(!initialStores || initialStores.length === 0)
+  const [stores, setStores] = useState<Store[]>(initialStoreList)
+  const [isLoading, setIsLoading] = useState(!hasInitialStores)
   const [hasError, setHasError] = useState(false)
   const router = useRouter()
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
 
   useEffect(() => {
-    if (initialStores && initialStores.length > 0) return
+    if (hasInitialStores) return
     if (!partnerId) return
 
     const cached = localStorage.getItem(getStoreStorageKey("cachedStores", partnerId))
@@ -105,7 +112,7 @@ export function StoreProvider({
         console.error("Error loading cached stores:", e)
       }
     }
-  }, [initialStores, partnerId])
+  }, [hasInitialStores, partnerId])
 
   useEffect(() => {
     if (propPartnerId && propPartnerId !== partnerId) {
@@ -115,26 +122,27 @@ export function StoreProvider({
 
   // Sync propActiveStoreId or initialStores when props change from SSR
   useEffect(() => {
-    if (initialStores && initialStores.length > 0) {
-      setStores(initialStores)
+    if (hasInitialStores) {
+      setStores(initialStoreList)
       const selectedStoreKey = getStoreStorageKey("selectedStoreId", partnerId)
       const savedStoreId = typeof window !== "undefined" ? localStorage.getItem(selectedStoreKey) : null
       const targetId = savedStoreId || propActiveStoreId
 
-      if (targetId && initialStores.some((s) => s.id === targetId)) {
-        const found = initialStores.find((s) => s.id === targetId)
+      if (targetId && initialStoreList.some((s) => s.id === targetId)) {
+        const found = initialStoreList.find((s) => s.id === targetId)
         if (found) {
           setSelectedStore(found)
         }
-      } else if (!selectedStore || !initialStores.some((s) => s.id === selectedStore.id)) {
-        setSelectedStore(initialStores[0])
-        if (typeof window !== "undefined") {
-          localStorage.setItem(selectedStoreKey, initialStores[0].id)
+      } else if (!selectedStore || !initialStoreList.some((s) => s.id === selectedStore.id)) {
+        const firstStore = initialStoreList[0] || null
+        setSelectedStore(firstStore)
+        if (typeof window !== "undefined" && firstStore) {
+          localStorage.setItem(selectedStoreKey, firstStore.id)
         }
       }
       setIsLoading(false)
     }
-  }, [initialStores, propActiveStoreId, partnerId])
+  }, [hasInitialStores, initialStoreList, propActiveStoreId, partnerId, selectedStore])
 
   const fetchStores = useCallback(async () => {
     if (!partnerId) {
@@ -189,8 +197,10 @@ export function StoreProvider({
   }, [partnerId, propActiveStoreId])
 
   useEffect(() => {
-    fetchStores()
-  }, [partnerId, fetchStores])
+    if (!hasInitialStores) {
+      fetchStores()
+    }
+  }, [hasInitialStores, partnerId, fetchStores])
 
   const storeChangeInFlight = useRef<string | null>(null)
 

@@ -15,6 +15,7 @@ import { enrichMarketplaceDistance, calculateDistance } from "@/lib/services/loc
 import { resolveCityAndStateFromSlug } from "./products"
 import { normalizeSearchQuery } from "@/lib/search/normalize"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
+import { recordMarketplaceSearchTelemetry } from "@/lib/services/analytics.service"
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
     if (!variants || variants.length === 0) return { fallback_variant_image: null, fallback_variant_price: null }
@@ -251,6 +252,18 @@ export const searchMarketplaceDirectFull = cache(async (
         if (moreDistantItems.length > 0) {
             moreDistantItems = filterSection(moreDistantItems)
         }
+    }
+
+    if (query && query.trim().length > 0 && !limits.cursor && !limits.lastId) {
+        const hasResults = (finalResults && finalResults.length > 0) || (moreDistantItems && moreDistantItems.length > 0)
+        // Fire-and-forget non-blocking telemetry logging
+        void recordMarketplaceSearchTelemetry({
+            query,
+            hasResults: Boolean(hasResults),
+            resultsCount: (finalResults?.length || 0) + (moreDistantItems?.length || 0),
+            citySlug: limits.cidade || null,
+            itemType: type,
+        })
     }
 
     return {

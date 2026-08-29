@@ -219,7 +219,7 @@ BEGIN
         o.payment_method,
         o.store_id,
         o.buyer_id,
-        c.customer_name AS raw_customer_name
+        c.name AS raw_customer_name
       FROM public.delivery_assignments da
       JOIN public.orders o ON o.id = da.order_id AND o.partner_id = da.partner_id
       LEFT JOIN public.customers c ON c.id = o.buyer_id AND c.partner_id = o.partner_id
@@ -289,7 +289,7 @@ BEGIN
         o_primary.delivery_address,
         ''
       ) AS store_address,
-      COALESCE(c_primary.full_name, dto.raw_customer_name, 'Cliente') AS customer_name,
+      COALESCE(c_primary.name, dto.raw_customer_name, 'Cliente') AS customer_name,
       COALESCE(c_primary.phone, '') AS customer_phone,
       COALESCE(
         (SELECT a.street || ', ' || COALESCE(a.number, 'S/N') || ' - ' || COALESCE(a.neighborhood, '') || ', ' || a.city FROM public.addresses a WHERE a.user_id = dto.buyer_id ORDER BY a.is_default DESC NULLS LAST, a.created_at ASC LIMIT 1),

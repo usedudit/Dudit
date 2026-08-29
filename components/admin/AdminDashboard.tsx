@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import {
     ShieldAlert,
     Users,
@@ -8,7 +9,8 @@ import {
     CheckCircle2,
     XCircle,
     Clock,
-    ArrowRight
+    ArrowRight,
+    TrendingUp
 } from 'lucide-react';
 import { Badge } from '@/components/reusable/Badge';
 import Button from '@/components/reusable/Button';
@@ -109,9 +111,16 @@ const AdminDashboard = ({ stats: serverStats }: AdminDashboardProps) => {
         <div className="p-6 md:p-8 max-w-[1700px] mx-auto space-y-8">
 
             {/* Header */}
-            <div>
-                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mb-2">System Overview</h1>
-                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">High-level metrics and recent administrative actions.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none mb-2">Visão Geral do Sistema</h1>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Métricas de alto nível e ações administrativas recentes.</p>
+                </div>
+                <Link href="/ddt-admin/analytics">
+                    <Button variant="outline" className="flex items-center gap-2 text-sm font-semibold border-brand-green/30 text-brand-green hover:bg-brand-green/10">
+                        <TrendingUp size={16} /> Analytics & Inteligência
+                    </Button>
+                </Link>
             </div>
 
             {/* Stats Grid */}

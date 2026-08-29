@@ -2380,62 +2380,65 @@ export function ProductDetailsPageClient({
                                     ))}
                                 </div>
 
-                                <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
-                                    {/* Desktop Prev Button */}
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {galleryItems.length > 1 && (
-                                            <Button variant="filled" onClick={goToPrev} className="w-10 h-10 flex items-center justify-center">
-                                                <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                            </Button>
-                                        )}
-                                    </div>
+                                <div className="flex-1 min-w-0 flex items-start gap-2 lg:gap-4">
+                                    {/* Gallery navigation + image (centered vertically) */}
+                                    <div className="flex-1 min-w-0 flex items-center gap-2 lg:gap-4">
+                                        {/* Desktop Prev Button */}
+                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                            {galleryItems.length > 1 && (
+                                                <Button variant="filled" onClick={goToPrev} className="w-10 h-10 flex items-center justify-center">
+                                                    <ChevronLeftIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                </Button>
+                                            )}
+                                        </div>
 
-                                    <div className="relative flex-1 min-w-0">
-                                        {/* Desktop main image */}
-                                        <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
-                                            <div ref={galleryContainerRef}
-                                                className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
-                                                onMouseMove={(e) => {
-                                                    const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
-                                                    zoomOriginX.set(((e.clientX - left) / width) * 100)
-                                                    zoomOriginY.set(((e.clientY - top) / height) * 100)
-                                                    zoomScale.set(2.2)
-                                                }}
-                                                onMouseLeave={() => zoomScale.set(1)}
-                                                onClick={() => openLightbox(activeImgIndex)}>
-                                                <AnimatePresence mode="popLayout" custom={slideDirection}>
-                                                    {galleryItems[activeImgIndex]?.type === "image" ? (
-                                                        <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
-                                                            className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
-                                                            custom={slideDirection} variants={slideVariants}
-                                                            initial="enter" animate="center" exit="exit"
-                                                            transition={{ duration: 0.2 }}
-                                                            onClick={() => openLightbox(activeImgIndex)}
-                                                            style={{ transformOrigin, scale: smoothScale }} />
-                                                    ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${product.name}`)}
+                                        <div className="relative flex-1 min-w-0">
+                                            {/* Desktop main image */}
+                                            <div className="hidden lg:block" style={{ paddingBottom: "100%", position: "relative" }}>
+                                                <div ref={galleryContainerRef}
+                                                    className="absolute inset-0 bg-brand-gray dark:bg-dark-border/30 overflow-hidden rounded-2xl cursor-zoom-in"
+                                                    onMouseMove={(e) => {
+                                                        const { left, top, width, height } = galleryContainerRef.current!.getBoundingClientRect()
+                                                        zoomOriginX.set(((e.clientX - left) / width) * 100)
+                                                        zoomOriginY.set(((e.clientY - top) / height) * 100)
+                                                        zoomScale.set(2.2)
+                                                    }}
+                                                    onMouseLeave={() => zoomScale.set(1)}
+                                                    onClick={() => openLightbox(activeImgIndex)}>
+                                                    <AnimatePresence mode="popLayout" custom={slideDirection}>
+                                                        {galleryItems[activeImgIndex]?.type === "image" ? (
+                                                            <motion.img key={activeImgIndex} src={galleryItems[activeImgIndex].src}
+                                                                className="absolute inset-0 w-full h-full object-contain cursor-pointer" alt={`Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`}
+                                                                custom={slideDirection} variants={slideVariants}
+                                                                initial="enter" animate="center" exit="exit"
+                                                                transition={{ duration: 0.2 }}
+                                                                onClick={() => openLightbox(activeImgIndex)}
+                                                                style={{ transformOrigin, scale: smoothScale }} />
+                                                        ) : renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Vídeo de ${product.name}`)}
+                                                    </AnimatePresence>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile main image */}
+                                            <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
+                                                <AnimatePresence mode="wait" custom={slideDirection}>
+                                                    {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
                                                 </AnimatePresence>
                                             </div>
                                         </div>
 
-                                        {/* Mobile main image */}
-                                        <div className="lg:hidden relative bg-white dark:bg-dark-surface rounded-xl overflow-hidden cursor-pointer" style={{ aspectRatio: "1/1" }} onClick={() => openLightbox(activeImgIndex)}>
-                                            <AnimatePresence mode="wait" custom={slideDirection}>
-                                                {renderGalleryItem(galleryItems[activeImgIndex], "absolute inset-0 w-full h-full object-contain", `Foto de ${product.name} à venda em ${partner.city} - ${partner.state}`)}
-                                            </AnimatePresence>
+                                        {/* Desktop Next Button */}
+                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                            {galleryItems.length > 1 && (
+                                                <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
+                                                    <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Desktop Next Button */}
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
-                                        {galleryItems.length > 1 && (
-                                            <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
-                                                <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Desktop Right Column (Actions) - aligned to the top, same Y axis as the Next button */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center absolute top-[30px]" style={{ right: 0 }}>
+                                    {/* Desktop Right Column (Actions) - top aligned, same X axis as Next button */}
+                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center pt-1">
                                         {(() => {
                                             const isFavProd = isFav(product.id, "produto")
                                             return (

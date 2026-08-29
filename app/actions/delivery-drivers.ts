@@ -408,12 +408,8 @@ export async function markSingleOrderDeliveredAction(params: {
   assignmentId: string
   orderId: string
 }) {
-  await requireDeliveryDriver()
-  const supabase = await getSupabaseServerClient()
+  const { user } = await requireDeliveryDriver()
   const { getAdminClient } = await import("@/lib/supabase/admin")
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false as const, error: "Não autenticado." }
 
   // Verify the assignment belongs to this driver
   const { data: assignment } = await getAdminClient()

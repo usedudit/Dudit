@@ -27,14 +27,60 @@ import { getAdminClient } from "@/lib/supabase/admin"
 // Used by force-dynamic pages for strict consistency
 // ==========================================
 
+// This profile is passed to marketplace/ERP UI code. Keep the projection
+// explicit: partners and payment_methods contain credentials and financial
+// configuration that must never be fetched as part of a public profile.
+const PARTNER_PROFILE_SELECT = `
+  id,
+  is_active,
+  created_at,
+  updated_at,
+  mp_user_id,
+  mp_public_key,
+  mp_connected_at,
+  mp_accepted_payment_methods,
+  mp_search_category_text,
+  mp_live_mode,
+  business_info,
+  is_showcase_active,
+  category_id,
+  subcategory_id,
+  service_deposit_enabled,
+  service_deposit_type,
+  service_deposit_percentage,
+  order_flow,
+  payment_methods(
+    id,
+    partner_id,
+    name,
+    payment_type,
+    card_brand,
+    is_active,
+    max_installments,
+    fee_type,
+    percentage_rate,
+    fixed_amount,
+    receiving_days,
+    discount_percent,
+    store_id,
+    type,
+    fee_percent,
+    fee_fixed,
+    fee_bearer,
+    supports_installments,
+    is_default,
+    priority,
+    is_online_default,
+    store_ids,
+    installment_fee_bearer
+  )
+`
+
 async function _getPartnerProfile(partnerId: string) {
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from("partners")
-    .select(`
-      *,
-      payment_methods(*)
-    `)
+    .select(PARTNER_PROFILE_SELECT)
     .eq("id", partnerId)
     .eq("is_active", true)
     .maybeSingle()
@@ -339,10 +385,7 @@ export const getCachedPartnerProfile = async (partnerId: string) => {
       const supabase = getAdminClient()
       const { data, error } = await supabase
         .from("partners")
-        .select(`
-          *,
-          payment_methods(*)
-        `)
+        .select(PARTNER_PROFILE_SELECT)
         .eq("id", partnerId)
         .eq("is_active", true)
         .single()
