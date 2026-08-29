@@ -18,6 +18,13 @@ const withSerwist = withSerwistInit({
   additionalPrecacheEntries: [{ url: "/~offline", revision }],
   disable: process.env.NODE_ENV === "development",
   register: false,
+  exclude: [
+    /\.js$/,
+    /\.css$/,
+    /\.map$/,
+    /^manifest.*\.js$/,
+    /\.json$/,
+  ],
 })
 
 /** @type {import('next').NextConfig} */

@@ -15,6 +15,7 @@ export function PWAUpdatePrompt() {
     if (pathname?.startsWith("/print")) return
     if (
       typeof window === "undefined" ||
+      window !== window.top ||
       !("serviceWorker" in navigator) ||
       process.env.NODE_ENV === "development"
     ) {
