@@ -19,7 +19,9 @@ import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { Switch } from "../reusable/Switch"
 import { GeneralFeedbackModal } from "@/components/feedback/GeneralFeedbackModal"
 import { usePermissions } from "@/lib/permission-context"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 import { MessageSquare } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface ERPHeaderProps {
     sidebarOpen?: boolean
@@ -51,7 +53,8 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
     const [imageUrl, setImageUrl] = useState<string | null>(userProfile?.imageUrl || null)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
-    const { partnerId, planSlug, role } = usePermissions()
+    const { partnerId, planSlug, role, businessInfo } = usePermissions()
+    const isDesapego = normalizeBusinessInfo(businessInfo).mode === "desapego"
     const { setIsMobileOpen, headerOverride } = useSidebar()
     const searchParams = useSearchParams()
 
@@ -213,7 +216,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
 
                             {/* Botão Unificado (Ícone + Nome + Setas) */}
                             <div
-                                className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-border transition-colors cursor-pointer select-none"
+                                className={cn(
+                                    "group flex items-center gap-2 pl-1 pr-2 py-1 rounded-full transition-colors select-none",
+                                    !isDesapego && "hover:bg-gray-100 dark:hover:bg-dark-border cursor-pointer"
+                                )}
                             >
                                 <div className="flex items-center gap-1.5 h-full">
                                     {/* 2. Nome do Local (Alinhado) */}
@@ -222,8 +228,10 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                                         <StoreSwitcher />
                                     </div>
 
-                                    {/* 3. Ícone Duas Setas (Selector) */}
-                                    <ChevronsUpDown className="w-4 h-4 text-brand-inactive-text/70 dark:text-dark-body/70" />
+                                    {/* 3. Ícone Duas Setas (Selector) - apenas se não for desapego */}
+                                    {!isDesapego && (
+                                        <ChevronsUpDown className="w-4 h-4 text-brand-inactive-text/70 dark:text-dark-body/70" />
+                                    )}
                                 </div>
                             </div>
 

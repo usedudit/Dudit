@@ -29,6 +29,7 @@ import { ReturnPolicySubPage } from "./ReturnPolicySubPage"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { DeliverySettingsSubPage } from "./DeliverySettingsSubPage"
 import { SalesSettingsSubPage } from "./SalesSettingsSubPage"
+import { ReceiptSettingsSubPage } from "./ReceiptSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
 import { AuditLogsSubPage } from "./AuditLogsSubPage"
@@ -227,8 +228,8 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessPayments = isOwnerOrAdmin && !isDesapego
   const canAccessReturns = isOwnerAdminOrManager && !isDesapego && !isQuick
   const canAccessDelivery = isOwnerOrAdmin && !isDesapego
-  const canAccessSalesSettings = isOwnerAdminOrManager && !isDesapego
-  const canAccessReceipts = isOwnerAdminOrManager && !isDesapego
+  const canAccessSalesSettings = isOwnerOrAdmin && !isDesapego
+  const canAccessReceipts = isOwnerOrAdmin && !isDesapego
   const canAccessBusinessData = isOwnerAdminOrManager && !isDesapego
   const canAccessResources = isOwnerOrAdmin && !isDesapego
   const canAccessLogs = isOwnerOrAdmin && !isDesapego && !isQuick
@@ -471,12 +472,18 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
             />
           )}
 
-          {(activePage === "sales-settings" || activePage === "receipts") && canAccessSalesSettings && (
+          {activePage === "sales-settings" && canAccessSalesSettings && (
             <SalesSettingsSubPage
-              key={`sales-settings-${activePage}`}
+              key="sales-settings"
               partnerId={partner.id}
-              storeId={selectedStore?.id}
-              initialTab={activePage === "receipts" ? "recibos" : "geral"}
+              onBack={() => navigateToSubpage("home")}
+            />
+          )}
+
+          {activePage === "receipts" && canAccessReceipts && (
+            <ReceiptSettingsSubPage
+              key="receipts"
+              partnerId={partner.id}
               onBack={() => navigateToSubpage("home")}
             />
           )}

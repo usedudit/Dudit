@@ -20,36 +20,21 @@ declare global {
 declare const self: ServiceWorkerGlobalScope
 
 // ============================================================
-// Filtro do precache: remove rotas que não fazem sentido cachear
-// no navegador (API routes, ERP, admin, rotas privadas, etc.)
-// Isso reduz o cache de ~600MB para ~30-60MB.
+// Filtro do precache: remove TODOS os chunks JS/CSS do Next.js
+// do precache inicial. Os arquivos do Next.js já possuem cache HTTP
+// imutável no navegador e são cacheados sob demanda pelo runtimeCaching.
+// Isso evita que o navegador baixe e armazene 150MB+ de scripts
+// da aplicação inteira no primeiro acesso.
 // ============================================================
-const PRECACHE_EXCLUDE_PATTERNS = [
-  /\/app\/api\//,          // API routes rodam no servidor
-  /\/app\/erp\//,          // ERP - privado, precisa de auth + dados live
-  /\/app\/ddt-admin\//,    // Admin - privado
-  /\/app\/auth\//,         // Auth - transiente
-  /\/app\/cart\//,          // Carrinho - privado
-  /\/app\/checkout\//,     // Checkout - privado
-  /\/app\/payment\//,      // Pagamento - privado
-  /\/app\/dashboard\//,    // Dashboard - privado
-  /\/app\/pedidos\//,      // Pedidos - privado
-  /\/app\/perfil\//,       // Perfil - privado
-  /\/app\/select-erp\//,   // Seleção ERP - privado
-  /\/app\/banned\//,       // Ban page
-  /\/app\/account\//,      // Conta - privado
-  /\/app\/invite\//,       // Convites - privado
-  /\/app\/assinaturas\//, // Assinaturas - privado
-  /\/loading-[a-f0-9]+\.js$/, // Loading skeletons - dispensáveis
-]
-
 function filterPrecacheManifest(
   manifest: (PrecacheEntry | string)[] | undefined
 ): (PrecacheEntry | string)[] {
   if (!manifest) return []
   return manifest.filter((entry) => {
     const url = typeof entry === "string" ? entry : entry.url
-    return !PRECACHE_EXCLUDE_PATTERNS.some((pattern) => pattern.test(url))
+    // Exclui todos os chunks de código e assets estáticos pesados do precache
+    if (url.startsWith("/_next/static/")) return false
+    return true
   })
 }
 
@@ -152,7 +137,7 @@ const duditRuntimeCaching = [
     }),
   },
 
-  // Assets estáticos Next.js - Cache First (imutáveis, hash no nome)
+  // Assets estáticos Next.js - Cache First sob demanda (apenas páginas visitadas)
   {
     matcher: ({ url }: { url: URL }) =>
       url.pathname.startsWith("/_next/static"),
@@ -160,8 +145,8 @@ const duditRuntimeCaching = [
       cacheName: "dudit-next-static",
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 200,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias (não 365)
+          maxEntries: 60,
+          maxAgeSeconds: 7 * 24 * 60 * 60, // 7 dias
           purgeOnQuotaError: true,
         }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),

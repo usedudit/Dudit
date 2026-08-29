@@ -373,12 +373,12 @@ export async function getNextQuoteNumberAction(partnerId: string) {
                 return errorResponse("Erro ao buscar próximo número")
             }
 
-            let nextNumber = "ORC-0001"
+            let nextNumber = "ORC00001"
             if (data?.quote_number) {
                 const match = data.quote_number.match(/(\d+)$/)
                 if (match) {
                     const currentNum = parseInt(match[0], 10)
-                    nextNumber = `ORC-${(currentNum + 1).toString().padStart(4, '0')}`
+                    nextNumber = `ORC${(currentNum + 1).toString().padStart(5, '0')}`
                 }
             }
 

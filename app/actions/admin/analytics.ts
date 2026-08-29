@@ -18,7 +18,6 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import {
     getMarketplaceSearchStats,
     recordDemandEventTelemetry,
-    recordMarketplaceSearchTelemetry,
     type MarketplaceDemandMetrics,
     type ZeroResultTerm,
 } from "@/lib/services/analytics.service"
@@ -82,10 +81,10 @@ function calculatePeriodDates(period: AnalyticsPeriod, customStart?: string, cus
         previousEndIso: prevEndDate.toISOString(),
         periodLabel: period === "today" ? "Hoje" :
             period === "7d" ? "Últimos 7 dias" :
-            period === "30d" ? "Últimos 30 dias" :
-            period === "90d" ? "Últimos 90 dias" :
-            period === "12m" ? "Últimos 12 meses" :
-            period === "all" ? "Todo o Histórico" : "Personalizado",
+                period === "30d" ? "Últimos 30 dias" :
+                    period === "90d" ? "Últimos 90 dias" :
+                        period === "12m" ? "Últimos 12 meses" :
+                            period === "all" ? "Todo o Histórico" : "Personalizado",
     }
 }
 
@@ -255,12 +254,12 @@ export async function getAdminOverviewAnalyticsAction(
     let downgrades = 0
     let cancellations = 0
 
-    ;(planEventsRes.data || []).forEach((ev: any) => {
-        const type = ev.event_type?.toLowerCase() || ""
-        if (type.includes("upgrade")) upgrades++
-        else if (type.includes("downgrade")) downgrades++
-        else if (type.includes("cancel")) cancellations++
-    })
+        ; (planEventsRes.data || []).forEach((ev: any) => {
+            const type = ev.event_type?.toLowerCase() || ""
+            if (type.includes("upgrade")) upgrades++
+            else if (type.includes("downgrade")) downgrades++
+            else if (type.includes("cancel")) cancellations++
+        })
 
     const totalSearches = searchStats.totalSearches
     const zeroResults = searchStats.searchesWithoutResults
@@ -351,10 +350,10 @@ export async function getUserAnalyticsAction(
 
     // Build daily timeline
     const dayMap = new Map<string, number>()
-    ;(usersTimelineRes.data || []).forEach((u: any) => {
-        const d = u.created_at.slice(0, 10)
-        dayMap.set(d, (dayMap.get(d) || 0) + 1)
-    })
+        ; (usersTimelineRes.data || []).forEach((u: any) => {
+            const d = u.created_at.slice(0, 10)
+            dayMap.set(d, (dayMap.get(d) || 0) + 1)
+        })
 
     const dailySignupsTimeline: Array<{ date: string; signups: number; active: number }> = []
     const cur = new Date(range.startDate)
@@ -440,7 +439,7 @@ export async function getPartnerAnalyticsAction(
 
     // Plans map
     const planNameMap = new Map<string, string>()
-    ;(plansRes.data || []).forEach((p: any) => planNameMap.set(p.id, p.name))
+        ; (plansRes.data || []).forEach((p: any) => planNameMap.set(p.id, p.name))
 
     // Parse billing events
     let planUpgrades = 0
@@ -449,9 +448,9 @@ export async function getPartnerAnalyticsAction(
     const recentPlanChanges: PlanChangeEvent[] = []
 
     const partnerIdsToFetch = new Set<string>()
-    ;(billingEventsRes.data || []).forEach((ev: any) => {
-        if (ev.partner_id) partnerIdsToFetch.add(ev.partner_id)
-    })
+        ; (billingEventsRes.data || []).forEach((ev: any) => {
+            if (ev.partner_id) partnerIdsToFetch.add(ev.partner_id)
+        })
 
     // Fetch store names for plan changes
     const storeMap = new Map<string, string>()
@@ -460,10 +459,10 @@ export async function getPartnerAnalyticsAction(
             .from("stores")
             .select("partner_id, name")
             .in("partner_id", Array.from(partnerIdsToFetch))
-        ;(stores || []).forEach((s: any) => storeMap.set(s.partner_id, s.name))
+            ; (stores || []).forEach((s: any) => storeMap.set(s.partner_id, s.name))
     }
 
-    ;(billingEventsRes.data || []).forEach((ev: any) => {
+    ; (billingEventsRes.data || []).forEach((ev: any) => {
         const evType = (ev.event_type || "").toLowerCase()
         const meta = (ev.metadata || {}) as Record<string, any>
 
@@ -499,10 +498,10 @@ export async function getPartnerAnalyticsAction(
 
     // Build daily partner timeline
     const dayMap = new Map<string, number>()
-    ;(partnersTimelineRes.data || []).forEach((p: any) => {
-        const d = p.created_at.slice(0, 10)
-        dayMap.set(d, (dayMap.get(d) || 0) + 1)
-    })
+        ; (partnersTimelineRes.data || []).forEach((p: any) => {
+            const d = p.created_at.slice(0, 10)
+            dayMap.set(d, (dayMap.get(d) || 0) + 1)
+        })
 
     const dailyPartnersTimeline: Array<{ date: string; newPartners: number; activePartners: number }> = []
     const cur = new Date(range.startDate)

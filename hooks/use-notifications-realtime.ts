@@ -44,7 +44,11 @@ export function useNotificationsRealtime(params: {
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
-      supabase.removeChannel(channel)
+      try {
+        supabase.removeChannel(channel)
+      } catch {
+        // Ignora erros de canal já desconectado no unmount
+      }
     }
   }, [supabase, params.userId, params.enabled, debouncedChange])
 }

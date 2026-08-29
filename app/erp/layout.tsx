@@ -36,6 +36,7 @@ import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
 import type { RoleId } from "@/lib/permissions/rbac-types"
 
+import { normalizeBusinessInfo } from "@/lib/business-info"
 import { listStoresAction } from "@/app/actions/erp/stores"
 import { createAdminClient } from "@/lib/supabase/server"
 import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedbackModal"
@@ -115,24 +116,56 @@ export default async function ERPLayout({
   const routePermissions: PartnerRoutePermissions =
     context.roleId === "owner" ? normalizeToRoutePermissions(role, null) : normalizeToRoutePermissions(role, context.permissions)
 
+  const businessMode = normalizeBusinessInfo(context.businessInfo).mode
+  const isDesapego = businessMode === "desapego"
+
   // Stage 2: Parallel fetch partner plan, initial stores, store cookie, and sidebar cookie
   const [partnerPlan, initialStoresRes, activeStoreId, cookieStore] = await Promise.all([
     getPartnerPlan(context.partnerId),
-    listStoresAction(context.partnerId).catch(e => {
-      console.error("Error pre-fetching stores in layout:", e)
-      return []
-    }),
-    getActiveStoreId(),
+    isDesapego
+      ? createAdminClient()
+          .from("stores")
+          .select("*, addresses!store_id(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .eq("partner_id", context.partnerId)
+          .limit(1)
+          .then((res: any) => {
+            const data = res?.data
+            if (!data || data.length === 0) return []
+            const store = data[0]
+            const { addresses, ...rest } = store
+            const addrList = Array.isArray(addresses) ? addresses : []
+            const address = addrList.find((a: any) => a.is_default) || addrList[0] || null
+            const merged: any = { ...rest, addresses: addrList }
+            if (address) {
+              merged.zip_code = address.zip_code ?? null
+              merged.street = address.street ?? null
+              merged.number = address.number ?? null
+              merged.complement = address.complement ?? null
+              merged.neighborhood = address.neighborhood ?? null
+              merged.city = address.city ?? null
+              merged.state = address.state ?? null
+            }
+            return [merged]
+          })
+          .catch((e: any) => {
+            console.error("Error pre-fetching single store in desapego mode:", e)
+            return []
+          })
+      : listStoresAction(context.partnerId).catch((e: any) => {
+          console.error("Error pre-fetching stores in layout:", e)
+          return []
+        }),
+    isDesapego ? Promise.resolve(null) : getActiveStoreId(),
     cookies(),
   ])
 
-  const initialStores = initialStoresRes || []
+  const initialStores: any[] = initialStoresRes || []
   const sidebarCookie = cookieStore.get("dudit_sidebar_state")
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
-  const effectiveActiveStoreId = (activeStoreId && initialStores.some(s => s.id === activeStoreId))
+  const effectiveActiveStoreId = (activeStoreId && initialStores.some((s: any) => s.id === activeStoreId))
     ? activeStoreId
-    : (initialStores.length > 0 ? (initialStores.find(s => s.is_headquarters)?.id || initialStores[0].id) : null)
+    : (initialStores.length > 0 ? (initialStores.find((s: any) => s.is_headquarters)?.id || initialStores[0].id) : null)
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>

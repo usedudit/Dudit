@@ -7,7 +7,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon, BoxIcon } from "@/lib/icons"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -96,6 +96,7 @@ export default function DeliveryDetailPage({
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
     const [activeTab, setActiveTab] = useState<string>("dados_gerais")
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const mounted = useRef(true)
 
@@ -716,6 +717,203 @@ export default function DeliveryDetailPage({
                     cancelText="Cancelar"
                 />
             )}
+
+            {(() => {
+                const isOpen = !!selectedLink;
+                const handleClose = () => setSelectedLink(null);
+
+                if (!selectedLink) return null;
+                const order = selectedLink.orders || selectedLink;
+                const displayId = order.order_number || `#${String(order.id || "").slice(0, 8).toUpperCase()}`;
+                const paymentMeta = getPaymentStatusMeta(order.situation || order.status || (order as any).paymentStatus);
+                const deliveryMeta = getDeliveryStatusMeta(selectedLink.status || order.delivery_status);
+
+                const sheetContent = (
+                    <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                        <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                            <div>
+                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
+                            </div>
+                            <Button variant="filled" onClick={handleClose} size="icon">
+                                <XIcon className="h-5 w-5" />
+                            </Button>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
+                            <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                    <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                        Dados Gerais
+                                    </TabsTrigger>
+                                    <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                        Itens do Pedido
+                                    </TabsTrigger>
+                                </TabsList>
+
+                                <div className="flex-1 overflow-y-auto space-y-6">
+                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                    {formatCurrency(order.total_amount || order.totalAmount || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(order.delivery_fee || order.shippingFee || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                    {(() => {
+                                                        if (Array.isArray(order.payment_breakdown || (order as any).paymentBreakdown) && (order.payment_breakdown || (order as any).paymentBreakdown).length > 0) {
+                                                            return (order.payment_breakdown || (order as any).paymentBreakdown)
+                                                                .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
+                                                                .filter(Boolean)
+                                                                .join(", ") || formatPaymentMethodLabel(order.payment_method || (order as any).paymentMethod, null) || "Não informado"
+                                                        }
+                                                        return formatPaymentMethodLabel(order.payment_method || (order as any).paymentMethod, null) || "Não informado"
+                                                    })()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
+                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
+                                                    {deliveryMeta.label}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {order.created_at ? formatDateTime(order.created_at) : (order.orderDate ? formatDateTime(order.orderDate) : "-")}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                                        <CustomerCard
+                                            customer={{
+                                                ...(order.customer || {}),
+                                                name: order.customer?.name || order.customer_name || "Cliente",
+                                                email: order.customer?.email || "",
+                                                phone: order.customer?.phone || "",
+                                            }}
+                                            address={order.customerAddress || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
+                                            showMap={false}
+                                            chrome="minimal"
+                                        />
+
+                                        {order.notes && (
+                                            <div>
+                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
+                                                <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
+                                                    {order.notes}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </TabsContent>
+
+                                    <TabsContent value="itens" className="mt-0">
+                                        {(() => {
+                                            const items = order.order_items || order.items || [];
+                                            const filteredItems = items.filter((item: any) => {
+                                                const pType = String(item.products?.product_type || "").toLowerCase()
+                                                return pType !== "serviço" && pType !== "servico" && pType !== "service"
+                                            })
+                                            if (filteredItems.length === 0) {
+                                                return (
+                                                    <div className="flex items-center justify-center py-8">
+                                                        <IconPlaceholder
+                                                            icon={BoxIcon}
+                                                            title="Sem itens por aqui"
+                                                            subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                        />
+                                                    </div>
+                                                )
+                                            }
+                                            return (
+                                                <div className="space-y-4">
+                                                    {filteredItems.map((item: any) => {
+                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
+                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
+                                                        const itemUnit = item.products?.unit || item.unit || "un"
+                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+
+                                                        return (
+                                                            <div key={item.id} className="flex items-start gap-4">
+                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={itemImage}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.product_name || "Produto sem nome"}
+                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            {item.product_name || "Produto sem nome"}
+                                                                        </h4>
+                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(itemSubtotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                        SKU: {itemSku}
+                                                                    </div>
+                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                        {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })()}
+                                    </TabsContent>
+                                </div>
+                            </Tabs>
+                        </div>
+
+                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                            <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
+                                Fechar
+                            </Button>
+                        </footer>
+                    </div>
+                );
+
+                return isMobile ? (
+                    <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                        {sheetContent}
+                    </BottomSheet>
+                ) : (
+                    <Portal>
+                        <div
+                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                            onClick={handleClose}
+                        >
+                            <div
+                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {sheetContent}
+                            </div>
+                        </div>
+                    </Portal>
+                );
+            })()}
         </FadeIn>
     )
 }

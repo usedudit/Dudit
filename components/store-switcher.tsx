@@ -10,6 +10,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { usePermissions } from "@/lib/permission-context"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 import { cn } from "@/lib/utils"
 
 interface StoreSwitcherProps {
@@ -29,8 +30,10 @@ export function StoreSwitcher({
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [partnerId, setPartnerId] = useState<string>("")
     const router = useRouter()
-    const { planSlug } = usePermissions()
+    const { planSlug, businessInfo } = usePermissions()
     const { openPlanUpgrade } = usePlanUpgrade()
+
+    const isDesapego = normalizeBusinessInfo(businessInfo).mode === "desapego"
 
     useEffect(() => {
         if (selectedStore?.partner_id) {
@@ -43,6 +46,53 @@ export function StoreSwitcher({
     }
 
     const storeLogo = getR2ImageUrl(selectedStore.logo_url || selectedStore.image_url)
+
+    const isSidebar = variant === "sidebar"
+
+    // No modo Desapego, não há filiais/múltiplas lojas e nem gerenciamento de lojas
+    if (isDesapego) {
+        if (isSidebar) {
+            return (
+                <div
+                    className={cn(
+                        "flex items-center gap-2.5 w-full p-2.5 rounded-xl bg-white/5 border border-dark-border select-none",
+                        className,
+                    )}
+                >
+                    <img
+                        src={storeLogo || "https://img.dudit.com.br/static/Placeholder.png"}
+                        alt={selectedStore.name}
+                        className="w-8 h-8 rounded-lg object-cover border border-dark-border shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0 flex-1 text-left">
+                        <span className="text-sm font-semibold text-white truncate line-clamp-1">
+                            {selectedStore.name}
+                        </span>
+                    </div>
+                </div>
+            )
+        }
+
+        return (
+            <div
+                className={cn(
+                    "flex items-center space-x-2 select-none",
+                    className,
+                )}
+            >
+                <img
+                    src={storeLogo || "https://img.dudit.com.br/static/Placeholder.png"}
+                    alt={selectedStore.name}
+                    className="w-8 h-8 rounded-full object-cover"
+                />
+                <div className={showNameAlways ? "flex flex-col" : "hidden sm:flex flex-col"}>
+                    <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1">
+                        {selectedStore.name}
+                    </span>
+                </div>
+            </div>
+        )
+    }
 
     const handleCreateClick = () => {
         if (!hasMinimumPlan(planSlug, "escalar")) {
@@ -60,8 +110,6 @@ export function StoreSwitcher({
         onSelect?.()
         router.push("/erp/lojas")
     }
-
-    const isSidebar = variant === "sidebar"
 
     return (
         <>

@@ -14,6 +14,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { BoxIcon, XIcon, SearchIcon, FilterIcon, ArrowUpDownIcon, MoneyIcon, InfoIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { useNotification } from "@/hooks/use-notification"
 
 const PLACEHOLDER_IMAGE = "https://img.dudit.com.br/static/Placeholder.png"
@@ -507,7 +508,7 @@ export default function SelectProductVariantSheet({ isOpen, product, onClose, on
                 <div className="flex items-center gap-3">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-brand-gray dark:border-dark-border dark:bg-dark-border/40">
                         <img
-                            src={getR2ImageUrl(product.images?.[0] || product.image || null, "thumbnail") || PLACEHOLDER_IMAGE}
+                            src={getPrimaryProductDisplayImage(product, "thumbnail")}
                             alt={product.name}
                             className="h-full w-full object-cover"
                         />

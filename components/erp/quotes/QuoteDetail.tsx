@@ -586,7 +586,8 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         </div>
                                                         {canConvertToOrder && (
                                                             <Button
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white h-12 shrink-0"
+                                                                variant="link"
+                                                                className="hidden md:flex"
                                                                 disabled={isConverting}
                                                                 onClick={handleConvertClick}
                                                             >
@@ -595,11 +596,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         )}
                                                         {quote.converted && quote.converted_order_id && (
                                                             <Button
-                                                                variant="outline"
-                                                                className="mt-3 h-12"
+                                                                variant="link"
                                                                 onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
+                                                                leftIcon={<ArrowRightIcon size={14} />}
                                                             >
-                                                                Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
+                                                                Abrir pedido
                                                             </Button>
                                                         )}
                                                     </div>
@@ -658,11 +659,11 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isRejected
                                                                         ? "bg-brand-red/10 text-brand-red"
                                                                         : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                                                    }`}>
+                                                                        }`}>
                                                                         <div className={`w-2.5 h-2.5 rounded-full ${isRejected
                                                                             ? "bg-brand-red"
                                                                             : "bg-brand-dark dark:bg-dark-heading"
-                                                                        }`} />
+                                                                            }`} />
                                                                     </div>
                                                                 }
                                                             />
@@ -675,8 +676,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 mt-3"
                                                         disabled={isConverting}
                                                         onClick={handleConvertClick}
+                                                        leftIcon={<ArrowRightIcon size={14} />}
                                                     >
-                                                        {isConverting ? "Convertendo…" : "Converter em Pedido"} <ArrowRightIcon size={14} className="ml-1" />
+                                                        {isConverting ? "Convertendo…" : "Converter em Pedido"}
                                                     </Button>
                                                 )}
                                                 {quote.converted && quote.converted_order_id && (
@@ -684,8 +686,9 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         variant="outline"
                                                         className="w-full h-12 mt-3"
                                                         onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
+                                                        leftIcon={<ArrowRightIcon size={14} />}
                                                     >
-                                                        Abrir pedido <ArrowRightIcon size={14} className="ml-1" />
+                                                        Abrir pedido
                                                     </Button>
                                                 )}
                                             </div>
@@ -985,6 +988,14 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                     leftIcon={<ArrowRightIcon size={18} />}
                                 >
                                     {isConverting ? "…" : "Converter"}
+                                </Button>
+                            )}
+                            {quote.converted && quote.converted_order_id && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
+                                >
+                                    Abrir pedido <ArrowRightIcon size={14} />
                                 </Button>
                             )}
                             <Button onClick={() => onEditQuote && onEditQuote(quote)} className="flex-1 whitespace-nowrap" leftIcon={<EditIcon size={18} />}>

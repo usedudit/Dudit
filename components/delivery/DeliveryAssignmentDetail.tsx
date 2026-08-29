@@ -4,9 +4,23 @@ import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, Button, DefaultModal, FormSection, InfoCard, ActionsDropdown, DropdownItem, Pagination, ListItem } from "@/components/reusable"
+import {
+    Badge,
+    Button,
+    DefaultModal,
+    FormSection,
+    InfoCard,
+    ActionsDropdown,
+    DropdownItem,
+    Pagination,
+    ListItem,
+    Accordion,
+    CustomerCard,
+    IconPlaceholder,
+} from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
-import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
+import Portal from "@/components/Portal"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable/Tabs"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useSidebar } from "@/lib/sidebar-context"
 import { toast } from "@/hooks/use-notification"
@@ -22,10 +36,16 @@ import {
     PhoneIcon,
     WhatsappIcon,
     MapPinIcon,
+    XIcon,
+    EyeIcon,
+    BoxIcon,
 } from "@/lib/icons"
 import { formatCurrency, formatDate, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
-import { getPaymentStatusMeta } from "@/lib/orders/status"
+import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
+import { useMediaQuery } from "@/components/erp/hooks"
+import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
 
 const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactNode; children: React.ReactNode; className?: string }) => (
@@ -86,6 +106,7 @@ export default function DeliveryAssignmentDetail({
     const [isOrderDetailSheetOpen, setIsOrderDetailSheetOpen] = useState(false)
     const [orderDetailLoading, setOrderDetailLoading] = useState(false)
     const [orderDeliveredMap, setOrderDeliveredMap] = useState<Record<string, boolean>>({})
+    const isMobile = useMediaQuery("(max-width: 768px)")
 
     const [activeTab, setActiveTab] = useState("resumo")
     const [itemsPage, setItemsPage] = useState(1)
@@ -118,6 +139,20 @@ export default function DeliveryAssignmentDetail({
         ]
     }, [assignment])
 
+    useEffect(() => {
+        if (ordersList.length > 0) {
+            setOrderDeliveredMap(prev => {
+                const next = { ...prev }
+                ordersList.forEach((o: any) => {
+                    if (o.delivery_status === "delivered" || o.status === "delivered") {
+                        next[o.order_id] = true
+                    }
+                })
+                return next
+            })
+        }
+    }, [ordersList])
+
     const totalRouteDeliveryFee = React.useMemo(() => {
         if (assignment.orders && assignment.orders.length > 0) {
             return assignment.orders.reduce((sum: number, o: any) => sum + Number(o.delivery_fee || 0), 0)
@@ -128,6 +163,14 @@ export default function DeliveryAssignmentDetail({
     const totalRouteAmount = React.useMemo(() => {
         return ordersList.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
     }, [ordersList])
+
+    const isCashPayment = React.useMemo(() => {
+        return ordersList.some((o: any) => {
+            const isCash = (o.payment_method || assignment.payment_method || "").toLowerCase().includes("dinheiro") || (o.payment_method || assignment.payment_method || "").toLowerCase().includes("cash")
+            const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((o.payment_status || assignment.payment_status || "").toLowerCase()) || ["paid", "concluído", "concluido", "approved", "pago"].includes((o.situation || "").toLowerCase())
+            return isCash && !isPaid
+        })
+    }, [ordersList, assignment])
 
     const statusMeta = statusConfig[assignment.status] || {
         label: assignment.status,
@@ -140,9 +183,6 @@ export default function DeliveryAssignmentDetail({
 
     const cleanStorePhone = (assignment.store_phone || "").replace(/\D/g, "")
 
-    const customerMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.delivery_address || "")}`
-    const customerWazeUrl = `https://waze.com/ul?q=${encodeURIComponent(assignment.delivery_address || "")}`
-
     const storeMapsUrl = assignment.store_address
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.store_address)}`
         : null
@@ -150,14 +190,11 @@ export default function DeliveryAssignmentDetail({
 
     const pageTitle = ordersList.length > 1
         ? `Rota com ${ordersList.length} pedidos`
-        : `Pedido ${orderNumberDisplay}`
+        : `Entrega ${orderNumberDisplay}`
 
     const handleBackClick = useCallback(() => {
-        if (onBack) {
-            onBack()
-        } else {
-            router.push("/entregadores")
-        }
+        if (onBack) onBack()
+        else router.push("/entregadores")
     }, [onBack, router])
 
     useEffect(() => {
@@ -167,85 +204,89 @@ export default function DeliveryAssignmentDetail({
             isSubPage: true,
         })
         return () => setHeaderOverride(null)
-    }, [pageTitle, assignment.status, handleBackClick, setHeaderOverride])
+    }, [pageTitle, handleBackClick, setHeaderOverride])
+
+    const allOrdersDelivered = React.useMemo(() => {
+        if (ordersList.length <= 1) return true
+        return ordersList.every((o: any) => orderDeliveredMap[o.order_id])
+    }, [ordersList, orderDeliveredMap])
+
+    const deliveredOrdersCount = React.useMemo(() => {
+        return ordersList.filter((o: any) => orderDeliveredMap[o.order_id]).length
+    }, [ordersList, orderDeliveredMap])
 
     const advance = async () => {
         const next = NEXT_STATUS[assignment.status]
         if (!next) return
 
+        // Se estiver em rota e houver múltiplos pedidos, todas as paradas devem ser entregues antes de finalizar
+        if (assignment.status === "out_for_delivery" && ordersList.length > 1 && !allOrdersDelivered) {
+            toast.error(`Ainda restam ${ordersList.length - deliveredOrdersCount} paradas a serem entregues nesta rota.`)
+            return
+        }
+
         setLoading(true)
-        const result = await transitionMyDeliveryAssignmentAction({
+        const res = await transitionMyDeliveryAssignmentAction({
             assignmentId: assignment.assignment_id,
             status: next.status,
         })
         setLoading(false)
 
-        if (!result.success) {
-            toast.error(result.error || "Não foi possível avançar a entrega.")
+        if (!res.success) {
+            toast.error(res.error || "Não foi possível avançar o status.")
             return
         }
 
-        const now = new Date().toISOString()
-        setAssignment((prev: any) => ({
-            ...prev,
-            status: next.status,
-            accepted_at: next.status === "accepted" ? now : prev.accepted_at,
-            picked_up_at: next.status === "picked_up" ? now : prev.picked_up_at,
-            out_for_delivery_at: next.status === "out_for_delivery" ? now : prev.out_for_delivery_at,
-            delivered_at: next.status === "delivered" ? now : prev.delivered_at,
-        }))
-        toast.success("Status da entrega atualizado com sucesso!")
+        setAssignment((prev: any) => ({ ...prev, status: next.status }))
+        toast.success(`Status atualizado para "${next.label}"!`)
     }
 
     const reportFailure = async () => {
         if (!failureReason.trim()) {
-            toast.error("Por favor, informe o motivo do problema ou falha.")
+            toast.error("Informe o motivo da falha.")
             return
         }
-
         setLoading(true)
-        const result = await transitionMyDeliveryAssignmentAction({
+        const res = await transitionMyDeliveryAssignmentAction({
             assignmentId: assignment.assignment_id,
             status: "failed",
-            failureReason,
+            failureReason: failureReason.trim(),
         })
         setLoading(false)
 
-        if (!result.success) {
-            toast.error(result.error || "Não foi possível registrar a falha.")
+        if (!res.success) {
+            toast.error(res.error || "Não foi possível registrar a falha.")
             return
         }
 
-        setAssignment((prev: any) => ({
-            ...prev,
-            status: "failed",
-            failed_at: new Date().toISOString(),
-        }))
+        setAssignment((prev: any) => ({ ...prev, status: "failed", failure_reason: failureReason.trim() }))
         setFailureOpen(false)
-        toast.success("Problema registrado na entrega.")
+        toast.success("Falha registrada.")
     }
 
     const confirmPayment = async () => {
         setLoading(true)
-        const result = await confirmDeliveryPaymentReceivedAction(assignment.assignment_id)
+        const res = await confirmDeliveryPaymentReceivedAction(
+            assignment.assignment_id || assignment.id
+        )
         setLoading(false)
 
-        if (!result.success) {
-            toast.error(result.error || "Não foi possível confirmar o pagamento.")
+        if (!res.success) {
+            toast.error(res.error || "Não foi possível confirmar o recebimento.")
             return
         }
 
         setAssignment((prev: any) => ({
             ...prev,
-            payment_confirmed_at: result.data?.confirmed_at || new Date().toISOString(),
+            payment_confirmed_at: new Date().toISOString(),
         }))
-        toast.success("Recebimento em dinheiro confirmado com sucesso!")
+        toast.success("Recebimento em dinheiro confirmado!")
     }
 
-    const isCashPayment = /dinheiro|cash|money|especie/i.test(String(assignment.payment_method || ""))
+    // Stepper logic
     const currentStepIndex = STEPS.findIndex((s) => s.key === assignment.status)
     const isTerminalFailed = ["failed", "cancelled"].includes(assignment.status)
-    const totalActiveSteps = isTerminalFailed ? currentStepIndex + 1 : currentStepIndex + 1
+    const totalActiveSteps = isTerminalFailed ? STEPS.length : currentStepIndex + 1
 
     const timelineSteps = React.useMemo(() => {
         return STEPS.map((step, idx) => {
@@ -282,7 +323,7 @@ export default function DeliveryAssignmentDetail({
         return active[active.length - 1] || timelineSteps[0]
     }, [timelineSteps])
 
-    // Build history entries explicitly to avoid && operator issues
+    // Build history entries explicitly
     const historyEntries: HistoryEntry[] = []
     if (assignment.assigned_at) {
         historyEntries.push({ id: "assigned", actor_name: "Sistema", change_lines: ["Entrega atribuída ao entregador"], created_at: assignment.assigned_at, entry_type: "status" })
@@ -341,6 +382,9 @@ export default function DeliveryAssignmentDetail({
                                         <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                             <span className="hidden md:inline truncate">{pageTitle}</span>
                                             <Badge variant={statusMeta.variant} className="shrink-0">{statusMeta.label}</Badge>
+                                            {ordersList.length > 1 && (
+                                                <Badge variant="gray" className="shrink-0">{deliveredOrdersCount}/{ordersList.length} entregues</Badge>
+                                            )}
                                         </h1>
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                             {assignment.store_name || assignment.partner_name || "Loja"} • {assignment.assigned_at ? formatDate(assignment.assigned_at) : "Hoje"}
@@ -353,10 +397,22 @@ export default function DeliveryAssignmentDetail({
                                                 Informar Falha
                                             </Button>
                                         )}
-                                        {NEXT_STATUS[assignment.status] && (
-                                            <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
-                                                {NEXT_STATUS[assignment.status].label}
-                                            </Button>
+                                        {assignment.status === "out_for_delivery" && ordersList.length > 1 ? (
+                                            allOrdersDelivered ? (
+                                                <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
+                                                    Finalizar Rota de Entrega
+                                                </Button>
+                                            ) : (
+                                                <Badge variant="orange" className="py-2 px-3 text-xs font-semibold">
+                                                    Entregue os pedidos individualmente ({deliveredOrdersCount}/{ordersList.length})
+                                                </Badge>
+                                            )
+                                        ) : (
+                                            NEXT_STATUS[assignment.status] && (
+                                                <Button variant="default" onClick={advance} disabled={loading} isLoading={loading}>
+                                                    {NEXT_STATUS[assignment.status].label}
+                                                </Button>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -364,7 +420,7 @@ export default function DeliveryAssignmentDetail({
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="resumo">Resumo</TabsTrigger>
-                                        <TabsTrigger value="itens">Itens do Pedido</TabsTrigger>
+                                        <TabsTrigger value="itens">Itens do Pedido ({items.length})</TabsTrigger>
                                         <TabsTrigger value="historico">Histórico</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -451,37 +507,26 @@ export default function DeliveryAssignmentDetail({
                                                                 showChevron={true}
                                                                 onClick={() => setIsStepsSheetOpen(true)}
                                                                 left={
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${currentActiveStep.failed
-                                                                        ? "bg-brand-red/10 text-brand-red"
-                                                                        : "bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
-                                                                        }`}>
-                                                                        <div className={`w-2.5 h-2.5 rounded-full ${currentActiveStep.failed
-                                                                            ? "bg-brand-red"
-                                                                            : "bg-brand-dark dark:bg-dark-heading"
-                                                                            }`} />
+                                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-brand-dark/10 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading">
+                                                                        <TruckIcon size={18} />
                                                                     </div>
                                                                 }
                                                             />
                                                         </FormSection>
                                                     ) : (
                                                         <InfoCard
-                                                            title={assignment.status === "failed" ? "Entrega com Falha/Problema" : "Entrega Cancelada"}
-                                                            message="Esta rota não está mais em andamento. Caso tenha dúvidas, entre em contato com o estabelecimento."
+                                                            title="Entrega Cancelada ou com Falha"
+                                                            message="Esta entrega não está mais em andamento."
                                                             color="red"
                                                         />
                                                     )}
                                                 </div>
 
-                                                {/* Order Instructions */}
-                                                {assignment.notes && (
-                                                    <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
-                                                )}
-
                                                 {/* Store Section */}
-                                                <FormSection title="Local de Coleta (Estabelecimento)">
+                                                <FormSection title="Local de Coleta (Estabelecimento)" hasSeparator>
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                        <div className="space-y-1">
-                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
+                                                        <div className="space-y-1 min-w-0">
+                                                            <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
                                                                 {assignment.store_name || assignment.partner_name || "Estabelecimento Parceiro"}
                                                             </h3>
                                                             {assignment.store_address && (
@@ -494,7 +539,7 @@ export default function DeliveryAssignmentDetail({
                                                         <div className="shrink-0">
                                                             <ActionsDropdown
                                                                 trigger={
-                                                                    <Button variant="outline" size="sm">Contato</Button>
+                                                                    <Button variant="outline" size="sm">Opções</Button>
                                                                 }
                                                             >
                                                                 {storeMapsUrl && (
@@ -520,25 +565,27 @@ export default function DeliveryAssignmentDetail({
                                                 {/* Customer Section(s) / Paradas - Desktop */}
                                                 <div className="hidden lg:block">
                                                     {ordersList.map((order: any, idx: number) => {
+                                                        const cleanCustPhone = (order.customer_phone || "").replace(/\D/g, "")
                                                         const custMaps = order.delivery_address
                                                             ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
                                                             : null
                                                         const custWaze = order.delivery_address
                                                             ? `https://waze.com/ul?q=${encodeURIComponent(order.delivery_address)}`
                                                             : null
+                                                        const custWhatsapp = cleanCustPhone ? `https://wa.me/55${cleanCustPhone}` : null
                                                         const stopTitle = ordersList.length > 1
                                                             ? `Parada ${idx + 1} de ${ordersList.length} - ${order.customer_name || "Cliente"} (Pedido #${order.order_number || String(order.order_id).slice(0, 8)})`
                                                             : "Local de Entrega (Cliente)"
                                                         const isOrderDelivered = orderDeliveredMap[order.order_id] || false
 
                                                         return (
-                                                            <FormSection key={order.order_id || idx} title={stopTitle}>
+                                                            <FormSection key={order.order_id || idx} title={stopTitle} hasSeparator>
                                                                 <div
                                                                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer rounded-xl hover:bg-brand-gray/30 dark:hover:bg-dark-border/10 transition-colors -mx-2 px-2 py-2"
                                                                     onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}
                                                                 >
                                                                     <div className="space-y-1 min-w-0">
-                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2">
+                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading flex items-center gap-2 flex-wrap">
                                                                             <span>{order.customer_name || "Cliente"}</span>
                                                                             {order.total_amount && (
                                                                                 <span className="text-xs font-normal text-brand-inactive-text">
@@ -550,7 +597,6 @@ export default function DeliveryAssignmentDetail({
                                                                             )}
                                                                         </h3>
                                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                                                            <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
                                                                             <span>{order.delivery_address || "Endereço não informado"}</span>
                                                                         </p>
                                                                         {order.notes && (
@@ -562,9 +608,34 @@ export default function DeliveryAssignmentDetail({
                                                                     <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                                         <ActionsDropdown
                                                                             trigger={
-                                                                                <Button variant="outline" size="sm">Rota</Button>
+                                                                                <Button variant="outline" size="sm">Opções</Button>
                                                                             }
                                                                         >
+                                                                            <DropdownItem onClick={() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}>
+                                                                                <EyeIcon size={16} /> Ver Detalhes do Pedido
+                                                                            </DropdownItem>
+                                                                            {assignment.status === "out_for_delivery" && !isOrderDelivered && (
+                                                                                <DropdownItem onClick={async () => {
+                                                                                    setLoading(true)
+                                                                                    const res = await markSingleOrderDeliveredAction({
+                                                                                        assignmentId: assignment.assignment_id,
+                                                                                        orderId: order.order_id,
+                                                                                    })
+                                                                                    setLoading(false)
+                                                                                    if (!res.success) {
+                                                                                        toast.error(res.error || "Não foi possível marcar como entregue.")
+                                                                                        return
+                                                                                    }
+                                                                                    setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
+                                                                                    toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue!`)
+                                                                                    const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
+                                                                                    if (allDone) {
+                                                                                        setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+                                                                                    }
+                                                                                }}>
+                                                                                    <CheckCircleIcon size={16} className="text-emerald-600" /> Confirmar Entrega deste Pedido
+                                                                                </DropdownItem>
+                                                                            )}
                                                                             {custMaps && (
                                                                                 <DropdownItem onClick={() => window.open(custMaps, "_blank")}>
                                                                                     <MapPinIcon size={16} /> Abrir Rota no Maps
@@ -575,8 +646,17 @@ export default function DeliveryAssignmentDetail({
                                                                                     <TruckIcon size={16} /> Abrir no Waze
                                                                                 </DropdownItem>
                                                                             )}
+                                                                            {cleanCustPhone && (
+                                                                                <DropdownItem onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")}>
+                                                                                    <PhoneIcon size={16} /> Ligar para o Cliente
+                                                                                </DropdownItem>
+                                                                            )}
+                                                                            {custWhatsapp && (
+                                                                                <DropdownItem onClick={() => window.open(custWhatsapp, "_blank")}>
+                                                                                    <WhatsappIcon size={16} /> WhatsApp
+                                                                                </DropdownItem>
+                                                                            )}
                                                                         </ActionsDropdown>
-                                                                        <Button variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }}>Detalhes</Button>
                                                                     </div>
                                                                 </div>
                                                             </FormSection>
@@ -586,7 +666,7 @@ export default function DeliveryAssignmentDetail({
 
                                                 {/* Customer Section(s) / Paradas - Mobile/Tablet */}
                                                 <div className="lg:hidden">
-                                                    <FormSection title={`Pedidos Vinculados (${ordersList.length})`} className="mt-0">
+                                                    <FormSection title={`Pedidos Vinculados (${ordersList.length})`} hasSeparator>
                                                         {ordersList.length === 1 ? (
                                                             <ListItem
                                                                 title={`${ordersList[0].customer_name || "Cliente"} • ${ordersList[0].total_amount ? formatCurrency(ordersList[0].total_amount) : ""}`}
@@ -631,6 +711,11 @@ export default function DeliveryAssignmentDetail({
 
                                             {/* RIGHT SIDEBAR COLUMN with divider */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
+                                                {/* Order Instructions */}
+                                                {assignment.notes && (
+                                                    <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
+                                                )}
+
                                                 <SidebarCard title="Remuneração & Valores">
                                                     <InfoCard
                                                         title="Sua Taxa de Entrega (Total)"
@@ -668,7 +753,7 @@ export default function DeliveryAssignmentDetail({
                                                                     Recebimento em dinheiro confirmado
                                                                 </div>
                                                             ) : (
-                                                                <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full text-xs font-bold">
+                                                                <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full">
                                                                     Confirmar Recebimento em Dinheiro
                                                                 </Button>
                                                             )}
@@ -683,71 +768,147 @@ export default function DeliveryAssignmentDetail({
                                 {activeTab === "itens" && (
                                     <FadeIn key="itens" className="block">
                                         <FormSection title={`Itens do Pedido (${items.length})`}>
-                                            {items.length > 0 ? (
-                                                <>
-                                                    <div className="w-full overflow-hidden rounded-xl">
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full text-left border-separate border-spacing-0 min-w-[600px]">
-                                                                <thead>
-                                                                    <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                                        <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Item</th>
-                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24">Qtd.</th>
-                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-36">Preço Unit.</th>
-                                                                        <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-right w-36 rounded-r-lg">Total</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {paginatedItems.map((it: any, idx: number) => {
+                                            {items.length === 0 ? (
+                                                <div className="py-12 flex flex-col items-center justify-center text-center">
+                                                    <IconPlaceholder
+                                                        icon={BoxIcon}
+                                                        title="Nenhum item detalhado"
+                                                        subtitle="Os itens individuais não foram especificados para este pedido."
+                                                    />
+                                                </div>
+                                            ) : ordersList.length > 1 ? (
+                                                <div className="space-y-4">
+                                                    {ordersList.map((order: any, oIdx: number) => {
+                                                        const orderItems = order.items || []
+                                                        return (
+                                                            <Accordion
+                                                                key={order.order_id || oIdx}
+                                                                title={
+                                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                        Parada {oIdx + 1}: Pedido #{order.order_number || String(order.order_id).slice(0, 8)} – {order.customer_name || "Cliente"} ({orderItems.length} {orderItems.length === 1 ? "item" : "itens"} • {formatCurrency(order.total_amount || 0)})
+                                                                    </span>
+                                                                }
+                                                                defaultOpen={oIdx === 0}
+                                                            >
+                                                                <div className="divide-y divide-brand-border dark:divide-dark-border pt-2">
+                                                                    {orderItems.map((it: any, idx: number) => {
+                                                                        const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
+                                                                        const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
                                                                         const qty = Number(it.quantity || 1)
+                                                                        const unit = it.unit || it.products?.unit || "un"
                                                                         const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
                                                                         const total = Number(it.subtotal || unitPrice * qty)
-                                                                        const itemSku = it.sku || it.product_variants?.sku || it.products?.sku || null
-                                                                        const unit = it.unit || it.products?.unit || "un"
 
                                                                         return (
-                                                                            <tr key={idx} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
-                                                                                <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
-                                                                                    <div className="font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                        {it.name || it.product_name || "Item"}
+                                                                            <div key={it.id || idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                                                                                <div className="flex items-center gap-4 min-w-0">
+                                                                                    <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                                        <img
+                                                                                            src={itemImg}
+                                                                                            alt={it.name || it.product_name || "Produto"}
+                                                                                            className="w-full h-full object-cover"
+                                                                                            onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                                        />
                                                                                     </div>
-                                                                                    {itemSku && itemSku !== "N/A" && (
-                                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mt-0.5">
-                                                                                            SKU: {itemSku}
+                                                                                    <div className="min-w-0">
+                                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                            {it.name || it.product_name || "Produto sem nome"}
+                                                                                        </h4>
+                                                                                        {itemSku && (
+                                                                                            <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
+                                                                                                SKU: {itemSku}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
+                                                                                            <span>{formatQuantityWithUnit(qty, unit)}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="text-right shrink-0">
+                                                                                    <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                                        {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
+                                                                                    </div>
+                                                                                    {qty > 1 && unitPrice > 0 && (
+                                                                                        <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                                            {formatUnitPriceWithUnit(unitPrice, unit)}
                                                                                         </div>
                                                                                     )}
-                                                                                </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-center font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                    {formatQuantityWithUnit(qty, unit)}
-                                                                                </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                    {unitPrice > 0 ? formatCurrency(unitPrice) : "-"}
-                                                                                </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border text-right font-bold text-[13px] text-brand-dark dark:text-dark-heading">
-                                                                                    {total > 0 ? formatCurrency(total) : "-"}
-                                                                                </td>
-                                                                            </tr>
+                                                                                </div>
+                                                                            </div>
                                                                         )
                                                                     })}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
+                                                                </div>
+                                                            </Accordion>
+                                                        )
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <div className="divide-y divide-brand-border dark:divide-dark-border">
+                                                        {paginatedItems.map((it: any, idx: number) => {
+                                                            const itemImg = getR2ImageUrl(it.product_variants?.variant_options?.image || it.products?.images || it.images || it.image_url || it.image || null, "thumbnail")
+                                                            const itemSku = it.product_variants?.sku || it.products?.sku || it.sku || (it.sku !== "N/A" ? it.sku : null)
+                                                            const qty = Number(it.quantity || 1)
+                                                            const unit = it.unit || it.products?.unit || "un"
+                                                            const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
+                                                            const total = Number(it.subtotal || unitPrice * qty)
+
+                                                            return (
+                                                                <div key={it.id || idx} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
+                                                                    <div className="flex items-center gap-4 min-w-0">
+                                                                        <div className="w-12 h-12 shrink-0 rounded-full overflow-hidden bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center">
+                                                                            <img
+                                                                                src={itemImg}
+                                                                                alt={it.name || it.product_name || "Produto"}
+                                                                                className="w-full h-full object-cover"
+                                                                                onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="min-w-0">
+                                                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                {it.name || it.product_name || "Produto sem nome"}
+                                                                            </h4>
+                                                                            {itemSku && (
+                                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase">
+                                                                                SKU: {itemSku}
+                                                                                </div>
+                                                                            )}
+                                                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-2 mt-0.5">
+                                                                                <span>{formatQuantityWithUnit(qty, unit)}</span>
+                                                                                {it.order_number && (
+                                                                                    <span>• Pedido #{it.order_number}</span>
+                                                                                )}
+                                                                                {it.customer_name && (
+                                                                                    <span>• {it.customer_name}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-right shrink-0">
+                                                                        <div className="font-bold text-sm text-brand-dark dark:text-dark-heading">
+                                                                            {total > 0 ? formatCurrency(total) : (unitPrice > 0 ? formatCurrency(unitPrice * qty) : "-")}
+                                                                        </div>
+                                                                        {qty > 1 && unitPrice > 0 && (
+                                                                            <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                                {formatUnitPriceWithUnit(unitPrice, unit)}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
                                                     </div>
 
                                                     {totalItemPages > 1 && (
-                                                        <div className="pt-4">
-                                                            <Pagination currentPage={itemsPage} totalPages={totalItemPages} onPageChange={setItemsPage} />
+                                                        <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                                                            <Pagination
+                                                                currentPage={itemsPage}
+                                                                totalPages={totalItemPages}
+                                                                onPageChange={setItemsPage}
+                                                            />
                                                         </div>
                                                     )}
-
-                                                    <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-4 mt-4">
-                                                        <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Total do Pedido</span>
-                                                        <span className="text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(assignment.total_amount || 0)}
-                                                        </span>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <p className="text-xs text-brand-inactive-text">Nenhum item listado.</p>
+                                                </div>
                                             )}
                                         </FormSection>
                                     </FadeIn>
@@ -755,336 +916,297 @@ export default function DeliveryAssignmentDetail({
 
                                 {activeTab === "historico" && (
                                     <FadeIn key="historico" className="block">
-                                        <HistoryTimeline
-                                            entries={historyEntries}
-                                            emptyMessage="Nenhum registro de histórico encontrado para esta entrega."
-                                        />
-                                        {isTerminalFailed && (
-                                            <div className="mt-4 rounded-xl bg-red-50/70 p-4 border border-red-200/60 dark:bg-red-950/20 dark:border-red-900/40 text-xs">
-                                                <span className="font-bold text-red-800 dark:text-red-300">
-                                                    {assignment.status === "failed" ? "Falha registrada" : "Entrega cancelada"}:
-                                                </span>
-                                                <p className="mt-1 text-red-700/80 dark:text-red-400">{assignment.failure_reason || "Não informado."}</p>
-                                            </div>
-                                        )}
+                                        <div className="space-y-6">
+                                            <HistoryTimeline entries={historyEntries} />
+                                        </div>
                                     </FadeIn>
                                 )}
                             </AnimatePresence>
                         </div>
                     </div>
-
-                    {/* Mobile Bottom Action Bar */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                        {["assigned", "accepted", "picked_up", "out_for_delivery"].includes(assignment.status) ? (
-                            <>
-                                <Button variant="outlinered" onClick={() => setFailureOpen(true)} disabled={loading} className="flex-1 h-12">
-                                    Informar Falha
-                                </Button>
-                                <Button onClick={advance} disabled={loading} isLoading={loading} className="flex-1 h-12">
-                                    {NEXT_STATUS[assignment.status]?.shortLabel || "Avançar"}
-                                </Button>
-                            </>
-                        ) : (
-                            <Button variant="outline" onClick={handleBackClick} className="flex-1 h-12">
-                                Voltar para entregas
-                            </Button>
-                        )}
-                    </div>
                 </Tabs>
 
-                {/* MODAL REPORT FAILURE */}
+                {/* Report Failure Modal */}
                 <DefaultModal
                     isOpen={failureOpen}
                     onClose={() => setFailureOpen(false)}
-                    title="Informar Problema na Entrega"
+                    title="Informar Falha na Entrega"
                     maxWidth="md"
                     footer={
-                        <div className="flex items-center justify-end gap-2 w-full">
-                            <Button variant="outline" onClick={() => setFailureOpen(false)} disabled={loading}>Cancelar</Button>
-                            <Button variant="destructive" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => setFailureOpen(false)}>Cancelar</Button>
+                            <Button variant="outlinered" onClick={reportFailure} disabled={loading || !failureReason.trim()} isLoading={loading}>
                                 Confirmar Falha
                             </Button>
                         </div>
                     }
                 >
-                    <div className="space-y-4 py-2">
-                        <p className="text-xs text-brand-inactive-text">
-                            Descreva com detalhes o que aconteceu para que o lojista e a plataforma possam dar andamento.
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Informe o motivo pelo qual a entrega não pôde ser concluída (ex: endereço incorreto, cliente ausente, problema com o veículo).
                         </p>
                         <textarea
                             value={failureReason}
                             onChange={(e) => setFailureReason(e.target.value)}
-                            placeholder="Ex: Cliente ausente no endereço, endereço incorreto, veículo quebrou..."
-                            className="w-full min-h-[110px] rounded-xl border border-brand-border bg-white p-3 text-sm text-brand-dark outline-none focus:border-brand-green dark:border-dark-border dark:bg-dark-surface dark:text-white"
+                            placeholder="Descreva o motivo da falha..."
+                            className="w-full h-28 p-3 text-sm rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface focus:outline-none focus:ring-2 focus:ring-brand-green/20"
                         />
                     </div>
                 </DefaultModal>
 
-                <BottomSheet
-                    isOpen={isStepsSheetOpen}
-                    onClose={() => setIsStepsSheetOpen(false)}
-                    title="Status da Entrega"
-                >
-                    <div className="space-y-0 my-4 px-2">
-                        {timelineSteps.map((step, idx) => (
-                            <div key={idx} className="relative pl-6 pb-6 border-l-2 border-brand-border dark:border-dark-border last:border-l-transparent">
-                                <div className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 z-10 transition-colors duration-300 flex items-center justify-center ${step.active ? (step.failed ? "bg-brand-red border-brand-red" : "bg-brand-dark dark:bg-dark-heading border-brand-dark dark:border-dark-heading") : "bg-white dark:bg-dark-surface border-gray-300 dark:border-dark-border"}`}>
-                                    {step.active && <div className="w-1.5 h-1.5 bg-white dark:bg-dark-surface rounded-full" />}
-                                </div>
-                                <div className="flex flex-col text-left">
-                                    <span className={`text-sm font-semibold ${step.active ? (step.failed ? "text-brand-red" : "text-brand-dark dark:text-dark-heading") : "text-gray-400 dark:text-dark-body"}`}>
-                                        {step.label}
-                                    </span>
-                                    {step.date ? (
-                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                            {step.date} às {step.time}
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-gray-300 dark:text-dark-body/50 mt-0.5">-</span>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </BottomSheet>
-
-                <BottomSheet
-                    isOpen={isOrdersSheetOpen}
-                    onClose={() => setIsOrdersSheetOpen(false)}
-                    title="Pedidos Vinculados"
-                >
-                    <div className="space-y-4 my-4 px-2">
-                        {ordersList.map((order: any, idx: number) => {
-                            const isOrderDelivered = orderDeliveredMap[order.order_id] || false
-                            return (
-                                <div
-                                    key={order.order_id || idx}
-                                    className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-3 cursor-pointer hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors active:scale-[0.99]"
-                                    onClick={() => { setIsOrdersSheetOpen(false); setTimeout(() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }, 200) }}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="min-w-0">
-                                            <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                                <span>Pedido #{order.order_number || String(order.order_id).slice(0, 8)}</span>
-                                                {isOrderDelivered && <Badge variant="green" className="text-[10px] px-1.5 py-0">Entregue</Badge>}
-                                            </h4>
+                {/* Mobile Stepper Sheet */}
+                <BottomSheet isOpen={isStepsSheetOpen} onClose={() => setIsStepsSheetOpen(false)}>
+                    <div className="p-6 space-y-6">
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Progresso da Entrega</h3>
+                        <div className="space-y-4">
+                            {timelineSteps.map((step, idx) => (
+                                <div key={idx} className="flex items-start gap-4">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${step.active ? (step.failed ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700") : "bg-gray-100 dark:bg-dark-border/40 text-gray-400"}`}>
+                                        {step.active ? "✓" : idx + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className={`text-sm font-semibold ${step.active ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 dark:text-dark-body"}`}>
+                                            {step.label}
+                                        </p>
+                                        {step.date && (
                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                {order.customer_name || "Cliente"} {order.total_amount ? `• ${formatCurrency(order.total_amount)}` : ""}
+                                                {step.date} às {step.time}
                                             </p>
-                                        </div>
-                                        <div className="shrink-0 flex items-center gap-2">
-                                            <Button variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setIsOrdersSheetOpen(false); setTimeout(() => { setSelectedOrderForDetail(order); setIsOrderDetailSheetOpen(true) }, 200) }}>Detalhes</Button>
-                                        </div>
+                                        )}
                                     </div>
-                                    {order.delivery_address && (
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1">
-                                            <MapPinIcon size={12} className="shrink-0 text-purple-500 mt-0.5" />
-                                            <span>{order.delivery_address}</span>
-                                        </p>
-                                    )}
-                                    {order.notes && (
-                                        <p className="text-xs text-amber-700 dark:text-amber-300">
-                                            <strong>Obs:</strong> {order.notes}
-                                        </p>
-                                    )}
                                 </div>
-                            )
-                        })}
+                            ))}
+                        </div>
                     </div>
                 </BottomSheet>
 
-                {/* ORDER DETAIL SHEET */}
-                <BottomSheet
-                    isOpen={isOrderDetailSheetOpen}
-                    onClose={() => { setIsOrderDetailSheetOpen(false); setSelectedOrderForDetail(null) }}
-                    title={selectedOrderForDetail ? `Pedido #${selectedOrderForDetail.order_number || String(selectedOrderForDetail.order_id).slice(0, 8)}` : "Detalhes do Pedido"}
-                >
-                    {selectedOrderForDetail && (() => {
-                        const ord = selectedOrderForDetail
-                        const ordItems = ord.items || []
-                        const ordTotal = Number(ord.total_amount || 0)
-                        const ordDeliveryFee = Number(ord.delivery_fee || 0)
-                        const ordPaymentMethod = ord.payment_method || ""
-                        const ordPaymentStatus = ord.payment_status || ""
-                        const isCash = /dinheiro|cash|money|especie/i.test(String(ordPaymentMethod))
-                        const isOrderDelivered = orderDeliveredMap[ord.order_id] || false
-                        const canMarkDelivered = ["picked_up", "out_for_delivery"].includes(assignment.status) && !isOrderDelivered && ordersList.length > 1
-                        const ordCustMaps = ord.delivery_address
-                            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ord.delivery_address)}`
-                            : null
-                        const ordCustWaze = ord.delivery_address
-                            ? `https://waze.com/ul?q=${encodeURIComponent(ord.delivery_address)}`
-                            : null
-                        const cleanCustPhone = (ord.customer_phone || "").replace(/\D/g, "")
+                {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
+                {(() => {
+                    const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
+                    const handleClose = () => {
+                        setIsOrderDetailSheetOpen(false)
+                        setSelectedOrderForDetail(null)
+                    }
 
-                        return (
-                            <div className="space-y-5 my-4 px-2">
-                                {/* Customer & Address */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="min-w-0">
-                                            <h4 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                {ord.customer_name || "Cliente"}
-                                            </h4>
-                                            {ord.delivery_address && (
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-start gap-1 mt-1">
-                                                    <MapPinIcon size={14} className="shrink-0 text-purple-500 mt-0.5" />
-                                                    <span>{ord.delivery_address}</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                        {isOrderDelivered && <Badge variant="green">Entregue</Badge>}
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {ordCustMaps && (
-                                            <Button variant="outline" size="sm" onClick={() => window.open(ordCustMaps, "_blank")} className="text-xs">
-                                                <MapPinIcon size={14} /> Maps
-                                            </Button>
-                                        )}
-                                        {ordCustWaze && (
-                                            <Button variant="outline" size="sm" onClick={() => window.open(ordCustWaze, "_blank")} className="text-xs">
-                                                <TruckIcon size={14} /> Waze
-                                            </Button>
-                                        )}
-                                        {cleanCustPhone && (
-                                            <Button variant="outline" size="sm" onClick={() => window.open(`tel:${cleanCustPhone}`, "_self")} className="text-xs">
-                                                <PhoneIcon size={14} /> Ligar
-                                            </Button>
-                                        )}
-                                        {cleanCustPhone && (
-                                            <Button variant="outline" size="sm" onClick={() => window.open(`https://wa.me/55${cleanCustPhone}`, "_blank")} className="text-xs">
-                                                <WhatsappIcon size={14} /> WhatsApp
-                                            </Button>
-                                        )}
-                                    </div>
+                    if (!selectedOrderForDetail) return null
+                    const order = selectedOrderForDetail
+                    const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
+                    const isOrderDelivered = orderDeliveredMap[order.order_id] || false
+                    const canMarkDelivered = assignment.status === "out_for_delivery" && !isOrderDelivered
+                    const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
+                    const deliveryMeta = getDeliveryStatusMeta(isOrderDelivered ? "delivered" : (assignment.status === "out_for_delivery" ? "sent" : assignment.status))
+                    const ordItems = order.items || []
+
+                    const sheetContent = (
+                        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                                <div>
+                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
                                 </div>
+                                <Button variant="filled" onClick={handleClose} size="icon">
+                                    <XIcon className="h-5 w-5" />
+                                </Button>
+                            </header>
 
-                                {/* Notes */}
-                                {ord.notes && (
-                                    <InfoCard title="Observações" message={ord.notes} color="orange" />
-                                )}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
+                                <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                        <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                            Dados Gerais
+                                        </TabsTrigger>
+                                        <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                            Itens do Pedido ({ordItems.length})
+                                        </TabsTrigger>
+                                    </TabsList>
 
-                                {/* Payment Info */}
-                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-3">
-                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Pagamento</h4>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Pedido:</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(ordTotal)}</span>
-                                        </div>
-                                        {ordDeliveryFee > 0 && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-brand-inactive-text dark:text-dark-body">Taxa de Entrega:</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(ordDeliveryFee)}</span>
+                                    <div className="flex-1 overflow-y-auto space-y-6">
+                                        <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                        {formatCurrency(order.total_amount || 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(order.delivery_fee || 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                        {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
+                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
+                                                        {deliveryMeta.label}
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                        {order.created_at ? formatDateTime(order.created_at) : (assignment.assigned_at ? formatDateTime(assignment.assigned_at) : "-")}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )}
-                                        {ordPaymentMethod && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-brand-inactive-text dark:text-dark-body">Forma de Pagamento:</span>
-                                                <span className="font-semibold text-brand-dark dark:text-dark-heading">
-                                                    {formatPaymentMethodLabel(ordPaymentMethod, null) || ordPaymentMethod}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {ordPaymentStatus && (
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-brand-inactive-text dark:text-dark-body">Status do Pagamento:</span>
-                                                <Badge variant={getPaymentStatusMeta(ordPaymentStatus).variant}>
-                                                    {getPaymentStatusMeta(ordPaymentStatus).label}
-                                                </Badge>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {isCash && (
-                                        <div className="pt-3 border-t border-brand-border dark:border-dark-border">
-                                            {assignment.payment_confirmed_at ? (
-                                                <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                    Recebimento confirmado
+
+                                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                                            <CustomerCard
+                                                customer={{
+                                                    name: order.customer_name || "Cliente",
+                                                    phone: order.customer_phone || "",
+                                                    email: order.customer_email || "",
+                                                }}
+                                                address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                                showMap={false}
+                                                chrome="minimal"
+                                            />
+
+                                            {order.notes && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
+                                                    <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
+                                                        {order.notes}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Action to deliver single order when in route */}
+                                            {canMarkDelivered && (
+                                                <div className="pt-2">
+                                                    <Button
+                                                        variant="default"
+                                                        className="w-full h-12 text-sm font-bold"
+                                                        disabled={orderDetailLoading}
+                                                        isLoading={orderDetailLoading}
+                                                        onClick={async () => {
+                                                            setOrderDetailLoading(true)
+                                                            const res = await markSingleOrderDeliveredAction({
+                                                                assignmentId: assignment.assignment_id,
+                                                                orderId: order.order_id,
+                                                            })
+                                                            setOrderDetailLoading(false)
+                                                            if (!res.success) {
+                                                                toast.error(res.error || "Não foi possível marcar como entregue.")
+                                                                return
+                                                            }
+                                                            setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
+                                                            toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue com sucesso!`)
+                                                            const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
+                                                            if (allDone) {
+                                                                setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
+                                                            }
+                                                        }}
+                                                    >
+                                                        <CheckCircleIcon size={18} className="mr-2" />
+                                                        Confirmar Entrega deste Pedido
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {isOrderDelivered && (
+                                                <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                    <CheckCircleIcon size={16} className="inline mr-1" />
+                                                    Este pedido já foi entregue ao cliente
+                                                </div>
+                                            )}
+                                        </TabsContent>
+
+                                        <TabsContent value="itens" className="mt-0">
+                                            {ordItems.length === 0 ? (
+                                                <div className="flex items-center justify-center py-8">
+                                                    <IconPlaceholder
+                                                        icon={BoxIcon}
+                                                        title="Sem itens por aqui"
+                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                    />
                                                 </div>
                                             ) : (
-                                                <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full text-xs font-bold">
-                                                    Confirmar Recebimento em Dinheiro
-                                                </Button>
+                                                <div className="space-y-4">
+                                                    {ordItems.map((item: any, idx: number) => {
+                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
+                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
+                                                        const itemUnit = item.products?.unit || item.unit || "un"
+                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                        const itemQty = Number(item.quantity || 1)
+                                                        const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
+
+                                                        return (
+                                                            <div key={item.id || idx} className="flex items-start gap-4">
+                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={itemImage}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.name || item.product_name || "Produto sem nome"}
+                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            {item.name || item.product_name || "Produto sem nome"}
+                                                                        </h4>
+                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(itemSubtotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                    {itemSku && (
+                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                            SKU: {itemSku}
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                        {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
                                             )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Items */}
-                                {ordItems.length > 0 && (
-                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl p-4 space-y-3">
-                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Itens ({ordItems.length})</h4>
-                                        <div className="space-y-2">
-                                            {ordItems.map((it: any, itIdx: number) => {
-                                                const qty = Number(it.quantity || 1)
-                                                const unitPrice = Number(it.product_price || it.price || it.unit_price || 0)
-                                                const total = Number(it.subtotal || unitPrice * qty)
-                                                const unit = it.unit || it.products?.unit || "un"
-                                                return (
-                                                    <div key={itIdx} className="flex items-center justify-between py-2 border-b border-brand-border/50 dark:border-dark-border/50 last:border-b-0">
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                                {it.name || it.product_name || "Item"}
-                                                            </p>
-                                                            <p className="text-[10px] text-brand-inactive-text dark:text-dark-body">
-                                                                {formatQuantityWithUnit(qty, unit)} × {unitPrice > 0 ? formatCurrency(unitPrice) : "-"}
-                                                            </p>
-                                                        </div>
-                                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading shrink-0 ml-3">
-                                                            {total > 0 ? formatCurrency(total) : "-"}
-                                                        </span>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                        <div className="flex items-center justify-between pt-2 border-t border-brand-border dark:border-dark-border">
-                                            <span className="text-xs font-medium text-brand-inactive-text">Total</span>
-                                            <span className="text-sm font-extrabold text-brand-dark dark:text-dark-heading">{formatCurrency(ordTotal)}</span>
-                                        </div>
+                                        </TabsContent>
                                     </div>
-                                )}
-
-                                {/* Mark as Delivered Action */}
-                                {canMarkDelivered && (
-                                    <Button
-                                        variant="default"
-                                        className="w-full h-12 text-sm font-bold"
-                                        disabled={orderDetailLoading}
-                                        isLoading={orderDetailLoading}
-                                        onClick={async () => {
-                                            setOrderDetailLoading(true)
-                                            const res = await markSingleOrderDeliveredAction({
-                                                assignmentId: assignment.assignment_id,
-                                                orderId: ord.order_id,
-                                            })
-                                            setOrderDetailLoading(false)
-                                            if (!res.success) {
-                                                toast.error(res.error || "Não foi possível marcar como entregue.")
-                                                return
-                                            }
-                                            setOrderDeliveredMap(prev => ({ ...prev, [ord.order_id]: true }))
-                                            toast.success(`Pedido #${ord.order_number || String(ord.order_id).slice(0, 8)} marcado como entregue!`)
-                                            // If all orders are now delivered, advance the whole delivery
-                                            const allDelivered = ordersList.every((o: any) => o.order_id === ord.order_id || orderDeliveredMap[o.order_id])
-                                            if (allDelivered) {
-                                                setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
-                                            }
-                                        }}
-                                    >
-                                        <CheckCircleIcon size={18} className="mr-2" />
-                                        Confirmar Entrega deste Pedido
-                                    </Button>
-                                )}
-                                {isOrderDelivered && (
-                                    <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                        <CheckCircleIcon size={16} className="inline mr-1" />
-                                        Este pedido já foi entregue ao cliente
-                                    </div>
-                                )}
+                                </Tabs>
                             </div>
-                        )
-                    })()}
-                </BottomSheet>
+
+                            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
+                                <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
+                                    Fechar
+                                </Button>
+                            </footer>
+                        </div>
+                    )
+
+                    return isMobile ? (
+                        <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                            {sheetContent}
+                        </BottomSheet>
+                    ) : (
+                        <Portal>
+                            <div
+                                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                                onClick={handleClose}
+                            >
+                                <div
+                                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {sheetContent}
+                                </div>
+                            </div>
+                        </Portal>
+                    )
+                })()}
             </div>
         </FadeIn>
     )

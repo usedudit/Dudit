@@ -212,5 +212,10 @@ export async function generateUniqueSupplierCode(supabase?: SupabaseClient): Pro
 }
 
 export async function generateQuoteNumber(supabase?: SupabaseClient): Promise<string> {
-  return generateUniqueCode("quotes", "quote_number", "ORC-", 6, supabase)
+  return generateUniqueCode("quotes", "quote_number", "ORC", 5, supabase)
 }
+
+export async function generateServiceOrderNumber(supabase?: SupabaseClient): Promise<string> {
+  return generateUniqueCode("service_orders", "order_number", "OS", 5, supabase)
+}
+

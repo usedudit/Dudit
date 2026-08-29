@@ -12,6 +12,7 @@ import {
     CalendarIcon,
 } from "@/lib/icons"
 import { Badge, Button } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { OverviewTab } from "./tabs/OverviewTab"
 import { MarketplaceDemandTab } from "./tabs/MarketplaceDemandTab"
 import { UserGrowthTab } from "./tabs/UserGrowthTab"
@@ -146,65 +147,28 @@ export default function AdminAnalyticsDashboard({
             </div>
 
             {/* Navigation Tabs Bar */}
-            <div className="flex items-center gap-2 border-b border-brand-border dark:border-dark-border overflow-x-auto pb-px scrollbar-hide">
-                <button
-                    onClick={() => setCurrentTab("overview")}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                        currentTab === "overview"
-                            ? "border-brand-green text-brand-green"
-                            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white"
-                    }`}
-                >
-                    <AnalyticsIcon size={16} /> Visão Geral
-                </button>
-
-                <button
-                    onClick={() => setCurrentTab("demanda")}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                        currentTab === "demanda"
-                            ? "border-brand-green text-brand-green"
-                            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white"
-                    }`}
-                >
-                    <SearchIcon size={16} /> Demanda & Buscas da Cidade
-                    {demandData.searchesWithoutResults > 0 && (
-                        <span className="w-2 h-2 rounded-full bg-red-500" />
-                    )}
-                </button>
-
-                <button
-                    onClick={() => setCurrentTab("usuarios")}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                        currentTab === "usuarios"
-                            ? "border-brand-green text-brand-green"
-                            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white"
-                    }`}
-                >
-                    <Users size={16} /> Usuários & Retenção
-                </button>
-
-                <button
-                    onClick={() => setCurrentTab("parceiros")}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                        currentTab === "parceiros"
-                            ? "border-brand-green text-brand-green"
-                            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white"
-                    }`}
-                >
-                    <BriefcaseIcon size={16} /> Parceiros & Planos
-                </button>
-
-                <button
-                    onClick={() => setCurrentTab("features")}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                        currentTab === "features"
-                            ? "border-brand-green text-brand-green"
-                            : "border-transparent text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-white"
-                    }`}
-                >
-                    <SparklesIcon size={16} /> Uso de Features
-                </button>
-            </div>
+            <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as TabType)}>
+                <TabsList>
+                    <TabsTrigger value="overview" icon={AnalyticsIcon}>
+                        Visão Geral
+                    </TabsTrigger>
+                    <TabsTrigger value="demanda" icon={SearchIcon}>
+                        Demanda & Buscas da Cidade
+                        {demandData.searchesWithoutResults > 0 && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 ml-1" />
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger value="usuarios" icon={Users}>
+                        Usuários & Retenção
+                    </TabsTrigger>
+                    <TabsTrigger value="parceiros" icon={BriefcaseIcon}>
+                        Parceiros & Planos
+                    </TabsTrigger>
+                    <TabsTrigger value="features" icon={SparklesIcon}>
+                        Uso de Features
+                    </TabsTrigger>
+                </TabsList>
+            </Tabs>
 
             {/* Content Area */}
             <div className={`transition-opacity duration-200 ${isPending ? "opacity-60 pointer-events-none" : "opacity-100"}`}>

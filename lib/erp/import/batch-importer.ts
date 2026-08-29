@@ -88,6 +88,36 @@ export async function executeImport(
   const mappedRows = rows.map((row) => mapRowToObject(row, mapping))
   const rawRowsObjects = rows.map((row) => mapRowToRawHeaderObject(row, headers))
 
+  // ─── Plan limit check for products & services (items) ────────────────────
+  let remainingItemsSlots: number | null = null
+  if (entityType === "products" || entityType === "services") {
+    const limitResult = await checkLimit(partnerId, "items")
+    if (!limitResult.allowed) {
+      return {
+        importId: "",
+        successRows: 0,
+        createdRows: 0,
+        updatedRows: 0,
+        errorRows: rows.length,
+        duplicateRows: 0,
+        warningRows: 0,
+        durationMs: 0,
+        errorMessage: limitResult.message || "Limite de itens do plano atingido. Faça upgrade para importar mais.",
+        failedRows: rows.map((_, i) => ({
+          rowIndex: i + 1,
+          data: rawRowsObjects[i],
+          errorMessage: limitResult.message || "Limite de itens do plano atingido.",
+        })),
+      }
+    }
+    if (limitResult.limit !== "unlimited") {
+      remainingItemsSlots = limitResult.limit - limitResult.current
+      if (remainingItemsSlots <= 0) {
+        remainingItemsSlots = 0
+      }
+    }
+  }
+
   let successRows = 0
   let createdRows = 0
   let updatedRows = 0
@@ -319,6 +349,7 @@ export async function executeImport(
         brandCache,
         duplicateStrategy,
         defaultProfitMarginPercent,
+        remainingItemsSlots,
       )
       successRows += result.success
       createdRows += result.created
@@ -337,6 +368,8 @@ export async function executeImport(
         startIndex,
         duplicateStrategy,
       )
+
+      // Customers don't have a plan limit (unlimited), so no slot tracking needed
       successRows += result.success
       createdRows += result.created
       updatedRows += result.updated
@@ -356,6 +389,7 @@ export async function executeImport(
         categoryCache,
         duplicateStrategy,
         defaultProfitMarginPercent,
+        remainingItemsSlots,
       )
       successRows += result.success
       createdRows += result.created
@@ -659,6 +693,7 @@ async function importProductBatch(
   brandCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
   defaultProfitMarginPercent: number | null = null,
+  remainingSlots: number | null = null,
 ): Promise<{
   success: number
   created: number
@@ -676,6 +711,7 @@ async function importProductBatch(
   let warnings = 0
   const failedRows: FailedRow[] = []
   let errorMessage: string | undefined = undefined
+  let newlyInsertedCount = 0
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
   const existingProductMap = new Map<string, any>()
@@ -858,6 +894,18 @@ async function importProductBatch(
         duplicates++
       }
     } else {
+      // Check plan limit before inserting new product
+      if (remainingSlots !== null && newlyInsertedCount >= remainingSlots) {
+        errors++
+        warnings++
+        failedRows.push({
+          rowIndex: rowNum,
+          data: rawRow,
+          errorMessage: "Limite de itens do plano atingido. Faça upgrade para importar mais itens.",
+        })
+        continue
+      }
+      newlyInsertedCount++
       toInsert.push(productData)
       toInsertMetadata.push({ fiscal, logistics, variants: parsedVariants })
     }
@@ -876,6 +924,10 @@ async function importProductBatch(
       errorMessage = error.message
     } else {
       created += inserted?.length ?? 0
+
+      if (inserted && inserted.length > 0) {
+        await increment_usage_counter(partnerId, "products_count", inserted.length)
+      }
 
       // Insert fiscal & logistics profiles and variants
       const fiscalToInsert: any[] = []
@@ -1220,6 +1272,7 @@ async function importServiceBatch(
   categoryCache: Map<string, string>,
   duplicateStrategy: "skip" | "update",
   defaultProfitMarginPercent: number | null = null,
+  remainingSlots: number | null = null,
 ): Promise<{
   success: number
   created: number
@@ -1237,6 +1290,7 @@ async function importServiceBatch(
   let warnings = 0
   const failedRows: FailedRow[] = []
   let errorMessage: string | undefined = undefined
+  let newlyInsertedCount = 0
 
   const skus = batch.map((r) => r["sku"]?.trim()).filter(Boolean) as string[]
   const existingServiceMap = new Map<string, any>()
@@ -1341,6 +1395,18 @@ async function importServiceBatch(
         duplicates++
       }
     } else {
+      // Check plan limit before inserting new service
+      if (remainingSlots !== null && newlyInsertedCount >= remainingSlots) {
+        errors++
+        warnings++
+        failedRows.push({
+          rowIndex: rowNum,
+          data: rawRow,
+          errorMessage: "Limite de itens do plano atingido. Faça upgrade para importar mais itens.",
+        })
+        continue
+      }
+      newlyInsertedCount++
       toInsert.push(serviceData)
     }
   }
@@ -1358,6 +1424,10 @@ async function importServiceBatch(
       errorMessage = error.message
     } else {
       created += inserted?.length ?? 0
+
+      if (inserted && inserted.length > 0) {
+        await increment_usage_counter(partnerId, "products_count", inserted.length)
+      }
     }
   }
 

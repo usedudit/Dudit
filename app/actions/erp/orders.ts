@@ -35,6 +35,8 @@ import { buildNotificationContent } from "@/lib/notifications/templates"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 export type ERPItemPayload = {
     productId?: string | null
@@ -692,9 +694,12 @@ async function validateERPItemsStock(params: {
         quantity: number
         allowSellWithoutStock?: boolean | null
     }>
+    salesSettings?: SalesSettings | null
 }) {
+    const isGlobalNegativeStockAllowed = params.salesSettings?.allowNegativeStock !== false
+
     const stockItems = params.items.filter(
-        (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId && !item.allowSellWithoutStock
+        (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId && (!item.allowSellWithoutStock || !isGlobalNegativeStockAllowed)
     )
 
     const productIds = Array.from(new Set(stockItems.map((item) => item.productId).filter(Boolean))) as string[]
@@ -764,6 +769,7 @@ async function validateERPItemsStock(params: {
         productId: string
         variantId?: string | null
         displayName: string
+        allowSellWithoutStock?: boolean | null
     }>()
 
     for (const item of stockItems) {
@@ -774,6 +780,7 @@ async function validateERPItemsStock(params: {
         const existing = requestedMap.get(key)
         if (existing) {
             existing.quantity += Number(item.quantity || 0)
+            existing.allowSellWithoutStock = existing.allowSellWithoutStock || item.allowSellWithoutStock
             continue
         }
 
@@ -784,6 +791,7 @@ async function validateERPItemsStock(params: {
             productId: item.productId,
             variantId: item.variantId || null,
             displayName: variantInfo ? `${productInfo?.name || "Produto"} - ${variantInfo.name}` : (productInfo?.name || item.customName || "Produto"),
+            allowSellWithoutStock: item.allowSellWithoutStock,
         })
     }
 
@@ -793,7 +801,11 @@ async function validateERPItemsStock(params: {
             return "Um dos produtos do pedido não foi encontrado para validar o estoque."
         }
 
+        // Product specific exemption: always allows selling without stock if enabled individually on product
         if (productInfo.allowSellWithoutStock) continue
+
+        // If global negative stock is enabled and item was marked as allowSellWithoutStock, bypass
+        if (isGlobalNegativeStockAllowed && request.allowSellWithoutStock) continue
 
         const availableStock = request.variantId
             ? variantMap.get(request.variantId)?.stock
@@ -804,6 +816,9 @@ async function validateERPItemsStock(params: {
         }
 
         if (request.quantity > availableStock) {
+            if (!isGlobalNegativeStockAllowed) {
+                return `O produto "${request.displayName}" não possui estoque suficiente (${availableStock} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
+            }
             return `A quantidade de "${request.displayName}" está maior que o estoque disponível.`
         }
     }
@@ -1666,14 +1681,35 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         .eq("partner_id", partnerId)
         .limit(1)
         .maybeSingle() : Promise.resolve({ data: null })
+    const partnerRowPromise = supabase
+        .from("partners")
+        .select("business_info")
+        .eq("id", partnerId)
+        .single()
+
+    const [{ data: financeAccount }, { data: partnerRow }] = await Promise.all([
+        financeAccountPromise,
+        partnerRowPromise,
+    ])
+
+    const partnerInfo = normalizeBusinessInfo(partnerRow?.business_info)
+    const salesSettings: SalesSettings = {
+        ...DEFAULT_SALES_SETTINGS,
+        ...((partnerInfo as any)?.salesSettings || {}),
+    }
+
+    if (salesSettings.requireSeller && !data.sellerPartnerUserId) {
+        return { error: "É obrigatório selecionar um vendedor para concluir a venda." }
+    }
+
     const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({
         supabase,
         partnerId,
         items: sanitizedItems,
+        salesSettings,
     }) : null
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
-    const { data: financeAccount } = await financeAccountPromise
     if (capabilities.hasFinancial && data.financeAccountId && !financeAccount?.id) {
         return { error: "Conta de recebimento inválida para esta venda." }
     }
@@ -1770,6 +1806,17 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
     couponDiscountAmount = pricingResult.couponDiscountAmount
     const serverComputedTotal = pricingResult.finalTotal
     const serverShippingCost = pricingResult.shipping
+
+    if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+        const subtotal = Math.max(0, Number(data.subtotal || 0))
+        const totalDiscount = Math.max(0, Number(data.discountValue || 0)) + couponDiscountAmount
+        const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
+        if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+            return {
+                error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas.`
+            }
+        }
+    }
 
     const sumExplicitAmountReceived = sanitizedPaymentBreakdown.reduce((s, e) => {
         const amtRec = Number(e.amountReceived || 0)
@@ -1877,6 +1924,11 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
             : Promise.resolve({ data: [] as any[] }),
     ])
 
+    let paymentExpiresAt: string | null = null
+    if (paymentState.situation === "pending" && salesSettings.autoCancelManualOrdersHours > 0) {
+        paymentExpiresAt = new Date(Date.now() + salesSettings.autoCancelManualOrdersHours * 60 * 60 * 1000).toISOString()
+    }
+
     const orderInsertPayload: Record<string, unknown> = {
         ...(data.id ? { id: data.id } : {}),
         partner_id: partnerId,
@@ -1915,6 +1967,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         pricing_version: pricingResult.pricingVersion,
         delivery_payer: effectiveDeliveryPayer,
         seller_commission_amount: sellerCommissionAmount,
+        ...(paymentExpiresAt ? { payment_expires_at: paymentExpiresAt } : {}),
         ...(preparationEstimate || {}),
     }
 
@@ -1932,6 +1985,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         delete (fallbackInsertPayload as any).payment_method_fee_amount
         delete (fallbackInsertPayload as any).payment_method_fixed_fee_amount
         delete (fallbackInsertPayload as any).store_credit_amount
+        delete (fallbackInsertPayload as any).payment_expires_at
         orderInsertResult = await supabase
             .from("orders")
             .insert(fallbackInsertPayload)
@@ -2465,7 +2519,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
             if (quoteByOrder) return quoteByOrder
 
             if (data.notes && data.notes.includes("orçamento")) {
-                const match = data.notes.match(/orçamento\s+(ORC-[\w-]+)/i)
+                const match = data.notes.match(/orçamento\s+(ORC-?[\w-]+)/i)
                 if (match?.[1]) {
                     const { data: quoteByNum } = await supabase
                         .from("quotes")
@@ -2752,6 +2806,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
 
+    const { data: partnerRow } = await supabase
+        .from("partners")
+        .select("business_info")
+        .eq("id", data.partnerId)
+        .single()
+    const partnerInfo = normalizeBusinessInfo(partnerRow?.business_info)
+    const salesSettings: SalesSettings = {
+        ...DEFAULT_SALES_SETTINGS,
+        ...((partnerInfo as any)?.salesSettings || {}),
+    }
+
+    if (salesSettings.requireSeller && !data.sellerPartnerUserId && !(currentOrder as any).seller_partner_user_id) {
+        return { error: "É obrigatório selecionar um vendedor para o pedido." }
+    }
+
     if (currentOrder.exchange_return_request_id && Number(data.totalAmount || 0) < (Number(currentOrder.paid_amount || 0) - 0.009)) {
         return { error: `O total do pedido (R$ ${Number(data.totalAmount || 0).toFixed(2)}) não pode ser menor que o crédito de troca aplicado (R$ ${Number(currentOrder.paid_amount || 0).toFixed(2)}).` }
     }
@@ -2872,6 +2941,17 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const giftIds = updatePricingResult.appliedGiftProductIds || []
     const giftItems = (capabilities.hasCampaigns && giftIds.length > 0) ? await buildGiftOrderItems(supabase, giftIds, filteredPromotions) : []
 
+    if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+        const subtotal = Math.max(0, Number(data.subtotal || 0))
+        const totalDiscount = Math.max(0, Number(data.discountValue || 0)) + couponDiscountAmount
+        const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
+        if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+            return {
+                error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas.`
+            }
+        }
+    }
+
     const nextItemsForDelta = [
         ...sanitizedItems,
         ...giftItems.map((item) => ({
@@ -2895,6 +2975,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         supabase,
         partnerId: data.partnerId,
         items: stockItemsToValidate,
+        salesSettings,
     }) : null
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)

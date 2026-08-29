@@ -1,5 +1,6 @@
 import type React from "react"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -31,10 +32,14 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
     avatarColor: "bg-brand-green",
   }
 
+  const cookieStore = await cookies()
+  const sidebarCookie = cookieStore.get("dudit_sidebar_state")
+  const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <NotificationsRealtimeProvider>
-        <SidebarProvider initialExpanded={true}>
+        <SidebarProvider initialExpanded={initialExpanded}>
           <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
             {isDriver && (
               <DeliverySidebar

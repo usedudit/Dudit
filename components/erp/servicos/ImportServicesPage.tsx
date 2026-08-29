@@ -747,7 +747,11 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                 <FormSection title="Estratégia para serviços existentes (mesmo SKU/Código)">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <ListItem
-                                            left={
+                                            title="Atualizar dados existentes"
+                                            description="Atualiza preços, descrições e dados de serviços já cadastrados"
+                                            onClick={() => setDuplicateStrategy("update")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "update" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategyService"
                                                     value="update"
@@ -755,13 +759,13 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                                     onChange={() => setDuplicateStrategy("update")}
                                                 />
                                             }
-                                            title="Atualizar dados existentes"
-                                            description="Atualiza preços, descrições e dados de serviços já cadastrados"
-                                            onClick={() => setDuplicateStrategy("update")}
-                                            className={duplicateStrategy === "update" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                         <ListItem
-                                            left={
+                                            title="Ignorar existentes"
+                                            description="Mantém os serviços existentes sem realizar qualquer alteração"
+                                            onClick={() => setDuplicateStrategy("skip")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "skip" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategyService"
                                                     value="skip"
@@ -769,10 +773,6 @@ export function ImportServicesPage({ partnerId }: ImportServicesPageProps) {
                                                     onChange={() => setDuplicateStrategy("skip")}
                                                 />
                                             }
-                                            title="Ignorar existentes"
-                                            description="Mantém os serviços existentes sem realizar qualquer alteração"
-                                            onClick={() => setDuplicateStrategy("skip")}
-                                            className={duplicateStrategy === "skip" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                     </div>
 

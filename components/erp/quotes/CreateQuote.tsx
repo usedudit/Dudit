@@ -1213,7 +1213,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                 <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto custom-scrollbar flex flex-col h-full">
                                     <div className="flex-1 min-h-0 flex flex-col">
                                         <QuotePreview
-                                            invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
+                                            invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
                                             quoteDate={quoteDate}
                                             expiryDate={expiryDate}
                                             selectedCustomer={selectedCustomer}
@@ -1493,7 +1493,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                             <TabsContent value="Visualização" className="flex-1 h-full overflow-y-auto custom-scrollbar mt-0 pb-20">
                                 <div className="min-h-full w-full bg-brand-gray dark:bg-dark-border/20 p-2 sm:p-4">
                                     <QuotePreview
-                                        invoiceNumber={quoteCode || (mode === 'create' ? 'ORC-0000' : 'N/A')}
+                                        invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
                                         quoteDate={quoteDate}
                                         expiryDate={expiryDate}
                                         selectedCustomer={selectedCustomer}

@@ -739,7 +739,11 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                 <FormSection title="Estratégia para clientes existentes (mesmo CPF/CNPJ ou E-mail)">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <ListItem
-                                            left={
+                                            title="Atualizar dados existentes"
+                                            description="Atualiza telefones, endereços e anotações dos clientes já cadastrados"
+                                            onClick={() => setDuplicateStrategy("update")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "update" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategyCustomer"
                                                     value="update"
@@ -747,13 +751,13 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                                     onChange={() => setDuplicateStrategy("update")}
                                                 />
                                             }
-                                            title="Atualizar dados existentes"
-                                            description="Atualiza telefones, endereços e anotações dos clientes já cadastrados"
-                                            onClick={() => setDuplicateStrategy("update")}
-                                            className={duplicateStrategy === "update" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                         <ListItem
-                                            left={
+                                            title="Ignorar existentes"
+                                            description="Mantém os clientes existentes sem realizar qualquer alteração"
+                                            onClick={() => setDuplicateStrategy("skip")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "skip" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategyCustomer"
                                                     value="skip"
@@ -761,10 +765,6 @@ export function ImportCustomersPage({ partnerId }: ImportCustomersPageProps) {
                                                     onChange={() => setDuplicateStrategy("skip")}
                                                 />
                                             }
-                                            title="Ignorar existentes"
-                                            description="Mantém os clientes existentes sem realizar qualquer alteração"
-                                            onClick={() => setDuplicateStrategy("skip")}
-                                            className={duplicateStrategy === "skip" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                     </div>
                                 </FormSection>

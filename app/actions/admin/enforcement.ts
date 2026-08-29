@@ -258,7 +258,7 @@ export async function getAdminUserDetail(userId: string): Promise<any | null> {
     // 3. Partner & Stores
     const { data: partner } = await supabase
         .from("partners")
-        .select("*, stores(*)")
+        .select("*, stores(id, name, partner_id, is_active, logo_url, banner_url, image_url, phone, description, risk_score, slug, short_id, is_headquarters, gallery, created_at, updated_at)")
         .eq("user_id", userId)
         .maybeSingle()
 
@@ -372,7 +372,7 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
                 // Fallback 2: Check if partner exists directly
                 const { data: partnerData, error: partnerDataError } = await supabase
                     .from("partners")
-                    .select("*, stores(*)")
+                    .select("*, stores(id, name, partner_id, is_active, logo_url, banner_url, image_url, phone, description, risk_score, slug, short_id, is_headquarters, gallery, created_at, updated_at)")
                     .eq("id", trimmedId)
                     .maybeSingle()
 

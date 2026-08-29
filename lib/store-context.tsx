@@ -205,6 +205,7 @@ export function StoreProvider({
   const storeChangeInFlight = useRef<string | null>(null)
 
   const selectStore = (storeId: string) => {
+    if (stores.length <= 1) return
     const store = stores.find((s) => s.id === storeId)
     if (store && selectedStore?.id !== storeId && storeChangeInFlight.current !== storeId) {
       storeChangeInFlight.current = storeId

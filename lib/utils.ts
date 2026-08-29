@@ -100,7 +100,7 @@ export function isStoreDeleted(order: any): boolean {
   }
 
   if (store) {
-    if (store.deleted_at || store.status === "deleted" || store.is_deleted || store.account_deleted || store.is_active === false) {
+    if (store.status === "deleted" || store.is_deleted || store.account_deleted || store.is_active === false) {
       return true
     }
   }

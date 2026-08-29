@@ -28,6 +28,7 @@ import {
     createFinanceAccountAction,
 } from "@/app/actions/erp/finance-accounts"
 import { normalizeBusinessInfo, isQuickMode } from "@/lib/business-info"
+import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
 import { createERPDeliveryAction, fetchDeliveryPeopleBucketAction } from "@/app/actions/erp/deliveries"
 import { assignPlatformDriverToDeliveryAction, fetchAvailablePlatformDeliveryDriversAction, syncPlatformDriverForOrderAction } from "@/app/actions/erp/delivery-driver-assignments"
 import { pickBankThenCashDefaultFinanceAccountId, type FinanceAccountType } from "@/lib/finance-utils"
@@ -256,6 +257,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const { businessInfo: contextBusinessInfo } = usePermissions()
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const salesSettings: SalesSettings = useMemo(() => ({
+        ...DEFAULT_SALES_SETTINGS,
+        ...((businessInfo as any)?.salesSettings || {}),
+    }), [businessInfo])
     const isQuick = isQuickMode(businessInfo)
 
     // --- State ---
@@ -876,14 +881,17 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
 
         for (const entry of stockMap.values()) {
-            if (entry.allowSellWithoutStock) continue
+            if (entry.allowSellWithoutStock && salesSettings.allowNegativeStock !== false) continue
             if (entry.quantity > entry.stock) {
+                if (salesSettings.allowNegativeStock === false) {
+                    return `O produto "${entry.name}" não possui estoque suficiente (${entry.stock} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
+                }
                 return `A quantidade de "${entry.name}" está maior que o estoque disponível.`
             }
         }
 
         return null
-    }, [inventoryAlreadyDeducted])
+    }, [inventoryAlreadyDeducted, salesSettings.allowNegativeStock])
 
     const proceedAddProduct = (product: any, forceBypass?: boolean) => {
         const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
@@ -922,6 +930,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setIsVariantSheetOpen(true)
         } else {
             if (!product.allow_sell_without_stock && Number(product.stock || 0) < 1) {
+                if (salesSettings.allowNegativeStock === false) {
+                    notifyError(`O produto "${product.name}" está sem estoque e as configurações da empresa não permitem vendas com estoque negativo.`)
+                    return
+                }
                 setPendingZeroStockItem({ product, callback: () => proceedAddProduct(product, true) })
                 setShowZeroStockAlert(true)
                 return
@@ -965,6 +977,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 }
 
                 if (cannotSell) {
+                    if (salesSettings.allowNegativeStock === false) {
+                        notifyError(`A variação "${variant.name}" não possui estoque suficiente (${variant.stock || 0} disponíveis) e as configurações da empresa não permitem vendas com estoque negativo.`)
+                        return
+                    }
                     setPendingZeroStockItem({
                         product: { ...selectedProductForVariant, name: `${selectedProductForVariant.name} - ${variant.name}` },
                         isVariant: true,
@@ -977,9 +993,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             }
         })
         setIsVariantSheetOpen(false)
+        setSelectedProductForVariant(null)
+        productBucket.setSearchQuery("")
     }
 
     const updateItemField = (index: number, field: string, value: any) => {
+        const targetItem = items[index]
+        if (field === "unitPrice" && targetItem && !targetItem.isManual && salesSettings.allowCustomItemPrice === false) {
+            notifyError("A alteração manual de preço unitário em itens cadastrados está desativada nas configurações de vendas.")
+            return
+        }
         const newItems = [...items]
         newItems[index][field] = value
         setItems(newItems)
@@ -1175,6 +1198,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             setShowValidationModal(true)
             return false
         }
+
+        if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+            const totalDiscount = discountAmount + effectiveCouponDiscountAmount
+            const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
+            if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.01) {
+                setActiveTab("general")
+                setValidationMessage(`O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas da empresa.`)
+                setShowValidationModal(true)
+                return false
+            }
+        }
+
         if (!financeAccountId) {
             setFieldErrors(new Set(["financeAccountId"]))
             setActiveTab("general")

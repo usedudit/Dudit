@@ -100,6 +100,84 @@ export async function getMyDeliveryAssignmentAction(assignmentId: string) {
   if (error) return { success: false as const, error: normalizeError(error, "Não foi possível carregar a entrega.") }
   if (!data) return { success: false as const, error: "Entrega não encontrada." }
 
+  // Garante que todas as paradas/pedidos vinculados ao delivery_id sejam hidratados corretamente
+  if (data?.delivery_id && (!Array.isArray(data.orders) || data.orders.length <= 1)) {
+    const { data: delOrders } = await supabase
+      .from("delivery_orders")
+      .select(`
+        order_id,
+        position,
+        orders (
+          id,
+          order_number,
+          customer_name,
+          delivery_address,
+          total_amount,
+          delivery_fee,
+          payment_method,
+          situation,
+          notes,
+          created_at,
+          buyer_id,
+          order_items (
+            id,
+            product_name,
+            quantity,
+            product_price,
+            subtotal,
+            products (id, sku, unit, images),
+            product_variants (id, sku, variant_options)
+          )
+        )
+      `)
+      .eq("delivery_id", data.delivery_id)
+      .order("position", { ascending: true })
+
+    if (delOrders && delOrders.length > 1) {
+      const buyerIds = delOrders.map((d: any) => d.orders?.buyer_id).filter(Boolean)
+      const { data: customerRows } = buyerIds.length > 0
+        ? await supabase.from("customers").select("id, name, phone, email").in("id", buyerIds)
+        : { data: [] }
+      const custMap = new Map((customerRows || []).map((c: any) => [c.id, c]))
+
+      data.orders = delOrders.map((d: any) => {
+        const ord = d.orders || {}
+        const cust = ord.buyer_id ? custMap.get(ord.buyer_id) : null
+        const rawItems = ord.order_items || []
+        return {
+          order_id: ord.id || d.order_id,
+          order_number: ord.order_number || `#${String(ord.id || d.order_id).slice(0, 8)}`,
+          position: d.position || 1,
+          customer_name: ord.customer_name || cust?.name || "Cliente",
+          customer_phone: cust?.phone || "",
+          customer_email: cust?.email || "",
+          delivery_address: ord.delivery_address || "",
+          total_amount: Number(ord.total_amount || 0),
+          delivery_fee: Number(ord.delivery_fee || 0),
+          payment_method: ord.payment_method || "",
+          payment_status: ord.situation || "Pendente",
+          notes: ord.notes || "",
+          created_at: ord.created_at || null,
+          items: rawItems.map((item: any) => ({
+            id: item.id,
+            name: item.product_name,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit_price: item.product_price,
+            price: item.product_price,
+            subtotal: item.subtotal || Number(item.quantity || 1) * Number(item.product_price || 0),
+            sku: item.product_variants?.sku || item.products?.sku || "N/A",
+            images: item.products?.images || null,
+            unit: item.products?.unit || "un",
+            product_variants: item.product_variants,
+            products: item.products,
+          })),
+        }
+      })
+      data.order_count = data.orders.length
+    }
+  }
+
   return { success: true as const, data }
 }
 

@@ -414,7 +414,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                                     <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
                                         <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
                                             <QuotePreview
-                                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                                invoiceNumber={dataQuote.quote_number || "ORC00000"}
                                                 quoteDate={dataQuote.issue_date || ""}
                                                 expiryDate={dataQuote.expiration_date || ""}
                                                 selectedCustomer={selectedCustomer}
@@ -447,7 +447,7 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
                         {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
                         <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
                             <QuotePreview
-                                invoiceNumber={dataQuote.quote_number || "ORC-0000"}
+                                invoiceNumber={dataQuote.quote_number || "ORC00000"}
                                 quoteDate={dataQuote.issue_date || ""}
                                 expiryDate={dataQuote.expiration_date || ""}
                                 selectedCustomer={selectedCustomer}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronRightIcon, XIcon, MoneyIcon, TagIcon, FileIcon, PackageIcon, StarIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { Button, AlertModal, DefaultModal, MoneyInput, PercentageInput, InfoCard, Input, IconPlaceholder, ListItem, RadioButton, Badge, FormTextarea } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
@@ -54,6 +54,8 @@ import type {
 import { FadeIn } from "@/components/animations/FadeIn"
 import { normalizePDVSearchTerm } from "@/lib/utils/pdv"
 import { CameraScannerModal } from "@/components/reusable/CameraScannerModal"
+import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 interface Props {
     partnerId: string
@@ -123,7 +125,12 @@ function DesktopPOSSheet({
 export default function POSPage({ partnerId, activeStoreId, initialData, initialActiveSession, initialPromotions, initialTeam, hasFinancial = true }: Props) {
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { planSlug, hasSpecific } = usePermissions()
+    const { planSlug, hasSpecific, businessInfo: contextBusinessInfo } = usePermissions()
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const salesSettings: SalesSettings = useMemo(() => ({
+        ...DEFAULT_SALES_SETTINGS,
+        ...((businessInfo as any)?.salesSettings || {}),
+    }), [businessInfo])
     const canDiscount = hasSpecific("pos", "can_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
     const isMobile = useMediaQuery("(max-width: 1024px)")
@@ -246,6 +253,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const [globalDiscountCouponCode, setGlobalDiscountCouponCode] = useState("")
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
     const [isCouponSheetOpen, setIsCouponSheetOpen] = useState(false)
+    const [isSellerSheetOpen, setIsSellerSheetOpen] = useState(false)
     const [isQuickProductSheetOpen, setIsQuickProductSheetOpen] = useState(false)
     const [isShippingSheetOpen, setIsShippingSheetOpen] = useState(false)
     const [isCreatingQuickProduct, setIsCreatingQuickProduct] = useState(false)
@@ -644,9 +652,14 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     itemAddons.every((ia) => selectedAddons.some((sa) => sa.optionId === ia.optionId))
                 return isSameProduct && isSameVariant && isSameAddons
             })
+            const displayName = selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name
             if (existingItem) {
                 const nextQty = existingItem.qty + normalizedQty
                 if (nextQty > availableStock && !existingItem.allowSellWithoutStock) {
+                    if (salesSettings.allowNegativeStock === false) {
+                        notifyError(`Estoque insuficiente de "${displayName}" (${availableStock} disponíveis). A empresa não permite vendas com estoque negativo.`)
+                        return
+                    }
                     setPendingZeroStockItem({
                         product: { name: existingItem.name },
                         callback: () => addToCart(product, variantId, quantity, true, selectedAddons)
@@ -655,7 +668,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                     return
                 }
             } else if (normalizedQty > availableStock) {
-                const displayName = selectedVariant?.variant_name ? `${product.name} - ${selectedVariant.variant_name}` : product.name
+                if (salesSettings.allowNegativeStock === false) {
+                    notifyError(`Estoque insuficiente de "${displayName}" (${availableStock} disponíveis). A empresa não permite vendas com estoque negativo.`)
+                    return
+                }
                 setPendingZeroStockItem({
                     product: { name: displayName },
                     callback: () => addToCart(product, variantId, quantity, true, selectedAddons)
@@ -666,7 +682,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         }
 
         proceedAddToCart(force)
-    }, [pdvPromotions, cart, notifyError])
+    }, [pdvPromotions, cart, salesSettings.allowNegativeStock, notifyError])
 
     const handleScanBarcode = useCallback(async (code: string) => {
         const cleanCode = code.trim()
@@ -1094,10 +1110,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             return
         }
 
+        if (salesSettings.requireSeller && !selectedSellerId) {
+            notifyError("Selecione o vendedor responsável antes de continuar.")
+            setIsSellerSheetOpen(true)
+            return
+        }
+
         setIsMobileSummarySheetOpen(false)
         setIsMobileItemsSheetOpen(false)
         setIsPaymentModalOpen(true)
-    }, [cart.length, notifyError])
+    }, [cart.length, salesSettings.requireSeller, selectedSellerId, notifyError])
 
     const handleConfirmVariantSelection = useCallback((
         selections: Array<{ variantId: string; qty: number }>,
@@ -1131,6 +1153,13 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     }) => {
         if (cart.length === 0) {
             return { error: "Adicione itens para finalizar." }
+        }
+
+        if (salesSettings.requireSeller && !selectedSellerId) {
+            setIsPaymentModalOpen(false)
+            setIsSellerSheetOpen(true)
+            notifyError("Selecione o vendedor responsável antes de finalizar a venda.")
+            return { error: "Vendedor obrigatório" }
         }
 
         if (isFinalizingRef.current) return { error: "A venda já está sendo processada." }
@@ -1408,8 +1437,13 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
         const available = variant ? Number(variant.stock_available || 0) : Number(product?.stock_available || 0)
 
         if (product && !product.allow_sell_without_stock && editQty > available) {
+            const itemName = editingItem.name + (editingItem.variantName ? ` - ${editingItem.variantName}` : "")
+            if (salesSettings.allowNegativeStock === false) {
+                notifyError(`Estoque insuficiente de "${itemName}" (${available} disponíveis). A empresa não permite vendas com estoque negativo.`)
+                return
+            }
             setPendingZeroStockItem({
-                product: { name: editingItem.name + (editingItem.variantName ? ` - ${editingItem.variantName}` : "") },
+                product: { name: itemName },
                 callback: () => {
                     setCart((prev) => prev.map((item) => {
                         if (item.id !== editingItem.id) return item
@@ -1742,7 +1776,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                                 <div key={product.id} className="rounded-xl border border-brand-border bg-white p-3 text-left transition-all dark:bg-dark-surface">
                                                     <div className="relative mb-2 aspect-square overflow-hidden rounded-2xl">
                                                         <img
-                                                            src={getR2ImageUrl(product.images?.[0] || null, "thumbnail")}
+                                                            src={getPrimaryProductDisplayImage(product, "thumbnail")}
                                                             alt={product.name}
                                                             className="h-full w-full object-cover bg-brand-gray dark:bg-dark-border/50"
                                                         />
@@ -2136,6 +2170,16 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                         onConfirm={handleConfirmVariantSelection}
                     />
 
+                    <SelectSellerSheet
+                        isOpen={isSellerSheetOpen}
+                        onClose={() => setIsSellerSheetOpen(false)}
+                        onSelect={(seller) => {
+                            setSelectedSellerId(seller.id)
+                            setIsSellerSheetOpen(false)
+                        }}
+                        selectedSellerId={selectedSellerId}
+                    />
+
                     {itemToRemoveId && (
                         <AlertModal
                             isOpen={!!itemToRemoveId}
@@ -2188,12 +2232,18 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-1">
                                     <MoneyInput
                                         label="Valor unitário"
                                         value={editPrice}
                                         onChange={(value: number) => setEditPrice(value)}
+                                        disabled={salesSettings.allowCustomItemPrice === false}
                                     />
+                                    {salesSettings.allowCustomItemPrice === false && (
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            A alteração manual de preço unitário está desativada nas configurações de vendas.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -2214,9 +2264,25 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                         setIsCouponSheetOpen(true)
                                         return
                                     }
-                                    if (globalDiscountType === "fixed" && globalDiscountValue > subtotal) {
-                                        notifyError("O desconto não pode ser maior que o valor total do pedido.")
-                                        return
+                                    if (globalDiscountType === "fixed") {
+                                        if (globalDiscountValue > subtotal) {
+                                            notifyError("O desconto não pode ser maior que o valor total do pedido.")
+                                            return
+                                        }
+                                        if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100 && subtotal > 0) {
+                                            const effectivePercent = (globalDiscountValue / subtotal) * 100
+                                            if (effectivePercent > salesSettings.maxDiscountPercent + 0.01) {
+                                                notifyError(`O desconto máximo permitido é de ${salesSettings.maxDiscountPercent}% (${formatCurrency((subtotal * salesSettings.maxDiscountPercent) / 100)}).`)
+                                                return
+                                            }
+                                        }
+                                    } else if (globalDiscountType === "percentage") {
+                                        if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+                                            if (globalDiscountValue > salesSettings.maxDiscountPercent) {
+                                                notifyError(`O desconto máximo permitido é de ${salesSettings.maxDiscountPercent}%.`)
+                                                return
+                                            }
+                                        }
                                     }
                                     setDiscountType(globalDiscountType)
                                     setDiscountAmount(globalDiscountValue)
@@ -2557,7 +2623,7 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                         >
                                             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-brand-border bg-white dark:border-dark-border">
                                                 <img
-                                                    src={getR2ImageUrl((gift as any).images?.[0] || null, "thumbnail")}
+                                                    src={getPrimaryProductDisplayImage(gift, "thumbnail")}
                                                     alt={gift.name}
                                                     className="h-full w-full object-cover"
                                                 />

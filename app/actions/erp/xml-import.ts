@@ -1155,12 +1155,15 @@ export async function confirmImportAction(
     }
 
     if (!result.success) {
-      const errorMessages = result.errors?.length > 0
-        ? result.errors.map((e: any) => e.error).filter(Boolean).join("; ")
-        : "Erro desconhecido na importação"
+      console.error("execute_xml_import retornou erro:", JSON.stringify(result))
+      const errorMessages = result.error
+        ? String(result.error)
+        : result.errors?.length > 0
+          ? result.errors.map((e: any) => e.error).filter(Boolean).join("; ")
+          : "Erro desconhecido na importação"
       return {
         success: false,
-        error: errorMessages,
+        error: friendlyError(errorMessages),
         imported: result.imported || 0,
         skipped: result.skipped || 0,
         errors: result.errors?.length > 0 ? result.errors.map((e: any) => e.error) : undefined,

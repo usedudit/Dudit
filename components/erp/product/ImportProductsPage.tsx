@@ -723,7 +723,11 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                 <FormSection title="Estratégia para produtos existentes (mesmo SKU)">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <ListItem
-                                            left={
+                                            title="Atualizar dados existentes"
+                                            description="Atualiza preços, estoques e dados de produtos já cadastrados"
+                                            onClick={() => setDuplicateStrategy("update")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "update" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategy"
                                                     value="update"
@@ -731,13 +735,13 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                                     onChange={() => setDuplicateStrategy("update")}
                                                 />
                                             }
-                                            title="Atualizar dados existentes"
-                                            description="Atualiza preços, estoques e dados de produtos já cadastrados"
-                                            onClick={() => setDuplicateStrategy("update")}
-                                            className={duplicateStrategy === "update" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                         <ListItem
-                                            left={
+                                            title="Ignorar existentes"
+                                            description="Mantém os produtos existentes sem realizar qualquer alteração"
+                                            onClick={() => setDuplicateStrategy("skip")}
+                                            className={`px-4 py-3 ${duplicateStrategy === "skip" ? "border-brand-green dark:border-brand-green" : ""}`}
+                                            right={
                                                 <RadioButton
                                                     name="duplicateStrategy"
                                                     value="skip"
@@ -745,10 +749,6 @@ export function ImportProductsPage({ partnerId }: ImportProductsPageProps) {
                                                     onChange={() => setDuplicateStrategy("skip")}
                                                 />
                                             }
-                                            title="Ignorar existentes"
-                                            description="Mantém os produtos existentes sem realizar qualquer alteração"
-                                            onClick={() => setDuplicateStrategy("skip")}
-                                            className={duplicateStrategy === "skip" ? "!border-brand-dark/40 dark:!border-white/40 shadow-xs" : ""}
                                         />
                                     </div>
 

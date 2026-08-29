@@ -5,9 +5,7 @@ export interface SalesSettings {
   allowCustomItemPrice: boolean
   quoteValidityDays: number
   autoCancelManualOrdersHours: number // 0 = never, 24, 48, 72, 168
-  onlinePixExpirationMinutes: number // 15, 30, 60, 120
   defaultReceiptFormat: "thermal" | "a4"
-  defaultProfitMarginPercent: number | null
 }
 
 export const DEFAULT_SALES_SETTINGS: SalesSettings = {
@@ -17,9 +15,7 @@ export const DEFAULT_SALES_SETTINGS: SalesSettings = {
   allowCustomItemPrice: true,
   quoteValidityDays: 15,
   autoCancelManualOrdersHours: 0, // 0 = never cancel manual orders
-  onlinePixExpirationMinutes: 30,
   defaultReceiptFormat: "thermal",
-  defaultProfitMarginPercent: null,
 }
 
 export interface ReceiptSettings {

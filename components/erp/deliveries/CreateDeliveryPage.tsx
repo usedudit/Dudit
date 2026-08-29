@@ -1041,7 +1041,7 @@ export default function CreateDeliveryPage({
                         </header>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                            <Tabs defaultValue="dados_gerais">
+                            <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
                                     <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
                                         Dados Gerais
@@ -1050,124 +1050,124 @@ export default function CreateDeliveryPage({
                                         Itens do Pedido
                                     </TabsTrigger>
                                 </TabsList>
-                            </Tabs>
 
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                                <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                                {formatCurrency(activeOrder.totalAmount || 0)}
-                                            </span>
+                                <div className="flex-1 overflow-y-auto space-y-6">
+                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                    {formatCurrency(activeOrder.totalAmount || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(activeOrder.shippingFee || activeOrder.deliveryFee || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                    {(() => {
+                                                        if (Array.isArray((activeOrder as any).paymentBreakdown) && (activeOrder as any).paymentBreakdown.length > 0) {
+                                                            return (activeOrder as any).paymentBreakdown
+                                                                .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
+                                                                .filter(Boolean)
+                                                                .join(", ") || formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
+                                                        }
+                                                        return formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
+                                                    })()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {formatCurrency(activeOrder.shippingFee || activeOrder.deliveryFee || 0)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                {(() => {
-                                                    if (Array.isArray((activeOrder as any).paymentBreakdown) && (activeOrder as any).paymentBreakdown.length > 0) {
-                                                        return (activeOrder as any).paymentBreakdown
-                                                            .map((e: any) => formatPaymentMethodLabel(e.method || e.payment_method || e.name, e.type || e.payment_type))
-                                                            .filter(Boolean)
-                                                            .join(", ") || formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
-                                                    }
-                                                    return formatPaymentMethodLabel(activeOrder.paymentMethod || (activeOrder as any).payment_method, null) || "Não informado"
-                                                })()}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{getPaymentStatusMeta(activeOrder.status || (activeOrder as any).paymentStatus).label}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e Hora</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                {activeOrder.orderDate ? formatDateTime(activeOrder.orderDate) : "-"}
-                                            </span>
-                                        </div>
-                                    </div>
 
-                                    <div className="border-t border-brand-border dark:border-dark-border w-full" />
+                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
 
-                                    <CustomerCard
-                                        customer={{
-                                            ...(activeOrder.customer || {}),
-                                            name: activeOrder.customer?.name || "Cliente",
-                                            email: activeOrder.customer?.email || "",
-                                            phone: activeOrder.customer?.phone || "",
-                                        }}
-                                        address={activeOrder.customerAddress || buildCustomerAddress(activeOrder.address)}
-                                        showMap={false}
-                                        chrome="minimal"
-                                    />
-                                </TabsContent>
+                                        <CustomerCard
+                                            customer={{
+                                                ...(activeOrder.customer || {}),
+                                                name: activeOrder.customer?.name || "Cliente",
+                                                email: activeOrder.customer?.email || "",
+                                                phone: activeOrder.customer?.phone || "",
+                                            }}
+                                            address={activeOrder.customerAddress || buildCustomerAddress(activeOrder.address)}
+                                            showMap={false}
+                                            chrome="minimal"
+                                        />
+                                    </TabsContent>
 
-                                <TabsContent value="itens" className="mt-0">
-                                    {(() => {
-                                        const filteredItems = (activeOrder.items || []).filter((item: any) => {
-                                            const pType = String(item.products?.product_type || "").toLowerCase()
-                                            return pType !== "serviço" && pType !== "servico" && pType !== "service"
-                                        })
-                                        if (filteredItems.length === 0) {
+                                    <TabsContent value="itens" className="mt-0">
+                                        {(() => {
+                                            const filteredItems = (activeOrder.items || []).filter((item: any) => {
+                                                const pType = String(item.products?.product_type || "").toLowerCase()
+                                                return pType !== "serviço" && pType !== "servico" && pType !== "service"
+                                            })
+                                            if (filteredItems.length === 0) {
+                                                return (
+                                                    <div className="flex items-center justify-center">
+                                                        <IconPlaceholder
+                                                            icon={BoxIcon}
+                                                            title="Sem itens por aqui"
+                                                            subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                        />
+                                                    </div>
+                                                )
+                                            }
                                             return (
-                                                <div className="flex items-center justify-center">
-                                                    <IconPlaceholder
-                                                        icon={BoxIcon}
-                                                        title="Sem itens por aqui"
-                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                    />
+                                                <div className="space-y-4">
+                                                    {filteredItems.map((item: any) => {
+                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
+                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
+                                                        const itemUnit = item.products?.unit || item.unit || "un"
+                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                        const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
+
+                                                        return (
+                                                            <div key={item.id} className="flex items-start gap-4">
+                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                    <img
+                                                                        src={itemImage}
+                                                                        className="w-full h-full object-cover rounded-xl"
+                                                                        alt={item.product_name || "Produto sem nome"}
+                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex justify-between items-start mb-0.5">
+                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                            {item.product_name || "Produto sem nome"}
+                                                                        </h4>
+                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                            {formatCurrency(itemSubtotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                        SKU: {itemSku}
+                                                                    </div>
+                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                        {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
                                             )
-                                        }
-                                        return (
-                                            <div className="space-y-4">
-                                                {filteredItems.map((item: any) => {
-                                                    const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || null, "thumbnail")
-                                                    const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || "N/A"
-                                                    const itemUnit = item.products?.unit || item.unit || "un"
-                                                    const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                    const itemSubtotal = Number(item.subtotal || itemPrice * Number(item.quantity || 0))
-
-                                                    return (
-                                                        <div key={item.id} className="flex items-start gap-4">
-                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                <img
-                                                                    src={itemImage}
-                                                                    className="w-full h-full object-cover rounded-xl"
-                                                                    alt={item.product_name || "Produto sem nome"}
-                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start mb-0.5">
-                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                        {item.product_name || "Produto sem nome"}
-                                                                    </h4>
-                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                        {formatCurrency(itemSubtotal)}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                    SKU: {itemSku}
-                                                                </div>
-                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                    {formatQuantityWithUnit(item.quantity, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )
-                                    })()}
-                                </TabsContent>
-                            </div>
+                                        })()}
+                                    </TabsContent>
+                                </div>
+                            </Tabs>
                         </div>
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">

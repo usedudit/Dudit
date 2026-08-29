@@ -16,11 +16,9 @@ import {
 
 export function ReceiptSettingsSubPage({
     partnerId,
-    storeId,
     onBack,
 }: {
     partnerId: string
-    storeId?: string
     onBack: () => void
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -43,7 +41,7 @@ export function ReceiptSettingsSubPage({
         let cancelled = false
         ;(async () => {
             setLoading(true)
-            const res = await getReceiptSettingsAction(partnerId, storeId)
+            const res = await getReceiptSettingsAction(partnerId)
             if (cancelled) return
             if (res.success && res.data) {
                 const loaded = {
@@ -66,7 +64,7 @@ export function ReceiptSettingsSubPage({
         return () => {
             cancelled = true
         }
-    }, [partnerId, storeId, notifyError])
+    }, [partnerId, notifyError])
 
     const updateField = <K extends keyof ReceiptSettings>(field: K, value: ReceiptSettings[K]) => {
         setSettings((prev) => {
@@ -94,8 +92,7 @@ export function ReceiptSettingsSubPage({
                 showStorePhone: settings.showStorePhone,
                 showStoreAddress: settings.showStoreAddress,
                 showSellerName: settings.showSellerName,
-            },
-            storeId
+            }
         )
         setSaving(false)
         if (res.success) {

@@ -1285,6 +1285,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="details">Detalhes</TabsTrigger>
+                                        {isTabletOrMobile && <TabsTrigger value="products">Produtos</TabsTrigger>}
                                         <TabsTrigger value="history">Histórico</TabsTrigger>
                                     </TabsList>
                                 </div>
@@ -1390,40 +1391,13 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                             <span className="text-xs font-medium text-brand-inactive-text">Chave NF-e:</span>
                                                             <span className="text-xs text-brand-dark dark:text-dark-heading break-all">{preview.invoice.chave}</span>
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleDownloadXml}
-                                                            disabled={isDownloadingXml}
-                                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-blue dark:text-blue-400 hover:underline shrink-0 self-start sm:self-auto cursor-pointer"
-                                                        >
-                                                            <FileIcon size={14} />
-                                                            <span>{isDownloadingXml ? "Baixando..." : "Download do arquivo XML"}</span>
-                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <FormSection title="Produtos" hasSeparator>
-                                                <div>
-                                                    {isTabletOrMobile ? (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                            {paginatedItems.map((item: any) => {
-                                                                const d = getDecision(item.id)
-                                                                return (
-                                                                    <ImportItemGridCard
-                                                                        key={item.id}
-                                                                        item={item}
-                                                                        d={d}
-                                                                        isPreview={isPreview}
-                                                                        onOpenAction={(kind) => setActionModal({ itemId: item.id, kind })}
-                                                                        supplierName={preview.supplier?.name}
-                                                                        supplierAction={supplierActions[item.id]}
-                                                                        onSupplierAction={(v) => setSupplierActions((prev: any) => ({ ...prev, [item.id]: v }))}
-                                                                    />
-                                                                )
-                                                            })}
-                                                        </div>
-                                                    ) : (
+                                            <div className="hidden xl:block">
+                                                <FormSection title="Produtos" hasSeparator>
+                                                    <div>
                                                         <div className="w-full overflow-hidden">
                                                             <table className="w-full text-left border-separate border-spacing-0">
                                                                 <thead>
@@ -1453,12 +1427,12 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                 </tbody>
                                                             </table>
                                                         </div>
-                                                    )}
-                                                    {paginatedItems.length > 0 && itemsTotalPages > 1 && (
-                                                        <Pagination currentPage={itemsPage} totalPages={itemsTotalPages} onPageChange={setItemsPage} inline />
-                                                    )}
-                                                </div>
-                                            </FormSection>
+                                                        {paginatedItems.length > 0 && itemsTotalPages > 1 && (
+                                                            <Pagination currentPage={itemsPage} totalPages={itemsTotalPages} onPageChange={setItemsPage} inline />
+                                                        )}
+                                                    </div>
+                                                </FormSection>
+                                            </div>
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
@@ -1632,6 +1606,35 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                 </FadeIn>
                             </TabsContent>
 
+                            <TabsContent value="products" className="mt-0">
+                                <FadeIn key="products">
+                                    <FormSection title="Produtos" hasSeparator>
+                                        <div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {paginatedItems.map((item: any) => {
+                                                    const d = getDecision(item.id)
+                                                    return (
+                                                        <ImportItemGridCard
+                                                            key={item.id}
+                                                            item={item}
+                                                            d={d}
+                                                            isPreview={isPreview}
+                                                            onOpenAction={(kind) => setActionModal({ itemId: item.id, kind })}
+                                                            supplierName={preview.supplier?.name}
+                                                            supplierAction={supplierActions[item.id]}
+                                                            onSupplierAction={(v) => setSupplierActions((prev: any) => ({ ...prev, [item.id]: v }))}
+                                                        />
+                                                    )
+                                                })}
+                                            </div>
+                                            {paginatedItems.length > 0 && itemsTotalPages > 1 && (
+                                                <Pagination currentPage={itemsPage} totalPages={itemsTotalPages} onPageChange={setItemsPage} inline />
+                                            )}
+                                        </div>
+                                    </FormSection>
+                                </FadeIn>
+                            </TabsContent>
+
                             <TabsContent value="history" className="mt-0">
                                 <XmlImportHistoryTab events={historyEntries} loading={historyLoading} />
                             </TabsContent>
@@ -1656,10 +1659,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
             {isPreview && (
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
                     <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadXml} disabled={isDownloadingXml}>
-                        <FileIcon className="w-4 h-4" /> {isDownloadingXml ? "..." : "XML"}
-                    </Button>
-                    <Button variant="outline" className="flex-1 h-12" onClick={onBack}>
-                        <ChevronLeftIcon className="w-4 h-4" /> Voltar
+                        <FileIcon className="w-4 h-4" /> {isDownloadingXml ? "..." : "Baixar XML"}
                     </Button>
                     <Button className="flex-1 h-12" onClick={handleConfirm} disabled={isConfirming}>
                         {isConfirming ? <span className="flex items-center gap-2"><Spinner size={18} /> Importando...</span> : "Confirmar"}
