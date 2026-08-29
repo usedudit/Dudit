@@ -337,6 +337,7 @@ const SYSTEM_RESOURCE_ROUTE_MAP: Record<string, SystemResourceId> = {
   "/erp/orcamentos": "quotes",
   "/erp/pdv": "pos",
   "/erp/devolucoes": "returns",
+  "/erp/entregas": "deliveries",
   "/erp/logistica": "deliveries",
   // ── Produtos
   "/erp/produtos": "products",

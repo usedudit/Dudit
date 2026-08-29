@@ -166,10 +166,12 @@ export function DeliveryRouteMap({
     const mapboxgl = (window as any).mapboxgl
 
     // clear old markers
-    for (const m of markersRef.current) m.remove()
+    for (const m of markersRef.current) {
+      try {
+        m.remove()
+      } catch {}
+    }
     markersRef.current = []
-
-    const bounds = new mapboxgl.LngLatBounds()
 
     const hasOrigin = origin?.lat != null && origin?.lng != null
       && Number.isFinite(Number(origin.lat)) && Number.isFinite(Number(origin.lng))
@@ -179,14 +181,20 @@ export function DeliveryRouteMap({
         && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)),
     )
 
+    const allCoords: [number, number][] = []
+
     // Pin da loja (início da rota)
     if (hasOrigin) {
+      const originLng = Number(origin.lng)
+      const originLat = Number(origin.lat)
+      allCoords.push([originLng, originLat])
+
       const el = document.createElement("div")
       el.className = "flex items-center justify-center rounded-full w-9 h-9 bg-brand-green text-white shadow-sm border-2 border-white dark:border-dark-surface cursor-pointer"
       el.innerHTML = STORE_PIN_SVG
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
-        .setLngLat([Number(origin.lng), Number(origin.lat)])
+        .setLngLat([originLng, originLat])
         .addTo(mapRef.current)
 
       marker.setPopup(
@@ -194,13 +202,12 @@ export function DeliveryRouteMap({
           .setHTML(buildStoreOriginPopupHtml({
             storeName: origin.name || "Sua Loja",
             address: origin.address || "Ponto de partida da entrega",
-            latitude: Number(origin.lat),
-            longitude: Number(origin.lng),
+            latitude: originLat,
+            longitude: originLng,
             tag: "Início",
           })),
       )
       markersRef.current.push(marker)
-      bounds.extend([Number(origin.lng), Number(origin.lat)])
     }
 
     // Pins numerados dos pedidos, na ordem da rota
@@ -208,6 +215,9 @@ export function DeliveryRouteMap({
       const isLast = idx === validPoints.length - 1
       const isSingle = validPoints.length === 1
       const posNumber = p.position || idx + 1
+      const pointLng = Number(p.longitude)
+      const pointLat = Number(p.latitude)
+      allCoords.push([pointLng, pointLat])
 
       const el = document.createElement("div")
       const bgClass = isLast && !isSingle ? "bg-purple-600" : "bg-brand-dark"
@@ -215,7 +225,7 @@ export function DeliveryRouteMap({
       el.innerText = String(posNumber)
 
       const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
-        .setLngLat([Number(p.longitude), Number(p.latitude)])
+        .setLngLat([pointLng, pointLat])
         .addTo(mapRef.current)
 
       marker.setPopup(
@@ -227,8 +237,8 @@ export function DeliveryRouteMap({
             totalPoints: validPoints.length,
             customerName: p.customerName,
             address: p.address,
-            latitude: Number(p.latitude),
-            longitude: Number(p.longitude),
+            latitude: pointLat,
+            longitude: pointLng,
             distanceKm: p.distanceKm,
             totalAmount: p.totalAmount,
             deliveryStatus: p.deliveryStatus,
@@ -237,14 +247,26 @@ export function DeliveryRouteMap({
           })),
       )
       markersRef.current.push(marker)
-      bounds.extend([Number(p.longitude), Number(p.latitude)])
     })
 
-    if (!bounds.isEmpty()) {
+    try {
+      mapRef.current?.resize()
+    } catch {}
+
+    if (allCoords.length === 1) {
       try {
-        mapRef.current?.resize()
-      } catch { }
-      mapRef.current.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 })
+        mapRef.current.easeTo({ center: allCoords[0], zoom: 14, duration: 500 })
+      } catch {}
+    } else if (allCoords.length >= 2) {
+      try {
+        const bounds = new mapboxgl.LngLatBounds(allCoords[0], allCoords[0])
+        for (let i = 1; i < allCoords.length; i++) {
+          bounds.extend(allCoords[i])
+        }
+        mapRef.current.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 })
+      } catch (boundsErr) {
+        console.warn("[DeliveryRouteMap] fitBounds error:", boundsErr)
+      }
     }
   }, [points, origin, ready])
 

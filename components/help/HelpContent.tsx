@@ -52,8 +52,8 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 selectedSentiment === "positive"
                     ? "Positivo"
                     : selectedSentiment === "neutral"
-                    ? "Neutro"
-                    : "Negativo"
+                        ? "Neutro"
+                        : "Negativo"
 
             const comment = withComment ? commentText.trim() : ""
             const message = comment
@@ -262,13 +262,13 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         const categoryData = helpCategories.find(c => c.id === article.category);
                         const catIcon = categoryData?.icon || (
                             article.category === "login-registro" ? "🔐" :
-                            article.category === "pedidos" ? "📦" :
-                            article.category === "vendas" ? "🛒" :
-                            article.category === "financeiro" ? "💰" :
-                            article.category === "produtos-estoque" ? "📦" :
-                            article.category === "servicos" ? "🛠️" :
-                            article.category === "clientes" ? "👥" :
-                            article.category === "marketing" ? "📣" : "📁"
+                                article.category === "pedidos" ? "📦" :
+                                    article.category === "vendas" ? "🛒" :
+                                        article.category === "financeiro" ? "💰" :
+                                            article.category === "produtos-estoque" ? "📦" :
+                                                article.category === "servicos" ? "🛠️" :
+                                                    article.category === "clientes" ? "👥" :
+                                                        article.category === "marketing" ? "📣" : "📁"
                         );
                         return (
                             <Badge variant="green" icon={null} className="px-3">
@@ -379,6 +379,23 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 onClose={() => setIsFeedbackModalOpen(false)}
                 title="Isto foi útil?"
                 maxWidth="sm"
+                footer={
+                    <div className="flex items-center justify-end">
+                        <Button
+                            variant="outline"
+                            onClick={() => handleSendFeedback(false)}
+                            disabled={isSubmittingFeedback}
+                        >
+                            Apenas enviar
+                        </Button>
+                        <Button
+                            onClick={() => handleSendFeedback(true)}
+                            disabled={isSubmittingFeedback}
+                        >
+                            {isSubmittingFeedback ? "Enviando..." : "Enviar comentário"}
+                        </Button>
+                    </div>
+                }
             >
                 <div className="space-y-4 pt-1">
                     {/* Emojis selection row */}
@@ -390,11 +407,10 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                                     key={item.sentiment}
                                     type="button"
                                     onClick={() => setSelectedSentiment(item.sentiment)}
-                                    className={`w-12 h-12 rounded-full border flex items-center justify-center text-2xl transition-all ${
-                                        isSelected
-                                            ? "border-brand-primary bg-brand-primary/10 ring-2 ring-brand-primary scale-110"
-                                            : "border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-surface opacity-60 hover:opacity-100 hover:scale-105"
-                                    }`}
+                                    className={`w-12 h-12 rounded-full border flex items-center justify-center text-2xl transition-all ${isSelected
+                                        ? "border-brand-primary bg-brand-primary/10 ring-2 ring-brand-primary scale-110"
+                                        : "border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-surface opacity-60 hover:opacity-100 hover:scale-105"
+                                        }`}
                                     title={item.label}
                                 >
                                     <span>{item.emoji}</span>
@@ -407,8 +423,8 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                         {selectedSentiment === "positive"
                             ? "Que bom que ajudou! Quer deixar algum comentário ou sugestão?"
                             : selectedSentiment === "neutral"
-                            ? "O que achou confuso ou o que poderíamos detalhar melhor?"
-                            : "Sentimos muito. O que faltou ou não funcionou para você?"}
+                                ? "O que achou confuso ou o que poderíamos detalhar melhor?"
+                                : "Sentimos muito. O que faltou ou não funcionou para você?"}
                     </p>
 
                     {/* Textarea */}
@@ -422,28 +438,6 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                             showCharacterCount
                             className="min-h-[85px] text-xs"
                         />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onClick={() => handleSendFeedback(false)}
-                            disabled={isSubmittingFeedback}
-                            className="text-xs"
-                        >
-                            Apenas enviar
-                        </Button>
-                        <Button
-                            variant="filled"
-                            type="button"
-                            onClick={() => handleSendFeedback(true)}
-                            disabled={isSubmittingFeedback}
-                            className="text-xs"
-                        >
-                            {isSubmittingFeedback ? "Enviando..." : "Enviar comentário"}
-                        </Button>
                     </div>
                 </div>
             </DefaultModal>

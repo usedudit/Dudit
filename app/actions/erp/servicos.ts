@@ -206,6 +206,8 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
         if (videoMetadata.video_type === "upload" && !data.id) throw new Error("ID do serviço é obrigatório para upload de vídeo")
         if (data.id) await assertUploadVideoOwnership(videoMetadata, user.id, data.id)
 
+        const admin = getAdminClient()
+
         let finalServicePrice = data.price
         const numServiceCost = Number(data.costPrice || data.cost_price || 0)
         if ((finalServicePrice === undefined || finalServicePrice === null || Number(finalServicePrice) === 0) && numServiceCost > 0) {

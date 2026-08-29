@@ -582,6 +582,8 @@ export async function createProductComprehensiveAction(data: {
             videoMetadata.video_thumbnail = cloned.video_thumbnail
         }
 
+        const admin = getAdminClient()
+
         let finalPrice = data.price
         const numCost = Number(data.costPrice || 0)
         if ((finalPrice === undefined || finalPrice === null || Number(finalPrice) === 0) && numCost > 0) {
@@ -675,8 +677,6 @@ export async function createProductComprehensiveAction(data: {
         }
 
         const supabase = await getSupabaseServerClient()
-        const admin = getAdminClient()
-
         // 5. INSERT DO PRODUTO com retry em caso de SKU collision
         let insertedProduct: any = null
         let transactionError: any = null

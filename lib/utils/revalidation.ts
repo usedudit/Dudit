@@ -63,6 +63,7 @@ export async function revalidateOrders(partnerId: string) {
         await safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
         await safeRevalidateTag(partnerId)
         await safeRevalidateTag(`partner-${partnerId}-orders`)
+        revalidatePath("/erp/entregas")
         revalidatePath("/erp/logistica")
     }
     await safeRevalidateTag("orders")

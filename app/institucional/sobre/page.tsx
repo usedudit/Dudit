@@ -24,24 +24,21 @@ import { GridLines, SectionHeader, Navbar, Footer, CTA } from '@/components/Inst
 const SobreHero = ({ onNavigate }: { onNavigate: (page: string) => void }) => (
     <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
         <GridLines />
-        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-6 max-w-[1300px] w-full relative z-10">
+        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
                 >
-                    <div className="inline-flex items-center gap-2 border border-brand-border rounded-full px-4 py-1.5 text-xs text-brand-dark mb-8 bg-brand-gray tracking-wider font-bold">
-                        SOBRE A DUDIT
-                    </div>
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-brand-dark leading-[1.1] mb-6">
+                    <h1 className="text-5xl font-bold text-brand-dark mb-6">
                         Um jeito mais simples de encontrar e oferecer o que você precisa.
                     </h1>
-                    <p className="text-brand-dark text-lg md:text-xl font-medium mb-8 max-w-lg leading-tight">
+                    <p className="text-brand-inactive-text text-lg md:text-xl mb-8 max-w-lg leading-relaxed">
                         A Dudit conecta pessoas e negócios em um só lugar para descobrir, anunciar, comprar, agendar e organizar.
                     </p>
                     <div className="flex flex-wrap gap-4">
-                        <Button variant="default" className="bg-brand-green text-white" onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
+                        <Button onClick={() => onNavigate('explore')}>Explorar Dudit</Button>
                         <Button variant="outline" onClick={() => onNavigate('start-selling')}>Começar grátis</Button>
                     </div>
                 </motion.div>

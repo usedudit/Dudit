@@ -237,9 +237,9 @@ export function OperationsTab({ data }: { data: OperationsDashboardData }) {
                               variant="outline"
                               size="sm"
                               className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
-                              onClick={() => router.push("/erp/logistica")}
+                              onClick={() => router.push("/erp/entregas")}
                             >
-                              Ver Logística
+                              Ver Entregas
                             </Button>
                           </td>
                         </tr>

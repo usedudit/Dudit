@@ -29,7 +29,7 @@ export default async function PainelPage() {
                         subtitle="Acesse a seção de entregas para acompanhar suas rotas e entregas em tempo real."
                         itemButton={{
                             text: "Acessar Entregas",
-                            action: "/erp/logistica"
+                            action: "/erp/entregas"
                         }}
                     />
                 </FadeIn>

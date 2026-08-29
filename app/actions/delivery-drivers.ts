@@ -295,6 +295,7 @@ export async function acceptDeliveryOfferAction(assignmentId: string) {
   revalidatePath("/entregadores")
   revalidatePath("/entregadores/entregas-disponiveis")
   revalidatePath("/entregadores/entregas")
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   revalidatePath("/erp/pedidos")
 
@@ -324,6 +325,7 @@ export async function transitionMyDeliveryAssignmentAction(params: {
   revalidatePath("/entregadores/entregas-disponiveis")
   revalidatePath(`/entregadores/entregas/${params.assignmentId}`)
   revalidatePath("/erp/pedidos")
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   return { success: true as const, data }
 }
@@ -353,6 +355,7 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
 
   revalidatePath(`/entregadores/entregas/${assignmentId}`)
   revalidatePath("/erp/pedidos")
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   return { success: true as const, data }
 }
@@ -488,6 +491,7 @@ export async function markSingleOrderDeliveredAction(params: {
   revalidatePath("/entregadores")
   revalidatePath(`/entregadores/entregas/${params.assignmentId}`)
   revalidatePath("/erp/pedidos")
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
 
   return { success: true as const }

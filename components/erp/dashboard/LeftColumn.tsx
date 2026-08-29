@@ -332,7 +332,7 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                         } else if (item.id === "pending-appointments") {
                           router.push("/erp/agendamentos");
                         } else if (item.id === "late-deliveries") {
-                          router.push("/erp/logistica");
+                          router.push("/erp/entregas");
                         }
                       }}
                     >

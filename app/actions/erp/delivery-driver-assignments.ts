@@ -89,6 +89,7 @@ export async function assignPlatformDriverToDeliveryAction(input: {
       source: "erp",
     })
 
+    revalidatePath("/erp/entregas")
     revalidatePath("/erp/logistica")
     revalidatePath("/erp/pedidos")
     revalidatePath("/entregadores")
@@ -132,6 +133,7 @@ export async function assignPlatformDriverToDeliveryAction(input: {
     metadata: { deliveryId: input.deliveryId, driverId: input.driverId, orderCount: rows.length },
     source: "erp",
   })
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   revalidatePath("/entregadores")
   return { success: true as const, count: rows.length }
@@ -208,6 +210,7 @@ export async function requestDuditDeliveryAction(input: {
     source: "erp",
   })
 
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   revalidatePath("/erp/pedidos")
   revalidatePath("/entregadores")
@@ -262,6 +265,7 @@ export async function cancelDuditDeliveryRequestAction(input: {
     source: "erp",
   })
 
+  revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   revalidatePath("/erp/pedidos")
   revalidatePath("/entregadores")

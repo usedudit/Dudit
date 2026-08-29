@@ -44,7 +44,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     },
     returns: { key: "returns", path: "/erp/devolucoes", label: "Devoluções", category: "Vendas", legacyCategory: "orders" },
     logistics: {
-        key: "logistics", path: "/erp/logistica", label: "Expedição e Entregas", category: "Vendas", legacyCategory: "orders",
+        key: "logistics", path: "/erp/entregas", label: "Expedição e Entregas", category: "Vendas", legacyCategory: "orders",
         specificPermissions: [
             "can_update_delivery_status", "can_assign_driver",
             "can_print_label", "can_generate_tracking", "can_view_delivery_details",

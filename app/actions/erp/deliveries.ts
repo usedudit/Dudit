@@ -55,6 +55,8 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
   revalidatePath("/erp/painel")
   revalidatePath("/erp/inicio")
+  revalidatePath("/erp/entregas")
+  revalidatePath("/erp/logistica")
 }
 
 function getDeliveryStatusHumanLabel(status: string): string {
@@ -2114,6 +2116,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     }
 
     revalidateDeliveryDashboard(params.partnerId)
+    revalidatePath("/erp/entregas")
     revalidatePath("/erp/logistica")
 
     return { success: true as const }

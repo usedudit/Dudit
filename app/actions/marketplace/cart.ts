@@ -1172,6 +1172,7 @@ export async function checkoutCartAction(
   }
 
   const fallbackCustomerName = buyerProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split("@")[0] : null) || user.email || "Cliente"
+  let resolvedCustomerId: string | null = null
   try {
     const { ensureMarketplaceCustomer } = await import("@/lib/services/marketplace-customer")
     resolvedCustomerId = await ensureMarketplaceCustomer({

@@ -4498,7 +4498,7 @@ export async function getERPOrdersPageAction(
                             if (c.marketplace_user_id) customerInfoByBuyerId.set(c.marketplace_user_id, info)
                         }
 
-                        const stillMissingIds = missingBuyerIds.filter(id => !customerInfoByBuyerId.has(id))
+                        const stillMissingIds = missingBuyerIds.filter((id): id is string => !customerInfoByBuyerId.has(id as string))
                         if (stillMissingIds.length > 0) {
                             const { data: profiles } = await supabase
                                 .from("user_profiles")

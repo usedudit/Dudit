@@ -30,7 +30,7 @@ const Hero = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
         <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
             <GridLines />
-            <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full">
+            <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full">
                 <div className="grid lg:grid-cols-2 gap-12 items-center">
                     <motion.div
                         initial={{ opacity: 0, y: 30 }}
@@ -162,7 +162,7 @@ const BentoFeaturesComoAjuda = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                 <SectionHeader
                     subtitle="RESOLVER O QUE VOCÊ PRECISA HOJE"
                     title="O que dá pra fazer na Dudit"
@@ -284,7 +284,7 @@ const ParaQuemCompra = () => {
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                 <SectionHeader
                     subtitle="PARA QUEM PROCURA"
                     title="O que você procura?"
@@ -346,7 +346,7 @@ const ParaQuemVende = () => {
     return (
         <section className="relative py-24 bg-white overflow-hidden border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Lado esquerdo: Imagem */}
                     <motion.div
@@ -448,7 +448,7 @@ const GlobalScale = () => {
     return (
         <section className="py-24 bg-white relative border-t border-gray-100">
             <GridLines />
-            <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                 <div className="flex flex-col lg:flex-row min-h-[600px] rounded-3xl overflow-hidden shadow-xl">
                     <div className="flex-1 bg-brand-dark p-12 lg:p-16 flex flex-col justify-center relative z-10">
                         <div className="absolute inset-0 pointer-events-none z-0 flex justify-center w-full h-full opacity-20">

@@ -51,7 +51,7 @@ const navItems: NavItem[] = [
             { label: "Orçamentos", href: "/erp/orcamentos" },
             { label: "PDV (Frente de Caixa)", href: "/erp/pdv" },
             { label: "Devoluções", href: "/erp/devolucoes" },
-            { label: "Expedição e Entregas", href: "/erp/logistica" },
+            { label: "Expedição e Entregas", href: "/erp/entregas" },
         ],
     },
     {
@@ -125,6 +125,7 @@ const navItems: NavItem[] = [
 
 const PLAN_GATED_MINIMUM: Record<string, "crescer" | "escalar"> = {
     "/erp/lojas": "escalar",
+    "/erp/entregas": "crescer",
     "/erp/logistica": "crescer",
     "/erp/transacoes": "crescer",
     "/erp/transacoes/dre": "escalar",
@@ -329,7 +330,7 @@ export function ERPSidebar() {
                             if (sub.href === "/erp/devolucoes") return returnsResourceActive
                             if (sub.href === "/erp/orcamentos") return quotesResourceActive
                             if (sub.href === "/erp/pdv") return posResourceActive
-                            if (sub.href.startsWith("/erp/logistica")) return deliveriesResourceActive
+                            if (sub.href.startsWith("/erp/entregas") || sub.href.startsWith("/erp/logistica")) return deliveriesResourceActive
                         }
                         if (item.href === "/erp/produtos") {
                             if (sub.href === "/erp/produtos") return productsResourceActive

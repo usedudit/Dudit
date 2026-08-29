@@ -454,56 +454,37 @@ export default function DeliveryDetailPage({
         </div>
     )
 
-    const pageHeader = (
-        <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
-            {/* Desktop header with title, back, edit, actions */}
-            <div className="hidden lg:flex items-center justify-between gap-3 py-2">
-                <div className="absolute -left-12 top-1/2 -translate-y-1/2">
-                    <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
-                        <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                    </Button>
-                </div>
-
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="min-w-0">
-                        <h1 className="text-xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
-                            Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
-                        </h1>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-1 truncate flex items-center gap-1.5">
-                            <span>Criado em {formatDateTime(delivery.created_at)} • </span>
-                            {isPlatformDriver && (
-                                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain inline-block shrink-0" />
-                            )}
-                            <span>{driverName}</span>
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                    {canEdit && onEdit && (
-                        <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
-                            Editar
-                        </Button>
-                    )}
-                    <ActionsDropdown
-                        onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
-                        onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
-                        cancelLabel="Cancelar entrega"
-                    />
+    const headerContent = (
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                    <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                </Button>
+                <div className="min-w-0">
+                    <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
+                        Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
+                    </h1>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-0.5 truncate flex items-center gap-1.5">
+                        <span>Criado em {formatDateTime(delivery.created_at)} • </span>
+                        {isPlatformDriver && (
+                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain inline-block shrink-0" />
+                        )}
+                        <span>{driverName}</span>
+                    </p>
                 </div>
             </div>
 
-            {/* Mobile/Tablet Tabs - only visible on <lg */}
-            <div className="lg:hidden border-b border-brand-border dark:border-dark-border">
-                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0 max-w-[1300px] mx-auto px-4 md:px-6">
-                    <TabsTrigger value="dados_gerais">
-                        Dados Gerais
-                        <RouteIcon className="w-4 h-4" />
-                    </TabsTrigger>
-                    <TabsTrigger value="mapa_rota">
-                        Mapa da Rota
-                    </TabsTrigger>
-                </TabsList>
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
+                {canEdit && onEdit && (
+                    <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
+                        Editar
+                    </Button>
+                )}
+                <ActionsDropdown
+                    onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
+                    onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
+                    cancelLabel="Cancelar entrega"
+                />
             </div>
         </div>
     )
@@ -511,60 +492,69 @@ export default function DeliveryDetailPage({
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Sticky Header */}
-                    <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 ${isScrolled ? "py-2 shadow-sm" : "py-4"}`}>
-                        {pageHeader}
+                {/* DESKTOP (lg:): 50/50 Split View */}
+                <div className="hidden lg:flex lg:flex-row w-full h-full overflow-hidden">
+                    {/* LEFT SIDE - HEADER & CONTENT */}
+                    <div className="w-1/2 flex flex-col flex-1 min-h-0 shrink-0 h-full border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
+                        {/* Header confined to Left Half */}
+                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 px-6 ${isScrolled ? "py-2.5 shadow-sm" : "py-4"}`}>
+                            {headerContent}
+                        </div>
+
+                        {/* Scrollable details */}
+                        <div className="flex-1 overflow-y-auto no-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
+                            <div className="pt-4 pb-12 px-6 space-y-8">
+                                {linkedOrdersCard}
+                                {deliveryInfoMetrics}
+                                {notesSection}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Content - Desktop: split view, Mobile: tabs */}
+                    {/* RIGHT SIDE - ROUTE MAP (Full height) */}
+                    <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-hidden flex flex-col h-full min-h-0">
+                        <div className="p-6 flex flex-col h-full min-h-0">
+                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4 shrink-0">Mapa da Rota</h3>
+                            <div className="flex-1 min-h-0 w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+                                {mapContent}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* MOBILE / TABLET (< lg): Single-column Tabbed View */}
+                <div className="lg:hidden flex flex-col h-full w-full overflow-hidden">
+                    {/* Top Header & Tabs for Mobile/Tablet */}
+                    <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border px-4 py-3">
+                        {headerContent}
+                        <div className="mt-3 border-t border-brand-border dark:border-dark-border pt-2">
+                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                <TabsTrigger value="dados_gerais">
+                                    Dados Gerais
+                                    <RouteIcon className="w-4 h-4" />
+                                </TabsTrigger>
+                                <TabsTrigger value="mapa_rota">
+                                    Mapa da Rota
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+                    </div>
+
+                    {/* Mobile/Tablet Content */}
                     <div className="flex-1 overflow-hidden relative">
-                        {/* DESKTOP: Split view - left content, right map (always visible) */}
-                        <div className="hidden lg:flex lg:flex-row w-full h-full">
-                            {/* LEFT SIDE - CONTENT */}
-                            <div className="w-1/2 flex flex-col flex-1 min-h-0 shrink-0 h-full border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
-                                <div className="flex-1 overflow-y-auto no-scrollbar relative">
-                                    <div className="flex-1 pt-4 pb-12 px-4 md:px-6 space-y-8">
-                                        {linkedOrdersCard}
-                                        {deliveryInfoMetrics}
-                                        {notesSection}
-                                    </div>
-                                </div>
+                        <TabsContent value="dados_gerais" className="flex-1 h-full overflow-y-auto no-scrollbar custom-scrollbar mt-0 pb-20">
+                            <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative">
+                                {linkedOrdersCard}
+                                {deliveryInfoMetrics}
+                                {notesSection}
                             </div>
+                        </TabsContent>
 
-                            {/* RIGHT SIDE - ROUTE MAP */}
-                            <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto no-scrollbar">
-                                <div className="p-4 md:p-6 flex flex-col h-full">
-                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Mapa da Rota</h3>
-                                    <div className="flex-1 min-h-[300px] w-full">
-                                        <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                                            {mapContent}
-                                        </div>
-                                    </div>
-                                </div>
+                        <TabsContent value="mapa_rota" className="flex-1 h-full overflow-hidden mt-0 p-4 md:p-6 pb-20">
+                            <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
+                                {mapContent}
                             </div>
-                        </div>
-
-                        {/* MOBILE/TABLET: Tabbed view */}
-                        <div className="lg:hidden flex-1 overflow-hidden">
-                            {/* DADOS GERAIS TAB */}
-                            <TabsContent value="dados_gerais" className="flex-1 h-full overflow-y-auto no-scrollbar custom-scrollbar" forceMount>
-                                <div className="max-w-[1300px] mx-auto w-full p-4 md:p-6 space-y-8 relative">
-                                    {linkedOrdersCard}
-                                    {deliveryInfoMetrics}
-                                    {notesSection}
-                                </div>
-                            </TabsContent>
-
-                            {/* MAPA DA ROTA TAB */}
-                            <TabsContent value="mapa_rota" className="flex-1 h-full overflow-hidden" forceMount>
-                                <div className="h-full w-full p-4 md:p-6">
-                                    <div className="h-full w-full rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface overflow-hidden">
-                                        {mapContent}
-                                    </div>
-                                </div>
-                            </TabsContent>
-                        </div>
+                        </TabsContent>
                     </div>
                 </div>
 
