@@ -105,7 +105,7 @@ export const getQuoteWithItemsCached = cache(async (quoteId: string, partnerId: 
                 }
 
                 if (!quote.public_token || isUuid(quote.public_token)) {
-                    const newToken = generateShortId(6)
+                    const newToken = generateShortId()
                     await supabase.from("quotes").update({ public_token: newToken }).eq("id", quoteId)
                     quote.public_token = newToken
                 }

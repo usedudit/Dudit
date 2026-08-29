@@ -73,12 +73,13 @@ export default async function ERPLayout({
   const hasOwnPartner = allAccess.some((a: typeof allAccess[number]) => a.roleId === "owner")
 
   // No ERP access at all → redirect to partner login/registration
-  if (allAccess.length === 0) {
+  // If active_partner_id cookie is set, skip redirect - the partner was likely
+  // just created and the cache may be stale. The cookie-based resolution below
+  // will handle it or fall through to select-erp.
+  const activePartnerId = await getActivePartnerId()
+  if (allAccess.length === 0 && !activePartnerId) {
     redirect("/auth/login?mode=partner")
   }
-
-  // Check if user has the active_partner_id cookie set
-  const activePartnerId = await getActivePartnerId()
 
   // If user has no own ERP, force explicit selection before entering ERP.
   if (!hasOwnPartner && !activePartnerId) {
@@ -93,6 +94,42 @@ export default async function ERPLayout({
     if (match) {
       const role = String(match.roleId || "delivery").toUpperCase() as PartnerRole
       context = { partnerId: match.partnerId, roleId: match.roleId as RoleId, role, permissions: match.permissions, businessInfo: match.businessInfo }
+    } else if (allAccess.length === 0 && activePartnerId) {
+      // Cache stale: partner was just created but unstable_cache hasn't been
+      // invalidated yet. Query DB directly to avoid redirecting to login.
+      const admin = createAdminClient()
+      const { getPermissionTemplate } = await import("@/lib/permissions/rbac-template-loader")
+      const { normalizePermissions } = await import("@/lib/permissions/rbac-normalize")
+      const template = await getPermissionTemplate()
+
+      const { data: freshPartner } = await admin
+        .from("partners")
+        .select("id, user_id, business_info, is_active, erp_disabled, suspended_at")
+        .eq("id", activePartnerId)
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (freshPartner && freshPartner.is_active && !freshPartner.erp_disabled && !freshPartner.suspended_at) {
+        const { data: freshStore } = await admin
+          .from("stores")
+          .select("id, name, is_active, suspended_at")
+          .eq("partner_id", activePartnerId)
+          .eq("is_active", true)
+          .is("suspended_at", null)
+          .order("is_headquarters", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (freshStore) {
+          context = {
+            partnerId: freshPartner.id,
+            roleId: "owner" as RoleId,
+            role: "OWNER" as PartnerRole,
+            permissions: normalizePermissions(template, {}),
+            businessInfo: normalizeBusinessInfo(freshPartner.business_info),
+          }
+        }
+      }
     }
   }
 

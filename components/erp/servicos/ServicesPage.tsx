@@ -12,6 +12,7 @@ import { getERPServicesPageAction, type ERPServiceListCursor } from "@/app/actio
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -165,7 +166,8 @@ export default function ServicesPage({
 }: { services: any[]; initialNextCursor: ERPServiceListCursor | null; initialHasMore: boolean; partnerId: string; partner?: any; }) {
     const router = useRouter()
     const { toast } = useToast()
-    const { planSlug } = usePermissions()
+    const { planSlug, businessInfo } = usePermissions()
+    const isDesapego = normalizeBusinessInfo(businessInfo).mode === "desapego"
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const { selectedStore } = useStore()
     const isMobile = useMediaQuery("(max-width: 767px)")
@@ -730,13 +732,15 @@ export default function ServicesPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => router.push("/erp/servicos/importar")}
-                                        leftIcon={<UploadSheetIcon size={16} />}
-                                    >
-                                        Importar
-                                    </Button>
+                                    {!isDesapego && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => router.push("/erp/servicos/importar")}
+                                            leftIcon={<UploadSheetIcon size={16} />}
+                                        >
+                                            Importar
+                                        </Button>
+                                    )}
                                     <Button
                                         onClick={handleAddFirstService}
                                         className="w-full"
@@ -763,6 +767,7 @@ export default function ServicesPage({
                                     onViewModeChange={(mode) => setViewModeState(mode)}
                                     hasActiveFilters={hasActiveFilters}
                                     tabCounts={tabCounts}
+                                    isDesapego={isDesapego}
                                 />
                             )}
 

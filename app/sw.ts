@@ -217,6 +217,33 @@ const serwist = new Serwist({
 
 serwist.addEventListeners()
 
+// Limpeza forçada de caches legados ou não mais utilizados
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const cacheNames = await self.caches.keys()
+        const activeCaches = [
+          "dudit-fonts",
+          "dudit-cdn-images",
+          "dudit-next-static",
+          "dudit-public-pages",
+          serwist.precacheStrategy.cacheName,
+        ]
+        await Promise.all(
+          cacheNames.map(async (name) => {
+            if (!activeCaches.includes(name)) {
+              await self.caches.delete(name)
+            }
+          })
+        )
+      } catch (err) {
+        console.error("[SW] Erro ao limpar caches obsoletos:", err)
+      }
+    })()
+  )
+})
+
 // ============================================================
 // Web Push Notifications Handler (Android, iOS Safari, PWA, Desktop)
 // Processa notificações push nativamente sem dependências de scripts remotos,

@@ -6,7 +6,9 @@
  */
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { can } from "@/lib/permissions/can"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { SMTP2GOService } from "@/lib/services/smtp2go.service"
@@ -91,18 +93,12 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
     }
 
     // ====================================================================
-    // SECURITY: If partnerId provided, verify ownership
+    // SECURITY: If partnerId provided, verify partner access + permission.
+    // If partnerId is omitted (platform-level email), strictly require admin role.
     // ====================================================================
     if (input.partnerId) {
-      const supabase = await getSupabaseServerClient()
-      const { data: partner } = await supabase
-        .from("partners")
-        .select("id")
-        .eq("id", input.partnerId)
-        .eq("user_id", user.id)
-        .single()
-
-      if (!partner) {
+      const access = await requirePartnerAccess(input.partnerId)
+      if (!can({ role_id: access.roleId, permissions: access.permissions }, "settings.settings_messages")) {
         SecureLogger.warn("[Email Action] Unauthorized partner access attempt", {
           userId: user.id,
           partnerId: input.partnerId,
@@ -110,6 +106,18 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
         return {
           success: false,
           error: "Acesso negado",
+        }
+      }
+    } else {
+      try {
+        await requireAdmin("admin")
+      } catch {
+        SecureLogger.warn("[Email Action] Unauthorized email relay attempt without partner context", {
+          userId: user.id,
+        })
+        return {
+          success: false,
+          error: "Acesso negado: permissão de administrador necessária para envio global.",
         }
       }
     }
@@ -171,5 +179,3 @@ export async function sendEmailAction(input: SendEmailInput): Promise<SendEmailR
     }
   }
 }
-
-

@@ -53,14 +53,14 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     // Fetch store logo, partner fallback and address details
     const [storeRes, partnerRes, addressRes] = await Promise.all([
         storeId
-            ? supabase.from("stores").select("name, logo_url, image_url, phone").eq("id", storeId).maybeSingle()
-            : supabase.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
+            ? supabase.from("stores").select("name, logo_url, phone").eq("id", storeId).maybeSingle()
+            : supabase.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle(),
         supabase.from("partners").select("name, store_name, logo_url, store_image_url, phone, address").eq("id", quote.partner_id).maybeSingle(),
         getPartnerAddressAction(quote.partner_id, storeId)
     ])
 
     const partnerName = storeRes.data?.name || partnerRes.data?.store_name || partnerRes.data?.name || "Parceiro"
-    const rawAvatar = storeRes.data?.logo_url || storeRes.data?.image_url || partnerRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
+    const rawAvatar = storeRes.data?.logo_url || partnerRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
     const partnerAddress = (addressRes.success && addressRes.data?.formatted) || partnerRes.data?.address || undefined
     const partnerPhone = storeRes.data?.phone || partnerRes.data?.phone || undefined

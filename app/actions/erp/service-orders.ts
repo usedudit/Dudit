@@ -1200,7 +1200,7 @@ export async function ensurePublicTokenAction(partnerId: string, serviceOrderId:
       .eq("partner_id", partnerId)
       .single()
     if (data?.public_token) return data.public_token
-    const newToken = generateShortId(6)
+    const newToken = generateShortId()
     await admin.from("service_orders").update({ public_token: newToken }).eq("id", serviceOrderId)
     return newToken
   } catch {
@@ -1212,9 +1212,15 @@ export async function getServiceOrderByTokenAction(
   token: string,
 ): Promise<{ success: true; data: { serviceOrder: any; services: any[]; products: any[]; attachments: any[]; history: any[]; sale: any } } | { success: false; error: string }> {
   try {
+    await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+    const cleanToken = String(token || "").trim()
+    if (!cleanToken || cleanToken.length < 6) {
+      return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
+    }
+
     const admin = getAdminClient()
 
-    let { data: row, error } = await admin
+    const { data: row, error } = await admin
       .from("service_orders")
       .select(`
         id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
@@ -1225,39 +1231,11 @@ export async function getServiceOrderByTokenAction(
           id, name, logo_url, phone
         )
       `)
-      .eq("public_token", token)
-      .single()
+      .eq("public_token", cleanToken)
+      .maybeSingle()
 
     if (error || !row) {
-      // Fallback: try lookup by id for legacy OSs without public_token
-      if (isUuid(token)) {
-        const { data: byId } = await admin
-          .from("service_orders")
-          .select(`
-            id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
-            total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
-            customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
-            public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
-            stores!left (
-              id, name, logo_url, phone
-            )
-          `)
-          .eq("id", token)
-          .single()
-        if (byId) {
-          // Generate public_token on the fly for this OS
-          if (!byId.public_token || isUuid(byId.public_token)) {
-            const newToken = generateShortId(6)
-            await admin.from("service_orders").update({ public_token: newToken }).eq("id", token)
-            byId.public_token = newToken
-          }
-          row = byId
-        } else {
-          throw new Error("Ordem de serviço não encontrada")
-        }
-      } else {
-        throw new Error("Ordem de serviço não encontrada")
-      }
+      return { success: false, error: "Ordem de serviço não encontrada" }
     }
 
     const fetchAddress = async () => {
@@ -1366,6 +1344,25 @@ export async function getServiceOrderByTokenAction(
     const resolvedPartnerLogo = storeObj?.logo_url || storeObj?.image_url || partnerRow?.logo_url || partnerRow?.store_image_url || null
     const resolvedPartnerPhone = storeObj?.phone || partnerRow?.phone || ""
 
+    const maskedCustomer = resolvedCustomer ? {
+      name: resolvedCustomer.name || null,
+      email: resolvedCustomer.email ? `${resolvedCustomer.email.split('@')[0].slice(0, 2)}***@${resolvedCustomer.email.split('@')[1] || 'email.com'}` : null,
+      phone: resolvedCustomer.phone ? `(***) *****-${resolvedCustomer.phone.replace(/\D/g, '').slice(-4)}` : null,
+      document: resolvedCustomer.document ? `***.${resolvedCustomer.document.replace(/\D/g, '').slice(3, 6)}.-**` : null,
+      addresses: Array.isArray(resolvedCustomer.addresses) ? resolvedCustomer.addresses.map((a: any) => ({
+        street: a.street,
+        neighborhood: a.neighborhood,
+        city: a.city,
+        state: a.state,
+        zip_code: a.zip_code ? `${a.zip_code.slice(0, 5)}-***` : null,
+        number: "***",
+        complement: "***",
+      })) : undefined,
+    } : null
+
+    const safeMetadata = { ...(row.metadata || {}) }
+    delete safeMetadata.plain_code
+
     const serviceOrder = {
       id: row.id,
       partner_id: row.partner_id,
@@ -1384,10 +1381,10 @@ export async function getServiceOrderByTokenAction(
       signature_image_key: row.signature_image_key,
       signed_at: row.signed_at,
       customer_name: customerName,
-      customer_snapshot: resolvedCustomer,
+      customer_snapshot: maskedCustomer,
       sale_id: row.sale_id,
       specifications,
-      metadata: row.metadata,
+      metadata: safeMetadata,
       lockout_until: row.lockout_until,
       assigned_user_name: assignedUserName,
       public_token: row.public_token,
@@ -2214,9 +2211,10 @@ export async function regenerateServiceOrderApprovalCodeAction(
       return { success: false, error: "Não é possível alterar o código de uma OS finalizada ou cancelada." }
     }
 
-    // 2. Generate new 4-digit code and salt
-    const plainCode = Math.floor(1000 + Math.random() * 9000).toString() // 4 digits
-    const salt = Math.random().toString(36).substring(2)
+    // 2. Generate new 4-digit code and salt using cryptographically secure random
+    const crypto = await import("crypto")
+    const plainCode = crypto.randomInt(1000, 10000).toString() // 4 digits
+    const salt = crypto.randomBytes(16).toString("hex")
 
     // Compute hash using RPC
     const { data: hashData, error: hashErr } = await supabase.rpc("compute_approval_hash", {
@@ -2231,7 +2229,11 @@ export async function regenerateServiceOrderApprovalCodeAction(
 
     const hash = hashData as string
 
-    // 3. Update service order
+    // Clean any legacy plain_code from metadata
+    const cleanMetadata = { ...(so.metadata || {}) }
+    delete cleanMetadata.plain_code
+
+    // 3. Update service order without persisting plain_code
     const { error: updateErr } = await supabase
       .from("service_orders")
       .update({
@@ -2240,10 +2242,7 @@ export async function regenerateServiceOrderApprovalCodeAction(
         failed_attempts: 0,
         lockout_until: null,
         lockout_count: 0,
-        metadata: {
-          ...(so.metadata || {}),
-          plain_code: plainCode
-        }
+        metadata: cleanMetadata,
       })
       .eq("id", serviceOrderId)
       .eq("partner_id", partnerId)
@@ -2260,6 +2259,9 @@ export async function regenerateServiceOrderApprovalCodeAction(
   }
 }
 
+const ALLOWED_SIGNATURE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"]
+const MAX_SIGNATURE_SIZE_BYTES = 2 * 1024 * 1024 // 2MB
+
 export async function getPublicPresignedUploadUrlAction(
   token: string,
   fileName: string,
@@ -2271,44 +2273,50 @@ export async function getPublicPresignedUploadUrlAction(
 > {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-
-    // 1. Fetch OS by token to get partner and assigned user details
-    const admin = getAdminClient()
-    let { data: order, error } = await admin
-      .from("service_orders")
-      .select("id, partner_id, assigned_user_id")
-      .eq("public_token", token)
-      .maybeSingle()
-
-    if (!order && isUuid(token)) {
-      const { data: orderById } = await admin
-        .from("service_orders")
-        .select("id, partner_id, assigned_user_id")
-        .eq("id", token)
-        .maybeSingle()
-      if (orderById) order = orderById
+    const cleanToken = String(token || "").trim()
+    if (!cleanToken || cleanToken.length < 6) {
+      return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
     }
 
-    if (!order) {
+    const admin = getAdminClient()
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, partner_id, assigned_user_id, status, signature_image_key")
+      .eq("public_token", cleanToken)
+      .maybeSingle()
+
+    if (error || !order) {
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
     }
 
-    if (fileSize > MAX_FILE_SIZE) {
-      return { success: false, error: "Arquivo muito grande. Máximo: 5MB." }
+    if (order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já foi concluída, cancelada ou já possui assinatura registrada." }
+    }
+
+    const normalizedMime = String(fileType || "").trim().toLowerCase()
+    if (!ALLOWED_SIGNATURE_MIME_TYPES.includes(normalizedMime)) {
+      return { success: false, error: "Formato de arquivo não permitido para assinatura. Use PNG, JPEG ou WebP." }
+    }
+
+    if (!fileSize || fileSize <= 0 || fileSize > MAX_SIGNATURE_SIZE_BYTES) {
+      return { success: false, error: "Arquivo de assinatura muito grande. O limite máximo é de 2MB." }
     }
 
     const uploadUserId = order.assigned_user_id || "public-guest"
     const prefix = R2_PREFIXES.serviceOrderSignatures
 
-    // Generate safe extension
-    const ext = fileName.split('.').pop() || "png"
+    // Resolve safe extension from validated MIME
+    const ext = normalizedMime === "image/png" ? "png" : normalizedMime === "image/webp" ? "webp" : "jpg"
+    const crypto = await import("crypto")
+    const randomSuffix = crypto.randomBytes(12).toString("hex")
+    const key = `users/${uploadUserId}/${prefix}${Date.now()}-${randomSuffix}.${ext}`
 
     const result = await generateSignedUploadUrl({
-      fileName,
-      fileType,
+      fileName: `signature-${Date.now()}.${ext}`,
+      fileType: normalizedMime,
       userId: uploadUserId,
       prefix,
-      key: `users/${uploadUserId}/${prefix}${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`,
+      key,
     })
     return { success: true, ...result }
   } catch (err: any) {
@@ -2326,26 +2334,33 @@ export async function signPublicServiceOrderAction(
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const admin = getAdminClient()
-
-    // 1. Fetch OS by token
-    let { data: order, error } = await admin
-      .from("service_orders")
-      .select("id, status, assigned_user_id, partner_id, customer_snapshot")
-      .eq("public_token", token)
-      .maybeSingle()
-
-    if (!order && isUuid(token)) {
-      const { data: orderById } = await admin
-        .from("service_orders")
-        .select("id, status, assigned_user_id, partner_id, customer_snapshot")
-        .eq("id", token)
-        .maybeSingle()
-      if (orderById) order = orderById
+    const cleanToken = String(token || "").trim()
+    if (!cleanToken || cleanToken.length < 6) {
+      return { success: false, error: "Token inválido ou ordem de serviço não encontrada" }
     }
 
-    if (!order) {
+    const admin = getAdminClient()
+
+    // 1. Fetch OS strictly by public_token
+    const { data: order, error } = await admin
+      .from("service_orders")
+      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key")
+      .eq("public_token", cleanToken)
+      .maybeSingle()
+
+    if (error || !order) {
       return { success: false, error: "Ordem de serviço não encontrada ou token inválido" }
+    }
+
+    if (order.status === "concluida" || order.status === "entregue" || order.status === "cancelada" || order.signature_image_key) {
+      return { success: false, error: "Esta ordem de serviço já foi concluída, cancelada ou já possui assinatura registrada." }
+    }
+
+    // Validate signatureImageKey format and prefix
+    const uploadUserId = order.assigned_user_id || "public-guest"
+    const expectedPrefix = `users/${uploadUserId}/${R2_PREFIXES.serviceOrderSignatures}`
+    if (!signatureImageKey || !signatureImageKey.startsWith(expectedPrefix) || !/\.(png|jpg|jpeg|webp)$/i.test(signatureImageKey)) {
+      return { success: false, error: "Chave de assinatura inválida ou não autorizada para esta ordem de serviço." }
     }
 
     // 2. Determine auth method and check permission

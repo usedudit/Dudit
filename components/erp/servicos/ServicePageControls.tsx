@@ -50,6 +50,7 @@ interface ServicePageControlsProps {
     onViewModeChange: (mode: "list" | "grid") => void
     hasActiveFilters: boolean
     tabCounts?: { all: number; active: number; inactive: number; archived: number }
+    isDesapego?: boolean
 }
 
 const ServicePageControls: React.FC<ServicePageControlsProps> = ({
@@ -67,6 +68,7 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
     onViewModeChange,
     hasActiveFilters,
     tabCounts,
+    isDesapego = false,
 }) => {
     const filtersContainerRef = useRef<HTMLDivElement>(null)
     const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
@@ -197,23 +199,25 @@ const ServicePageControls: React.FC<ServicePageControlsProps> = ({
                         >
                             <FilterIcon className="w-4 h-4" />
                         </Button>
-                        <Dropdown
-                            trigger={
-                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
-                                    <Settings2Icon className="w-4 h-4" />
-                                </Button>
-                            }
-                            align="right"
-                            showChevron={false}
-                            className="w-fit"
-                        >
-                            <DropdownItem onClick={onOpenImport}>
-                                <UploadIcon size={14} /> Importar XML
-                            </DropdownItem>
-                            <DropdownItem onClick={onOpenExport}>
-                                <ExportFileIcon size={14} /> Exportar
-                            </DropdownItem>
-                        </Dropdown>
+                        {!isDesapego && (
+                            <Dropdown
+                                trigger={
+                                    <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                        <Settings2Icon className="w-4 h-4" />
+                                    </Button>
+                                }
+                                align="right"
+                                showChevron={false}
+                                className="w-fit"
+                            >
+                                <DropdownItem onClick={onOpenImport}>
+                                    <UploadIcon size={14} /> Importar XML
+                                </DropdownItem>
+                                <DropdownItem onClick={onOpenExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            </Dropdown>
+                        )}
                         <Button
                             onClick={onAddService}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"

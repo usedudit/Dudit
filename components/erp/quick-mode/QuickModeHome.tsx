@@ -29,6 +29,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
 import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedbackModal";
+import { StorePlaqueModal } from "@/components/erp/shared/StorePlaqueModal";
 import { usePermissions } from "@/lib/permission-context";
 import { MessageSquare } from "lucide-react";
 
@@ -68,99 +69,28 @@ interface DashboardChecklistItem {
 const DINO_CAVALERE_URL = "/api/assets/qr-dino";
 
 function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName: string }) {
-    const canvasRef = React.useRef<HTMLCanvasElement>(null);
-    const [generating, setGenerating] = useState(false);
-    const { toast } = useToast();
-
-    // Posições exatas do espaço branco do cavalete no QRDino.png (perfeitamente quadrado, abaixo do logo dudit)
-    const QR_POSITION = {
-        x: 0.156,      // 15.6% da largura (centro do espaço branco do cavalete)
-        y: 0.644,      // 64.4% da altura (abaixo do logo verde da dudit no cavalete)
-        width: 0.188,  // 18.8% da largura (quadrado perfeito)
-        height: 0.188, // 18.8% da altura (quadrado perfeito)
-    };
-
-    const downloadPoster = React.useCallback(async () => {
-        setGenerating(true);
-        try {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-
-            // Carrega a imagem do Dino cavalete
-            const dinoImg = new Image();
-            dinoImg.crossOrigin = "anonymous";
-            await new Promise<void>((resolve, reject) => {
-                dinoImg.onload = () => resolve();
-                dinoImg.onerror = reject;
-                dinoImg.src = DINO_CAVALERE_URL;
-            });
-
-            // Carrega o QR code em tamanho maior para melhor resolução
-            const qrSize = 500;
-            const qrImg = new Image();
-            qrImg.crossOrigin = "anonymous";
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(profileUrl)}`;
-            await new Promise<void>((resolve, reject) => {
-                qrImg.onload = () => resolve();
-                qrImg.onerror = reject;
-                qrImg.src = qrUrl;
-            });
-
-            // Configura o canvas com as dimensões da imagem original
-            canvas.width = dinoImg.naturalWidth;
-            canvas.height = dinoImg.naturalHeight;
-
-            // Desenha o Dino cavalete original
-            ctx.drawImage(dinoImg, 0, 0);
-
-            // Calcula a posição do QR code no cavalete (proporções exatas sem distorção)
-            const qrX = canvas.width * QR_POSITION.x;
-            const qrY = canvas.height * QR_POSITION.y;
-            const qrWidth = canvas.width * QR_POSITION.width;
-            const qrHeight = canvas.height * QR_POSITION.height;
-
-            // Desenha o QR code centralizado perfeitamente no espaço branco já existente no cavalete
-            ctx.drawImage(qrImg, qrX, qrY, qrWidth, qrHeight);
-
-            // Converte para blob e faz download direto
-            canvas.toBlob((blob) => {
-                if (blob) {
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = `poster-dudit-${storeName.replace(/\s+/g, "-").toLowerCase()}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
-                    toast({ title: "Poster baixado!", description: "Pronto para imprimir ou compartilhar." });
-                }
-                setGenerating(false);
-            }, "image/png");
-
-        } catch (err) {
-            console.error("Erro ao gerar poster:", err);
-            toast({ title: "Erro ao gerar imagem", description: "Tente novamente.", variant: "destructive" });
-            setGenerating(false);
-        }
-    }, [profileUrl, storeName, toast]);
+    const [showModal, setShowModal] = useState(false);
 
     return (
         <>
-            <canvas ref={canvasRef} className="hidden" />
             <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 rounded-full font-semibold text-xs text-brand-green border-brand-green/40 hover:bg-brand-green-light/30"
-                onClick={downloadPoster}
-                disabled={generating}
+                className="gap-2 rounded-full font-bold text-xs text-brand-green border-brand-green/40 hover:bg-brand-green-light/30"
+                onClick={() => setShowModal(true)}
             >
-                <DownloadIcon className="w-3.5 h-3.5" />
-                {generating ? "Gerando..." : "Baixar Poster"}
+                <SparklesIcon className="w-3.5 h-3.5" />
+                Gerar Plaquinhas & Posters
             </Button>
+
+            {showModal && (
+                <StorePlaqueModal
+                    isOpen={showModal}
+                    onClose={() => setShowModal(false)}
+                    profileUrl={profileUrl}
+                    storeName={storeName}
+                />
+            )}
         </>
     );
 }

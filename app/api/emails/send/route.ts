@@ -5,6 +5,11 @@
  * Security:
  * - Requires authentication
  * - Rate limited per user
+ * POST /api/emails/send
+ *
+ * Security:
+ * - Requires authentication
+ * - Rate limited per user
  * - Input validation
  * - No API key exposure
  */
@@ -12,6 +17,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser, requirePartnerAccess } from "@/lib/auth/authorization"
+import { requireAdmin } from "@/lib/auth/admin-authorization"
 import { can } from "@/lib/permissions/can"
 import { SecureLogger } from "@/lib/secure-logger"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
@@ -117,7 +123,8 @@ async function handler(request: NextRequest) {
     }
 
     // ====================================================================
-    // SECURITY: Verify partner access + permission if provided
+    // SECURITY: Verify partner access + permission if provided.
+    // If partnerId is omitted (platform-level email), strictly require admin role.
     // ====================================================================
     if (body.partnerId) {
       const access = await requirePartnerAccess(body.partnerId)
@@ -127,6 +134,15 @@ async function handler(request: NextRequest) {
           partnerId: body.partnerId,
         })
         return NextResponse.json({ error: "Acesso negado" }, { status: 403 })
+      }
+    } else {
+      try {
+        await requireAdmin("admin")
+      } catch {
+        SecureLogger.warn("[Email API] Unauthorized email relay attempt without partner context", {
+          userId,
+        })
+        return NextResponse.json({ error: "Acesso negado: permissão de administrador necessária para envio global." }, { status: 403 })
       }
     }
 
@@ -199,3 +215,19 @@ async function handler(request: NextRequest) {
 
 // Apply CSRF protection middleware
 export const POST = withCSRFProtection(handler)
+
+export async function GET() {
+  return NextResponse.json({ error: "Método não permitido" }, { status: 405 })
+}
+
+export async function PUT() {
+  return NextResponse.json({ error: "Método não permitido" }, { status: 405 })
+}
+
+export async function DELETE() {
+  return NextResponse.json({ error: "Método não permitido" }, { status: 405 })
+}
+
+export async function PATCH() {
+  return NextResponse.json({ error: "Método não permitido" }, { status: 405 })
+}

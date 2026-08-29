@@ -92,10 +92,10 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                 const supabase = (await import("@/lib/supabase/browser-client")).supabaseBrowser;
                 const storeId = selectedStore?.id || existingQuote?.store_id;
                 const storeQuery = storeId
-                    ? supabase.from("stores").select("logo_url, image_url").eq("id", storeId).maybeSingle()
-                    : supabase.from("stores").select("logo_url, image_url").eq("partner_id", partnerId).limit(1).maybeSingle();
+                    ? supabase.from("stores").select("logo_url").eq("id", storeId).maybeSingle()
+                    : supabase.from("stores").select("logo_url").eq("partner_id", partnerId).limit(1).maybeSingle();
                 const { data } = await storeQuery;
-                const foundLogo = data?.logo_url || data?.image_url;
+                const foundLogo = data?.logo_url;
                 if (foundLogo) setPartnerImage(foundLogo);
             };
             fetchPartnerImage();

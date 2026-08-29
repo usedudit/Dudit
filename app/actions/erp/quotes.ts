@@ -2309,9 +2309,10 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
                 return errorResponse("Não é possível alterar o código de um orçamento aprovado, rejeitado ou convertido.")
             }
 
-            // 2. Generate new code and salt
-            const plainCode = Math.floor(1000 + Math.random() * 9000).toString() // 4-digit code
-            const salt = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+            // 2. Generate new code and salt with cryptographically secure random
+            const crypto = await import("crypto")
+            const plainCode = crypto.randomInt(1000, 10000).toString() // 4-digit code
+            const salt = crypto.randomBytes(16).toString("hex")
 
             const { data: hashData, error: hashErr } = await supabase
                 .rpc("compute_approval_hash", { salt: salt, code: plainCode })
@@ -2323,7 +2324,11 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
 
             const hash = hashData as string
 
-            // 3. Update quote
+            // Clean any legacy plain_code from metadata
+            const cleanMetadata = { ...(quote.metadata || {}) }
+            delete cleanMetadata.plain_code
+
+            // 3. Update quote without persisting plain_code
             const { error: updateErr } = await supabase
                 .from("quotes")
                 .update({
@@ -2332,10 +2337,7 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
                     failed_attempts: 0,
                     lockout_until: null,
                     lockout_count: 0,
-                    metadata: {
-                        ...(quote.metadata || {}),
-                        plain_code: plainCode
-                    }
+                    metadata: cleanMetadata,
                 })
                 .eq("id", quoteId)
                 .eq("partner_id", partnerId)
@@ -2370,10 +2372,16 @@ export async function regenerateQuoteApprovalCodeAction(quoteId: string, partner
 export async function getPublicQuoteAction(publicToken: string, ip?: string, userAgent?: string) {
     return withTelemetry("getPublicQuoteAction", async () => {
         try {
+            await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+            const cleanToken = String(publicToken || "").trim()
+            if (!cleanToken || cleanToken.length < 6) {
+                return errorResponse("Link inválido ou orçamento não encontrado")
+            }
+
             const admin = getAdminClient()
 
-            // 1. Fetch quote by public_token
-            let { data: quote, error: quoteErr } = await admin
+            // 1. Fetch quote strictly by public_token
+            const { data: quote, error: quoteErr } = await admin
                 .from("quotes")
                 .select(`
                     *,
@@ -2385,42 +2393,8 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         id, user_id
                     )
                 `)
-                .eq("public_token", publicToken)
+                .eq("public_token", cleanToken)
                 .maybeSingle()
-
-            // 1b. Fallback: try by quote id (UUID)
-            if (!quote && isUuid(publicToken)) {
-                const { data: quoteById } = await admin
-                    .from("quotes")
-                    .select(`
-                        *,
-                        customers (
-                            id, name, email, phone,
-                            addresses (*)
-                        ),
-                        partners (
-                            id, user_id
-                        )
-                    `)
-                    .eq("id", publicToken)
-                    .maybeSingle()
-                if (quoteById) {
-                    quote = quoteById
-                    // Auto-generate public_token if missing or UUID
-                    if (!quote.public_token || isUuid(quote.public_token)) {
-                        const newToken = generateShortId(6)
-                        await admin.from("quotes").update({ public_token: newToken }).eq("id", quote.id)
-                        quote.public_token = newToken
-                    }
-                }
-            }
-
-            // 1c. Auto-generate public_token if quote exists but has none or is UUID
-            if (quote && (!quote.public_token || isUuid(quote.public_token))) {
-                const newToken = generateShortId(6)
-                await admin.from("quotes").update({ public_token: newToken }).eq("id", quote.id)
-                quote.public_token = newToken
-            }
 
             if (quoteErr || !quote) {
                 return errorResponse("Link inválido ou orçamento não encontrado")
@@ -2514,10 +2488,10 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
 
             // Fetch store details to resolve partner name/logo override
             const storeQuery = quote.store_id
-                ? admin.from("stores").select("name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
-                : admin.from("stores").select("name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle()
+                ? admin.from("stores").select("name, logo_url, phone").eq("id", quote.store_id).maybeSingle()
+                : admin.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle()
             const { data: store } = await storeQuery
-            const storeLogo = store?.logo_url || store?.image_url || null
+            const storeLogo = store?.logo_url || null
 
             // 5. Fetch live details and items
             let sellerInfo = null
@@ -2639,8 +2613,20 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 },
                 seller: sellerInfo,
                 customer: quote.customers ? {
-                    ...quote.customers,
-                    addresses: quote.customers.addresses || []
+                    id: quote.customers.id,
+                    name: quote.customers.name,
+                    email: quote.customers.email ? `${quote.customers.email.split('@')[0].slice(0, 2)}***@${quote.customers.email.split('@')[1] || 'email.com'}` : null,
+                    phone: quote.customers.phone ? `(***) *****-${quote.customers.phone.replace(/\D/g, '').slice(-4)}` : null,
+                    addresses: (quote.customers.addresses || []).map((a: any) => ({
+                        id: a.id,
+                        street: a.street,
+                        neighborhood: a.neighborhood,
+                        city: a.city,
+                        state: a.state,
+                        zip_code: a.zip_code ? `${a.zip_code.slice(0, 5)}-***` : null,
+                        number: "***",
+                        complement: "***",
+                    }))
                 } : null,
                 items: formattedItems,
                 payment_terms: quote.metadata?.payment_terms || null,

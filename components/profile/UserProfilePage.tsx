@@ -182,12 +182,12 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 try {
                     const supabase = createClient()
                     await supabase.auth.signOut({ scope: "global" })
-                } catch {}
+                } catch { }
                 if (typeof window !== "undefined") {
                     try {
                         localStorage.clear()
                         sessionStorage.clear()
-                    } catch {}
+                    } catch { }
                     window.location.replace("/auth/login?deleted=true")
                 }
             }
@@ -805,11 +805,12 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 )}
 
                 {deleteStep === "verify_code" && (
-                    <div className="pt-2 pb-4">
+                    <div>
                         <InfoCard
                             title="Código enviado por e-mail"
                             message={`Enviamos um código numérico de 6 dígitos para ${deleteMaskedEmail}. O código expira em 15 minutos.`}
                             color="green"
+                            className="mb-4"
                         />
 
                         {deleteError && (
@@ -830,7 +831,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                 autoFocus
                                 required
                             />
-                            <div className="flex items-center justify-between text-xs pt-1">
+                            <div className="flex items-center justify-between text-xs mb-2">
                                 <span className="text-brand-inactive-text dark:text-dark-body">
                                     Não recebeu o e-mail?
                                 </span>

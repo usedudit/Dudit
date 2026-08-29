@@ -9,8 +9,8 @@ const gitHash = spawnSync("git", ["rev-parse", "HEAD"], {
 
 const revision =
   gitHash ||
-  process.env.RAILWAY_GIT_COMMIT_SHA ||
-  "offline-v1"
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  "v1"
 
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",

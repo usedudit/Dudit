@@ -326,17 +326,21 @@ export class AccountDeletionService {
    * Cancel customer preapprovals (subscriptions) linked to the partner.
    */
   static async cancelCustomerSubscriptions(partnerId: string): Promise<number> {
-    const admin = getAdminClient()
-    let cancelledCount = 0
+    try {
+      const admin = getAdminClient()
+      let cancelledCount = 0
 
-    // Fetch active customer subscriptions of this partner
-    const { data: subs } = await admin
-      .from("recurring_subscriptions")
-      .select("id, mp_preapproval_id")
-      .eq("partner_id", partnerId)
-      .not("mp_preapproval_id", "is", null)
+      // Fetch active customer subscriptions of this partner
+      const { data: subs, error: subsError } = await admin
+        .from("recurring_subscriptions")
+        .select("id, mp_preapproval_id")
+        .eq("partner_id", partnerId)
+        .not("mp_preapproval_id", "is", null)
 
-    if (subs && subs.length > 0) {
+      if (subsError || !subs || subs.length === 0) {
+        return 0
+      }
+
       // Find decrypted token of the partner
       const { data: partner } = await admin
         .from("partners")
@@ -378,9 +382,12 @@ export class AccountDeletionService {
           }
         }
       }
-    }
 
-    return cancelledCount
+      return cancelledCount
+    } catch (err) {
+      SecureLogger.warn("cancelCustomerSubscriptions bypassed due to error or missing columns", { error: err })
+      return 0
+    }
   }
 
   /**
@@ -593,7 +600,7 @@ export class AccountDeletionService {
 
     // Retrieve MP subscription details
     let mpSubscriptionId = null
-    let mpCustomerId = null
+    const mpCustomerId = null
     if (partnerId) {
       const { data: sub } = await admin
         .from("subscriptions")
@@ -602,22 +609,18 @@ export class AccountDeletionService {
         .maybeSingle()
 
       mpSubscriptionId = sub?.mercado_pago_subscription_id || null
-
-      const { data: partner } = await admin
-        .from("partners")
-        .select("mp_customer_id")
-        .eq("id", partnerId)
-        .maybeSingle()
-
-      mpCustomerId = partner?.mp_customer_id || null
     }
 
-    // 1. Anonymize Orders
+    // 1. Anonymize Orders (must maintain customer_name to satisfy CHECK constraint orders_customer_not_null)
     if (partnerId) {
       const { data: orders } = await admin
         .from("orders")
         .update({
           buyer_id: null,
+          customer_name: "[CLIENTE ANONIMIZADO]",
+          customer_email: null,
+          customer_phone: null,
+          customer_cpf: null,
           delivery_address: "[DADOS ANONIMIZADOS - CONTA EXCLUÍDA]",
           notes: null
         })
@@ -632,6 +635,10 @@ export class AccountDeletionService {
       .from("orders")
       .update({
         buyer_id: null,
+        customer_name: "[CLIENTE ANONIMIZADO]",
+        customer_email: null,
+        customer_phone: null,
+        customer_cpf: null,
         delivery_address: "[DADOS ANONIMIZADOS - CONTA EXCLUÍDA]",
         notes: null
       })

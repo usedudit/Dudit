@@ -915,7 +915,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                 </div>
 
                                 {/* Tabs */}
-                                {!isQuick && (
+                                {!isDesapego && (
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="general">
@@ -931,15 +931,17 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                     {getTabErrorCount("variations") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </span>
                                             </TabsTrigger>
-                                            <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
-                                                <span className="inline-flex items-center gap-2">
-                                                    Fornecedores
-                                                    {suppliersPlanBlocked ? (
-                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
-                                                    ) : null}
-                                                    {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                                </span>
-                                            </TabsTrigger>
+                                            {!isQuick && (
+                                                <TabsTrigger value="suppliers" disabled={isLoadingDetails}>
+                                                    <span className="inline-flex items-center gap-2">
+                                                        Fornecedores
+                                                        {suppliersPlanBlocked ? (
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
+                                                        ) : null}
+                                                        {getTabErrorCount("suppliers") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                                    </span>
+                                                </TabsTrigger>
+                                            )}
                                             {productData.show_in_marketplace && (
                                                 <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
                                                     Marketplace

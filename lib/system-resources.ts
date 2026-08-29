@@ -194,6 +194,39 @@ export const SYSTEM_RESOURCE_IDS: SystemResourceId[] = [
   "communityVideos",
 ]
 
+export const DESAPEGO_AVAILABLE_RESOURCES: SystemResourceId[] = [
+  "products",
+  "services",
+]
+
+export const QUICK_AVAILABLE_RESOURCES: SystemResourceId[] = [
+  "orders",
+  "quotes",
+  "products",
+  "productCadastros",
+  "services",
+  "appointments",
+  "serviceCadastros",
+  "deliveries",
+  "customers",
+  "coupons",
+  "campaigns",
+  "communityVideos",
+]
+
+export const ERP_AVAILABLE_RESOURCES: SystemResourceId[] = SYSTEM_RESOURCES.map((resource) => resource.id)
+
+export function getAvailableResourcesForMode(mode?: string): SystemResourceId[] {
+  const normalizedMode = String(mode || "erp").toLowerCase().trim()
+  if (normalizedMode === "desapego") {
+    return DESAPEGO_AVAILABLE_RESOURCES
+  }
+  if (normalizedMode === "quick" || normalizedMode === "showcase") {
+    return QUICK_AVAILABLE_RESOURCES
+  }
+  return ERP_AVAILABLE_RESOURCES
+}
+
 export function normalizeActiveResources(value: unknown): SystemResourceId[] {
   if (!Array.isArray(value)) {
     return [

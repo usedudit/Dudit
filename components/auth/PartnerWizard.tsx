@@ -356,12 +356,14 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
             if (isUserLoggedIn || createdSession) {
                 const announce = searchParams.get("announce")
-                if (announce === "product") {
-                    router.push("/erp/produtos?create=true")
-                } else if (announce === "service") {
-                    router.push("/erp/servicos?create=true")
-                } else {
-                    router.push("/erp/inicio")
+                if (typeof window !== "undefined") {
+                    if (announce === "product") {
+                        window.location.href = "/erp/produtos?create=true"
+                    } else if (announce === "service") {
+                        window.location.href = "/erp/servicos?create=true"
+                    } else {
+                        window.location.href = "/erp/inicio"
+                    }
                 }
             } else {
                 router.push(`/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)

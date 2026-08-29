@@ -1,3 +1,5 @@
+import { randomBytes } from "crypto"
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
@@ -8,17 +10,17 @@ export function isUuid(value: unknown): value is string {
     return UUID_REGEX.test(value.trim())
 }
 
-const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
+/**
+ * Generates a cryptographically secure URL-safe public token with 128+ bits of entropy.
+ * Default size produces 22 URL-safe characters using crypto.randomBytes(16).
+ */
+export function generateShortId(_size?: number): string {
+    return randomBytes(16).toString("base64url")
+}
 
 /**
- * Generates a clean lowercase alphanumeric short ID of specified length.
- * Default size is 6 characters (~2.17 billion permutations).
+ * Generates a cryptographically secure URL-safe public token with specified byte entropy (default 16 bytes = 128 bits).
  */
-export function generateShortId(size = 6): string {
-    let id = ""
-    for (let i = 0; i < size; i++) {
-        const randomIndex = Math.floor(Math.random() * ALPHABET.length)
-        id += ALPHABET[randomIndex]
-    }
-    return id
+export function generateSecurePublicToken(byteLength = 16): string {
+    return randomBytes(byteLength).toString("base64url")
 }

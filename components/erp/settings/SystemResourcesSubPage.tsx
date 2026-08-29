@@ -14,13 +14,16 @@ import {
     SYSTEM_RESOURCES,
     SYSTEM_RESOURCE_MODULE_LABELS,
     resolveActiveResources,
+    getAvailableResourcesForMode,
     type SystemResourceId,
     type SystemResourceModule,
 } from "@/lib/system-resources"
 
 interface SystemResourcesSubPageProps {
     businessInfo: {
+        mode?: string
         activeResources?: string[]
+        resourcesVersion?: number
     }
     planSlug: string
     onBack: () => void
@@ -47,14 +50,15 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(hasChanges)
 
     const groupedResources = React.useMemo(() => {
+        const allowedIds = new Set(getAvailableResourcesForMode(businessInfo?.mode))
         return SYSTEM_RESOURCES
-            .filter((r) => r.id !== "team")
+            .filter((r) => r.id !== "team" && allowedIds.has(r.id))
             .reduce((acc, resource) => {
                 if (!acc[resource.module]) acc[resource.module] = []
                 acc[resource.module].push(resource)
                 return acc
             }, {} as Record<SystemResourceModule, typeof SYSTEM_RESOURCES>)
-    }, [])
+    }, [businessInfo?.mode])
 
     const isResourceLocked = (_resourceId: SystemResourceId): boolean => {
         return false

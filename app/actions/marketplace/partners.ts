@@ -2,10 +2,11 @@
 
 // Removed createSupabaseAdmin
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { unstable_cache, revalidatePath, revalidateTag } from "next/cache"
+import { unstable_cache, revalidatePath } from "next/cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { cache } from "react"
-import { revalidatePartnerProfile, revalidateAddresses } from "@/lib/utils/revalidation"
+import { revalidatePartnerProfile, revalidateAddresses, safeRevalidateTag } from "@/lib/utils/revalidation"
+import { setActivePartner, setActiveStore } from "@/lib/auth/partner-context"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -1050,8 +1051,16 @@ export async function registerPartner(data: any) {
     }
     await revalidatePartnerProfile(newPartner.id)
 
-    revalidateTag(TAGS.userAccess(userId), "max")
+    await safeRevalidateTag(TAGS.userAccess(userId))
     revalidatePath("/erp")
+
+    // Set cookies so ERP layout can resolve partner context immediately
+    if (newPartner?.id) {
+      await setActivePartner(newPartner.id)
+    }
+    if (newStore?.id) {
+      await setActiveStore(newStore.id)
+    }
 
     return { success: true, partnerId: newPartner.id }
 

@@ -15,6 +15,7 @@ import { getERPProductsPageAction, type ERPProductListCursor } from "@/app/actio
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { usePermissions } from "@/lib/permission-context"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/limit-upgrade"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -211,7 +212,8 @@ export default function ProductsPage({
     const { error: notifyError, success: notifySuccess } = useNotification()
     const { selectedStore } = useStore()
     const isTabletOrMobile = useMediaQuery("(max-width: 1023px)")
-    const { planSlug } = usePermissions()
+    const { planSlug, businessInfo } = usePermissions()
+    const isDesapego = normalizeBusinessInfo(businessInfo).mode === "desapego"
     const { openPlanUpgrade } = usePlanUpgrade()
 
     const storeId = selectedStore?.id || null
@@ -984,42 +986,46 @@ export default function ProductsPage({
                                 </div>
 
                                 <div className="flex items-center gap-3">
-                                    <Button
-                                        variant="outlineorange"
-                                        className="w-[42px] h-[42px]"
-                                        onClick={() => {
-                                            if (hasMinimumPlan(planSlug, "escalar")) setShowReplenishment(true)
-                                            else openPlanUpgrade("escalar")
-                                        }}
-                                        leftIcon={<StarIcon size={18} />}
-                                    >
-                                    </Button>
-                                    <Dropdown
-                                        trigger={
-                                            <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
-                                                Ações
-                                            </Button>
-                                        }
-                                        align="right"
-                                        showChevron={false}
-                                        fullWidth={false}
-                                    >
-                                        <DropdownItem onClick={() => router.push("/erp/produtos/importar")}>
-                                            <UploadSheetIcon size={18} /> Importar Planilha
-                                        </DropdownItem>
-                                        <DropdownItem onClick={handleExport} disabled={isExporting}>
-                                            <ExportFileIcon size={18} /> {isExporting ? "Exportando..." : "Exportar"}
-                                        </DropdownItem>
-                                        <DropdownItem onClick={() => {
-                                            if (!hasMinimumPlan(planSlug, "crescer")) {
-                                                openPlanUpgrade("crescer")
-                                            } else {
-                                                setShowLabelModal(true)
+                                    {!isDesapego && (
+                                        <Button
+                                            variant="outlineorange"
+                                            className="w-[42px] h-[42px]"
+                                            onClick={() => {
+                                                if (hasMinimumPlan(planSlug, "escalar")) setShowReplenishment(true)
+                                                else openPlanUpgrade("escalar")
+                                            }}
+                                            leftIcon={<StarIcon size={18} />}
+                                        >
+                                        </Button>
+                                    )}
+                                    {!isDesapego && (
+                                        <Dropdown
+                                            trigger={
+                                                <Button variant="outline" leftIcon={<Settings2Icon size={18} />}>
+                                                    Ações
+                                                </Button>
                                             }
-                                        }}>
-                                            <TagIcon size={18} /> Gerar Etiquetas
-                                        </DropdownItem>
-                                    </Dropdown>
+                                            align="right"
+                                            showChevron={false}
+                                            fullWidth={false}
+                                        >
+                                            <DropdownItem onClick={() => router.push("/erp/produtos/importar")}>
+                                                <UploadSheetIcon size={18} /> Importar Planilha
+                                            </DropdownItem>
+                                            <DropdownItem onClick={handleExport} disabled={isExporting}>
+                                                <ExportFileIcon size={18} /> {isExporting ? "Exportando..." : "Exportar"}
+                                            </DropdownItem>
+                                            <DropdownItem onClick={() => {
+                                                if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                    openPlanUpgrade("crescer")
+                                                } else {
+                                                    setShowLabelModal(true)
+                                                }
+                                            }}>
+                                                <TagIcon size={18} /> Gerar Etiquetas
+                                            </DropdownItem>
+                                        </Dropdown>
+                                    )}
 
                                     <Button
                                         onClick={handleAddFirstProduct}
@@ -1056,6 +1062,7 @@ export default function ProductsPage({
                                     }}
                                     hasEscalarPlan={hasMinimumPlan(planSlug, "escalar")}
                                     tabCounts={tabCounts}
+                                    isDesapego={isDesapego}
                                 />
                             )}
 

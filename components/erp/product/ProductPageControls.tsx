@@ -60,6 +60,7 @@ interface ProductPageControlsProps {
     onOpenReplenishment?: () => void
     hasEscalarPlan?: boolean
     tabCounts?: { all: number; normal: number; low: number; out_of_stock: number; archived: number }
+    isDesapego?: boolean
 }
 
 const ProductPageControls: React.FC<ProductPageControlsProps> = ({
@@ -81,6 +82,7 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
     onOpenReplenishment,
     hasEscalarPlan,
     tabCounts,
+    isDesapego = false,
 }) => {
     // Estado local para o scroll dos filtros (badges)
     const filtersContainerRef = useRef<HTMLDivElement>(null)
@@ -250,35 +252,37 @@ const ProductPageControls: React.FC<ProductPageControlsProps> = ({
                         >
                             <FilterIcon className="w-4 h-4" />
                         </Button>
-                        <Dropdown
-                            trigger={
-                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
-                                    <Settings2Icon className="w-4 h-4" />
-                                </Button>
-                            }
-                            align="right"
-                            showChevron={false}
-                            className="w-fit"
-                        >
-                            <DropdownItem onClick={onOpenReplenishment}>
-                                <div className="flex items-center gap-2">
-                                    <StarIcon size={14} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
-                                    <span>Sugestões</span>
-                                    {!hasEscalarPlan && (
-                                        <span className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded ml-auto">Premium</span>
-                                    )}
-                                </div>
-                            </DropdownItem>
-                            <DropdownItem onClick={onOpenCamera}>
-                                <CameraIcon size={14} /> Escanear Câmera
-                            </DropdownItem>
-                            <DropdownItem onClick={onOpenImport}>
-                                <UploadIcon size={14} /> Importar XML
-                            </DropdownItem>
-                            <DropdownItem onClick={onOpenExport}>
-                                <ExportFileIcon size={14} /> Exportar
-                            </DropdownItem>
-                        </Dropdown>
+                        {!isDesapego && (
+                            <Dropdown
+                                trigger={
+                                    <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                        <Settings2Icon className="w-4 h-4" />
+                                    </Button>
+                                }
+                                align="right"
+                                showChevron={false}
+                                className="w-fit"
+                            >
+                                <DropdownItem onClick={onOpenReplenishment}>
+                                    <div className="flex items-center gap-2">
+                                        <StarIcon size={14} className={hasEscalarPlan ? "" : "text-brand-inactive-text"} />
+                                        <span>Sugestões</span>
+                                        {!hasEscalarPlan && (
+                                            <span className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded ml-auto">Premium</span>
+                                        )}
+                                    </div>
+                                </DropdownItem>
+                                <DropdownItem onClick={onOpenCamera}>
+                                    <CameraIcon size={14} /> Escanear Câmera
+                                </DropdownItem>
+                                <DropdownItem onClick={onOpenImport}>
+                                    <UploadIcon size={14} /> Importar XML
+                                </DropdownItem>
+                                <DropdownItem onClick={onOpenExport}>
+                                    <ExportFileIcon size={14} /> Exportar
+                                </DropdownItem>
+                            </Dropdown>
+                        )}
                         <Button
                             onClick={onAddProduct}
                             className="w-[42px] h-[42px] p-0 flex items-center justify-center"
