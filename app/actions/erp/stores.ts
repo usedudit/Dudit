@@ -39,7 +39,7 @@ export async function listStoresAction(partnerId: string) {
                 if (!puRes.data) return []
                 const { data: members } = await admin
                     .from("store_members")
-                    .select("store_id")
+                    .select("store_id, role")
                     .eq("partner_user_id", puRes.data.id)
                 const memberStoreIds = (members || []).map((m: any) => m.store_id)
                 if (memberStoreIds.length === 0) return []
@@ -55,6 +55,18 @@ export async function listStoresAction(partnerId: string) {
             if (allowedStoreIds !== null) query = query.in("id", allowedStoreIds)
             const { data, error } = await query.order("created_at", { ascending: true })
             if (error) throw new Error(error.message)
+
+            // Build a map of store_id -> user_role for non-owner users
+            const storeRoleMap = new Map<string, string>()
+            if (!isPartnerOwner && roleId !== "owner" && puRes.data) {
+                const { data: members } = await admin
+                    .from("store_members")
+                    .select("store_id, role")
+                    .eq("partner_user_id", puRes.data.id)
+                for (const m of members || []) {
+                    if (m.store_id && m.role) storeRoleMap.set(m.store_id, m.role)
+                }
+            }
 
             const stores: any[] = []
             for (const store of data || []) {
@@ -76,6 +88,12 @@ export async function listStoresAction(partnerId: string) {
                         const { decryptCPF } = await import("@/lib/crypto")
                         merged.cpf = await decryptCPF(merged.cpf as string)
                     } catch { /* keep encrypted */ }
+                }
+                // Attach user's effective role for this store
+                if (isPartnerOwner || roleId === "owner") {
+                    merged.user_role = "owner"
+                } else {
+                    merged.user_role = storeRoleMap.get(store.id) || roleId
                 }
                 stores.push(merged)
             }

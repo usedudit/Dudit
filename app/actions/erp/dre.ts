@@ -7,6 +7,7 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getDreReport, type DreFilters, type DreReportData } from "@/lib/services/dre.service"
+import { checkPermission } from "@/lib/permissions/access"
 
 export async function getDreReportAction(filters: DreFilters): Promise<{
   success: boolean
@@ -35,16 +36,18 @@ export async function getDreReportAction(filters: DreFilters): Promise<{
     }
 
     const isPartnerOwner = partnerRes.data?.user_id === user.id
-    const roleId = String(puRes.data?.role_id || "").toLowerCase()
 
-    // 2. Verificação de Role (apenas owner, admin, manager)
-    if (!isPartnerOwner && !["owner", "admin", "manager"].includes(roleId)) {
-      return { success: false, error: "Apenas proprietários, administradores e gerentes podem acessar o DRE." }
+    // 2. Verificação de Permissão: Owner bypasses, outros precisam de reports.export_dre
+    if (!isPartnerOwner) {
+      const { allowed } = await checkPermission(partnerId, "reports", "export_dre")
+      if (!allowed) {
+        return { success: false, error: "Apenas proprietários, administradores e gerentes podem acessar o DRE." }
+      }
     }
 
     // 3. Verificação de Lojas Acessíveis pelo Usuário
     let allowedStoreIds: string[] | null = null
-    if (!isPartnerOwner && roleId !== "owner") {
+    if (!isPartnerOwner) {
       if (!puRes.data) {
         return { success: false, error: "Você não possui acesso a nenhuma loja desta empresa." }
       }

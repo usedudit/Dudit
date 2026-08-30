@@ -5,12 +5,14 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPCustomersPageAction } from "@/app/actions/erp/customers"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export default async function CustomersRoute() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
 
-  if (context.roleId === "delivery") {
+  if (!can(context as RbacUserLike, "customers.list")) {
     return <AccessDenied />
   }
 

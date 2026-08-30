@@ -247,7 +247,7 @@ function normalizeCustomerForCard(customer: any) {
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const { planSlug, role, hasSpecific } = usePermissions()
+    const { planSlug, role, hasSpecific, canRbac } = usePermissions()
     const canDiscount = hasSpecific("orders", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
     const router = useRouter()
@@ -2048,7 +2048,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                     <OrderObservationsTab
                                         notes={notes}
                                         setNotes={setNotes}
-                                        disabled={role === 'DELIVERY'}
+                                        disabled={!canRbac("orders.edit")}
                                     />
                                 </FadeIn>
                             </TabsContent>

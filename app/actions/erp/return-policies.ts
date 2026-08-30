@@ -3,6 +3,8 @@
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
@@ -13,8 +15,6 @@ import {
   normalizePolicyRow,
   type PartnerReturnPolicy,
 } from "@/lib/returns/policy"
-
-const MANAGE_ROLES = new Set(["owner", "admin", "manager"])
 
 const policySchema = z.object({
   partnerId: z.string().uuid(),
@@ -38,8 +38,8 @@ const policySchema = z.object({
   slaResponseDays: z.number().int().min(1).max(90),
 })
 
-function assertManageRole(roleId: string) {
-  if (!MANAGE_ROLES.has(String(roleId || "").toLowerCase())) {
+function assertManageRole(access: { roleId: string; permissions: any }) {
+  if (!can(access as RbacUserLike, "orders.can_refund")) {
     throw new Error("Sem permissão para editar políticas de devolução")
   }
 }
@@ -79,7 +79,7 @@ export async function upsertPartnerReturnPolicyAction(input: z.infer<typeof poli
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     const parsed = policySchema.parse(input)
     const access = await requirePermission(parsed.partnerId, "settings", "settings_returns")
-    assertManageRole(access.roleId)
+    assertManageRole(access)
 
     const supabase = createAdminClient()
     const payload = {

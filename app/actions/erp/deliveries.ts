@@ -20,6 +20,7 @@ import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { createNotification } from "@/lib/services/notification.service"
+import { checkPermission } from "@/lib/permissions/access"
 
 export type ERPDeliveryListCursor = { createdAt: string; id: string }
 
@@ -627,7 +628,8 @@ export async function getSmartDeliverySuggestionsAction(input: {
   await requireUser()
   await requirePartnerRouteAccess(input.partnerId, "logistics", { specificPermission: "can_create_deliveries" })
   const actor = await getDeliveryActorScope(input.partnerId)
-  if (actor.roleId === "delivery") {
+  const deliveryCreateCheck = await checkPermission(input.partnerId, "delivery", "create")
+  if (!deliveryCreateCheck.allowed) {
     return { success: false as const, error: "Sem permissão para gerar sugestões." }
   }
 
@@ -899,7 +901,8 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
   await requireUser()
   await requireActivePartnerContext(partnerId)
   const actor = await getDeliveryActorScope(partnerId)
-  if (actor.roleId === "delivery") return []
+  const orderListCheck = await checkPermission(partnerId, "orders", "list")
+  if (!orderListCheck.allowed) return []
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
   if (!planCheck.allowed) return []
   const supabase = await getSupabaseServerClient()
@@ -1097,7 +1100,8 @@ async function geocodeWithTimeout(address: string, timeoutMs = 600): Promise<{ l
 export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
   await requireUser()
   const actor = await getDeliveryActorScope(partnerId)
-  if (actor.roleId === "delivery") return []
+  const teamCheck = await checkPermission(partnerId, "settings", "settings_team")
+  if (!teamCheck.allowed) return []
 
   return getCachedErpPage(
     ["erp-delivery-people-bucket", partnerId],
@@ -1216,7 +1220,8 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
 export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     await requireUser()
     const actor = await getDeliveryActorScope(partnerId)
-    if (actor.roleId === "delivery") {
+    const deliverySettingsCheck = await checkPermission(partnerId, "settings", "settings_delivery")
+    if (!deliverySettingsCheck.allowed) {
       return { success: false as const, error: "Sem permissão para configurar entregas." }
     }
 
@@ -1246,7 +1251,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
   export async function createERPDeliveryAction(payload: CreateDeliveryPayload) {
     const user = await requireUser()
     const actor = await getDeliveryActorScope(payload.partnerId, "can_create_deliveries")
-    if (actor.roleId === "delivery") {
+    const deliveryCreateCheck = await checkPermission(payload.partnerId, "delivery", "create")
+    if (!deliveryCreateCheck.allowed) {
       return { success: false as const, error: "Sem permissão para criar entregas." }
     }
     const supabase = await getSupabaseServerClient()
@@ -2337,7 +2343,8 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
   }) {
     const user = await requireUser()
     const actor = await getDeliveryActorScope(payload.partnerId, "can_assign_driver")
-    if (actor.roleId === "delivery") {
+    const deliveryEditCheck = await checkPermission(payload.partnerId, "delivery", "edit")
+    if (!deliveryEditCheck.allowed) {
       return { success: false as const, error: "Sem permissão para editar entregas." }
     }
     const supabase = await getSupabaseServerClient()

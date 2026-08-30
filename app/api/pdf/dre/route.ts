@@ -6,6 +6,7 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { generatePdf } from "@/lib/pdf/generator"
 import { formatDateToBR } from "@/lib/utils"
+import { checkPermission } from "@/lib/permissions/access"
 
 export async function GET(request: NextRequest) {
   // 1. Autenticar usuário
@@ -51,11 +52,14 @@ export async function GET(request: NextRequest) {
   const isPartnerOwner = partnerRes.data?.user_id === user.id
   const roleId = String(puRes.data?.role_id || "").toLowerCase()
 
-  if (!isPartnerOwner && !["owner", "admin", "manager"].includes(roleId)) {
-    return new Response(JSON.stringify({ error: "Apenas proprietários, administradores e gerentes podem exportar o DRE." }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    })
+  if (!isPartnerOwner) {
+    const { allowed } = await checkPermission(partnerId, "reports", "export_dre")
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Apenas proprietários, administradores e gerentes podem exportar o DRE." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
   }
 
   // 3. Validar acesso à loja

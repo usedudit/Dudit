@@ -5,6 +5,8 @@ import { getUnifiedDashboardAction } from "@/app/actions/erp/quick-mode"
 import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { IconPlaceholder, SkeletonLoader } from "@/components/reusable"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export const dynamic = "force-dynamic"
 
@@ -17,7 +19,7 @@ export default async function InicioPage() {
 
     const { partnerId, roleId } = context
 
-    if (roleId === "delivery") {
+    if (!can(context as RbacUserLike, "dashboard.view")) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 text-center">
                 <FadeIn>

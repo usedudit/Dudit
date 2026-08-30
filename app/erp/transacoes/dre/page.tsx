@@ -7,6 +7,7 @@ import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { createAdminClient } from "@/lib/supabase/server"
+import { checkPermission } from "@/lib/permissions/access"
 
 export const dynamic = "force-dynamic"
 
@@ -36,16 +37,16 @@ export default async function DreRoute() {
   }
 
   const isPartnerOwner = partnerRes.data?.user_id === context.userId
-  const roleId = String(puRes.data?.role_id || context.roleId || context.role || "").toLowerCase()
 
-  // 2. Verificação de Role: Somente Owner, Admin e Gerente (Manager)
-  if (!isPartnerOwner && !["owner", "admin", "manager"].includes(roleId)) {
-    return <AccessDenied />
+  // 2. Verificação de Permissão: Owner bypasses, outros precisam de reports.export_dre
+  if (!isPartnerOwner) {
+    const { allowed } = await checkPermission(partnerId, "reports", "export_dre")
+    if (!allowed) return <AccessDenied />
   }
 
   // 3. Filtrar somente as lojas que o usuário tem acesso
   let allowedStoreIds: string[] | null = null
-  if (!isPartnerOwner && roleId !== "owner") {
+  if (!isPartnerOwner) {
     if (!puRes.data) return <AccessDenied />
     const { data: members } = await admin
       .from("store_members")

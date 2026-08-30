@@ -11,9 +11,10 @@ export type PermissionTemplate = {
     can_apply_discount: boolean
     can_add_delivery: boolean
     can_refund: boolean
+    list: boolean
   }
   appointments: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  customers: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  customers: { view: boolean; create: boolean; edit: boolean; delete: boolean; list: boolean; view_fiscal_data: boolean; view_personal_data: boolean }
   suppliers: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   products: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   stock_movements: { view: boolean; create: boolean; undo: boolean }
@@ -34,7 +35,7 @@ export type PermissionTemplate = {
   categories: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   coupons: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   goals: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  reports: { view_basic: boolean; view_advanced: boolean }
+  reports: { view_basic: boolean; view_advanced: boolean; export_dre: boolean }
   dashboard: { view: boolean }
   delivery: { view: boolean; create: boolean; edit: boolean; update_status: boolean }
   recurring_plans: { view: boolean; manage: boolean }

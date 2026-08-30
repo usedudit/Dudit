@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getCurrentUser } from "@/lib/auth/authorization"
+import { getCurrentUser, requirePartnerAccess } from "@/lib/auth/authorization"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { SecureLogger } from "@/lib/secure-logger"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
@@ -44,77 +44,87 @@ export async function GET(
 
     const paymentData = await response.json()
 
+    // ── Locate target subscription in local database ──
+    const { getAdminClient } = await import("@/lib/supabase/admin")
+    const adminClient = getAdminClient()
+
+    const subscriptionId = paymentData.external_reference || paymentData.metadata?.subscription_id
+
+    let targetSub = null
+    if (subscriptionId) {
+      const { data: sub } = await adminClient
+        .from("subscriptions")
+        .select("id, partner_id, status, plan_id, current_period_end, mercado_pago_subscription_id")
+        .eq("id", subscriptionId)
+        .maybeSingle()
+      targetSub = sub
+    }
+
+    if (!targetSub && paymentData.preapproval_id) {
+      const { data: sub } = await adminClient
+        .from("subscriptions")
+        .select("id, partner_id, status, plan_id, current_period_end, mercado_pago_subscription_id")
+        .eq("mercado_pago_subscription_id", paymentData.preapproval_id.toString())
+        .maybeSingle()
+      targetSub = sub
+    }
+
+    if (!targetSub) {
+      return NextResponse.json({ error: "Assinatura correspondente não encontrada" }, { status: 404 })
+    }
+
+    // ── SECURITY: Strictly verify that the calling user has partner access to this subscription ──
+    try {
+      await requirePartnerAccess(targetSub.partner_id, user)
+    } catch {
+      return NextResponse.json({ error: "Acesso negado a esta assinatura" }, { status: 403 })
+    }
+
     // ── Auto-reactivate and synchronize subscription when payment is approved ──
     let reactivated = false
     if (paymentData.status === "approved") {
       try {
-        const { getAdminClient } = await import("@/lib/supabase/admin")
-        const adminClient = getAdminClient()
+        const now = new Date()
+        const currentEnd = targetSub.current_period_end ? new Date(targetSub.current_period_end) : null
+        const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
+          ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
+          : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
-        const subscriptionId = paymentData.external_reference || paymentData.metadata?.subscription_id
+        const { error: updateError } = await adminClient
+          .from("subscriptions")
+          .update({
+            status: "active",
+            past_due_at: null,
+            current_period_start: now.toISOString(),
+            current_period_end: nextEnd.toISOString(),
+            updated_at: now.toISOString(),
+          })
+          .eq("id", targetSub.id)
 
-        let targetSub = null
-        if (subscriptionId) {
-          const { data: sub } = await adminClient
-            .from("subscriptions")
-            .select("id, partner_id, status, plan_id, current_period_end, mercado_pago_subscription_id")
-            .eq("id", subscriptionId)
-            .maybeSingle()
-          targetSub = sub
-        }
+        if (!updateError) {
+          reactivated = true
+          const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
+          invalidatePartnerPlanCache(targetSub.partner_id)
 
-        if (!targetSub && paymentData.preapproval_id) {
-          const { data: sub } = await adminClient
-            .from("subscriptions")
-            .select("id, partner_id, status, plan_id, current_period_end, mercado_pago_subscription_id")
-            .eq("mercado_pago_subscription_id", paymentData.preapproval_id.toString())
-            .maybeSingle()
-          targetSub = sub
-        }
+          const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
+          await syncSubscriptionToBilling(targetSub.id, "manual", "active", now, nextEnd).catch((err) => {
+            console.error("[SUBSCRIPTION_PAYMENT_SYNC] Billing sync error:", err)
+          })
 
-        if (targetSub) {
-          const now = new Date()
-          const currentEnd = targetSub.current_period_end ? new Date(targetSub.current_period_end) : null
-          const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
-            ? new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000)
-            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-
-          const { error: updateError } = await adminClient
-            .from("subscriptions")
-            .update({
-              status: "active",
-              past_due_at: null,
-              current_period_start: now.toISOString(),
-              current_period_end: nextEnd.toISOString(),
-              updated_at: now.toISOString(),
+          try {
+            await adminClient.from("billing_events").insert({
+              partner_id: targetSub.partner_id,
+              event_type: "subscription_reactivated",
+              amount: Number(paymentData.transaction_amount || 0),
+              provider: "mercado_pago",
+              metadata: {
+                mp_subscription_id: targetSub.mercado_pago_subscription_id,
+                mp_payment_id: paymentId.toString(),
+                payment_method: paymentData.payment_method_id || "pix",
+                sync_source: "status_poll",
+              },
             })
-            .eq("id", targetSub.id)
-
-          if (!updateError) {
-            reactivated = true
-            const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
-            invalidatePartnerPlanCache(targetSub.partner_id)
-
-            const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
-            await syncSubscriptionToBilling(targetSub.id, "manual", "active", now, nextEnd).catch((err) => {
-              console.error("[SUBSCRIPTION_PAYMENT_SYNC] Billing sync error:", err)
-            })
-
-            try {
-              await adminClient.from("billing_events").insert({
-                partner_id: targetSub.partner_id,
-                event_type: "subscription_reactivated",
-                amount: Number(paymentData.transaction_amount || 0),
-                provider: "mercado_pago",
-                metadata: {
-                  mp_subscription_id: targetSub.mercado_pago_subscription_id,
-                  mp_payment_id: paymentId.toString(),
-                  payment_method: paymentData.payment_method_id || "pix",
-                  sync_source: "status_poll",
-                },
-              })
-            } catch {}
-          }
+          } catch {}
         }
       } catch (syncErr: any) {
         SecureLogger.error("Failed to auto-reactivate subscription on payment check", {

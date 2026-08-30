@@ -10,6 +10,8 @@ import {
     permissionDeniedMessage,
 } from "@/lib/permissions/route-permissions"
 import { DEFAULT_BUSINESS_INFO, normalizeBusinessInfo } from "@/lib/business-info"
+import { can as canRbac } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 // ─── Context Types ──────────────────────────────────────────────────────────
 
@@ -29,6 +31,8 @@ interface PermissionContextValue {
     hasSpecific: (routeKey: RouteKey, permKey: string) => boolean
     canAccessPath: (pathname: string) => boolean
     getDeniedMessage: (routeKey: RouteKey, action: string) => string
+    /** RBAC permission check (e.g. `canRbac("orders.edit")`) */
+    canRbac: (permission: string) => boolean
 }
 
 const PermissionContext = createContext<PermissionContextValue | null>(null)
@@ -42,11 +46,18 @@ interface PermissionProviderProps {
     partnerId: string
     businessInfo: any
     planSlug?: string
+    roleId?: string
+    permissions?: any
 }
 
-export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo, planSlug = "free" }: PermissionProviderProps) {
+export function PermissionProvider({ children, role, routePermissions, partnerId, businessInfo, planSlug = "free", roleId, permissions }: PermissionProviderProps) {
     const routePermissionsKey = JSON.stringify(routePermissions)
     const businessInfoKey = JSON.stringify(businessInfo)
+
+    const rbacUser = useMemo<RbacUserLike>(() => ({
+        roleId: roleId || role?.toLowerCase(),
+        permissions: permissions || {},
+    }), [roleId, permissions, role])
 
     const value = useMemo<PermissionContextValue>(() => ({
         role,
@@ -61,7 +72,8 @@ export function PermissionProvider({ children, role, routePermissions, partnerId
         hasSpecific: (routeKey: RouteKey, permKey: string) => hasSpecificPermission(routePermissions, routeKey, permKey),
         canAccessPath: (pathname: string) => canAccessPath(routePermissions, pathname),
         getDeniedMessage: (routeKey: RouteKey, action: string) => permissionDeniedMessage(routeKey, action),
-    }), [role, routePermissionsKey, partnerId, businessInfoKey, planSlug])
+        canRbac: (permission: string) => canRbac(rbacUser, permission),
+    }), [role, routePermissionsKey, partnerId, businessInfoKey, planSlug, rbacUser])
 
     return (
         <PermissionContext.Provider value={value}>
@@ -91,6 +103,7 @@ export function usePermissions(): PermissionContextValue {
             hasSpecific: () => false,
             canAccessPath: () => false,
             getDeniedMessage: () => "Sem permissão",
+            canRbac: () => false,
         }
     }
     return ctx

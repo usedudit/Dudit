@@ -13,9 +13,7 @@ import {
   TagIcon,
   PackageReceiveIcon,
   CadastrosIcon,
-  ClockIcon,
   ShoppingCartIcon,
-  PrinterIcon,
   MotorbikeIcon,
 } from "@/lib/icons"
 
@@ -32,9 +30,7 @@ import { SalesSettingsSubPage } from "./SalesSettingsSubPage"
 import { ReceiptSettingsSubPage } from "./ReceiptSettingsSubPage"
 import { CommissionsSubPage } from "./CommissionsSubPage"
 import { SystemResourcesSubPage } from "./SystemResourcesSubPage"
-import { AuditLogsSubPage } from "./AuditLogsSubPage"
 import type { PartnerRole } from "@/lib/permissions/types"
-import type { RoleId } from "@/lib/permissions/rbac-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { useSidebar } from "@/lib/sidebar-context"
 import { usePermissions } from "@/lib/permission-context"
@@ -46,7 +42,7 @@ import { isSystemResourceActive } from "@/lib/system-resources"
 interface SettingsTabsProps {
   partner: any
   paymentMethods: any[]
-  role: PartnerRole
+  role?: PartnerRole
 }
 
 type ActivePage =
@@ -63,7 +59,6 @@ type ActivePage =
   | "vitrine"
   | "delivery"
   | "resources"
-  | "logs"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
   const searchParams = useSearchParams()
@@ -72,7 +67,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const pendingUrlSyncRef = useRef(false)
   const [mpConnected] = useState(!!partner.mp_user_id)
   const { setHeaderOverride } = useSidebar()
-  const { planSlug } = usePermissions()
+  const { planSlug, canRbac } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
   const { selectedStore } = useStore()
 
@@ -89,7 +84,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     "delivery": "entrega",
     "integrations": "integracoes",
     "resources": "gerenciar-recursos",
-    "logs": "historico-atividades",
   }
 
   const SLUG_TO_PAGE: Record<string, ActivePage> = {
@@ -190,7 +184,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "trocas": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
         "delivery": "Logística e Entrega",
-        "logs": "Histórico de Atividades",
         "resources": "Gerenciar Recursos",
         "home": "Configurações"
       }
@@ -209,30 +202,24 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
 
   const businessInfo = normalizeBusinessInfo(partner.business_info)
 
-  const roleId = String(role || "DELIVERY").toLowerCase() as RoleId
-  const isOwner = roleId === "owner"
-  const isAdmin = roleId === "admin"
-  const isManager = roleId === "manager"
-  const isOwnerOrAdmin = isOwner || isAdmin
-  const isOwnerAdminOrManager = isOwner || isAdmin || isManager
-
-  const showVitrine = isOwnerOrAdmin && isSystemResourceActive(businessInfo, "showcase")
   const isDesapego = businessInfo.mode === "desapego"
   const isQuick = businessInfo.mode === "quick" || businessInfo.mode === "showcase"
   const isDeliveriesResourceActive = isSystemResourceActive(businessInfo, "deliveries")
   const isTeamResourceActive = isSystemResourceActive(businessInfo, "team")
-  const canAccessSubscription = isOwner
-  const canAccessIntegrations = isOwner && !isDesapego
-  const canAccessCommissions = isOwnerOrAdmin && !isDesapego && !isQuick
-  const canAccessTeam = isOwnerOrAdmin && !isDesapego && !isQuick
-  const canAccessPayments = isOwnerOrAdmin && !isDesapego
-  const canAccessReturns = isOwnerAdminOrManager && !isDesapego && !isQuick
-  const canAccessDelivery = isOwnerOrAdmin && !isDesapego
-  const canAccessSalesSettings = isOwnerOrAdmin && !isDesapego
-  const canAccessReceipts = isOwnerOrAdmin && !isDesapego
-  const canAccessBusinessData = isOwnerAdminOrManager && !isDesapego
-  const canAccessResources = isOwnerOrAdmin && !isDesapego
-  const canAccessLogs = isOwnerOrAdmin && !isDesapego && !isQuick
+
+  const showVitrine = canRbac("settings.settings_vitrine") && isSystemResourceActive(businessInfo, "showcase")
+  const canAccessSubscription = canRbac("settings.settings_plan")
+  const canAccessIntegrations = canRbac("settings.settings_integrations") && !isDesapego
+  const canAccessCommissions = canRbac("settings.settings_comissions") && !isDesapego && !isQuick
+  const canAccessTeam = canRbac("settings.settings_team") && !isDesapego && !isQuick
+  const canAccessPayments = canRbac("settings.settings_payments") && !isDesapego
+  const canAccessReturns = canRbac("settings.settings_returns") && !isDesapego && !isQuick
+  const canAccessDelivery = canRbac("settings.settings_delivery") && !isDesapego
+  const canAccessSalesSettings = canRbac("settings.settings_negocio") && !isDesapego
+  const canAccessReceipts = canRbac("settings.settings_messages") && !isDesapego
+  const canAccessBusinessData = canRbac("settings.settings_negocio") && !isDesapego
+  const canAccessResources = canRbac("settings.settings_resources") && !isDesapego
+  const hasAdditionalSettings = canAccessResources || canAccessIntegrations
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const commissionsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
@@ -250,8 +237,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "trocas" && !canAccessReturns) setActivePage("home")
     if (activePage === "business-data" && !canAccessBusinessData) setActivePage("home")
     if (activePage === "resources" && !canAccessResources) setActivePage("home")
-    if (activePage === "logs" && !canAccessLogs) setActivePage("home")
-  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessSalesSettings, canAccessReceipts, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources, canAccessLogs])
+  }, [activePage, canAccessSubscription, canAccessIntegrations, canAccessSalesSettings, canAccessReceipts, canAccessCommissions, canAccessTeam, canAccessPayments, canAccessReturns, canAccessBusinessData, canAccessResources])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -279,9 +265,11 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                     <TabsTrigger value="vendas">
                       Configurações de vendas
                     </TabsTrigger>
-                    <TabsTrigger value="adicionais">
-                      Configurações adicionais
-                    </TabsTrigger>
+                    {hasAdditionalSettings && (
+                      <TabsTrigger value="adicionais">
+                        Configurações adicionais
+                      </TabsTrigger>
+                    )}
                   </TabsList>
                 )}
 
@@ -413,7 +401,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                       </TabsContent>
                     )}
 
-                    {!isDesapego && (
+                    {!isDesapego && hasAdditionalSettings && (
                       <TabsContent value="adicionais" key="adicionais" className="mt-0 focus-visible:outline-none">
                         {activeTab === "adicionais" && (
                           <FadeIn className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -438,16 +426,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 ) : "Integrações"}
                                 description="Conecte-se com plataformas externas e APIs de terceiros."
                                 onClick={() => navigateToSubpage("integrations")}
-                                showChevron
-                                className="px-4 py-3 gap-4"
-                              />
-                            )}
-                            {canAccessLogs && (
-                              <ListItem
-                                icon={ClockIcon}
-                                title="Histórico de Atividades"
-                                description="Visualize o registro de ações realizadas no sistema."
-                                onClick={() => navigateToSubpage("logs")}
                                 showChevron
                                 className="px-4 py-3 gap-4"
                               />
@@ -515,7 +493,6 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
           {activePage === "vitrine" && selectedStore && <ShowcaseSubPage key="vitrine" store={selectedStore} partnerId={partner.id} onBack={() => navigateToSubpage("home")} />}
           {activePage === "delivery" && <DeliverySettingsSubPage key="delivery" partnerId={partner.id} storeId={selectedStore?.id} onBack={() => navigateToSubpage("home")} planGate={deliveryPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined} />}
           {activePage === "resources" && <SystemResourcesSubPage key="resources" businessInfo={businessInfo} planSlug={planSlug} onBack={() => navigateToSubpage("home")} />}
-          {activePage === "logs" && canAccessLogs && <AuditLogsSubPage key="logs" onBack={() => navigateToSubpage("home")} />}
         </AnimatePresence>
       </div>
     </FadeIn>

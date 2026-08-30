@@ -7,6 +7,8 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { normalizeActiveResources } from "@/lib/system-resources"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export async function updateSystemResourcesAction(activeResources: string[]) {
   const user = await getCurrentUser()
@@ -15,8 +17,7 @@ export async function updateSystemResourcesAction(activeResources: string[]) {
   const context = await getCurrentPartnerContext(user)
   if (!context) return { success: false, error: "ERP nao encontrado" }
 
-  const canManage = context.roleId === "owner" || context.roleId === "admin"
-  if (!canManage) {
+  if (!can(context as RbacUserLike, "settings.settings_resources")) {
     return { success: false, error: "Apenas proprietarios e administradores podem gerenciar recursos." }
   }
 

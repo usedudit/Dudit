@@ -3,6 +3,7 @@
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { Badge, DatePicker, FormDropdown, FormSection, Input, TimePicker } from "@/components/reusable"
+import { usePermissions } from "@/lib/permission-context"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
@@ -87,10 +88,11 @@ export const AddressTab: React.FC<AddressTabProps> = ({
     isPaidOrder = false,
     role = "OPERATOR",
 }) => {
+    const { canRbac } = usePermissions()
     const selectedStatusMeta = getDeliveryStatusMeta(deliveryStatus)
 
-    const isAddressLocked = isPaidOrder || role === 'DELIVERY'
-    const isDeliveryLocked = originalDeliveryStatus === 'delivered' || role === 'DELIVERY'
+    const isAddressLocked = isPaidOrder || !canRbac("orders.edit")
+    const isDeliveryLocked = originalDeliveryStatus === 'delivered' || !canRbac("orders.edit")
 
     const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
         <div className="flex justify-between items-start text-[14px] gap-4">

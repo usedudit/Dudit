@@ -30,11 +30,6 @@ type CashMovementFallbackInput = {
   userId: string
 }
 
-function isManagementRole(roleId: RoleId | string | null | undefined) {
-  const v = String(roleId || "").toLowerCase()
-  return v === "owner" || v === "admin" || v === "manager"
-}
-
 function money(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.round(value * 100) / 100

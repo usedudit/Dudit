@@ -16,6 +16,7 @@ import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCatego
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { usePermissions } from "@/lib/permission-context"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
@@ -309,7 +310,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
                                 <div
                                     className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
-                                    dangerouslySetInnerHTML={{ __html: serviceData.description }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(serviceData.description) }}
                                 />
                             </div>
                         )}

@@ -10,6 +10,8 @@ import { decryptCPF, encryptCPF } from "@/lib/crypto"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
@@ -401,7 +403,7 @@ export async function updateComprehensiveCustomerAction(data: {
   if (data.hasDifferentBillingAddress && data.billingZipCode && !validateCEP(data.billingZipCode)) {
     return { error: "CEP de cobrança inválido" }
   }
-  const cpfResult: { cpf?: string | null; error?: string } = customerAccess.roleId === "operator"
+  const cpfResult: { cpf?: string | null; error?: string } = !can(customerAccess as RbacUserLike, "customers.view_fiscal_data")
     ? { cpf: null as string | null }
     : await prepareEncryptedCpf(supabase, partnerId, data.cpf, data.customerId)
   if (cpfResult.error) {
@@ -663,7 +665,7 @@ export async function getCustomerByIdAction(customerId: string) {
       ; (customer as any).last_order_at = null
   }
 
-  if (customerAccess.roleId === "operator") {
+  if (!can(customerAccess as RbacUserLike, "customers.view_fiscal_data")) {
     for (const field of [
       "cpf",
       "cnpj",
@@ -847,7 +849,7 @@ export async function getPartnerCustomersAction(partnerId: string, currentStoreI
     }
 
     let result = customers || []
-    if (customerAccess.roleId === "operator") {
+    if (!can(customerAccess as RbacUserLike, "customers.view_personal_data")) {
       result = result.map((customer: any) => {
         const { birth_date: _birthDate, ...safeCustomer } = customer
         return safeCustomer
@@ -1007,7 +1009,7 @@ export async function getERPCustomersPageAction(
 > {
   try {
     const customerAccess = await requireAuthorizedCustomerContext(partnerId, "view")
-    if (customerAccess.roleId === "delivery") {
+    if (!can(customerAccess as RbacUserLike, "customers.list")) {
       return { success: false, error: "Sem permissão para acessar a listagem de clientes." }
     }
     partnerId = customerAccess.partnerId
@@ -1114,7 +1116,7 @@ export async function getERPCustomersPageAction(
     const hasMore = page.hasMore
     const items: any[] = page.items
 
-    if (customerAccess.roleId === "operator") {
+    if (!can(customerAccess as RbacUserLike, "customers.view_personal_data")) {
       for (const item of items) {
         delete item.birth_date
         delete item.user_id

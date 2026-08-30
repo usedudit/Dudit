@@ -92,12 +92,12 @@ function mapLegacyReason(reason: unknown) {
 export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: ReturnsPageProps) {
     const { toast } = useToast()
     const { openPlanUpgrade } = usePlanUpgrade()
-    const { planSlug } = usePermissions()
+    const { planSlug, canRbac } = usePermissions()
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
-    const canManage = roleId === "owner" || roleId === "admin" || roleId === "manager"
+    const canManage = canRbac("orders.can_refund")
 
     const queryClient = useQueryClient()
     const [isSaving, setIsSaving] = useState(false)

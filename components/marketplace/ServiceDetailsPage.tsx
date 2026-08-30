@@ -41,6 +41,7 @@ import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
 import { RequestQuoteModal } from "./RequestQuoteModal"
 import { ReportModal } from "./ReportModal"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { ReviewsSection } from "./ReviewsSection"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
@@ -2206,7 +2207,7 @@ export function ServiceDetailsPageClient({
                                     {service.description ? (
                                         <div
                                             className="rich-text-content"
-                                            dangerouslySetInnerHTML={{ __html: service.description }}
+                                            dangerouslySetInnerHTML={{ __html: sanitizeRichText(service.description) }}
                                         />
                                     ) : (
                                         <p className="text-sm md:text-[0.9375rem] text-gray-600 dark:text-dark-body leading-relaxed">Sem descrição.</p>

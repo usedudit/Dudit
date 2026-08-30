@@ -2,10 +2,10 @@ import "server-only"
 
 import { ForbiddenError } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import type { PermissionTemplate } from "@/lib/permissions/rbac-types"
 import type { ErpExportModule } from "./types"
-
-const EXPORT_ROLES = new Set(["owner", "admin", "manager"])
 
 const MODULE_RESOURCE: Record<ErpExportModule, keyof PermissionTemplate> = {
   orders: "orders",
@@ -28,8 +28,7 @@ const MODULE_RESOURCE: Record<ErpExportModule, keyof PermissionTemplate> = {
 export async function requireErpExportPermission(partnerId: string, module: ErpExportModule) {
   const resource = MODULE_RESOURCE[module]
   const access = await requirePermission(partnerId, resource as any, "view")
-  const role = String(access.roleId || "").toLowerCase()
-  if (!EXPORT_ROLES.has(role)) {
+  if (!can(access as RbacUserLike, "orders.can_refund")) {
     throw new ForbiddenError("Exportação disponível apenas para Proprietário, Administrador ou Gestor.")
   }
   return access

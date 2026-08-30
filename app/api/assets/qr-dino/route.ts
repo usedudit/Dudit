@@ -4,6 +4,8 @@ const MASCOTS: Record<string, string> = {
   qrdino: "https://img.dudit.com.br/static/mascots/QRDino.png",
   happydino: "https://img.dudit.com.br/static/mascots/HappyDino.png",
   vender: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+  logo: "https://img.dudit.com.br/static/Logo.png",
+  icon: "https://img.dudit.com.br/static/Icon.png",
 }
 
 const DEFAULT_SOURCE_URL = MASCOTS.qrdino

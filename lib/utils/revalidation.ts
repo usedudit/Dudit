@@ -196,6 +196,7 @@ export async function revalidateStockMovements(partnerId: string) {
 export async function revalidateTransactions(partnerId: string) {
     if (partnerId) {
         await safeRevalidateTag(TAGS.transactions(partnerId))
+        await safeRevalidateTag(TAGS.financeAccounts(partnerId))
         await safeRevalidateTag(DASHBOARD_TAGS.general(partnerId))
         await safeRevalidateTag(DASHBOARD_TAGS.financial(partnerId))
         await safeRevalidateTag(DASHBOARD_TAGS.metrics(partnerId))
@@ -206,6 +207,7 @@ export async function revalidateTransactions(partnerId: string) {
     await safeRevalidateTag("transactions")
     revalidatePath("/erp/painel")
     revalidatePath("/erp/inicio")
+    revalidatePath("/erp/transacoes/cadastros-financeiro")
 }
 
 /**

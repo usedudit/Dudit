@@ -182,7 +182,7 @@ interface OrderDetailViewProps {
 }
 
 export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onUpdatePaymentStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
-    const { role } = usePermissions()
+    const { role, canRbac } = usePermissions()
     const { selectedStore } = useStore()
 
     const [isScrolled, setIsScrolled] = useState(false)
@@ -791,7 +791,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                         <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                             <ActionsDropdown
                                                 onPrint={() => setPrintModalOrderId(order.id || order.order_number)}
-                                                onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
+                                                onEdit={(canEdit && canRbac("orders.edit")) ? () => onEditOrder(order) : undefined}
                                                 onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                                                 onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
                                                 onDeliveryStatus={(order.situation !== "cancelled" && !hasOnlyServices) ? () => onUpdateDeliveryStatus(order) : undefined}
@@ -1768,7 +1768,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
                 <ActionsDropdown
                     onPrint={() => setPrintModalOrderId(order.id || order.order_number)}
-                    onEdit={(canEdit && role !== 'DELIVERY') ? () => onEditOrder(order) : undefined}
+                    onEdit={(canEdit && canRbac("orders.edit")) ? () => onEditOrder(order) : undefined}
                     onCancel={order.situation === "cancelled" ? () => onOpenNotes(order) : () => onCancelOrder(order)}
                     onPaymentStatus={order.situation !== "cancelled" ? () => onUpdatePaymentStatus(order) : undefined}
                     onDeliveryStatus={(order.situation !== "cancelled" && !hasOnlyServices) ? () => onUpdateDeliveryStatus(order) : undefined}

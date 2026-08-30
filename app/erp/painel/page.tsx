@@ -9,6 +9,8 @@ import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/pa
 import { checkPermission } from "@/lib/permissions/access"
 import { IconPlaceholder } from "@/components/reusable"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import type { Period, CompareMode } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
@@ -32,7 +34,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
     const partnerId = context.partnerId
     const roleId = context.roleId
 
-    if (roleId === "delivery") {
+    if (!can(context as RbacUserLike, "dashboard.view")) {
         return (
             <>
                 <ERPPageHeader title="Início" />

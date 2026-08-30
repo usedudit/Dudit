@@ -31,6 +31,7 @@ import {
 } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { normalizeToRoutePermissions } from "@/lib/permissions/route-permissions"
+import { resolveEffectivePermissions } from "@/lib/store-members"
 import { OfflineBanner } from "@/components/pwa/OfflineBanner"
 import { LimitStatusWidget } from "@/components/erp/LimitStatusWidget"
 import type { PartnerRole, PartnerRoutePermissions } from "@/lib/permissions/types"
@@ -147,10 +148,10 @@ export default async function ERPLayout({
   }
 
   // ── Resolve route permissions ──
-  const role = (context.role || "DELIVERY") as PartnerRole
+  let role = (context.role || "DELIVERY") as PartnerRole
   // Owner is a code-side override: do not let "all-false stored JSON"
   // from RBAC template hide the OWNER preset in the UI.
-  const routePermissions: PartnerRoutePermissions =
+  let routePermissions: PartnerRoutePermissions =
     context.roleId === "owner" ? normalizeToRoutePermissions(role, null) : normalizeToRoutePermissions(role, context.permissions)
 
   const businessMode = normalizeBusinessInfo(context.businessInfo).mode
@@ -204,6 +205,20 @@ export default async function ERPLayout({
     ? activeStoreId
     : (initialStores.length > 0 ? (initialStores.find((s: any) => s.is_headquarters)?.id || initialStores[0].id) : null)
 
+  // ── Resolve store-level permissions ──
+  // For non-owner users, override partner-level role with the store-specific role
+  // from store_members table. This ensures the UI reflects the actual per-store access.
+  if (context.roleId !== "owner" && effectiveActiveStoreId) {
+    const storeEffective = await resolveEffectivePermissions(context.partnerId, effectiveActiveStoreId)
+    if (storeEffective) {
+      context.roleId = storeEffective.role.toLowerCase() as RoleId
+      context.role = storeEffective.role as PartnerRole
+      context.permissions = storeEffective.permissions
+      role = storeEffective.role as PartnerRole
+      routePermissions = normalizeToRoutePermissions(role, context.permissions)
+    }
+  }
+
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ProductMetadataProvider>
@@ -214,6 +229,8 @@ export default async function ERPLayout({
             partnerId={context.partnerId}
             businessInfo={context.businessInfo}
             planSlug={partnerPlan.slug}
+            roleId={context.roleId}
+            permissions={context.permissions}
           >
             <PlanUpgradeProvider>
               <StoreProvider partnerId={context.partnerId} activeStoreId={effectiveActiveStoreId} initialStores={initialStores}>

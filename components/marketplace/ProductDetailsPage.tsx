@@ -28,6 +28,7 @@ import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
@@ -2470,7 +2471,7 @@ export function ProductDetailsPageClient({
                                     {product.description ? (
                                         <div
                                             className="rich-text-content"
-                                            dangerouslySetInnerHTML={{ __html: product.description }}
+                                            dangerouslySetInnerHTML={{ __html: sanitizeRichText(product.description) }}
                                         />
                                     ) : (
                                         <p className="text-sm md:text-[0.9375rem] text-gray-600 dark:text-dark-body leading-relaxed">Sem descrição.</p>

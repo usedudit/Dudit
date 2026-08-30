@@ -13,6 +13,19 @@ import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { cn } from "@/lib/utils"
 
+const ROLE_LABELS: Record<string, string> = {
+    owner: "Proprietário",
+    admin: "Administrador",
+    manager: "Gestor",
+    operator: "Operador",
+    delivery: "Entregador",
+}
+
+function formatUserRole(role?: string | null): string {
+    if (!role) return ""
+    return ROLE_LABELS[role.toLowerCase()] || role
+}
+
 interface StoreSwitcherProps {
     variant?: "header" | "sidebar"
     className?: string
@@ -68,6 +81,11 @@ export function StoreSwitcher({
                         <span className="text-sm font-semibold text-white truncate line-clamp-1">
                             {selectedStore.name}
                         </span>
+                        {selectedStore.user_role && (
+                            <span className="text-[11px] text-green-400 truncate">
+                                {formatUserRole(selectedStore.user_role)}
+                            </span>
+                        )}
                     </div>
                 </div>
             )
@@ -89,6 +107,11 @@ export function StoreSwitcher({
                     <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1">
                         {selectedStore.name}
                     </span>
+                    {selectedStore.user_role && (
+                        <span className="text-xs text-brand-green">
+                            {formatUserRole(selectedStore.user_role)}
+                        </span>
+                    )}
                 </div>
             </div>
         )
@@ -132,6 +155,11 @@ export function StoreSwitcher({
                                     <span className="text-sm font-semibold text-white truncate line-clamp-1">
                                         {selectedStore.name}
                                     </span>
+                                    {selectedStore.user_role && (
+                                        <span className="text-[11px] text-green-400 truncate">
+                                            {formatUserRole(selectedStore.user_role)}
+                                        </span>
+                                    )}
                                     <span className="text-[11px] text-brand-inactive-text truncate">
                                         Trocar filial / loja
                                     </span>
@@ -155,6 +183,11 @@ export function StoreSwitcher({
                                 <span className="text-md font-semibold text-brand-dark dark:text-dark-heading line-clamp-1">
                                     {selectedStore.name}
                                 </span>
+                                {selectedStore.user_role && (
+                                    <span className="text-xs text-green-600 dark:text-green-400">
+                                        {formatUserRole(selectedStore.user_role)}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     )
@@ -183,6 +216,11 @@ export function StoreSwitcher({
                                 />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{store.name}</p>
+                                    {store.user_role && (
+                                        <p className="text-xs text-green-600 dark:text-green-400 truncate">
+                                            {formatUserRole(store.user_role)}
+                                        </p>
+                                    )}
                                 </div>
                                 {selectedStore.id === store.id && (
                                     <div className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />

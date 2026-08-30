@@ -8,6 +8,7 @@ import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 const CONDITION_OPTIONS = [
     { value: "Novo", label: "Novo" },
@@ -118,7 +119,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                             {productData?.description ? (
                                 <div
                                     className="rich-text-content text-sm md:text-base text-brand-dark dark:text-dark-heading leading-relaxed"
-                                    dangerouslySetInnerHTML={{ __html: productData.description }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(productData.description) }}
                                 />
                             ) : (
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">Sem descrição cadastrada.</p>

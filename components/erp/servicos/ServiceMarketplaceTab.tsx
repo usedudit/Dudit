@@ -8,6 +8,7 @@ import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon, Package, CheckC
 import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
     <>
@@ -100,7 +101,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                             {serviceData?.description ? (
                                 <div
                                     className="rich-text-content text-sm md:text-base text-brand-dark dark:text-dark-heading leading-relaxed"
-                                    dangerouslySetInnerHTML={{ __html: serviceData.description }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(serviceData.description) }}
                                 />
                             ) : (
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body">Sem descrição cadastrada.</p>

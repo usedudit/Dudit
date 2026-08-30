@@ -23,8 +23,12 @@ let _adminClient: any = null
 export function getAdminClient(): any {
     if (_adminClient) return _adminClient
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:54321"
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-key"
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceRoleKey) {
+        throw new Error("Missing Supabase admin environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be defined.")
+    }
 
     _adminClient = createClient(supabaseUrl, serviceRoleKey, {
         auth: {

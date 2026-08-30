@@ -35,6 +35,8 @@ interface Store {
   inscricao_municipal: string | null
   created_at: string
   updated_at: string
+  /** User's effective role for this specific store (from store_members or partner_users) */
+  user_role?: string | null
 }
 
 interface StoreContextType {

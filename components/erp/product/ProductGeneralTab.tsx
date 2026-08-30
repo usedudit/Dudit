@@ -17,6 +17,7 @@ import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { ProductAddonsSection } from "./ProductAddonsSection"
 import { usePermissions } from "@/lib/permission-context"
+import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 const FormCombobox = ({
     label,
@@ -339,7 +340,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
                                 <div
                                     className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
-                                    dangerouslySetInnerHTML={{ __html: productData.description }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(productData.description) }}
                                 />
                             </div>
                         )}

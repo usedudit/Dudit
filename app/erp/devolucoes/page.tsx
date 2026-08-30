@@ -5,6 +5,8 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export const dynamic = "force-dynamic"
 
@@ -14,8 +16,7 @@ export default async function ReturnsPageServer() {
 
   const { partnerId, roleId, activeStoreId } = context
 
-  // Delivery role has no access at all
-  if (roleId === "delivery") {
+  if (!can(context as RbacUserLike, "orders.can_refund")) {
     return <AccessDenied />
   }
 

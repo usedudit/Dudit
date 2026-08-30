@@ -6,6 +6,8 @@ import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser, requireMinimumPlan, requireOrderAccess } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -181,6 +183,12 @@ function assertRole(roleId: string, allowed: Set<string>) {
     }
 }
 
+function assertPermission(access: { roleId: string; permissions: any }, permission: string) {
+    if (!can(access as RbacUserLike, permission)) {
+        throw new Error("Sem permissao para esta acao")
+    }
+}
+
 function toNumber(value: unknown) {
     const n = Number(value || 0)
     return Number.isFinite(n) ? n : 0
@@ -342,7 +350,7 @@ export async function getReturnRequestsPageAction(
 ) {
     try {
         const access = await requirePermission(partnerId, "orders", "view")
-        assertRole(access.roleId, VIEW_ROLES)
+        assertPermission(access, "orders.list")
         const supabase = createAdminClient()
         const ctx = await getCurrentPartnerContext()
         const storeId = ctx?.activeStoreId || ""
@@ -413,7 +421,7 @@ export async function getReturnRequestsPageAction(
 export async function getReturnRequestDetailsAction(partnerId: string, requestId: string) {
     try {
         const access = await requirePermission(partnerId, "orders", "view")
-        assertRole(access.roleId, VIEW_ROLES)
+        assertPermission(access, "orders.list")
         const supabase = createAdminClient()
         const { data, error } = await supabase
             .from("return_requests")
@@ -532,7 +540,7 @@ export async function createReturnRequestAction(input: unknown) {
         addMonitoringBreadcrumb({ domain: "returns", message: "create.started", metadata: { entityId: orderId, partnerId, resolution } })
         await requireMinimumPlan(data.partnerId, "crescer")
         const access = await requirePermission(data.partnerId, "orders", "edit")
-        assertRole(access.roleId, MANAGE_ROLES)
+        assertPermission(access, "orders.can_refund")
         const supabase = createAdminClient()
 
         // Validate that the order has situation = 'paid' or 'partially_paid'
@@ -979,7 +987,7 @@ export async function processReturnRequestAction(input: unknown) {
         if (data.nextStatus && !RETURN_STATUS_SET.has(data.nextStatus)) throw new Error("Status invalido")
 
         const access = await requirePermission(data.partnerId, "orders", "edit")
-        assertRole(access.roleId, MANAGE_ROLES)
+        assertPermission(access, "orders.can_refund")
         const supabase = createAdminClient()
 
         const { data: request, error: requestError } = await supabase
@@ -1649,7 +1657,7 @@ export async function escalateReturnRequestAction(partnerId: string, requestId: 
 export async function fetchReturnOrderBucketAction(partnerId: string) {
     try {
         const access = await requirePermission(partnerId, "orders", "view")
-        assertRole(access.roleId, VIEW_ROLES)
+        assertPermission(access, "orders.list")
         const supabase = createAdminClient()
         const ctx = await getCurrentPartnerContext()
         const storeId = ctx?.activeStoreId || ""
@@ -1830,7 +1838,7 @@ export async function retryMercadoPagoRefundAction(partnerId: string, refundId: 
     try {
         const user = await requireUser()
         const access = await requirePermission(partnerId, "orders", "edit")
-        assertRole(access.roleId, MANAGE_ROLES)
+        assertPermission(access, "orders.can_refund")
         const supabase = createAdminClient()
 
         const { data: refund, error: refundError } = await supabase

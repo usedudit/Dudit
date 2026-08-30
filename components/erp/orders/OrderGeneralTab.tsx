@@ -26,6 +26,7 @@ import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { usePermissions } from "@/lib/permission-context"
 
 function formatLocalISODate(date: Date) {
     const y = date.getFullYear()
@@ -163,7 +164,8 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     role = "OPERATOR",
     searchPromotions = [],
 }) => {
-    const isMarketplaceLocked = isPaidOrder || role === 'DELIVERY';
+    const { canRbac } = usePermissions()
+    const isMarketplaceLocked = isPaidOrder || !canRbac("orders.edit");
     const hasOnlyServices = items.length > 0 && items.every((item) => Boolean(item.isService));
     const PaymentRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
         <div className="flex justify-between items-start text-[14px] gap-4">

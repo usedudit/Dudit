@@ -222,7 +222,7 @@ export function ERPSidebar() {
     const pathname = usePathname()
     const { isExpanded, toggleSidebar, isMobileOpen, setIsMobileOpen, sidebarCard } = useSidebar()
     const isCollapsed = !isExpanded
-    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug, role } = usePermissions()
+    const { canAccessPath: canAccess, businessInfo: contextBusinessInfo, planSlug, role, canRbac } = usePermissions()
 
     const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
 
@@ -343,9 +343,7 @@ export function ERPSidebar() {
                         if (item.label === "Financeiro") {
                             if (sub.href === "/erp/transacoes") return financialResourceActive
                             if (sub.href === "/erp/transacoes/dre") {
-                                const roleId = String(role || "").toLowerCase()
-                                const isAllowedRole = !role || ["owner", "admin", "manager"].includes(roleId)
-                                return financialResourceActive && isAllowedRole
+                                return financialResourceActive && canRbac("reports.export_dre")
                             }
                             if (sub.href === "/erp/contas-a-pagar") return financialResourceActive
                             if (sub.href === "/erp/contas-a-receber") return financialResourceActive

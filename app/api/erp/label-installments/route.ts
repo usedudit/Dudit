@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { requirePartnerAccess } from "@/lib/auth/authorization"
 
 export async function GET(request: NextRequest) {
     const user = await getCurrentUser()
@@ -16,6 +17,15 @@ export async function GET(request: NextRequest) {
     if (!partnerId) {
         return new Response(JSON.stringify({ error: "partnerId obrigatório" }), {
             status: 400,
+            headers: { "Content-Type": "application/json" }
+        })
+    }
+
+    try {
+        await requirePartnerAccess(partnerId, user)
+    } catch {
+        return new Response(JSON.stringify({ error: "Acesso negado ao parceiro" }), {
+            status: 403,
             headers: { "Content-Type": "application/json" }
         })
     }

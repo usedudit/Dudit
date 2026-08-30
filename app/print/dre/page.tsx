@@ -6,6 +6,7 @@ import { DreA4Preview } from "@/components/erp/financial/dre/receipt/DreA4Previe
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { redirect, notFound } from "next/navigation"
 import { createAdminClient } from "@/lib/supabase/server"
+import { checkPermission } from "@/lib/permissions/access"
 
 interface PrintDrePageProps {
   searchParams: Promise<{
@@ -55,20 +56,22 @@ export default async function PrintDrePage({ searchParams }: PrintDrePageProps) 
   }
 
   const isPartnerOwner = partnerRes.data?.user_id === user.id
-  const roleId = String(puRes.data?.role_id || "").toLowerCase()
 
-  // 2. Validação de Role: Apenas owner, admin e gerente (manager)
-  if (!isPartnerOwner && !["owner", "admin", "manager"].includes(roleId)) {
-    return (
-      <div className="p-8 text-center text-red-600 font-bold font-sans">
-        Apenas proprietários, administradores e gerentes podem visualizar o DRE.
-      </div>
-    )
+  // 2. Validação de Permissão: Owner bypasses, outros precisam de reports.export_dre
+  if (!isPartnerOwner) {
+    const { allowed } = await checkPermission(partnerId, "reports", "export_dre")
+    if (!allowed) {
+      return (
+        <div className="p-8 text-center text-red-600 font-bold font-sans">
+          Apenas proprietários, administradores e gerentes podem visualizar o DRE.
+        </div>
+      )
+    }
   }
 
   // 3. Validação de Lojas Acessíveis
   let allowedStoreIds: string[] | null = null
-  if (!isPartnerOwner && roleId !== "owner") {
+  if (!isPartnerOwner) {
     if (!puRes.data) {
       return (
         <div className="p-8 text-center text-red-600 font-bold font-sans">

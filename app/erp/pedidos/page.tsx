@@ -5,6 +5,8 @@ import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPOrdersPageAction } from "@/app/actions/erp/orders"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export const dynamic = "force-dynamic"
 
@@ -13,7 +15,7 @@ export default async function OrdersPageServer() {
   const context = await getCurrentPartnerContext()
   if (!context) return <AccessDenied />
 
-  if (context.roleId === "delivery") {
+  if (!can(context as RbacUserLike, "orders.list")) {
     return <AccessDenied />
   }
 

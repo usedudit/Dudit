@@ -270,7 +270,7 @@ export default function ProductsPage({
                 if (productIds.length === 0) return
 
                 const [variantsRes, paymentRes] = await Promise.all([
-                    fetch(`/api/erp/label-variants?productIds=${encodeURIComponent(JSON.stringify(productIds))}`),
+                    fetch(`/api/erp/label-variants?productIds=${encodeURIComponent(JSON.stringify(productIds))}&partnerId=${encodeURIComponent(partnerId)}`),
                     fetch(`/api/erp/label-installments?partnerId=${partnerId}`),
                 ])
 

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 import { requireUser, requireStorePermission, requirePartnerAccess } from "@/lib/auth/authorization"
 import { logAudit } from "@/lib/observability/audit-log"
 import type { ActionResponse } from "@/lib/types/action-response"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 interface StoreMemberRow {
     id: string
@@ -39,8 +41,7 @@ export async function addStoreMemberAction(
     try {
         const user = await requireUser()
         const access = await requirePartnerAccess(partnerId, user)
-        const roleUpper = String(access.roleId || "").toUpperCase()
-        if (roleUpper !== "OWNER" && roleUpper !== "ADMIN") {
+        if (!can(access as RbacUserLike, "settings.settings_team")) {
             return { success: false, error: "Apenas Proprietários e Administradores podem adicionar membros." }
         }
 
@@ -161,8 +162,7 @@ export async function saveMemberStoreAccessAction(params: {
         const { partnerUserId, partnerId, storeAccesses } = params
 
         const access = await requirePartnerAccess(partnerId, user)
-        const roleUpper = String(access.roleId || "").toUpperCase()
-        if (roleUpper !== "OWNER" && roleUpper !== "ADMIN") {
+        if (!can(access as RbacUserLike, "settings.settings_team")) {
             return { success: false, error: "Apenas Proprietários e Administradores podem alterar os acessos às lojas dos membros." }
         }
 

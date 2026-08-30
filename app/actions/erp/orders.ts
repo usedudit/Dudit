@@ -7,6 +7,8 @@ import { formatDateTime } from "@/lib/utils/formatters"
 import { formatCurrency } from "@/lib/utils"
 import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
+import { can } from "@/lib/permissions/can"
+import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { sanitizeNotes } from "@/lib/input-validator"
@@ -2747,7 +2749,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const user = await requireUser()
     if (!user) return { error: "Não autenticado" }
 
-    const { roleId } = await requirePermission(data.partnerId, "orders", "edit")
+    const orderAccess = await requirePermission(data.partnerId, "orders", "edit")
 
     // Normalize empty finance account to null (avoids `invalid input syntax for type uuid: ""`)
     data.financeAccountId = data.financeAccountId?.trim() ? data.financeAccountId.trim() : null
@@ -2829,8 +2831,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const isPaidOrder = currentOrder.situation === 'paid' || currentOrder.situation === 'partially_paid'
     const isDeliveredOrder = currentOrder.delivery_status === 'delivered'
 
-    if (roleId === "delivery") {
-        return { error: "Entregadores não têm permissão para editar pedidos." }
+    if (!can(orderAccess as RbacUserLike, "orders.edit")) {
+        return { error: "Sem permissão para editar pedidos." }
     }
 
     // Check if items changed
@@ -4501,7 +4503,7 @@ export async function getERPOrdersPageAction(
 > {
     try {
         const access = await requirePermission(partnerId, "orders", "view")
-        if (access.roleId === "delivery") {
+        if (!can(access as RbacUserLike, "orders.list")) {
             return { success: false, error: "Sem permissão para acessar a listagem de pedidos." }
         }
 
