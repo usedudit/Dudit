@@ -5,6 +5,12 @@ import { encrypt, decrypt } from "@/lib/cryptoService"
 const refreshPromises = new Map<string, Promise<string>>()
 
 export async function getValidMercadoPagoAccessToken(partnerId: string): Promise<string> {
+    // Sandbox mode: use the application's test access token directly
+    // The Checkout API does not support sandbox testing via OAuth test accounts
+    if (process.env.MP_SANDBOX_MODE === "true" && process.env.MP_SANDBOX_ACCESS_TOKEN) {
+        return process.env.MP_SANDBOX_ACCESS_TOKEN
+    }
+
     if (refreshPromises.has(partnerId)) {
         return refreshPromises.get(partnerId)!
     }
