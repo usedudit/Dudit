@@ -430,7 +430,7 @@ export default function DeliveriesPage({
                         deliveryId={selectedDeliveryId}
                         partnerId={partnerId}
                         onBack={() => closeEntity()}
-                        onEdit={(id) => openEntity("edit", id)}
+                        onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
                         planSlug={planSlug}
                     />
                 </FadeIn>
@@ -496,13 +496,17 @@ export default function DeliveriesPage({
                                             subtitle={
                                                 planGate
                                                     ? planGate.message
+                                                    : isDelivery
+                                                    ? "Nenhuma entrega atribuída a você no momento."
+                                                    : activeTab === "closed"
+                                                    ? "Nenhuma entrega cancelada ou com falha encontrada."
                                                     : "Crie uma entrega a partir de um pedido para começar."
                                             }
                                             itemButton={
                                                 planGate ? {
                                                     text: "Ver Plano Crescer",
                                                     action: () => openPlanUpgrade("crescer"),
-                                                } : {
+                                                } : isDelivery ? undefined : {
                                                     text: "Adicionar primeira entrega",
                                                     action: () => openEntity("create"),
                                                 }
@@ -515,7 +519,7 @@ export default function DeliveriesPage({
                                             deliveries={mapped}
                                             activeTab={activeTab}
                                             onDetails={(id) => openEntity("view", id)}
-                                            onEdit={(id) => openEntity("edit", id)}
+                                            onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
                                             onQuickStatusChange={handleQuickStatusChange}
                                         />
                                     </FadeIn>

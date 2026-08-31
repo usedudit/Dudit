@@ -221,6 +221,32 @@ async function getDeliveryActorScope(partnerId: string, specificPermission?: str
   }
 }
 
+async function isDeliveryAssignedToDriver(params: {
+  deliveryId: string
+  deliveryPersonId: string | null | undefined
+  actor: { roleId: string; partnerUserId: string | null; userId: string }
+}): Promise<boolean> {
+  if (params.actor.roleId !== "delivery") return true
+
+  const pUserId = params.actor.partnerUserId
+  const uId = params.actor.userId
+
+  if (pUserId && String(params.deliveryPersonId || "") === pUserId) return true
+  if (uId && String(params.deliveryPersonId || "") === uId) return true
+
+  const admin = getAdminClient()
+  const { data: assignment } = await admin
+    .from("delivery_assignments")
+    .select("id")
+    .eq("delivery_id", params.deliveryId)
+    .eq("driver_id", uId)
+    .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+    .limit(1)
+    .maybeSingle()
+
+  return !!assignment?.id
+}
+
 async function getPartnerUserNameByIdMap(
   _supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
   partnerId: string,
@@ -451,8 +477,11 @@ export async function getDeliveryRoutePointsAction(params: { partnerId: string; 
   }
 
   if (actor.roleId === "delivery") {
-    const isAssigned = (actor.partnerUserId && String(delivery.delivery_person_id || "") === actor.partnerUserId) ||
-      (user.id && String(delivery.delivery_person_id || "") === user.id)
+    const isAssigned = await isDeliveryAssignedToDriver({
+      deliveryId: params.deliveryId,
+      deliveryPersonId: delivery.delivery_person_id,
+      actor,
+    })
     if (!isAssigned) {
       return { success: false as const, error: "Sem permissão para visualizar esta entrega." }
     }
@@ -901,6 +930,7 @@ export async function fetchDeliveryOrderBucketAction(partnerId: string, excludeD
   await requireUser()
   await requireActivePartnerContext(partnerId)
   const actor = await getDeliveryActorScope(partnerId)
+  if (actor.roleId === "delivery") return []
   const orderListCheck = await checkPermission(partnerId, "orders", "list")
   if (!orderListCheck.allowed) return []
   const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
@@ -1100,6 +1130,7 @@ async function geocodeWithTimeout(address: string, timeoutMs = 600): Promise<{ l
 export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
   await requireUser()
   const actor = await getDeliveryActorScope(partnerId)
+  if (actor.roleId === "delivery") return []
   const teamCheck = await checkPermission(partnerId, "settings", "settings_team")
   if (!teamCheck.allowed) return []
 
@@ -1604,15 +1635,28 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       `)
         .eq("partner_id", partnerId)
 
+      let validDeliveryPersonIds: string[] = []
+      let assignedDeliveryIds: string[] = []
+
       if (actor.roleId === "delivery") {
         const pUserId = actor.partnerUserId
         const uId = user.id
-        const filters: string[] = []
-        if (pUserId) filters.push(`delivery_person_id.eq.${pUserId}`)
-        if (uId) filters.push(`delivery_person_id.eq.${uId}`)
-        if (filters.length > 0) {
-          q = q.or(filters.join(","))
-        } else {
+
+        // 1. Buscar entregas atribuídas ao motorista via delivery_assignments
+        const { data: driverAssignments } = await getAdminClient()
+          .from("delivery_assignments")
+          .select("delivery_id")
+          .eq("partner_id", partnerId)
+          .eq("driver_id", uId)
+          .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+          .not("delivery_id", "is", null)
+
+        assignedDeliveryIds = Array.from(
+          new Set((driverAssignments || []).map((a: any) => String(a.delivery_id)).filter(Boolean))
+        )
+        validDeliveryPersonIds = [pUserId, uId].filter(Boolean) as string[]
+
+        if (validDeliveryPersonIds.length === 0 && assignedDeliveryIds.length === 0) {
           return {
             success: true,
             items: [],
@@ -1621,9 +1665,31 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             userRole: actor.roleId,
           }
         }
-      }
 
-      if (cursor) q = q.or(buildKeysetFilter(cursor))
+        const orClauses: string[] = []
+        if (validDeliveryPersonIds.length > 0) {
+          orClauses.push(`delivery_person_id.in.(${validDeliveryPersonIds.join(",")})`)
+        }
+        if (assignedDeliveryIds.length > 0) {
+          orClauses.push(`id.in.(${assignedDeliveryIds.join(",")})`)
+        }
+
+        if (cursor) {
+          const qVal = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+          const k1 = `created_at.lt.${qVal(cursor.createdAt)}`
+          const k2 = `and(created_at.eq.${qVal(cursor.createdAt)},id.lt.${qVal(cursor.id)})`
+          const combinedClauses: string[] = []
+          for (const rc of orClauses) {
+            combinedClauses.push(`and(${rc},${k1})`)
+            combinedClauses.push(`and(${rc},${k2})`)
+          }
+          q = q.or(combinedClauses.join(","))
+        } else {
+          q = q.or(orClauses.join(","))
+        }
+      } else {
+        if (cursor) q = q.or(buildKeysetFilter(cursor))
+      }
 
       const { data, error } = await q
         .order("created_at", { ascending: false })
@@ -1631,7 +1697,16 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         .limit(fetchLimit)
 
       if (error) throw error
-      const rows = data || []
+      let rows = data || []
+
+      // Filtro defensivo em memória para o cargo de entregador
+      if (actor.roleId === "delivery") {
+        rows = rows.filter((row: any) => {
+          const isPersonMatch = validDeliveryPersonIds.includes(String(row.delivery_person_id || ""))
+          const isIdMatch = assignedDeliveryIds.includes(String(row.id || ""))
+          return isPersonMatch || isIdMatch
+        })
+      }
       const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
       const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
 
@@ -1847,8 +1922,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     )
 
     if (actor.roleId === "delivery") {
-      const isAssigned = (actor.partnerUserId && String(data?.delivery_person_id || "") === actor.partnerUserId) ||
-        (user.id && String(data?.delivery_person_id || "") === user.id)
+      const isAssigned = await isDeliveryAssignedToDriver({
+        deliveryId,
+        deliveryPersonId: data?.delivery_person_id,
+        actor,
+      })
       if (!isAssigned) {
         return { success: false as const, error: "Sem permissão para visualizar esta entrega." }
       }
@@ -2031,6 +2109,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
   }) {
     const user = await requireUser()
     await requireActivePartnerContext(params.partnerId)
+    const actor = await getDeliveryActorScope(params.partnerId)
+    if (actor.roleId === "delivery") {
+      return { success: false as const, error: "Sem permissão para desatribuir entregador." }
+    }
     await requirePartnerRouteAccess(params.partnerId, "logistics", { specificPermission: "can_update_delivery_status" })
     const supabase = await getSupabaseServerClient()
     const admin = getAdminClient()
@@ -2152,10 +2234,13 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       .maybeSingle()
     if (!currentDelivery?.id) return { success: false as const, error: "Entrega não encontrada." }
     if (actor.roleId === "delivery") {
-      const isAssigned = (actor.partnerUserId && String(currentDelivery.delivery_person_id || "") === actor.partnerUserId) ||
-        (user.id && String(currentDelivery.delivery_person_id || "") === user.id)
+      const isAssigned = await isDeliveryAssignedToDriver({
+        deliveryId: params.deliveryId,
+        deliveryPersonId: currentDelivery.delivery_person_id,
+        actor,
+      })
       if (!isAssigned) {
-        return { success: false as const, error: "Sem permissão para alterar esta entrega." }
+        return { success: false as const, error: "Você só pode alterar status de entregas atribuídas a você." }
       }
     }
 
@@ -2657,10 +2742,13 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
 
   if (!currentDelivery?.id) return { success: false as const, error: "Entrega não encontrada." }
   if (actor.roleId === "delivery") {
-    const isAssigned = (actor.partnerUserId && String(currentDelivery.delivery_person_id || "") === actor.partnerUserId) ||
-      (user.id && String(currentDelivery.delivery_person_id || "") === user.id)
+    const isAssigned = await isDeliveryAssignedToDriver({
+      deliveryId: params.deliveryId,
+      deliveryPersonId: currentDelivery.delivery_person_id,
+      actor,
+    })
     if (!isAssigned) {
-      return { success: false as const, error: "Sem permissão para alterar esta entrega." }
+      return { success: false as const, error: "Você só pode alterar status de entregas atribuídas a você." }
     }
   }
 

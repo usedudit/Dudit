@@ -171,9 +171,9 @@ export function LabelGenerator({ products, maxInstallments }: { products: Produc
                       name={`quantity-${product.id}`}
                       type="number"
                       min="1"
-                      max="300"
+                      max="200"
                       value={selectedProducts.find((p) => p.productId === product.id)?.quantity || 1}
-                      onChange={(e) => updateQuantity(product.id, Math.min(300, Number.parseInt(e.target.value) || 1))}
+                      onChange={(e) => updateQuantity(product.id, Math.min(200, Number.parseInt(e.target.value) || 1))}
                       className="w-16 text-center"
                     />
                     <Button
@@ -181,7 +181,7 @@ export function LabelGenerator({ products, maxInstallments }: { products: Produc
                       size="sm"
                       onClick={() => {
                         const current = selectedProducts.find((p) => p.productId === product.id)?.quantity || 1
-                        updateQuantity(product.id, Math.min(300, current + 1))
+                        updateQuantity(product.id, Math.min(200, current + 1))
                       }}
                     >
                       +

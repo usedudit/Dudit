@@ -18,6 +18,8 @@ import { QueryClient, dehydrate } from "@tanstack/react-query"
 import { HydrationBoundary } from "@tanstack/react-query"
 import { cookies } from "next/headers"
 import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS } from "@/components/marketplace/explorar-constants"
+import { FormSection } from "@/components/reusable/FormSection"
+import { ListItem } from "@/components/reusable/ListItem"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "alimentacao": "Alimentação",
@@ -333,42 +335,61 @@ export default async function ExplorarPage({
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
-                        {FALLBACK_CATEGORIES.map((cat) => {
-                            const gradient = CATEGORY_GRADIENTS[cat.slug] || "from-gray-400 to-gray-500"
-                            const href = cat.slug === "servicos"
-                                ? `/explorar/${landingCitySlug}?type=servicos`
-                                : `/explorar/${landingCitySlug}/${cat.slug}`
-                            return (
-                                <a
-                                    key={cat.slug}
-                                    href={href}
-                                    className={`relative rounded-2xl overflow-hidden bg-gradient-to-br ${gradient} group cursor-pointer`}
-                                    style={{ aspectRatio: "4/3" }}
-                                >
-                                    <div className="absolute inset-0 p-4 lg:p-5 flex flex-col justify-between z-10">
-                                        <span className="text-white font-bold text-sm lg:text-base leading-tight drop-shadow-sm">
-                                            {cat.name}
-                                        </span>
-                                        <span className="text-white/80 text-xs lg:text-sm font-medium hidden sm:block">
-                                            Ver produtos
-                                        </span>
-                                    </div>
-                                    {cat.icon_url ? (
-                                        <img
-                                            src={cat.icon_url}
-                                            alt={cat.name}
-                                            className="absolute bottom-2 right-2 w-16 h-16 lg:w-20 lg:h-20 object-contain opacity-90 group-hover:scale-110 group-hover:opacity-100 transition-all duration-300 drop-shadow-lg"
-                                        />
-                                    ) : (
-                                        <div className="absolute bottom-3 right-3 w-14 h-14 lg:w-16 lg:h-16 rounded-full bg-white/20 flex items-center justify-center">
-                                            <span className="text-2xl lg:text-3xl">📦</span>
-                                        </div>
-                                    )}
-                                </a>
-                            )
-                        })}
-                    </div>
+                    {(() => {
+                        const productCategories = FALLBACK_CATEGORIES.filter(cat => cat.slug !== "servicos")
+                        const serviceCategory = FALLBACK_CATEGORIES.find(cat => cat.slug === "servicos")
+
+                        return (
+                            <>
+                                <FormSection title="Categorias de Produtos">
+                                    {productCategories.map((cat) => {
+                                        const href = `/explorar/${landingCitySlug}/${cat.slug}`
+                                        return (
+                                            <a key={cat.slug} href={href}>
+                                                <ListItem
+                                                    icon={
+                                                        cat.icon_url ? (
+                                                            <img
+                                                                src={cat.icon_url}
+                                                                alt={cat.name}
+                                                                className="w-6 h-6 object-contain"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-lg">📦</span>
+                                                        )
+                                                    }
+                                                    title={cat.name}
+                                                    showChevron
+                                                />
+                                            </a>
+                                        )
+                                    })}
+                                </FormSection>
+
+                                {serviceCategory && (
+                                    <FormSection title="Categorias de Serviços" hasSeparator>
+                                        <a href={`/explorar/${landingCitySlug}?type=servicos`}>
+                                            <ListItem
+                                                icon={
+                                                    serviceCategory.icon_url ? (
+                                                        <img
+                                                            src={serviceCategory.icon_url}
+                                                            alt={serviceCategory.name}
+                                                            className="w-6 h-6 object-contain"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-lg">🔧</span>
+                                                    )
+                                                }
+                                                title={serviceCategory.name}
+                                                showChevron
+                                            />
+                                        </a>
+                                    </FormSection>
+                                )}
+                            </>
+                        )
+                    })()}
                 </main>
 
                 <MarketplaceFooter />

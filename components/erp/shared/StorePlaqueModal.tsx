@@ -7,65 +7,36 @@ import {
     DownloadIcon,
     PrinterIcon,
     CopyIcon,
-    EyeIcon,
     StoreIcon,
-    CheckCircleIcon,
 } from "@/lib/icons"
-import { DefaultModal, Button, Input } from "@/components/reusable"
+import { DefaultModal, Button } from "@/components/reusable"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
-export type PlaqueTemplateId = "cavalete" | "acrylic_table" | "minimal_clean" | "dark_premium"
+export type PlaqueTemplateId = "digital_card" | "cavalete"
 
 interface PlaqueTemplate {
     id: PlaqueTemplateId
     name: string
     tag: string
     description: string
-    iconLabel: string
-    recommendedFor: string
 }
 
 const TEMPLATES: PlaqueTemplate[] = [
     {
-        id: "cavalete",
-        name: "Cavalete Dudit",
-        tag: "Oficial",
-        description: "Dino com cavalete simples para divulgar sua vitrine.",
-        iconLabel: "🦖",
-        recommendedFor: "Balcão e calçada",
-    },
-    {
-        id: "acrylic_table",
-        name: "Display Digital",
+        id: "digital_card",
+        name: "Card Digital",
         tag: "Mais Popular",
-        description: "Estilo card limpo com logo Dudit e QR Code destacado.",
-        iconLabel: "📱",
-        recommendedFor: "Mesas e balcões",
+        description: "Card limpo com icone Dudit, logo e QR Code. Estilo profissional.",
     },
     {
-        id: "minimal_clean",
-        name: "Minimalista",
-        tag: "Econômico",
-        description: "Design clean para impressão A4 ou A5.",
-        iconLabel: "📄",
-        recommendedFor: "Impressão / porta-retrato",
-    },
-    {
-        id: "dark_premium",
-        name: "Totem Neon",
-        tag: "Moderno",
-        description: "Visual escuro com destaque neon para ambientes noturnos.",
-        iconLabel: "✨",
-        recommendedFor: "Bares e barbearias",
+        id: "cavalete",
+        name: "Cavalete Dino",
+        tag: "Oficial",
+        description: "Dino com cavalete para divulgar sua vitrine.",
     },
 ]
 
-const DUDIT_GREEN = "#10B981"
-const DUDIT_DARK_GREEN = "#003229"
-const DUDIT_LIGHT_GREEN = "#ECFDF5"
-
-// Helpers para desenho no Canvas
 function roundRect(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -116,7 +87,7 @@ export function StorePlaqueModal({
 }: StorePlaqueModalProps) {
     const { toast } = useToast()
     const canvasRef = useRef<HTMLCanvasElement>(null)
-    const [selectedTemplate, setSelectedTemplate] = useState<PlaqueTemplateId>("acrylic_table")
+    const [selectedTemplate, setSelectedTemplate] = useState<PlaqueTemplateId>("digital_card")
     const [isRendering, setIsRendering] = useState(false)
     const [isDownloading, setIsDownloading] = useState(false)
     const [copiedLink, setCopiedLink] = useState(false)
@@ -144,16 +115,16 @@ export function StorePlaqueModal({
         try {
             const qrDataUrl = await QRCode.toDataURL(profileUrl, {
                 width: 900,
-                margin: 1,
+                margin: 0,
                 color: {
-                    dark: selectedTemplate === "dark_premium" ? "#FFFFFF" : "#000000",
-                    light: selectedTemplate === "dark_premium" ? "#0F172A" : "#FFFFFF",
+                    dark: "#000000",
+                    light: "#FFFFFF",
                 },
                 errorCorrectionLevel: "H",
             })
 
             const qrImg = await loadImage(qrDataUrl)
-            const logoImg = await loadImage("/api/assets/qr-dino?mascot=logo")
+            const iconImg = await loadImage("/api/assets/qr-dino?mascot=icon")
 
             const W = 1200
             const H = 1600
@@ -161,30 +132,107 @@ export function StorePlaqueModal({
             canvas.height = H
             ctx.clearRect(0, 0, W, H)
 
-            // ========================================================
-            // TEMPLATE: CAVALETE DUDIT (Simples - Dino + Cavalete)
-            // ========================================================
-            if (selectedTemplate === "cavalete") {
-                ctx.fillStyle = "#F8FAFC"
+            if (selectedTemplate === "digital_card") {
+                // ============================================================
+                // TEMPLATE: CARD DIGITAL (estilo TripAdvisor - fundo branco)
+                // ============================================================
+
+                // Fundo branco
+                ctx.fillStyle = "#FFFFFF"
                 ctx.fillRect(0, 0, W, H)
 
+                // Icon Dudit dentro de um quadrado verde arredondado (estilo TripAdvisor)
+                const iconSize = 200
+                const iconRadius = 40
+                const iconBoxX = (W - iconSize) / 2
+                const iconBoxY = 180
+
+                // Quadrado verde atras do icone
+                ctx.save()
+                ctx.fillStyle = "#10B981"
+                roundRect(ctx, iconBoxX, iconBoxY, iconSize, iconSize, iconRadius)
+                ctx.fill()
+                ctx.restore()
+
+                // Icon Dudit branco dentro do quadrado
+                const iconPad = 30
+                ctx.save()
+                ctx.filter = "brightness(10)"
+                ctx.drawImage(iconImg, iconBoxX + iconPad, iconBoxY + iconPad, iconSize - iconPad * 2, iconSize - iconPad * 2)
+                ctx.restore()
+
+                // "dudit" texto verde abaixo do icone
+                ctx.fillStyle = "#10B981"
+                ctx.font = "bold 72px sans-serif"
+                ctx.textAlign = "center"
+                ctx.textBaseline = "alphabetic"
+                ctx.fillText("dudit", W / 2, iconBoxY + iconSize + 80)
+
+                // Texto principal
+                ctx.fillStyle = "#0F172A"
+                ctx.font = "bold 56px sans-serif"
+                ctx.fillText("Conheça nossa", W / 2, iconBoxY + iconSize + 180)
+                ctx.fillText("vitrine online", W / 2, iconBoxY + iconSize + 250)
+
+                // QR Code
+                const qrSize = 480
+                const qrX = (W - qrSize) / 2
+                const qrY = iconBoxY + iconSize + 300
+                ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize)
+
+                // Texto abaixo do QR
+                ctx.fillStyle = "#64748B"
+                ctx.font = "500 30px sans-serif"
+                ctx.textAlign = "center"
+                ctx.fillText("Escaneie o QR Code", W / 2, qrY + qrSize + 55)
+
+                // Linha divisoria fina
+                ctx.save()
+                ctx.strokeStyle = "#E2E8F0"
+                ctx.lineWidth = 2
+                ctx.beginPath()
+                ctx.moveTo(W / 2 - 100, qrY + qrSize + 90)
+                ctx.lineTo(W / 2 + 100, qrY + qrSize + 90)
+                ctx.stroke()
+                ctx.restore()
+
+                // Nome da loja
+                ctx.fillStyle = "#334155"
+                ctx.font = "bold 36px sans-serif"
+                ctx.fillText(storeName || "Sua Loja", W / 2, qrY + qrSize + 145)
+
+                // Rodape
+                ctx.fillStyle = "#94A3B8"
+                ctx.font = "500 22px sans-serif"
+                ctx.fillText("Powered by Dudit", W / 2, H - 80)
+            }
+
+            if (selectedTemplate === "cavalete") {
+                // ============================================================
+                // TEMPLATE: CAVALETE DINO (estilo card quadrado verde/branco)
+                // ============================================================
+
+                // Metade superior verde
+                const greenHeight = H * 0.45
+                ctx.fillStyle = "#10B981"
+                ctx.fillRect(0, 0, W, greenHeight)
+
+                // Metade inferior branca
+                ctx.fillStyle = "#FFFFFF"
+                ctx.fillRect(0, greenHeight, W, H - greenHeight)
+
+                // Dino com cavalete
                 const dinoImg = await loadImage("/api/assets/qr-dino?mascot=qrdino")
 
-                const padTop = 120
-                const padBottom = 140
-                const availableHeight = H - padTop - padBottom
-                const scale = Math.min(W / dinoImg.naturalWidth, availableHeight / dinoImg.naturalHeight)
+                const padTop = 40
+                const padBottom = 40
+                const availableHeight = greenHeight - padTop - padBottom
+                const scale = Math.min((W * 0.6) / dinoImg.naturalWidth, availableHeight / dinoImg.naturalHeight)
                 const dinoW = dinoImg.naturalWidth * scale
                 const dinoH = dinoImg.naturalHeight * scale
                 const dinoX = (W - dinoW) / 2
                 const dinoY = padTop + (availableHeight - dinoH) / 2
 
-                // Logo Dudit no topo
-                const logoW = 200
-                const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
-                ctx.drawImage(logoImg, (W - logoW) / 2, 30, logoW, logoH)
-
-                // Desenha Dino com cavalete
                 ctx.drawImage(dinoImg, dinoX, dinoY, dinoW, dinoH)
 
                 // QR Code no cavalete
@@ -195,316 +243,32 @@ export function StorePlaqueModal({
                 const qrH = dinoH * QR_POS.height
                 ctx.drawImage(qrImg, qrX, qrY, qrW, qrH)
 
-                // Texto simples abaixo do dino
-                ctx.fillStyle = DUDIT_DARK_GREEN
-                ctx.font = "bold 36px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "middle"
-                ctx.fillText("Conheça nossa vitrine online", W / 2, H - 100)
-
-                ctx.fillStyle = "#64748B"
-                ctx.font = "500 22px sans-serif"
-                ctx.fillText("Escaneie o QR Code", W / 2, H - 55)
-            }
-
-            // ========================================================
-            // TEMPLATE: DISPLAY DIGITAL (Estilo TripAdvisor com Logo Dudit)
-            // ========================================================
-            else if (selectedTemplate === "acrylic_table") {
-                // Fundo branco limpo
-                ctx.fillStyle = "#FFFFFF"
-                ctx.fillRect(0, 0, W, H)
-
-                // Card principal com borda verde
-                const cardX = 80
-                const cardY = 80
-                const cardW = W - 160
-                const cardH = H - 160
-                const cardR = 32
-
-                // Sombra suave
-                ctx.save()
-                ctx.shadowColor = "rgba(0, 0, 0, 0.08)"
-                ctx.shadowBlur = 30
-                ctx.shadowOffsetY = 10
-                ctx.fillStyle = "#FFFFFF"
-                roundRect(ctx, cardX, cardY, cardW, cardH, cardR)
-                ctx.fill()
-                ctx.restore()
-
-                // Borda verde Dudit
-                ctx.save()
-                ctx.strokeStyle = DUDIT_GREEN
-                ctx.lineWidth = 6
-                roundRect(ctx, cardX, cardY, cardW, cardH, cardR)
-                ctx.stroke()
-                ctx.restore()
-
-                // Logo Dudit centralizado no topo
-                const logoW = 280
-                const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
-                const logoX = (W - logoW) / 2
-                const logoY = cardY + 60
-                ctx.drawImage(logoImg, logoX, logoY, logoW, logoH)
-
-                // Texto principal
-                ctx.fillStyle = "#0F172A"
-                ctx.font = "bold 42px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "alphabetic"
-                ctx.fillText("Conheça nossa vitrine", W / 2, logoY + logoH + 80)
-
-                // Subtítulo
-                ctx.fillStyle = "#64748B"
-                ctx.font = "500 26px sans-serif"
-                ctx.fillText("Escaneie o QR Code para ver nossos produtos", W / 2, logoY + logoH + 130)
-
-                // Card do QR Code com borda verde
-                const qrCardSize = 560
-                const qrCardX = (W - qrCardSize) / 2
-                const qrCardY = logoY + logoH + 170
-
-                // Fundo verde claro
-                ctx.save()
-                ctx.fillStyle = DUDIT_LIGHT_GREEN
-                roundRect(ctx, qrCardX, qrCardY, qrCardSize, qrCardSize, 28)
-                ctx.fill()
-                ctx.restore()
-
-                // QR Code centralizado
-                const qrPad = 50
-                ctx.drawImage(qrImg, qrCardX + qrPad, qrCardY + qrPad, qrCardSize - qrPad * 2, qrCardSize - qrPad * 2)
-
-                // Ícone do WhatsApp (emoji simples)
-                ctx.fillStyle = "#25D366"
-                ctx.font = "bold 48px sans-serif"
-                ctx.textAlign = "center"
-                ctx.fillText("💬", W / 2, qrCardY + qrCardSize + 70)
-
-                // Texto de ação
-                ctx.fillStyle = DUDIT_DARK_GREEN
-                ctx.font = "bold 28px sans-serif"
-                ctx.fillText("Peça pelo WhatsApp", W / 2, qrCardY + qrCardSize + 120)
-
-                // Rodapé com nome da loja
-                ctx.fillStyle = "#94A3B8"
-                ctx.font = "500 22px sans-serif"
-                ctx.fillText(storeName || "Sua Loja", W / 2, H - 130)
-
-                // Linha decorativa verde
-                ctx.save()
-                ctx.strokeStyle = DUDIT_GREEN
-                ctx.lineWidth = 4
-                ctx.beginPath()
-                ctx.moveTo(W / 2 - 60, H - 100)
-                ctx.lineTo(W / 2 + 60, H - 100)
-                ctx.stroke()
-                ctx.restore()
-
-                // Texto Dudit
-                ctx.fillStyle = DUDIT_GREEN
-                ctx.font = "bold 18px sans-serif"
-                ctx.fillText("Powered by Dudit", W / 2, H - 70)
-            }
-
-            // ========================================================
-            // TEMPLATE: MINIMALISTA (Clean para impressão)
-            // ========================================================
-            else if (selectedTemplate === "minimal_clean") {
-                ctx.fillStyle = "#FFFFFF"
-                ctx.fillRect(0, 0, W, H)
-
-                // Moldura fina verde
-                ctx.save()
-                ctx.strokeStyle = DUDIT_GREEN
-                ctx.lineWidth = 5
-                roundRect(ctx, 40, 40, W - 80, H - 80, 24)
-                ctx.stroke()
-                ctx.restore()
-
-                // Logo Dudit
-                const logoW = 240
-                const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
-                ctx.drawImage(logoImg, (W - logoW) / 2, 100, logoW, logoH)
-
-                // Título
+                // Texto na area branca
                 ctx.fillStyle = "#0F172A"
                 ctx.font = "bold 48px sans-serif"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "alphabetic"
-                ctx.fillText("Nossa Vitrine Online", W / 2, 250)
+                ctx.fillText("Conheça nossa vitrine", W / 2, greenHeight + 120)
 
-                // Linha divisória
-                ctx.save()
-                ctx.strokeStyle = DUDIT_GREEN
-                ctx.lineWidth = 4
-                ctx.beginPath()
-                ctx.moveTo(W / 2 - 80, 280)
-                ctx.lineTo(W / 2 + 80, 280)
-                ctx.stroke()
-                ctx.restore()
-
-                // Subtítulo
                 ctx.fillStyle = "#64748B"
-                ctx.font = "500 26px sans-serif"
-                ctx.fillText("Escaneie o QR Code para ver o catálogo", W / 2, 330)
+                ctx.font = "500 28px sans-serif"
+                ctx.fillText("Escaneie o QR Code", W / 2, greenHeight + 180)
 
-                // Card QR Code
-                const qrSize = 580
-                const qrX = (W - qrSize) / 2
-                const qrY = 380
+                // QR Code grande na area branca
+                const bigQrSize = 420
+                const bigQrX = (W - bigQrSize) / 2
+                const bigQrY = greenHeight + 220
+                ctx.drawImage(qrImg, bigQrX, bigQrY, bigQrSize, bigQrSize)
 
-                ctx.save()
-                ctx.fillStyle = "#F8FAFC"
-                ctx.shadowColor = "rgba(0, 0, 0, 0.06)"
-                ctx.shadowBlur = 20
-                ctx.shadowOffsetY = 6
-                roundRect(ctx, qrX, qrY, qrSize, qrSize, 24)
-                ctx.fill()
-                ctx.restore()
+                // Nome da loja
+                ctx.fillStyle = "#334155"
+                ctx.font = "bold 34px sans-serif"
+                ctx.fillText(storeName || "Sua Loja", W / 2, bigQrY + bigQrSize + 80)
 
-                // QR Code
-                const innerPad = 40
-                ctx.drawImage(qrImg, qrX + innerPad, qrY + innerPad, qrSize - innerPad * 2, qrSize - innerPad * 2)
-
-                // Benefícios
-                const benefits = [
-                    "✓ Sem precisar baixar app",
-                    "✓ Catálogo e preços atualizados",
-                    "✓ Direto no seu WhatsApp",
-                ]
-
-                const benefitsY = qrY + qrSize + 60
-                benefits.forEach((text, i) => {
-                    ctx.fillStyle = "#334155"
-                    ctx.font = "bold 24px sans-serif"
-                    ctx.textAlign = "center"
-                    ctx.fillText(text, W / 2, benefitsY + i * 50)
-                })
-
-                // Rodapé
+                // Rodape
                 ctx.fillStyle = "#94A3B8"
                 ctx.font = "500 22px sans-serif"
-                ctx.fillText(storeName || "Sua Loja", W / 2, H - 100)
-
-                ctx.fillStyle = DUDIT_GREEN
-                ctx.font = "bold 18px sans-serif"
                 ctx.fillText("Powered by Dudit", W / 2, H - 60)
-            }
-
-            // ========================================================
-            // TEMPLATE: TOTEM NEON (Dark premium com Dudit)
-            // ========================================================
-            else if (selectedTemplate === "dark_premium") {
-                // Fundo escuro
-                const darkGrad = ctx.createLinearGradient(0, 0, W, H)
-                darkGrad.addColorStop(0, "#090D16")
-                darkGrad.addColorStop(0.5, "#0F172A")
-                darkGrad.addColorStop(1, "#020617")
-                ctx.fillStyle = darkGrad
-                ctx.fillRect(0, 0, W, H)
-
-                // Glow verde
-                const radGrad = ctx.createRadialGradient(W / 2, 800, 50, W / 2, 800, 600)
-                radGrad.addColorStop(0, DUDIT_GREEN + "33")
-                radGrad.addColorStop(1, "transparent")
-                ctx.fillStyle = radGrad
-                ctx.fillRect(0, 0, W, H)
-
-                // Moldura externa
-                ctx.save()
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)"
-                ctx.lineWidth = 3
-                roundRect(ctx, 45, 45, W - 90, H - 90, 28)
-                ctx.stroke()
-                ctx.restore()
-
-                // Logo Dudit (usando versão clara ou ícone)
-                const logoW = 220
-                const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
-                // Para dark mode, desenha o logo com filtro brightness
-                ctx.save()
-                ctx.filter = "brightness(2) contrast(0.8)"
-                ctx.drawImage(logoImg, (W - logoW) / 2, 80, logoW, logoH)
-                ctx.restore()
-
-                // Badge
-                const bWidth = 360
-                const bHeight = 46
-                const bX = (W - bWidth) / 2
-                const bY = 340
-                ctx.save()
-                ctx.fillStyle = "rgba(255, 255, 255, 0.06)"
-                roundRect(ctx, bX, bY, bWidth, bHeight, 23)
-                ctx.fill()
-                ctx.strokeStyle = DUDIT_GREEN
-                ctx.lineWidth = 2
-                roundRect(ctx, bX, bY, bWidth, bHeight, 23)
-                ctx.stroke()
-
-                ctx.fillStyle = DUDIT_GREEN
-                ctx.font = "bold 18px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "middle"
-                ctx.fillText("📱 VITRINE DIGITAL", W / 2, bY + bHeight / 2)
-                ctx.restore()
-
-                // Headline
-                ctx.fillStyle = "#FFFFFF"
-                ctx.font = "bold 48px sans-serif"
-                ctx.textAlign = "center"
-                ctx.textBaseline = "alphabetic"
-                ctx.fillText("Conheça nossos", W / 2, 440)
-                ctx.fillText("produtos", W / 2, 500)
-
-                // Subtitle
-                ctx.fillStyle = "#94A3B8"
-                ctx.font = "500 24px sans-serif"
-                ctx.fillText("Escaneie o QR Code e veja tudo", W / 2, 560)
-
-                // Card QR Code
-                const darkCardSize = 540
-                const darkCardX = (W - darkCardSize) / 2
-                const darkCardY = 610
-
-                ctx.save()
-                ctx.shadowColor = DUDIT_GREEN + "44"
-                ctx.shadowBlur = 25
-                ctx.fillStyle = "#FFFFFF"
-                roundRect(ctx, darkCardX, darkCardY, darkCardSize, darkCardSize, 28)
-                ctx.fill()
-                ctx.restore()
-
-                // QR Code
-                const dPad = 40
-                ctx.drawImage(qrImg, darkCardX + dPad, darkCardY + dPad, darkCardSize - dPad * 2, darkCardSize - dPad * 2)
-
-                // Ação
-                const actionY = darkCardY + darkCardSize + 60
-                ctx.save()
-                ctx.fillStyle = "rgba(255, 255, 255, 0.05)"
-                roundRect(ctx, 140, actionY, W - 280, 100, 20)
-                ctx.fill()
-
-                ctx.fillStyle = "#FFFFFF"
-                ctx.font = "bold 26px sans-serif"
-                ctx.textAlign = "center"
-                ctx.fillText("Sem filas • Peça no seu ritmo", W / 2, actionY + 40)
-
-                ctx.fillStyle = DUDIT_GREEN
-                ctx.font = "bold 22px sans-serif"
-                ctx.fillText("Direto pelo WhatsApp", W / 2, actionY + 75)
-                ctx.restore()
-
-                // Footer
-                ctx.fillStyle = "#64748B"
-                ctx.font = "500 22px sans-serif"
-                ctx.textAlign = "center"
-                ctx.fillText(storeName || "Sua Loja", W / 2, H - 80)
-
-                ctx.fillStyle = DUDIT_GREEN
-                ctx.font = "bold 16px sans-serif"
-                ctx.fillText("Powered by Dudit", W / 2, H - 45)
             }
         } catch (err) {
             console.error("Erro na renderização do canvas:", err)
@@ -534,7 +298,7 @@ export function StorePlaqueModal({
                         const url = URL.createObjectURL(blob)
                         const link = document.createElement("a")
                         const cleanName = (storeName || "loja").replace(/[\s/\\?%*:|"<>]+/g, "-").toLowerCase()
-                        link.download = `plaquinha-${selectedTemplate}-${cleanName}.png`
+                        link.download = `vitrine-${selectedTemplate}-${cleanName}.png`
                         link.href = url
                         document.body.appendChild(link)
                         link.click()
@@ -576,7 +340,7 @@ export function StorePlaqueModal({
             <!DOCTYPE html>
             <html>
                 <head>
-                    <title>Imprimir Plaquinha - ${storeName || "Dudit"}</title>
+                    <title>Imprimir - ${storeName || "Dudit"}</title>
                     <style>
                         @page { size: A4 portrait; margin: 0; }
                         * { box-sizing: border-box; }
@@ -586,7 +350,7 @@ export function StorePlaqueModal({
                     </style>
                 </head>
                 <body>
-                    <img src="${dataUrl}" alt="Plaquinha ${storeName}" onload="window.print(); window.close();" />
+                    <img src="${dataUrl}" alt="Vitrine ${storeName}" onload="window.print(); window.close();" />
                 </body>
             </html>
         `)
@@ -628,7 +392,7 @@ export function StorePlaqueModal({
                             disabled={isDownloading || isRendering}
                         >
                             <DownloadIcon size={15} />
-                            {isDownloading ? "Gerando PNG..." : "Baixar Plaquinha"}
+                            {isDownloading ? "Gerando..." : "Baixar PNG"}
                         </Button>
 
                         <Button
@@ -656,13 +420,13 @@ export function StorePlaqueModal({
                     </div>
                 </div>
 
-                {/* Seleção de Modelo */}
+                {/* Selecao de Modelo */}
                 <div className="lg:col-span-6 flex flex-col gap-5">
                     <div>
                         <label className="text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading block mb-2.5">
                             Escolha o Modelo
                         </label>
-                        <div className="grid grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 gap-2.5">
                             {TEMPLATES.map((tmpl) => {
                                 const isSelected = selectedTemplate === tmpl.id
                                 return (
@@ -671,14 +435,16 @@ export function StorePlaqueModal({
                                         type="button"
                                         onClick={() => setSelectedTemplate(tmpl.id)}
                                         className={cn(
-                                            "flex flex-col text-left p-3 rounded-xl border transition-all cursor-pointer relative",
+                                            "flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer",
                                             isSelected
                                                 ? "border-brand-green bg-brand-green/5 dark:bg-brand-green/10 shadow-sm ring-1 ring-brand-green"
                                                 : "border-brand-border dark:border-dark-border hover:border-brand-inactive-text/50 bg-white dark:bg-dark-surface"
                                         )}
                                     >
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-xl">{tmpl.iconLabel}</span>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                {tmpl.name}
+                                            </span>
                                             <span
                                                 className={cn(
                                                     "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tight",
@@ -690,10 +456,7 @@ export function StorePlaqueModal({
                                                 {tmpl.tag}
                                             </span>
                                         </div>
-                                        <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                            {tmpl.name}
-                                        </span>
-                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body line-clamp-2 mt-0.5">
+                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">
                                             {tmpl.description}
                                         </span>
                                     </button>
@@ -702,13 +465,13 @@ export function StorePlaqueModal({
                         </div>
                     </div>
 
-                    {/* Info */}
+                    {/* Info da loja */}
                     <div className="bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 rounded-xl p-4">
                         <div className="flex items-start gap-3">
                             <StoreIcon size={20} className="text-brand-green mt-0.5 shrink-0" />
                             <div>
                                 <p className="text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Sua vitrine: {storeName || "Sua Loja"}
+                                    Vitrine: {storeName || "Sua Loja"}
                                 </p>
                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">
                                     A plaquinha usa o link da sua vitrine no Dudit. Seus clientes escaneiam o QR Code e são redirecionados direto para sua loja online.

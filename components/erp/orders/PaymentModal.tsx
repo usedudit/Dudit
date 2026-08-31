@@ -3263,7 +3263,7 @@ const PaymentModal = ({
                                             {
                                                 text: "Voltar e ajustar venda",
                                                 action: () => {
-                                                    setPaymentStatus('idle');
+                                                    setPaymentStatus('input');
                                                 },
                                                 variant: "filled",
                                             }

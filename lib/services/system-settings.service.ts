@@ -301,14 +301,14 @@ export async function dispatchMaintenanceBroadcast(
         .select("user_id")
         .eq("is_active", true)
 
-      userIds = Array.from(new Set(partnerUsers?.map(p => p.user_id).filter(Boolean) || []))
+      userIds = Array.from(new Set((partnerUsers as Array<{ user_id: string | null }> | null)?.map(p => p.user_id).filter(Boolean) || [])) as string[]
     } else if (input.targetAudience === "customers") {
       const { data: profiles } = await adminDb
         .from("user_profiles")
         .select("user_id")
         .limit(1000)
 
-      userIds = Array.from(new Set(profiles?.map(p => p.user_id).filter(Boolean) || []))
+      userIds = Array.from(new Set((profiles as Array<{ user_id: string | null }> | null)?.map(p => p.user_id).filter(Boolean) || [])) as string[]
     } else {
       // All active users
       const { data: profiles } = await adminDb
@@ -316,7 +316,7 @@ export async function dispatchMaintenanceBroadcast(
         .select("user_id")
         .limit(2000)
 
-      userIds = Array.from(new Set(profiles?.map(p => p.user_id).filter(Boolean) || []))
+      userIds = Array.from(new Set((profiles as Array<{ user_id: string | null }> | null)?.map(p => p.user_id).filter(Boolean) || [])) as string[]
     }
 
     const batchId = `maint_broadcast_${Date.now()}`
@@ -327,7 +327,7 @@ export async function dispatchMaintenanceBroadcast(
           const idempotencyKey = `${batchId}_${userId}`
           const created = await createNotification({
             userId,
-            type: "system_announcement",
+            type: "admin_announcement",
             title: input.title,
             message: input.message,
             idempotencyKey,
@@ -349,7 +349,7 @@ export async function dispatchMaintenanceBroadcast(
               title: input.title,
               body: input.message,
               href: "/",
-              type: "system_announcement",
+              type: "admin_announcement",
               entityType: null,
               entityId: null,
             })

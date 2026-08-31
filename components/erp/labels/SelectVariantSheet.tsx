@@ -65,21 +65,19 @@ export default function SelectVariantSheet({ isOpen, onClose, product, selectedV
                 {/* Option: no variant (base product) */}
                 <button
                     onClick={() => setSelectedId(null)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                        selectedId === null
-                            ? "border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10"
-                            : "border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                    }`}
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${selectedId === null
+                        ? "border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10"
+                        : "border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-border/40"
+                        }`}
                 >
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        selectedId === null ? "border-brand-primary" : "border-gray-300 dark:border-dark-border"
-                    }`}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedId === null ? "border-brand-primary" : "border-gray-300 dark:border-dark-border"
+                        }`}>
                         {selectedId === null && <div className="w-2 h-2 rounded-full bg-brand-primary" />}
                     </div>
                     <div className="flex-1 text-left">
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Produto base</p>
                         <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                            Sem variacao - {formatCurrency(product.price)}
+                            Sem variação - {formatCurrency(product.price)}
                         </p>
                     </div>
                 </button>
@@ -100,15 +98,13 @@ export default function SelectVariantSheet({ isOpen, onClose, product, selectedV
                                         <button
                                             key={variant.id}
                                             onClick={() => setSelectedId(variant.id)}
-                                            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                                                isSelected
-                                                    ? "border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10"
-                                                    : "border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-border/40"
-                                            }`}
+                                            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors ${isSelected
+                                                ? "border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10"
+                                                : "border-brand-border dark:border-dark-border hover:bg-gray-50 dark:hover:bg-dark-border/40"
+                                                }`}
                                         >
-                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                                                isSelected ? "border-brand-primary" : "border-gray-300 dark:border-dark-border"
-                                            }`}>
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-brand-primary" : "border-gray-300 dark:border-dark-border"
+                                                }`}>
                                                 {isSelected && <div className="w-2 h-2 rounded-full bg-brand-primary" />}
                                             </div>
                                             <div className="flex-1 text-left">

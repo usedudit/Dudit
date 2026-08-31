@@ -11,11 +11,11 @@ import { formatCurrency } from "@/lib/utils"
 import { generateEAN13 } from "@/lib/utils/barcode"
 import Pagination from "@/components/reusable/Pagination"
 import SelectProductSheet from "./SelectProductSheet"
-import SelectVariantSheet from "./SelectVariantSheet"
+import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import { downloadPdf } from "@/lib/pdf/download"
 import { toast } from "@/hooks/use-notification"
 
-const MAX_QUANTITY = 300
+const MAX_QUANTITY = 200
 
 interface ProductVariant {
     id: string
@@ -170,6 +170,32 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
         )
     }
 
+    const variantPickerProduct = useMemo(() => {
+        if (!showVariantSheet) return null
+        const product = allProducts.find((p) => p.id === showVariantSheet)
+        if (!product) return null
+        return {
+            ...product,
+            product_variants: (product.variants || []).map((v) => ({
+                ...v,
+                stock_available: v.stock_quantity,
+            })),
+        }
+    }, [showVariantSheet, allProducts])
+
+    const handleVariantSheetConfirm = useCallback(
+        (selections: Array<{ variantId: string; qty: number }>) => {
+            if (!showVariantSheet) return
+            if (selections.length > 0) {
+                handleVariantConfirm(showVariantSheet, selections[0].variantId)
+            } else {
+                handleVariantConfirm(showVariantSheet, null)
+            }
+            setShowVariantSheet(null)
+        },
+        [showVariantSheet, handleVariantConfirm],
+    )
+
     const totalSelectedPages = Math.max(1, Math.ceil(selected.length / SELECTED_PAGE_SIZE))
     const paginatedSelected = useMemo(
         () => selected.slice((selectedPage - 1) * SELECTED_PAGE_SIZE, selectedPage * SELECTED_PAGE_SIZE),
@@ -192,9 +218,9 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                     labelQuantity: s.quantity,
                     variant: variant
                         ? {
-                              type: variant.variant_type,
-                              name: variant.variant_name,
-                          }
+                            type: variant.variant_type,
+                            name: variant.variant_name,
+                        }
                         : undefined,
                 }
             }),
@@ -246,14 +272,18 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
             const data = buildPrintData()
             const params = new URLSearchParams({ data: JSON.stringify(data) })
             await downloadPdf(`/api/pdf/labels?${params.toString()}`, "etiquetas.pdf")
-            onClose()
         } catch (error: any) {
             console.error("[LabelPrintModal] Error downloading PDF:", error)
             toast.error("Erro ao gerar PDF", error?.message || "Não foi possível gerar o PDF. Tente novamente.")
         } finally {
             setIsDownloadingPdf(false)
         }
-    }, [selected, buildPrintData, isDownloadingPdf, onClose])
+    }, [selected, buildPrintData, isDownloadingPdf])
+
+    const handleClose = useCallback(() => {
+        if (isDownloadingPdf) return
+        onClose()
+    }, [isDownloadingPdf, onClose])
 
     if (!isVisible) return null
 
@@ -269,7 +299,12 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                             <h2 className="text-lg md:text-xl font-bold text-brand-dark dark:text-dark-heading">
                                 Imprimir etiquetas {totalLabels > 0 && `(${totalLabels})`}
                             </h2>
-                            <Button variant="filled" onClick={onClose} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                            <Button
+                                variant="filled"
+                                onClick={handleClose}
+                                disabled={isDownloadingPdf}
+                                className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
+                            >
                                 <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
@@ -317,64 +352,55 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                                             />
                                         ) : (
                                             <>
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-left border-separate border-spacing-0">
-                                                        <thead>
-                                                            <tr className="text-xs text-brand-inactive-text">
-                                                                <th className="py-3 pl-6 pr-0 font-medium">Produto</th>
-                                                                <th className="py-3 px-2 font-medium w-28">Qtd</th>
-                                                                <th className="py-3 pl-2 font-medium w-16">Ação</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {paginatedSelected.map((item) => {
-                                                                const variant = item.selectedVariantId
-                                                                    ? item.product.variants?.find((v) => v.id === item.selectedVariantId)
-                                                                    : null
-                                                                const hasVariants = item.product.variants && item.product.variants.length > 0
-                                                                return (
-                                                                    <tr
-                                                                        key={item.productId}
-                                                                        className="bg-white dark:bg-dark-background transition-colors hover:bg-brand-gray dark:hover:bg-dark-border/10 border-b border-brand-border dark:border-dark-border"
-                                                                    >
-                                                                        <td className="py-3 pl-6 pr-0">
-                                                                            <div className="flex flex-col">
-                                                                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[180px]">
-                                                                                    {item.product.name}
-                                                                                </span>
-                                                                                {variant && (
-                                                                                    <span className="text-xs font-medium text-brand-primary truncate max-w-[180px]">
-                                                                                        {variant.variant_type}: {variant.variant_name}
-                                                                                    </span>
-                                                                                )}
-                                                                                {hasVariants && !variant && (
-                                                                                    <button
-                                                                                        onClick={() => setShowVariantSheet(item.productId)}
-                                                                                        className="text-xs font-medium text-brand-primary hover:underline text-left truncate max-w-[180px]"
-                                                                                    >
-                                                                                        Selecionar variacao
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        </td>
-                                                                        <td className="py-3 px-2">
-                                                                            <QuantitySelector
-                                                                                value={item.quantity}
-                                                                                onChange={(v) => updateQty(item.productId, v)}
-                                                                                max={MAX_QUANTITY}
-                                                                                size="sm"
-                                                                            />
-                                                                        </td>
-                                                                        <td className="py-3 pl-2">
-                                                                            <Button variant="outlinered" size="icon" onClick={() => removeProduct(item.productId)}>
-                                                                                <TrashIcon size={16} />
-                                                                            </Button>
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            })}
-                                                        </tbody>
-                                                    </table>
+                                                <div className="rounded-xl border border-brand-border dark:border-dark-border overflow-hidden">
+                                                    {paginatedSelected.map((item) => {
+                                                        const variant = item.selectedVariantId
+                                                            ? item.product.variants?.find((v) => v.id === item.selectedVariantId)
+                                                            : null
+                                                        const hasVariants = item.product.variants && item.product.variants.length > 0
+                                                        const needsVariant = hasVariants && !variant
+                                                        return (
+                                                            <div
+                                                                key={item.productId}
+                                                                className={`group flex items-center gap-4 border-b border-brand-border p-3.5 last:border-0 dark:border-dark-border transition-colors hover:bg-brand-gray dark:hover:bg-dark-border/10 ${needsVariant ? "bg-amber-50/50 dark:bg-amber-900/10" : "bg-white dark:bg-dark-background"}`}
+                                                            >
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[200px]">
+                                                                            {item.product.name}
+                                                                        </span>
+                                                                    </div>
+                                                                    {variant ? (
+                                                                        <span className="text-xs font-medium text-brand-primary truncate max-w-[200px] block mt-0.5">
+                                                                            {variant.variant_type}: {variant.variant_name}
+                                                                        </span>
+                                                                    ) : hasVariants ? (
+                                                                        <button
+                                                                            onClick={() => setShowVariantSheet(item.productId)}
+                                                                            className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline text-left truncate max-w-[200px] block mt-0.5"
+                                                                        >
+                                                                            Selecionar variação
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[200px] block mt-0.5">
+                                                                            {item.product.sku || "Sem SKU"}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <QuantitySelector
+                                                                    value={item.quantity}
+                                                                    onChange={(v) => updateQty(item.productId, v)}
+                                                                    max={MAX_QUANTITY}
+                                                                    size="sm"
+                                                                />
+
+                                                                <Button variant="outlinered" size="icon" onClick={() => removeProduct(item.productId)}>
+                                                                    <TrashIcon size={16} />
+                                                                </Button>
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
 
                                                 {totalSelectedPages > 1 && (
@@ -470,7 +496,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
 
                                     {/* Desktop actions */}
                                     <div className="hidden lg:flex gap-3 pt-2">
-                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0} leftIcon={<PrinterIcon size={18} />}>
+                                        <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<PrinterIcon size={18} />}>
                                             Imprimir
                                         </Button>
                                         <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<DownloadIcon size={18} />}>
@@ -481,7 +507,7 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
 
                                 {/* Mobile footer */}
                                 <div className="lg:hidden shrink-0 p-4 border-t border-brand-border dark:border-dark-border flex gap-3">
-                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0} leftIcon={<PrinterIcon size={18} />}>
+                                    <Button className="flex-1 h-12" onClick={handlePrint} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<PrinterIcon size={18} />}>
                                         Imprimir
                                     </Button>
                                     <Button variant="outline" className="flex-1 h-12" onClick={handleDownloadPdf} disabled={selected.length === 0 || isDownloadingPdf} leftIcon={<DownloadIcon size={18} />}>
@@ -527,16 +553,12 @@ export function LabelPrintModal({ isOpen, onClose, allProducts, maxInstallments 
                 onConfirm={handleProductConfirm}
             />
 
-            {showVariantSheet && (
-                <SelectVariantSheet
+            {variantPickerProduct && (
+                <SelectProductVariantSheet
                     isOpen={!!showVariantSheet}
+                    product={variantPickerProduct}
                     onClose={() => setShowVariantSheet(null)}
-                    product={allProducts.find((p) => p.id === showVariantSheet)!}
-                    selectedVariantId={selected.find((s) => s.productId === showVariantSheet)?.selectedVariantId}
-                    onConfirm={(variantId) => {
-                        handleVariantConfirm(showVariantSheet, variantId)
-                        setShowVariantSheet(null)
-                    }}
+                    onConfirm={handleVariantSheetConfirm}
                 />
             )}
         </>

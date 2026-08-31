@@ -40,9 +40,9 @@ function BarcodeCell({ value }: { value: string }) {
     try {
       JsBarcode(ref.current, value, {
         format: detectBarcodeFormat(value),
-        width: 1.2,
-        height: 24,
-        fontSize: 8,
+        width: 1,
+        height: 18,
+        fontSize: 7,
         margin: 1,
         displayValue: true,
       })
@@ -52,8 +52,8 @@ function BarcodeCell({ value }: { value: string }) {
   }, [value])
 
   return (
-    <div style={{ width: "100%", display: "flex", justifyContent: "center", margin: "0.3mm 0" }}>
-      <svg ref={ref} style={{ maxWidth: "100%", height: "auto" }} />
+    <div style={{ width: "100%", display: "flex", justifyContent: "center", margin: "0.3mm 0", maxHeight: "10mm", overflow: "hidden" }}>
+      <svg ref={ref} style={{ maxWidth: "80%", height: "auto" }} />
     </div>
   )
 }
