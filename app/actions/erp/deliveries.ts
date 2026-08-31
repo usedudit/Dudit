@@ -1551,6 +1551,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       items: any[]
       nextCursor: ERPDeliveryListCursor | null
       hasMore: boolean
+      userRole?: string
       planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
     }
     | { success: false; error: string }
@@ -1569,6 +1570,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             nextCursor: null,
             hasMore: false,
             planGate: { requiredPlanSlug: "crescer", message: planCheck.error },
+            userRole: actor.roleId,
           }
         }
         return { success: false, error: planCheck.error }
@@ -1616,6 +1618,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             items: [],
             nextCursor: null,
             hasMore: false,
+            userRole: actor.roleId,
           }
         }
       }
@@ -1755,7 +1758,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         ? { createdAt: String(last.created_at), id: String(last.id) }
         : null
 
-      return { success: true, items, nextCursor, hasMore }
+      return { success: true, items, nextCursor, hasMore, userRole: actor.roleId }
     } catch (e: any) {
       return { success: false, error: e?.message || "Erro ao carregar entregas." }
     }

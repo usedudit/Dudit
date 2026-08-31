@@ -225,12 +225,6 @@ export default function DuditDriverDetailsModal({
                         )}
                     </div>
                 )}
-
-                <div className="pt-2">
-                    <Button variant="outline" onClick={onClose} className="w-full font-bold">
-                        Fechar
-                    </Button>
-                </div>
             </div>
         </DefaultModal>
     )

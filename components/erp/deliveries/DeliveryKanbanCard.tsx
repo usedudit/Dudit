@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown, Badge } from "@/components/reusable"
+import { ActionsDropdown } from "@/components/reusable"
 import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency } from "@/lib/utils"
-import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
-import { ClockIcon, MapPinIcon, TruckIcon, UserIcon, BlockedIcon, DeliverySentIcon, CheckCircleIcon, DeliveryPickupIcon, DeliveryFailedIcon } from "@/lib/icons"
+import { getDeliveryStatusMeta } from "@/lib/orders/status"
+import { ClockIcon, TruckIcon, UserIcon } from "@/lib/icons"
 
 interface DeliveryKanbanCardProps {
   delivery: any
@@ -97,9 +97,6 @@ export default function DeliveryKanbanCard({
               +{delivery.orderCount - 1} ped.
             </span>
           )}
-          <Badge variant={statusMeta.variant} icon={getDeliveryStatusIcon(delivery.status)} className="scale-90 origin-left">
-            {statusMeta.label}
-          </Badge>
         </div>
 
         {/* Description / Customer info */}
@@ -107,7 +104,7 @@ export default function DeliveryKanbanCard({
           <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading leading-tight truncate">
             {delivery.customerName}
           </h4>
-          
+
           {delivery.customerAddress ? (
             <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-normal line-clamp-2" title={delivery.customerAddress}>
               {delivery.customerAddress}

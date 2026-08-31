@@ -1814,6 +1814,15 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         const totalDiscount = Math.max(0, Number(data.discountValue || 0)) + couponDiscountAmount
         const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
         if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+            const { logPolicyLimitExceeded } = await import("@/lib/auth/auth-logger")
+            logPolicyLimitExceeded({
+                userId: user?.id,
+                partnerId: data.partnerId,
+                policy: "maxDiscountPercent",
+                attemptedValue: `${effectiveDiscountPercent.toFixed(1)}%`,
+                allowedLimit: `${salesSettings.maxDiscountPercent}%`,
+                details: { subtotal, discountValue: data.discountValue, couponDiscountAmount, totalDiscount }
+            })
             return {
                 error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas.`
             }
@@ -2948,6 +2957,15 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         const totalDiscount = Math.max(0, Number(data.discountValue || 0)) + couponDiscountAmount
         const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
         if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+            const { logPolicyLimitExceeded } = await import("@/lib/auth/auth-logger")
+            logPolicyLimitExceeded({
+                userId: user?.id,
+                partnerId: data.partnerId,
+                policy: "maxDiscountPercent",
+                attemptedValue: `${effectiveDiscountPercent.toFixed(1)}%`,
+                allowedLimit: `${salesSettings.maxDiscountPercent}%`,
+                details: { subtotal, discountValue: data.discountValue, couponDiscountAmount, totalDiscount }
+            })
             return {
                 error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas.`
             }

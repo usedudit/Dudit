@@ -1,0 +1,35 @@
+import type { Metadata } from "next"
+import { AdminHeader } from "@/components/admin/admin-header"
+import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { getMaintenanceConfig, getGlobalAnnouncementConfig } from "@/lib/services/system-settings.service"
+import { SystemMaintenancePage } from "@/components/admin/system/SystemMaintenancePage"
+
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
+export const metadata: Metadata = {
+  title: "Sistema & Manutenção | Painel DDT",
+}
+
+export default async function AdminSystemPage() {
+  await requireAdmin("admin")
+
+  const [maintenance, announcement] = await Promise.all([
+    getMaintenanceConfig(),
+    getGlobalAnnouncementConfig(),
+  ])
+
+  return (
+    <>
+      <AdminHeader pageTitle="Sistema & Manutenção" />
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+        <SystemMaintenancePage
+          initialState={{
+            maintenance,
+            announcement,
+          }}
+        />
+      </div>
+    </>
+  )
+}

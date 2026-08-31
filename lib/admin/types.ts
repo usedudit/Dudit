@@ -76,8 +76,11 @@ export enum AdminActionType {
     AD_DELETE = "advertising.delete",
     AD_STATUS_CHANGE = "advertising.status_change",
 
-    // Notifications
+    // Notifications & Announcements
     ANNOUNCEMENT_SEND = "notification.announcement_send",
+    SYSTEM_MAINTENANCE_TOGGLE = "system.maintenance_toggle",
+    SYSTEM_ANNOUNCEMENT_UPDATE = "system.announcement_update",
+    SYSTEM_NOTIFICATION_BROADCAST = "system.notification_broadcast",
 
     // Marketplace search config
     MARKETPLACE_SYNONYM_CHANGE = "marketplace.synonym_change",

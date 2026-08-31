@@ -14,6 +14,7 @@ interface DeliveryPageControlsProps {
     canSmartSuggest?: boolean
     addDisabled?: boolean
     tabCounts?: { active: number; closed: number }
+    userRole?: string | null
 }
 
 export default function DeliveryPageControls({
@@ -27,6 +28,7 @@ export default function DeliveryPageControls({
     canSmartSuggest = false,
     addDisabled = false,
     tabCounts,
+    userRole,
 }: DeliveryPageControlsProps) {
     return (
         <>
@@ -76,25 +78,29 @@ export default function DeliveryPageControls({
                     >
                         <FilterIcon className="w-4 h-4" />
                     </Button>
-                    <Dropdown
-                        trigger={
-                            <Button variant="outline" className="w-[42px] h-[42px] p-0">
-                                <Settings2Icon className="w-4 h-4" />
-                            </Button>
-                        }
-                        align="right"
-                        showChevron={false}
-                        className="w-fit"
-                    >
-                        <DropdownItem onClick={onOpenSuggestions}>
-                            <SparklesIcon size={14} /> Gerar sugestões
-                        </DropdownItem>
-                    </Dropdown>
-                    <Button
-                        onClick={onAdd}
-                        className="w-[42px] h-[42px] p-0 flex items-center justify-center"
-                        leftIcon={<PlusIcon size={18} />}
-                    />
+                    {userRole !== "delivery" && (
+                        <Dropdown
+                            trigger={
+                                <Button variant="outline" className="w-[42px] h-[42px] p-0">
+                                    <Settings2Icon className="w-4 h-4" />
+                                </Button>
+                            }
+                            align="right"
+                            showChevron={false}
+                            className="w-fit"
+                        >
+                            <DropdownItem onClick={onOpenSuggestions}>
+                                <SparklesIcon size={14} /> Gerar sugestões
+                            </DropdownItem>
+                        </Dropdown>
+                    )}
+                    {userRole !== "delivery" && (
+                        <Button
+                            onClick={onAdd}
+                            className="w-[42px] h-[42px] p-0 flex items-center justify-center"
+                            leftIcon={<PlusIcon size={18} />}
+                        />
+                    )}
                 </div>
 
                 <div className="hidden md:flex items-center w-full gap-3">

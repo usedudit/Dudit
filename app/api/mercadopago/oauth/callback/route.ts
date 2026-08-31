@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
             grant_type: "authorization_code",
             code: code,
             redirect_uri: redirectUri,
+            ...(process.env.NODE_ENV === "development" ? { test_token: "true" } : {}),
           }),
           signal: tokenController.signal,
         }

@@ -59,17 +59,13 @@ export async function checkPermission<R extends PermissionResource>(
 
 /**
  * Fallback: verifica permissão em nível de partner (sem store).
- * Usa requirePartnerAccessWithPermission com try/catch.
+ * Usa checkPartnerPermission não-lançante para evitar logs desnecessários em renders de UI.
  */
 async function checkPartnerPermissionFallback(
     partnerId: string,
     resource: string,
     action: string
 ): Promise<{ allowed: boolean }> {
-    try {
-        await requirePartnerAccessWithPermission(partnerId, resource as any, action as string)
-        return { allowed: true }
-    } catch {
-        return { allowed: false }
-    }
+    const { checkPartnerPermission } = await import("@/lib/auth/authorization")
+    return checkPartnerPermission(partnerId, resource as any, action)
 }

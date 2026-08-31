@@ -1137,107 +1137,107 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                                     </div>
                                 )}
                                 <div className="flex-1 pt-4 pb-12 px-6">
-                                            <QuoteEditor mode={mode}
-                                                searchQuery={productBucket.searchQuery}
-                                                setSearchQuery={productBucket.setSearchQuery}
-                                                isProductSearchOpen={isProductSearchOpen}
-                                                setIsProductSearchOpen={setIsProductSearchOpen}
-                                                filteredProducts={productBucket.filteredResults}
-                                                isSearching={productBucket.isLoading}
-                                                onSearchFocus={productBucket.loadBucket}
-                                                loadMoreProducts={productBucket.loadMore}
-                                                hasMoreProducts={productBucket.hasMore}
-                                                quotePromotions={quotePromotions}
-                                                handleProductClick={handleProductClick}
-                                                addBlankItem={addBlankItem}
-                                                quoteItems={quoteItems}
-                                                updateItemPrice={updateItemPrice}
-                                                updateItemQty={updateItemQty}
-                                                updateItemField={updateItemField}
-                                                toggleItemEdit={toggleItemEdit}
-                                                removeItem={removeItem}
-                                                discount={discount}
-                                                setDiscount={setDiscount}
-                                                discountType={discountType}
-                                                setDiscountType={setDiscountType}
-                                                shippingFee={shippingFee}
-                                                setShippingFee={setShippingFee}
-                                                otherCosts={otherCosts}
-                                                setOtherCosts={setOtherCosts}
-                                                subtotal={subtotal}
-                                                discountValue={discountValue}
-                                                total={total}
-                                                selectedCustomer={selectedCustomer}
-                                                setSelectedCustomer={setSelectedCustomer}
-                                                setIsCustomerSheetOpen={setIsCustomerSheetOpen}
-                                                quoteDate={quoteDate}
-                                                setQuoteDate={setQuoteDate}
-                                                expiryDate={expiryDate}
-                                                setExpiryDate={setExpiryDate}
-                                                status={status}
-                                                setStatus={setStatus}
-                                                internalNote={internalNote}
-                                                setInternalNote={setInternalNote}
-                                                staffInternalNotes={staffInternalNotes}
-                                                setStaffInternalNotes={setStaffInternalNotes}
-                                                editCaps={editCaps}
-                                                onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
-                                                onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
-                                                primaryColor={primaryColor}
-                                                setPrimaryColor={setPrimaryColor}
-                                                secondaryColor={secondaryColor}
-                                                setSecondaryColor={setSecondaryColor}
-                                                quoteTitle={quoteTitle}
-                                                setQuoteTitle={setQuoteTitle}
-                                                quoteSubtitle={quoteSubtitle}
-                                                setQuoteSubtitle={setQuoteSubtitle}
-                                                showDecoration={showDecoration}
-                                                setShowDecoration={setShowDecoration}
-                                                isReadOnly={mode === 'view'}
-                                                fieldErrors={fieldErrors}
-                                                setFieldErrors={setFieldErrors}
-                                                manualItemNameErrors={manualItemNameErrors}
-                                                manualItemPriceErrors={manualItemPriceErrors}
-                                                isLoadingItems={isLoadingProposalItems}
-                                                salespersonId={salespersonId}
-                                                setSalespersonId={setSalespersonId}
-                                                salespeople={salespeople}
-                                                canApplyDiscount={canDiscount}
-                                                isMarketplaceOrigin={isMarketplaceOrigin}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* RIGHT SIDE - PREVIEW (always visible on desktop) */}
-                                <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto custom-scrollbar flex flex-col h-full">
-                                    <div className="flex-1 min-h-0 flex flex-col">
-                                        <QuotePreview
-                                            invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
-                                            quoteDate={quoteDate}
-                                            expiryDate={expiryDate}
-                                            selectedCustomer={selectedCustomer}
-                                            quoteItems={quoteItems}
-                                            subtotal={subtotal}
-                                            shippingNum={shippingNum}
-                                            otherCosts={parseFloat(otherCosts) || 0}
-                                            discountValue={discountValue}
-                                            total={total}
-                                            note={internalNote}
-                                            primaryColor={primaryColor}
-                                            secondaryColor={secondaryColor}
-                                            quoteTitle={quoteTitle}
-                                            quoteSubtitle={quoteSubtitle}
-                                            partnerName={partnerName}
-                                            partnerAddress={partnerAddress}
-                                            partnerPhone={partnerPhone}
-                                            partnerAvatar={partnerAvatar}
-                                            showDecoration={showDecoration}
-                                            salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
-                                        />
-                                    </div>
+                                    <QuoteEditor mode={mode}
+                                        searchQuery={productBucket.searchQuery}
+                                        setSearchQuery={productBucket.setSearchQuery}
+                                        isProductSearchOpen={isProductSearchOpen}
+                                        setIsProductSearchOpen={setIsProductSearchOpen}
+                                        filteredProducts={productBucket.filteredResults}
+                                        isSearching={productBucket.isLoading}
+                                        onSearchFocus={productBucket.loadBucket}
+                                        loadMoreProducts={productBucket.loadMore}
+                                        hasMoreProducts={productBucket.hasMore}
+                                        quotePromotions={quotePromotions}
+                                        handleProductClick={handleProductClick}
+                                        addBlankItem={addBlankItem}
+                                        quoteItems={quoteItems}
+                                        updateItemPrice={updateItemPrice}
+                                        updateItemQty={updateItemQty}
+                                        updateItemField={updateItemField}
+                                        toggleItemEdit={toggleItemEdit}
+                                        removeItem={removeItem}
+                                        discount={discount}
+                                        setDiscount={setDiscount}
+                                        discountType={discountType}
+                                        setDiscountType={setDiscountType}
+                                        shippingFee={shippingFee}
+                                        setShippingFee={setShippingFee}
+                                        otherCosts={otherCosts}
+                                        setOtherCosts={setOtherCosts}
+                                        subtotal={subtotal}
+                                        discountValue={discountValue}
+                                        total={total}
+                                        selectedCustomer={selectedCustomer}
+                                        setSelectedCustomer={setSelectedCustomer}
+                                        setIsCustomerSheetOpen={setIsCustomerSheetOpen}
+                                        quoteDate={quoteDate}
+                                        setQuoteDate={setQuoteDate}
+                                        expiryDate={expiryDate}
+                                        setExpiryDate={setExpiryDate}
+                                        status={status}
+                                        setStatus={setStatus}
+                                        internalNote={internalNote}
+                                        setInternalNote={setInternalNote}
+                                        staffInternalNotes={staffInternalNotes}
+                                        setStaffInternalNotes={setStaffInternalNotes}
+                                        editCaps={editCaps}
+                                        onReopenQuote={mode === "edit" ? handleReopenQuote : undefined}
+                                        onDuplicateQuote={mode === "edit" ? handleDuplicateFromEditor : undefined}
+                                        primaryColor={primaryColor}
+                                        setPrimaryColor={setPrimaryColor}
+                                        secondaryColor={secondaryColor}
+                                        setSecondaryColor={setSecondaryColor}
+                                        quoteTitle={quoteTitle}
+                                        setQuoteTitle={setQuoteTitle}
+                                        quoteSubtitle={quoteSubtitle}
+                                        setQuoteSubtitle={setQuoteSubtitle}
+                                        showDecoration={showDecoration}
+                                        setShowDecoration={setShowDecoration}
+                                        isReadOnly={mode === 'view'}
+                                        fieldErrors={fieldErrors}
+                                        setFieldErrors={setFieldErrors}
+                                        manualItemNameErrors={manualItemNameErrors}
+                                        manualItemPriceErrors={manualItemPriceErrors}
+                                        isLoadingItems={isLoadingProposalItems}
+                                        salespersonId={salespersonId}
+                                        setSalespersonId={setSalespersonId}
+                                        salespeople={salespeople}
+                                        canApplyDiscount={canDiscount}
+                                        isMarketplaceOrigin={isMarketplaceOrigin}
+                                    />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* RIGHT SIDE - PREVIEW (always visible on desktop) */}
+                        <div className="w-1/2 bg-brand-gray dark:bg-dark-border/20 overflow-auto custom-scrollbar flex flex-col h-full">
+                            <div className="flex-1 min-h-0 flex flex-col">
+                                <QuotePreview
+                                    invoiceNumber={quoteCode || (mode === 'create' ? 'ORC00000' : 'N/A')}
+                                    quoteDate={quoteDate}
+                                    expiryDate={expiryDate}
+                                    selectedCustomer={selectedCustomer}
+                                    quoteItems={quoteItems}
+                                    subtotal={subtotal}
+                                    shippingNum={shippingNum}
+                                    otherCosts={parseFloat(otherCosts) || 0}
+                                    discountValue={discountValue}
+                                    total={total}
+                                    note={internalNote}
+                                    primaryColor={primaryColor}
+                                    secondaryColor={secondaryColor}
+                                    quoteTitle={quoteTitle}
+                                    quoteSubtitle={quoteSubtitle}
+                                    partnerName={partnerName}
+                                    partnerAddress={partnerAddress}
+                                    partnerPhone={partnerPhone}
+                                    partnerAvatar={partnerAvatar}
+                                    showDecoration={showDecoration}
+                                    salespersonName={salespeople.find(s => s.id === salespersonId)?.name}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     {/* MOBILE/TABLET: Tabbed view (< lg) */}
                     <div className="lg:hidden flex flex-col h-full w-full overflow-hidden">

@@ -456,7 +456,7 @@ export default function DeliveryDetailPage({
     )
 
     const headerContent = (
-        <div className="flex items-center justify-between gap-3">
+        <div className="hidden lg:flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
                 <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
@@ -526,9 +526,9 @@ export default function DeliveryDetailPage({
                 {/* MOBILE / TABLET (< lg): Single-column Tabbed View */}
                 <div className="lg:hidden flex flex-col h-full w-full overflow-hidden">
                     {/* Top Header & Tabs for Mobile/Tablet */}
-                    <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border px-4 py-3">
+                    <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
                         {headerContent}
-                        <div className="mt-3 border-t border-brand-border dark:border-dark-border pt-2">
+                        <div>
                             <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                 <TabsTrigger value="dados_gerais">
                                     Dados Gerais
@@ -887,9 +887,43 @@ export default function DeliveryDetailPage({
                         </div>
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
-                            <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
-                                Fechar
-                            </Button>
+                            <div className="flex gap-3 w-full">
+                                {selectedLink?.status !== "delivered" && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={() => {
+                                            setSimpleConfirmModal({
+                                                isOpen: true,
+                                                orderId: order.id,
+                                                nextStatus: "delivered"
+                                            })
+                                        }}
+                                    >
+                                        Marcar como Entregue
+                                    </Button>
+                                )}
+                                {selectedLink?.status !== "received" && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={() => {
+                                            setSimpleConfirmModal({
+                                                isOpen: true,
+                                                orderId: order.id,
+                                                nextStatus: "received"
+                                            })
+                                        }}
+                                    >
+                                        Marcar como Recebido
+                                    </Button>
+                                )}
+                                <Button type="button" variant="filled" className="flex-1 h-12" onClick={handleClose}>
+                                    Fechar
+                                </Button>
+                            </div>
                         </footer>
                     </div>
                 );

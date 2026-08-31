@@ -55,12 +55,14 @@ export default function DeliveriesPage({
     initialNextCursor = null,
     initialHasMore = false,
     planGate: propPlanGate,
+    userRole: initialUserRole,
 }: {
     partnerId: string
     deliveries?: any[]
     initialNextCursor?: ERPDeliveryListCursor | null
     initialHasMore?: boolean
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
+    userRole?: string
 }) {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -170,6 +172,7 @@ export default function DeliveriesPage({
     })
 
     const planGate = propPlanGate
+    const isDelivery = initialUserRole === "delivery"
 
     useInfiniteScrollObserver(observerTarget, {
         enabled: true,
@@ -440,20 +443,26 @@ export default function DeliveriesPage({
                                 <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
-                                    Exportar
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={loadSuggestions}
-                                    disabled={!!planGate}
-                                    leftIcon={<SparklesIcon size={18} />}
-                                >
-                                    Gerar sugestões
-                                </Button>
-                                <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
-                                    Nova entrega
-                                </Button>
+                                {!isDelivery && (
+                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                                        Exportar
+                                    </Button>
+                                )}
+                                {!isDelivery && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={loadSuggestions}
+                                        disabled={!!planGate}
+                                        leftIcon={<SparklesIcon size={18} />}
+                                    >
+                                        Gerar sugestões
+                                    </Button>
+                                )}
+                                {!isDelivery && (
+                                    <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
+                                        Nova entrega
+                                    </Button>
+                                )}
                             </div>
                         </div>
 
@@ -468,6 +477,7 @@ export default function DeliveriesPage({
                             canSmartSuggest={canSmartSuggest}
                             addDisabled={!!planGate}
                             tabCounts={tabCounts}
+                            userRole={initialUserRole}
                         />
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">

@@ -31,9 +31,37 @@ export class UnauthorizedError extends AuthError {
 }
 
 export class ForbiddenError extends AuthError {
-  constructor(message = "Acesso negado") {
+  public readonly resource?: string
+  public readonly action?: string
+  public readonly permissionKey?: string
+  public readonly roleId?: string
+  public readonly userId?: string
+  public readonly partnerId?: string
+  public readonly details?: any
+
+  constructor(
+    message = "Acesso negado",
+    meta?: {
+      resource?: string
+      action?: string
+      permissionKey?: string
+      roleId?: string
+      userId?: string
+      partnerId?: string
+      details?: any
+    }
+  ) {
     super(message, 403)
     this.name = "ForbiddenError"
+    if (meta) {
+      this.resource = meta.resource
+      this.action = meta.action
+      this.permissionKey = meta.permissionKey
+      this.roleId = meta.roleId
+      this.userId = meta.userId
+      this.partnerId = meta.partnerId
+      this.details = meta.details
+    }
   }
 }
 
@@ -509,7 +537,20 @@ export async function requirePartnerAccessWithPermission(
 
   const access = await checkPartnerAccess(partnerId, user.id)
   if (!access) {
-    throw new ForbiddenError("Você não tem acesso a este negócio")
+    const { logPermissionDenied } = await import("@/lib/auth/auth-logger")
+    logPermissionDenied({
+      userId: user.id,
+      partnerId,
+      resource: resource as string,
+      action: action as string,
+      reason: "Usuário não possui acesso ativo a esta empresa",
+    })
+    throw new ForbiddenError("Você não tem acesso a este negócio", {
+      userId: user.id,
+      partnerId,
+      resource: resource as string,
+      action: action as string,
+    })
   }
 
   const permissions = access.permissions
@@ -519,7 +560,28 @@ export async function requirePartnerAccessWithPermission(
   if (resource && action) {
     const permissionKey = `${String(resource)}.${String(action)}`
     if (!can({ role_id: roleId, role: roleId, permissions }, permissionKey)) {
-      throw new ForbiddenError("Sem permissão para esta ação")
+      const { getPermissionErrorMessage } = await import("@/lib/permissions/permission-descriptions")
+      const { logPermissionDenied } = await import("@/lib/auth/auth-logger")
+      const friendlyMessage = getPermissionErrorMessage(String(resource), String(action))
+
+      logPermissionDenied({
+        userId: user.id,
+        partnerId,
+        roleId,
+        resource: String(resource),
+        action: String(action),
+        permissionKey,
+        reason: `Cargo '${roleId}' não tem a permissão '${permissionKey}' habilitada`,
+      })
+
+      throw new ForbiddenError(friendlyMessage, {
+        resource: String(resource),
+        action: String(action),
+        permissionKey,
+        roleId,
+        userId: user.id,
+        partnerId,
+      })
     }
   }
 
@@ -620,13 +682,39 @@ export async function requirePartnerRouteAccess(
 
   const routePermissionKey = routeKeyToPermissionKey(routeKey)
   if (!routePermissionKey || !can({ role_id: access.roleId, permissions: access.permissions }, routePermissionKey)) {
-    throw new ForbiddenError("Sem permissão para acessar este módulo")
+    const { logPermissionDenied } = await import("@/lib/auth/auth-logger")
+    logPermissionDenied({
+      userId: access.userId,
+      partnerId: access.partnerId,
+      roleId: access.roleId,
+      permissionKey: routePermissionKey || `route.${routeKey}`,
+      reason: `Sem permissão de acesso ao módulo '${routeKey}'`,
+    })
+    throw new ForbiddenError("Você não possui permissão para acessar este módulo.", {
+      permissionKey: routePermissionKey || `route.${routeKey}`,
+      roleId: access.roleId,
+      userId: access.userId,
+      partnerId: access.partnerId,
+    })
   }
 
   if (options?.specificPermission) {
     const specificKey = specificPermissionToPermissionKey(options.specificPermission)
     if (!specificKey || !can({ role_id: access.roleId, permissions: access.permissions }, specificKey)) {
-      throw new ForbiddenError("Sem permissão para esta ação")
+      const { logPermissionDenied } = await import("@/lib/auth/auth-logger")
+      logPermissionDenied({
+        userId: access.userId,
+        partnerId: access.partnerId,
+        roleId: access.roleId,
+        permissionKey: specificKey || options.specificPermission,
+        reason: `Sem permissão para a ação '${options.specificPermission}'`,
+      })
+      throw new ForbiddenError("Você não possui permissão para esta ação.", {
+        permissionKey: specificKey || options.specificPermission,
+        roleId: access.roleId,
+        userId: access.userId,
+        partnerId: access.partnerId,
+      })
     }
   }
 
@@ -691,7 +779,26 @@ export async function requireStorePermission(
   }
   const rbacUser = { role_id: effective.role.toLowerCase() as RoleId, role: effective.role, permissions: effective.permissions }
   if (!can(rbacUser, `${module}.${action}`)) {
-    throw new ForbiddenError("Permissão negada para esta ação na loja")
+    const { getPermissionErrorMessage } = await import("@/lib/permissions/permission-descriptions")
+    const { logPermissionDenied } = await import("@/lib/auth/auth-logger")
+    const friendlyMessage = getPermissionErrorMessage(module, action)
+    logPermissionDenied({
+      userId: "store_member",
+      partnerId,
+      storeId,
+      roleId: effective.role,
+      resource: module,
+      action,
+      permissionKey: `${module}.${action}`,
+      reason: `Permissão '${module}.${action}' negada na loja '${storeId}'`,
+    })
+    throw new ForbiddenError(friendlyMessage, {
+      resource: module,
+      action,
+      permissionKey: `${module}.${action}`,
+      roleId: effective.role,
+      partnerId,
+    })
   }
 }
 

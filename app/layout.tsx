@@ -14,6 +14,7 @@ import { LegalConsentBanner } from "@/components/legal/LegalConsentBanner"
 import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
 import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-features"
+import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
@@ -228,6 +229,7 @@ export default async function RootLayout({
                 <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
                     <SupabaseProvider initialUser={user} initialSessionData={null}>
                         <QueryProvider>
+                            <GlobalAnnouncementBanner />
                             <PreventSamePageNavigation />
                             <NotificationProvider>
                                 <RouteAwareGlobalFeatures>

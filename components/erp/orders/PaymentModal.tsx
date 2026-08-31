@@ -2103,9 +2103,10 @@ const PaymentModal = ({
                 setErrorMessage(result?.error || "Ocorreu um problema ao concluir o pagamento. Você pode tentar novamente.");
                 setPaymentStatus('error');
             }
-        } catch (error) {
+        } catch (error: any) {
             setSuccessSnapshot(null);
-            setErrorMessage("Ocorreu um problema inesperado ao concluir o pagamento. Você pode tentar novamente.");
+            const userMsg = error?.message || (typeof error === 'string' ? error : null);
+            setErrorMessage(userMsg || "Ocorreu um problema ao concluir o pagamento. Você pode tentar novamente.");
             setPaymentStatus('error');
         }
     };
@@ -3262,6 +3263,15 @@ const PaymentModal = ({
                                         imageAlt="Não foi possível concluir a venda"
                                         title="Não foi possível concluir a venda"
                                         subtitle={errorMessage}
+                                        buttons={[
+                                            {
+                                                text: "Voltar e ajustar venda",
+                                                action: () => {
+                                                    setPaymentStatus('idle');
+                                                },
+                                                variant: "filled",
+                                            }
+                                        ]}
                                     />
                                 </motion.div>
                             )}

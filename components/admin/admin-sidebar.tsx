@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon, AnalyticsIcon } from "@/lib/icons"
+import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, ShoppingCartIcon, ReturnIcon, MoneyIcon, UserIcon, MegaphoneIcon, FlagIcon, FileIcon, BriefcaseIcon, MotorbikeIcon, AnalyticsIcon, SlidersIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
@@ -31,6 +31,11 @@ const navItems: NavItem[] = [
         icon: AnalyticsIcon,
         label: "Analytics da Dudit",
         href: "/ddt-admin/analytics",
+    },
+    {
+        icon: SlidersIcon,
+        label: "Sistema & Manutenção",
+        href: "/ddt-admin/system",
     },
     {
         icon: ShieldIcon,

@@ -24,6 +24,7 @@ export default async function DeliveriesRoutePage() {
   }
 
   const planGate = page.planGate
+  const userRole = page.userRole
 
   return (
     <>
@@ -35,6 +36,7 @@ export default async function DeliveriesRoutePage() {
           initialNextCursor={page.nextCursor}
           initialHasMore={page.hasMore}
           planGate={planGate}
+          userRole={userRole}
         />
       </FadeIn>
     </>

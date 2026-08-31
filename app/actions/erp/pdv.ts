@@ -850,12 +850,20 @@ export async function getPOSInitialDataAction(partnerId: string, storeId?: strin
 }
 
 export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
-    await requireUser()
-    await requirePermission(input.partnerId, "pdv", "sell")
+    let user: any = null
+    try {
+        user = await requireUser()
+        await requirePermission(input.partnerId, "pdv", "sell")
 
-    // Validate discount permission if a discount or coupon is being applied
-    if (input.discountAmount > 0 || input.couponCode || input.couponId) {
-        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+        // Validate discount permission if a discount or coupon is being applied
+        if (input.discountAmount > 0 || input.couponCode || input.couponId) {
+            await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+        }
+    } catch (err: any) {
+        if (err instanceof ForbiddenError || err?.name === "ForbiddenError") {
+            return { success: false as const, error: err.message }
+        }
+        throw err
     }
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -870,6 +878,31 @@ export async function upsertPreSaleDraftAction(input: DraftUpsertInput) {
     const subtotalFromItems = computeSubtotal(normalizedItems)
     const subtotal = subtotalFromItems
     const discountAmount = safeMoney(Math.min(Math.max(0, input.discountAmount), subtotalFromItems))
+
+    // Validate max discount percent configured for partner
+    if (discountAmount > 0) {
+        const { getSalesSettings } = await import("@/app/actions/erp/sales-settings")
+        const salesSettings = await getSalesSettings(input.partnerId)
+        if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+            const effectiveDiscountPercent = subtotal > 0 ? (discountAmount / subtotal) * 100 : 0
+            if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+                const { logPolicyLimitExceeded } = await import("@/lib/auth/auth-logger")
+                logPolicyLimitExceeded({
+                    userId: user?.id,
+                    partnerId: input.partnerId,
+                    policy: "maxDiscountPercent",
+                    attemptedValue: `${effectiveDiscountPercent.toFixed(1)}%`,
+                    allowedLimit: `${salesSettings.maxDiscountPercent}%`,
+                    details: { subtotal, discountAmount }
+                })
+                return {
+                    success: false as const,
+                    error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas da empresa.`
+                }
+            }
+        }
+    }
+
     const shippingFee = safeMoney(input.shippingFee ?? 0)
     const otherCosts = safeMoney(input.otherCosts ?? 0)
     const { listActivePromotionsForMarketplaceAction, filterRawPromotionsByGiftStock } = await import("@/app/actions/shared/promotions")
@@ -1034,10 +1067,18 @@ export async function deletePreSaleDraftAction(partnerId: string, preSaleId: str
  * - Idempotent: returns existing sale ID if already finalized
  */
 export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
-    const user = await requireUser()
-    await requirePermission(input.partnerId, "pdv", "sell")
-    if (input.storeId) {
-        await requireStoreAccess(input.storeId, input.partnerId)
+    let user: any = null
+    try {
+        user = await requireUser()
+        await requirePermission(input.partnerId, "pdv", "sell")
+        if (input.storeId) {
+            await requireStoreAccess(input.storeId, input.partnerId)
+        }
+    } catch (err: any) {
+        if (err instanceof ForbiddenError || err?.name === "ForbiddenError") {
+            return { success: false as const, error: err.message }
+        }
+        throw err
     }
 
     const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -1109,7 +1150,39 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     const hasDiscount = Number(preSaleDraft.discount_amount || 0) > 0
     const hasCoupon = !!preSaleDraft.coupon_id || !!preSaleDraft.coupon_code
     if (hasDiscount || hasCoupon) {
-        await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+        try {
+            await requirePermission(input.partnerId, "pdv", "can_apply_discount")
+        } catch (err: any) {
+            if (err instanceof ForbiddenError || err?.name === "ForbiddenError") {
+                return { success: false as const, error: err.message }
+            }
+            throw err
+        }
+
+        // Validate max discount percent configured in sales settings
+        const { getSalesSettings } = await import("@/app/actions/erp/sales-settings")
+        const salesSettings = await getSalesSettings(input.partnerId)
+        if (salesSettings.maxDiscountPercent !== null && salesSettings.maxDiscountPercent < 100) {
+            const subtotal = Math.max(0, Number(preSaleDraft.subtotal || 0))
+            const totalDiscount = Math.max(0, Number(preSaleDraft.discount_amount || 0)) + Number(preSaleDraft.coupon_discount_amount || 0)
+            const effectiveDiscountPercent = subtotal > 0 ? (totalDiscount / subtotal) * 100 : 0
+            if (effectiveDiscountPercent > salesSettings.maxDiscountPercent + 0.05) {
+                const { logPolicyLimitExceeded } = await import("@/lib/auth/auth-logger")
+                logPolicyLimitExceeded({
+                    userId: user?.id,
+                    partnerId: input.partnerId,
+                    storeId: input.storeId,
+                    policy: "maxDiscountPercent",
+                    attemptedValue: `${effectiveDiscountPercent.toFixed(1)}%`,
+                    allowedLimit: `${salesSettings.maxDiscountPercent}%`,
+                    details: { subtotal, discountAmount: preSaleDraft.discount_amount, totalDiscount }
+                })
+                return {
+                    success: false as const,
+                    error: `O desconto de ${effectiveDiscountPercent.toFixed(1)}% ultrapassa o limite máximo permitido (${salesSettings.maxDiscountPercent}%) configurado para as vendas da empresa.`
+                }
+            }
+        }
     }
 
     const capabilities = await getPartnerCapabilities(input.partnerId, { storeId: input.storeId })

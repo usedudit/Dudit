@@ -1304,6 +1304,10 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
             clearCartAfterPaymentModalClosesRef.current = true
             router.refresh()
             return { success: true, orderNumber: result.data?.saleNumber || result.data?.saleId, orderId: result.data?.saleId }
+        } catch (error: any) {
+            const errorMsg = error?.message || "Não foi possível finalizar a venda."
+            notifyError(errorMsg)
+            return { success: false, error: errorMsg }
         } finally {
             setIsFinalizing(false)
             isFinalizingRef.current = false

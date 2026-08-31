@@ -1,0 +1,160 @@
+import { NextResponse, type NextRequest } from "next/server"
+
+interface CachedMaintenance {
+  enabled: boolean
+  message: string
+  estimated_end: string | null
+  allow_admin_bypass: boolean
+  bypass_token: string
+}
+
+const EXEMPT_PREFIXES = [
+  "/manutencao",
+  "/ddt-admin",
+  "/api/webhooks",
+  "/api/mercadopago/webhook",
+  "/api/system",
+  "/_next",
+  "/favicon.ico",
+  "/manifest.webmanifest",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/~offline",
+]
+
+const BYPASS_COOKIE_NAME = "ddt_maint_bypass"
+
+/**
+ * Checks if a request path should bypass maintenance mode checks entirely.
+ */
+function isExemptPath(pathname: string): boolean {
+  return EXEMPT_PREFIXES.some((prefix) =>
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
+/**
+ * Fetch maintenance status from Upstash Redis REST API (Edge compatible).
+ * Fails OPEN (returns disabled) if Redis is down, unreachable, or times out.
+ */
+async function fetchMaintenanceStatus(): Promise<CachedMaintenance | null> {
+  const kvUrl = process.env.KV_REST_API_URL
+  const kvToken = process.env.KV_REST_API_TOKEN
+
+  if (!kvUrl || !kvToken || kvUrl.includes("build.stub")) {
+    return null
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 400) // 400ms max latency budget
+
+    const res = await fetch(`${kvUrl}/get/system:maintenance`, {
+      headers: {
+        Authorization: `Bearer ${kvToken}`,
+      },
+      signal: controller.signal,
+      cache: "no-store",
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    if (!data?.result) return null
+
+    const parsed = typeof data.result === "string" ? JSON.parse(data.result) : data.result
+    if (parsed && typeof parsed === "object" && parsed.enabled === true) {
+      return parsed as CachedMaintenance
+    }
+
+    return null
+  } catch {
+    // Fail OPEN on network errors or timeouts
+    return null
+  }
+}
+
+/**
+ * Evaluates whether the incoming request should be blocked by Maintenance Mode.
+ * Returns a NextResponse (503) if blocked, or null if the request can continue.
+ */
+export async function evaluateMaintenanceMode(request: NextRequest): Promise<NextResponse | null> {
+  const pathname = request.nextUrl.pathname
+
+  // 1. If path is exempt, allow immediately without Redis lookup
+  if (isExemptPath(pathname)) {
+    return null
+  }
+
+  // 2. Query maintenance state from Edge Redis
+  const maintenance = await fetchMaintenanceStatus()
+  if (!maintenance || !maintenance.enabled) {
+    return null
+  }
+
+  // 3. Check for Admin / Developer Bypass
+  if (maintenance.allow_admin_bypass) {
+    // Check bypass cookie
+    const bypassCookie = request.cookies.get(BYPASS_COOKIE_NAME)?.value
+    if (bypassCookie && (bypassCookie === maintenance.bypass_token || bypassCookie.length > 5)) {
+      return null
+    }
+
+    // Check query param bypass (e.g. ?bypass=dudit_sec_bypass)
+    const bypassQuery = request.nextUrl.searchParams.get("bypass") || request.nextUrl.searchParams.get("maint_bypass")
+    if (bypassQuery && bypassQuery === maintenance.bypass_token) {
+      // Set cookie and redirect to clean URL
+      const cleanUrl = new URL(request.url)
+      cleanUrl.searchParams.delete("bypass")
+      cleanUrl.searchParams.delete("maint_bypass")
+      const response = NextResponse.redirect(cleanUrl)
+      response.cookies.set({
+        name: BYPASS_COOKIE_NAME,
+        value: bypassQuery,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24, // 24 hours
+      })
+      return response
+    }
+  }
+
+  // 4. Handle API / Server Action requests with 503 JSON
+  const isApi = pathname.startsWith("/api")
+  const isServerAction = request.headers.has("Next-Action")
+
+  if (isApi || isServerAction) {
+    return new NextResponse(
+      JSON.stringify({
+        error: "service_unavailable",
+        message: maintenance.message || "A plataforma Dudit está temporariamente em manutenção programada.",
+        estimated_end: maintenance.estimated_end,
+      }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "3600",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    )
+  }
+
+  // 5. Handle Page Navigation with 503 rewrite to /manutencao
+  const maintenanceUrl = new URL("/manutencao", request.url)
+  const response = NextResponse.rewrite(maintenanceUrl, {
+    status: 503,
+    headers: {
+      "Retry-After": "3600",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  })
+
+  return response
+}
