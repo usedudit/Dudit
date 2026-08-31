@@ -338,7 +338,8 @@ self.addEventListener("push", (event) => {
       entityId: notificationData.entityId || payload.entityId || "",
     },
     requireInteraction: false,
-    vibrate: [100, 50, 100],
+    renotify: true,
+    vibrate: [200, 100, 200],
   } as any
 
   event.waitUntil(self.registration.showNotification(title, options))

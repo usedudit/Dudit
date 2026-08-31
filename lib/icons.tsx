@@ -157,7 +157,8 @@ import {
     EnergyIcon as EnergyIcon01,
     CollectionsBookmarkIcon,
     PinIcon as PinIcon01,
-    ArchiveArrowDownIcon
+    ArchiveArrowDownIcon,
+    SettingsError01Icon
 } from "@hugeicons/core-free-icons"
 
 
@@ -189,6 +190,7 @@ export const MenuSquareIcon = CreateIcon(MenuSquare01)
 export const MenuIcon = CreateIcon(Menu01Icon)
 export const HomeIcon = CreateIcon(Home03Icon)
 export const GridIcon = CreateIcon(DashboardSquare01Icon)
+export const SettingsConfigIcon = CreateIcon(SettingsError01Icon)
 
 export const ChevronDownIcon = CreateIcon(ArrowDown01Icon)
 export const ChevronUpIcon = CreateIcon(ArrowUp01Icon)

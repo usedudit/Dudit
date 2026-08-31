@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangleIcon, InfoIcon, ShieldAlertIcon, XIcon, ArrowRightIcon } from "@/lib/icons"
+import { AlertTriangleIcon, InfoIcon, ShieldIcon, XIcon, ArrowRightIcon } from "@/lib/icons"
 import type { GlobalAnnouncementConfig } from "@/lib/system/types"
 
 interface GlobalAnnouncementBannerProps {
@@ -30,7 +30,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
             setAnnouncement(data)
           }
         })
-        .catch(() => {})
+        .catch(() => { })
     }
   }, [initialAnnouncement])
 
@@ -68,7 +68,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
     setIsDismissed(true)
     try {
       localStorage.setItem(`${STORAGE_KEY_PREFIX}${announcement.id}`, "true")
-    } catch {}
+    } catch { }
   }
 
   const isUrgent = announcement.type === "urgent"
@@ -77,16 +77,16 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
   const bgClasses = isUrgent
     ? "bg-rose-950/90 border-rose-800/80 text-rose-100"
     : isWarning
-    ? "bg-[#181408]/95 border-amber-500/40 text-amber-100"
-    : "bg-[#061814]/95 border-emerald-500/40 text-emerald-100"
+      ? "bg-[#181408]/95 border-amber-500/40 text-amber-100"
+      : "bg-[#061814]/95 border-emerald-500/40 text-emerald-100"
 
   const iconBg = isUrgent
     ? "text-rose-400 bg-rose-500/10 border-rose-500/20"
     : isWarning
-    ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
-    : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+      ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+      : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
 
-  const IconComponent = isUrgent ? ShieldAlertIcon : isWarning ? AlertTriangleIcon : InfoIcon
+  const IconComponent = isUrgent ? ShieldIcon : isWarning ? AlertTriangleIcon : InfoIcon
 
   return (
     <AnimatePresence>

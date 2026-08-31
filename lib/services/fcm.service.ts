@@ -138,6 +138,7 @@ export async function sendPushToUser(params: {
               badge: "/icons/icon-192x192.png",
               tag: params.notificationId || `dudit-${Date.now()}`,
               requireInteraction: false,
+              renotify: true,
               data: {
                 href: params.href,
                 notificationId: params.notificationId,

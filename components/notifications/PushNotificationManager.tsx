@@ -53,7 +53,7 @@ async function getOrRegisterServiceWorker(): Promise<ServiceWorkerRegistration |
 /**
  * Executa o fluxo de obtenção do token FCM e envio para o servidor.
  */
-export async function syncFcmToken(userId: string): Promise<string | null> {
+export async function syncFcmToken(userId: string, force = false): Promise<string | null> {
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return null
   }
@@ -82,18 +82,39 @@ export async function syncFcmToken(userId: string): Promise<string | null> {
 
     if (!token) return null
 
-    const deviceName = await getDeviceName()
-    const deviceFingerprint = getDeviceFingerprint()
+    // Verificar se o token atual já está sincronizado recentemente no backend
+    const storageKey = `dudit_fcm_${userId}`
+    let isAlreadySynced = false
 
-    await registerPushSubscriptionAction({
-      fcmToken: token,
-      deviceName,
-      deviceFingerprint,
-    })
+    if (!force && typeof localStorage !== "undefined") {
+      const cachedRaw = localStorage.getItem(storageKey)
+      if (cachedRaw) {
+        try {
+          const cached = JSON.parse(cachedRaw) as { token?: string; registeredAt?: number }
+          const ageMs = Date.now() - (cached.registeredAt || 0)
+          const MAX_SYNC_AGE_MS = 24 * 60 * 60 * 1000 // 24 horas
+          if (cached.token === token && ageMs < MAX_SYNC_AGE_MS) {
+            isAlreadySynced = true
+          }
+        } catch {
+          isAlreadySynced = false
+        }
+      }
+    }
 
-    if (typeof localStorage !== "undefined") {
-      const storageKey = `dudit_fcm_${userId}`
-      localStorage.setItem(storageKey, JSON.stringify({ token, registeredAt: Date.now() }))
+    if (!isAlreadySynced) {
+      const deviceName = await getDeviceName()
+      const deviceFingerprint = getDeviceFingerprint()
+
+      await registerPushSubscriptionAction({
+        fcmToken: token,
+        deviceName,
+        deviceFingerprint,
+      })
+
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(storageKey, JSON.stringify({ token, registeredAt: Date.now() }))
+      }
     }
 
     return token
@@ -131,7 +152,7 @@ export function usePushNotificationStatus() {
       setPermission(perm)
 
       if (perm === "granted" && user?.id) {
-        await syncFcmToken(user.id)
+        await syncFcmToken(user.id, true)
         return true
       }
       return false
@@ -176,25 +197,7 @@ export function PushNotificationManager() {
 
       isSyncingRef.current = true
       try {
-        // Verificar cache local para evitar chamadas redundantes frequentes
-        const storageKey = `dudit_fcm_${user!.id}`
-        const cachedRaw = typeof localStorage !== "undefined" ? localStorage.getItem(storageKey) : null
-        let shouldSync = true
-
-        if (cachedRaw) {
-          try {
-            const cached = JSON.parse(cachedRaw) as { token?: string; registeredAt?: number }
-            const ageMs = Date.now() - (cached.registeredAt || 0)
-            const MAX_CACHE_AGE_MS = 3 * 24 * 60 * 60 * 1000 // 3 dias
-            if (cached.token && ageMs < MAX_CACHE_AGE_MS) {
-              shouldSync = false
-            }
-          } catch {
-            shouldSync = true
-          }
-        }
-
-        if (shouldSync && !cancelled) {
+        if (!cancelled) {
           await syncFcmToken(user!.id)
         }
 
@@ -217,6 +220,16 @@ export function PushNotificationManager() {
       }
     }
 
+    const handleControllerChange = () => {
+      if (user?.id && Notification.permission === "granted") {
+        syncFcmToken(user.id, true).catch(() => {})
+      }
+    }
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
+    }
+
     let idleHandle: number | ReturnType<typeof setTimeout> | null = null
 
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -227,6 +240,9 @@ export function PushNotificationManager() {
 
     return () => {
       cancelled = true
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange)
+      }
       if (idleHandle !== null) {
         if (typeof window !== "undefined" && "cancelIdleCallback" in window && typeof idleHandle === "number") {
           (window as any).cancelIdleCallback(idleHandle)

@@ -2528,18 +2528,18 @@ export function CheckoutPageClient() {
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
                                     {availableStoreCredit > 0 && (
-                                        <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 space-y-3 transition-all">
+                                        <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3 transition-all">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                                                        <TagIcon size={20} />
+                                                    <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center shrink-0">
+                                                        <TagIcon size={18} className="text-brand-green" />
                                                     </div>
                                                     <div>
                                                         <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                             Crédito em Loja
                                                         </div>
                                                         <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                            Você possui <strong className="text-emerald-600 dark:text-emerald-400">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
+                                                            Você possui <strong className="text-brand-green">{formatCurrency(availableStoreCredit)}</strong> disponível nesta loja.
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2550,11 +2550,11 @@ export function CheckoutPageClient() {
                                                         onChange={(e) => setUseStoreCredit(e.target.checked)}
                                                         className="sr-only peer"
                                                     />
-                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-emerald-500"></div>
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-green"></div>
                                                 </label>
                                             </div>
                                             {useStoreCredit && (
-                                                <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 text-xs text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1.5">
+                                                <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 text-xs text-brand-green font-medium flex items-center gap-1.5">
                                                     <CheckCircleIcon size={14} className="shrink-0" />
                                                     {appliedStoreCredit >= checkoutTotalToCharge ? (
                                                         <span>Seu crédito cobre 100% do valor do pedido. Nenhuma cobrança adicional será feita.</span>
@@ -2975,6 +2975,44 @@ export function CheckoutPageClient() {
                         {mobileStep === 2 && (
                             <div className="space-y-6 pb-28">
                                 {renderFreeDeliveryProgressCard()}
+                                {availableStoreCredit > 0 && (
+                                    <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center shrink-0">
+                                                    <TagIcon size={18} className="text-brand-green" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                        Crédito em Loja
+                                                    </div>
+                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                        Você possui <strong className="text-brand-green">{formatCurrency(availableStoreCredit)}</strong> disponível
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={useStoreCredit}
+                                                    onChange={(e) => setUseStoreCredit(e.target.checked)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-dark-border peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-green"></div>
+                                            </label>
+                                        </div>
+                                        {useStoreCredit && (
+                                            <div className="pt-2 border-t border-brand-border/40 dark:border-dark-border/40 text-xs text-brand-green font-medium flex items-center gap-1.5">
+                                                <CheckCircleIcon size={14} className="shrink-0" />
+                                                {appliedStoreCredit >= checkoutTotalToCharge ? (
+                                                    <span>Seu crédito cobre 100% do pedido.</span>
+                                                ) : (
+                                                    <span>Abatido {formatCurrency(appliedStoreCredit)}. Pague o restante ({formatCurrency(remainingBalanceToCharge)}) abaixo.</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
                                     {!partnerInfo.mpConnected && !storefrontMethods.length ? (

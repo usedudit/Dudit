@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { ShieldIcon, RefreshIcon, LockIcon, XIcon, CheckCircleIcon, AlertTriangleIcon } from "@/lib/icons"
+import { ShieldIcon, ReloadIcon, LockIcon, XIcon, CheckCircleIcon, AlertTriangleIcon } from "@/lib/icons"
 import { setBypassCookieAction } from "@/app/actions/admin/system"
 import type { MaintenanceConfig } from "@/lib/system/types"
 
@@ -15,7 +15,7 @@ export function MaintenanceView({ initialConfig }: MaintenanceViewProps) {
   const router = useRouter()
   const [message] = useState(
     initialConfig?.message ||
-      "Estamos realizando uma manutenção programada para trazer melhorias na plataforma Dudit. Voltaremos em breve!"
+    "Estamos realizando uma manutenção programada para trazer melhorias na plataforma Dudit. Voltaremos em breve!"
   )
   const [estimatedEnd] = useState<string | null>(initialConfig?.estimated_end || null)
   const [timeLeft, setTimeLeft] = useState<{ hours: number; minutes: number; seconds: number } | null>(null)
@@ -162,7 +162,7 @@ export function MaintenanceView({ initialConfig }: MaintenanceViewProps) {
               onClick={handleRefresh}
               className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-zinc-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
-              <RefreshIcon className="w-4 h-4 text-zinc-950" />
+              <ReloadIcon className="w-4 h-4 text-zinc-950" />
               Verificar se voltou
             </button>
 
