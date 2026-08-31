@@ -628,22 +628,14 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                         {deliveryTime && (
                                             <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
                                         )}
-                                        {deliveryTime && (distanceLabel || deliveryFeeLabel || locationLabel) && (
-                                            <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
-                                        )}
-                                        {distanceLabel ? (
-                                            <span className="shrink-0">{distanceLabel}</span>
-                                        ) : locationLabel ? (
-                                            <span className="shrink-0">{locationLabel}</span>
-                                        ) : null}
-                                        {(distanceLabel || (!deliveryTime && locationLabel)) && deliveryFeeLabel && (
+                                        {deliveryTime && deliveryFeeLabel && (
                                             <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
                                         )}
                                         {deliveryFeeLabel ? (
                                             <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
                                                 {deliveryFeeLabel}
                                             </span>
-                                        ) : !deliveryTime && !distanceLabel && !locationLabel ? (
+                                        ) : !deliveryTime ? (
                                             <span>{sellerLabel || "Pronta entrega"}</span>
                                         ) : null}
                                     </div>

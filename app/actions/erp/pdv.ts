@@ -3,7 +3,7 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput } from "@/lib/input-validator"
-import { requireUser, requireStoreAccess } from "@/lib/auth/authorization"
+import { requireUser, requireStoreAccess, ForbiddenError } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { revalidateOrders, revalidateTransactions, revalidateStockMovements } from "@/lib/utils/revalidation"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
