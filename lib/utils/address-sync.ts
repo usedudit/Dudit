@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useRef } from "react"
 
 export const DUDIT_ADDRESS_UPDATED_EVENT = "dudit:address-updated"
 export const DUDIT_ACTIVE_ADDRESS_STORAGE_KEY = "dudit_active_address_id"
@@ -31,26 +31,28 @@ export function notifyAddressUpdated(addressId?: string) {
  * (troca de endereço padrão, novo endereço criado em modal, etc).
  */
 export function useAddressSync(onAddressUpdated: (addressId?: string) => void) {
-  const handler = useCallback(
-    (e: Event) => {
-      const customEvent = e as CustomEvent<{ addressId?: string }>
-      onAddressUpdated(customEvent.detail?.addressId)
-    },
-    [onAddressUpdated],
-  )
+  const callbackRef = useRef(onAddressUpdated)
+  callbackRef.current = onAddressUpdated
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    window.addEventListener(DUDIT_ADDRESS_UPDATED_EVENT, handler)
-    window.addEventListener("storage", (e) => {
+    const handleAddressUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ addressId?: string }>
+      callbackRef.current(customEvent.detail?.addressId)
+    }
+    const handleStorage = (e: StorageEvent) => {
       if (e.key === DUDIT_ACTIVE_ADDRESS_STORAGE_KEY) {
-        onAddressUpdated(e.newValue || undefined)
+        callbackRef.current(e.newValue || undefined)
       }
-    })
+    }
+
+    window.addEventListener(DUDIT_ADDRESS_UPDATED_EVENT, handleAddressUpdated)
+    window.addEventListener("storage", handleStorage)
 
     return () => {
-      window.removeEventListener(DUDIT_ADDRESS_UPDATED_EVENT, handler)
+      window.removeEventListener(DUDIT_ADDRESS_UPDATED_EVENT, handleAddressUpdated)
+      window.removeEventListener("storage", handleStorage)
     }
-  }, [handler, onAddressUpdated])
+  }, [])
 }

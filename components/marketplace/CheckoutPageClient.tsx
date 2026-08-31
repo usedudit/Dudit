@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon, CrownIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon } from "@/lib/icons"
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -908,41 +908,39 @@ export function CheckoutPageClient() {
         const isFree = diff <= 0
         const percentage = Math.min(100, (current / threshold) * 100)
 
-        const storeUrl = checkoutContext?.store ? getStoreUrl(checkoutContext.store) : checkoutContext?.partner ? getStoreUrl(checkoutContext.partner) : "/"
-
         return (
-            <div className="border border-brand-border dark:border-dark-border rounded-xl p-4 bg-brand-slate/10 dark:bg-dark-border/10 space-y-3 shadow-sm mb-6">
-                <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 px-2 py-0.5 rounded-full">
-                        Frete Grátis
-                    </span>
-                    {isFree ? (
-                        <span className="text-xs font-semibold text-brand-green flex items-center gap-1">
-                            <CheckCircleIcon size={14} className="fill-brand-green text-white shrink-0" /> Atingido
-                        </span>
-                    ) : (
-                        <Link href={storeUrl} className="text-xs font-bold text-brand-green hover:underline">
-                            Ver mais itens
-                        </Link>
-                    )}
+            <div className="flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                <div className="w-12 h-12 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
+                    <TruckIcon className="text-brand-green" />
                 </div>
-
-                <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-brand-dark dark:text-dark-heading leading-tight">
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                            Frete Grátis
+                        </p>
                         {isFree ? (
-                            "Parabéns! Você ganhou entrega grátis nesta compra."
+                            <span className="text-xs font-bold text-brand-green flex items-center gap-1">
+                                <CheckCircleIcon size={14} className="fill-brand-green text-white shrink-0" /> Atingido
+                            </span>
                         ) : (
-                            <>
-                                Falta <span className="font-bold text-brand-green">{formatCurrency(diff)}</span> para entrega grátis nesse vendedor
-                            </>
+                            <span className="text-xs font-bold text-brand-green">{percentage.toFixed(0)}%</span>
+                        )}
+                    </div>
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                        {isFree ? (
+                            "Parabéns! Você ganhou entrega grátis."
+                        ) : (
+                            <>Falta <strong className="text-brand-green">{formatCurrency(diff)}</strong> para entrega grátis</>
                         )}
                     </p>
-                    <div className="w-full h-2 bg-gray-200 dark:bg-dark-border/40 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-brand-green rounded-full transition-all duration-300"
-                            style={{ width: `${percentage}%` }}
-                        />
-                    </div>
+                    {!isFree && (
+                        <div className="w-full bg-brand-gray dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-2">
+                            <div
+                                className="bg-brand-green h-full rounded-full transition-all duration-300"
+                                style={{ width: `${percentage}%` }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         )
@@ -1011,6 +1009,12 @@ export function CheckoutPageClient() {
         let active = true
 
         const timer = window.setTimeout(async () => {
+            // Wait for the context to hydrate the default address before the
+            // first authoritative pricing run. Pickup does not need an address.
+            if (contextLoading || (productDeliveryQuoteActive && !formData.deliveryAddress)) {
+                return
+            }
+
             const destinationCoords = selectedAddress?.latitude && selectedAddress?.longitude
                 ? { lat: Number(selectedAddress.latitude), lng: Number(selectedAddress.longitude) }
                 : undefined

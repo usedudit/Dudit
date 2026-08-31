@@ -1048,14 +1048,6 @@ const PaymentModal = ({
         setMpBrickError(null);
         try {
             const resolvedFormData = formData.formData || formData;
-            const paymentMethodId = resolvedFormData?.payment_method_id;
-            const isRedirectMethod = !paymentMethodId || ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethodId);
-
-            if (isRedirectMethod) {
-                setMpStep("mp_redirect");
-                setMpIsProcessing(false);
-                return;
-            }
 
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
                 method: "POST",
@@ -1102,17 +1094,21 @@ const PaymentModal = ({
                     setMpBrickError("Dados do Boleto não retornados pelo provedor.");
                 }
             } else if (status === "in_process" || status === "pending") {
-                // Payment in analysis - register as pending
-                handleStartProcessing({
-                    paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
-                    paymentProvider: "Mercado Pago",
-                    mpPaymentId: responseData.mpPaymentId,
-                    paymentStatus: "unpaid",
-                    paidAmount: 0,
-                    paymentBreakdown: [],
-                    splitPayments: [],
-                    isPendingDelivery,
-                });
+                const isRedirectPayment = ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethod);
+                if (isRedirectPayment) {
+                    setMpStep("mp_redirect");
+                } else {
+                    handleStartProcessing({
+                        paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
+                        paymentProvider: "Mercado Pago",
+                        mpPaymentId: responseData.mpPaymentId,
+                        paymentStatus: "unpaid",
+                        paidAmount: 0,
+                        paymentBreakdown: [],
+                        splitPayments: [],
+                        isPendingDelivery,
+                    });
+                }
             } else {
                 setMpBrickError(`Pagamento não aprovado. Status: ${status || "desconhecido"}`);
                 setMpStep("error");

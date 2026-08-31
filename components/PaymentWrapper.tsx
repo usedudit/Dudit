@@ -333,17 +333,7 @@ export function PaymentWrapper({
         setIsProcessingBrick(true)
         setBrickError(null)
         try {
-            // Detect redirect-based MP methods (Mercado Pago wallet, Linha de Crédito, etc.)
-            // These methods open a new tab on MP's site and don't return a payment_method_id
             const resolvedFormData = formData.formData || formData
-            const paymentMethodId = resolvedFormData?.payment_method_id
-            const isRedirectMethod = !paymentMethodId || ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethodId)
-
-            if (isRedirectMethod) {
-                setStep("mp_redirect")
-                setIsProcessingBrick(false)
-                return
-            }
 
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
                 method: "POST",
@@ -394,7 +384,12 @@ export function PaymentWrapper({
                     setBrickError("Dados do Boleto não retornados pelo provedor.")
                 }
             } else if (status === "in_process" || status === "pending") {
-                setStep("success")
+                const isRedirectPayment = ["account_money", "consumer_credits", "mercadopago"].includes(paymentMethod)
+                if (isRedirectPayment) {
+                    setStep("mp_redirect")
+                } else {
+                    setStep("success")
+                }
                 notification.info("Pagamento em Análise", "Seu pagamento está sendo processado.")
             } else {
                 handleFatalError(`Pagamento não aprovado. Status: ${status || "desconhecido"}`)

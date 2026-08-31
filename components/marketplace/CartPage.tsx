@@ -23,15 +23,18 @@ import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketpl
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
-import { MapPinIcon, PlusIcon, CheckCircleIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, CheckCircleIcon, TruckIcon } from "@/lib/icons"
 import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
 
 interface CartPageClientProps {
     itemsByPartner: any
     userId: string
+    initialCartCount: number
+    initialUserProfile: { full_name: string | null; address: string | null; avatar_url: string | null } | null
+    initialUserAddresses: any[]
 }
 
-export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) {
+export function CartPageClient({ itemsByPartner, userId, initialCartCount, initialUserProfile, initialUserAddresses }: CartPageClientProps) {
     const router = useRouter()
     const { user } = useSupabase()
     const { setDirection } = useTransitionDirection()
@@ -45,9 +48,13 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     // Optimistic overrides for instant UI feedback (selection + quantity)
     const [optimisticItems, setOptimisticItems] = useState<Record<string, { selected?: boolean; quantity?: number }>>({})
+    const [cartCount, setCartCount] = useState(initialCartCount)
 
-    const [userAddresses, setUserAddresses] = useState<any[]>([])
-    const [selectedAddressId, setSelectedAddressId] = useState<string>("")
+    const [userAddresses, setUserAddresses] = useState<any[]>(initialUserAddresses)
+    const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
+        const selected = initialUserAddresses.find((address: any) => address.is_default) || initialUserAddresses[0]
+        return selected?.id || ""
+    })
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
     const [showAddressModal, setShowAddressModal] = useState(false)
@@ -89,10 +96,6 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
             console.error("Error loading user addresses in cart:", err)
         }
     }, [userId, selectedAddressId])
-
-    useEffect(() => {
-        loadUserAddresses()
-    }, [loadUserAddresses])
 
     useAddressSync(useCallback((updatedId?: string) => {
         loadUserAddresses(updatedId)
@@ -192,37 +195,56 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
         if (pendingPromos.length === 0 && !showFreeDeliveryBanner) return null
 
         return (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-3">
                 {showFreeDeliveryBanner && (
-                    <div className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 dark:from-emerald-950/10 dark:to-emerald-900/10 p-4 rounded-xl border border-emerald-500/15 dark:border-emerald-500/20 space-y-2">
-                        <div className="flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                            <span>Falta <strong className="text-brand-green">{formatCurrency(diffFreeDelivery)}</strong> para você ter Entrega Grátis nesta loja!</span>
-                            <span className="text-brand-green">{Math.min(100, Math.round((partnerItemsTotal / freeDeliveryThreshold) * 100))}%</span>
+                    <div className="flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                        <div className="w-12 h-12 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
+                            <TruckIcon className="text-brand-green" />
                         </div>
-                        <div className="w-full bg-brand-gray dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                            <div
-                                className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${Math.min(100, (partnerItemsTotal / freeDeliveryThreshold) * 100)}%` }}
-                            />
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                    Frete Grátis
+                                </p>
+                                <span className="text-xs font-bold text-brand-green">{Math.min(100, Math.round((partnerItemsTotal / freeDeliveryThreshold) * 100))}%</span>
+                            </div>
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                Falta <strong className="text-brand-green">{formatCurrency(diffFreeDelivery)}</strong> para entrega grátis
+                            </p>
+                            <div className="w-full bg-brand-gray dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-2">
+                                <div
+                                    className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${Math.min(100, (partnerItemsTotal / freeDeliveryThreshold) * 100)}%` }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
                 {pendingPromos.map((promo: any) => {
                     const diff = promo.minSpendAmount - partnerItemsTotal
                     const pct = Math.min(100, (partnerItemsTotal / promo.minSpendAmount) * 100)
-                    const label = `Falta ${formatCurrency(diff)} para você ganhar um Brinde Especial (${promo.name})!`
 
                     return (
-                        <div key={promo.id} className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 dark:from-emerald-950/10 dark:to-emerald-900/10 p-4 rounded-xl border border-emerald-500/15 dark:border-emerald-500/20 space-y-2">
-                            <div className="flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                <span>{label}</span>
-                                <span className="text-brand-green">{pct.toFixed(0)}%</span>
+                        <div key={promo.id} className="flex items-center gap-4 p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface">
+                            <div className="w-12 h-12 rounded-full bg-brand-green/10 flex items-center justify-center shrink-0">
+                                <CheckCircleIcon className="text-brand-green" />
                             </div>
-                            <div className="w-full bg-brand-gray dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                                <div
-                                    className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
-                                    style={{ width: `${pct}%` }}
-                                />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                        {promo.name}
+                                    </p>
+                                    <span className="text-xs font-bold text-brand-green">{pct.toFixed(0)}%</span>
+                                </div>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                    Falta <strong className="text-brand-green">{formatCurrency(diff)}</strong> para ganhar este brinde
+                                </p>
+                                <div className="w-full bg-brand-gray dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden mt-2">
+                                    <div
+                                        className="bg-brand-green h-full rounded-full transition-all duration-500 ease-out"
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
                             </div>
                         </div>
                     )
@@ -410,6 +432,7 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
                 notifyError(res.error)
                 setOptimisticItems(prev => ({ ...prev, [cartItemId]: { ...prev[cartItemId], quantity: currentQty } }))
             } else {
+                setCartCount(prev => Math.max(0, prev + newQty - currentQty))
                 invalidateCartCache()
             }
         } catch {
@@ -444,11 +467,17 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     const removeItem = async (cartItemId: string) => {
         if (loading || isActionInProgress.current) return
+        const itemToRemove = Object.values(itemsByPartner)
+            .flatMap((partner: any) => partner.items || [])
+            .find((item: any) => item.id === cartItemId)
         isActionInProgress.current = true
         setLoading(cartItemId)
         try {
             const token = await getCsrfToken()
-            await removeFromCartAction(cartItemId, token)
+            const result = await removeFromCartAction(cartItemId, token)
+            if (!result?.error) {
+                setCartCount(prev => Math.max(0, prev - Number(itemToRemove?.quantity || 0)))
+            }
             invalidateCartCache()
             // Removed router.refresh() - item removal is handled by server action revalidation
         } finally {
@@ -730,7 +759,11 @@ export function CartPageClient({ itemsByPartner, userId }: CartPageClientProps) 
 
     return (
         <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-            <MarketplaceHeader simpleTitle="Minha sacola" />
+            <MarketplaceHeader
+                simpleTitle="Minha sacola"
+                userProfile={initialUserProfile}
+                cartCount={cartCount}
+            />
 
             <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full pt-6 md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
                 <div className="hidden lg:block items-center mb-8">

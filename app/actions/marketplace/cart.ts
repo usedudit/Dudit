@@ -29,6 +29,17 @@ import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-ful
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 
+export type MarketplaceCartPageData = {
+  itemsByPartner: Record<string, any>
+  cartCount: number
+  userProfile: {
+    full_name: string | null
+    address: string | null
+    avatar_url: string | null
+  } | null
+  userAddresses: any[]
+}
+
 export type MarketplaceCheckoutPricingSnapshot = {
   subtotal: number
   couponDiscount: number
@@ -84,14 +95,15 @@ export async function getCartItemCountAction() {
 }
 
 // --- LEITURA DO CARRINHO (sem cache para garantir dados frescos) ---
-export async function getCachedCart(userId: string) {
+export async function getCachedCart(userId: string): Promise<MarketplaceCartPageData> {
   const supabase = getAdminClient()
 
-  // 1. Busca Itens do Carrinho e Dados Relacionados
-  // Endereços são buscados separadamente para não quebrar a query principal
-  const { data: cartItems, error } = await supabase
-    .from("cart_items")
-    .select(`
+  // Dados usados pela página e pelo cabeçalho são carregados no mesmo request.
+  // Isso evita uma segunda hidratação do perfil/carrinho no cliente.
+  const [cartResult, profileResult, addressesResult] = await Promise.all([
+    supabase
+      .from("cart_items")
+      .select(`
       id,
       item_type,
       product_id,
@@ -119,15 +131,44 @@ export async function getCachedCart(userId: string) {
         mp_public_key
       )
     `)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("user_profiles")
+      .select("full_name, avatar_url")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("addresses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ])
+
+  const { data: cartItems, error } = cartResult
+  const userAddresses = addressesResult.data || []
+  const defaultAddress = userAddresses.find((address: any) => address.is_default) || userAddresses[0]
+  const pageData = {
+    cartCount: (cartItems || []).reduce((sum: number, item: any) => sum + (item.quantity || 1), 0),
+    userProfile: profileResult.data
+      ? {
+          full_name: profileResult.data.full_name || null,
+          address: defaultAddress?.city && defaultAddress?.state
+            ? `${defaultAddress.city} - ${defaultAddress.state}`
+            : null,
+          avatar_url: profileResult.data.avatar_url || null,
+        }
+      : null,
+    userAddresses,
+  }
 
   if (error) {
     console.error("Erro ao buscar sacola:", error)
-    return {}
+    return { ...pageData, itemsByPartner: {} }
   }
 
-  if (!cartItems || cartItems.length === 0) return {}
+  if (!cartItems || cartItems.length === 0) return { ...pageData, itemsByPartner: {} }
 
   // 2. Busca Métodos de Pagamento, Endereços, Configurações de Entrega, Promoções e Lojas em Paralelo (Batching)
   const partnerIds = [...new Set(cartItems.map((item: any) => item.partner_id))] as string[]
@@ -283,7 +324,7 @@ export async function getCachedCart(userId: string) {
     }
   }
 
-  return itemsByPartner
+  return { ...pageData, itemsByPartner }
 }
 
 // --- ACTIONS DE ESCRITA (Adicionar/Remover/Checkout) ---

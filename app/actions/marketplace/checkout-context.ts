@@ -127,7 +127,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
-  const [{ data: partnerRow }, { data: storeRowData }, { data: storeNameData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
+  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -139,13 +139,6 @@ export async function getMarketplaceCheckoutContextAction(input: {
       ? admin
           .from("stores")
           .select("id, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
-          .eq("id", targetStoreId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    targetStoreId
-      ? admin
-          .from("stores")
-          .select("name")
           .eq("id", targetStoreId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -344,7 +337,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
   const partnerAddress = Array.isArray(addresses) ? addresses[0] : addresses
   const storeAddress = (storeRowData as any)?.addresses?.[0] || null
   const effectiveAddress = storeAddress || partnerAddress
-  const effectiveStoreName = (storeRowData as any)?.name || storeNameData?.name || null
+  const effectiveStoreName = (storeRowData as any)?.name || null
 
   const rawMethods = (storefrontPaymentMethodsResult as any)?.data || []
   const pixMethod = rawMethods.find((m: any) => m.type === "pix") || null

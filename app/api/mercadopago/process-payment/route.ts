@@ -661,6 +661,7 @@ async function handler(request: NextRequest) {
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: chargeAmount,
       payment_method_id: paymentFormData.payment_method_id,
+      notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       payer: {
         email: paymentFormData.payer?.email || user.email,
         first_name: payerFirstName,

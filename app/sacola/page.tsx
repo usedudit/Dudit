@@ -16,8 +16,15 @@ export default async function CartPage() {
   // Use cached auth layer instead of raw supabase call
   const user = await requireUser()
 
-  // Busca de Dados Otimizada (Vem do Cache de Dados, não do Banco)
-  const itemsByPartner = await getCachedCart(user.id)
+  const cartPageData = await getCachedCart(user.id)
 
-  return <CartPageClient itemsByPartner={itemsByPartner} userId={user.id} />
+  return (
+    <CartPageClient
+      itemsByPartner={cartPageData.itemsByPartner}
+      userId={user.id}
+      initialCartCount={cartPageData.cartCount}
+      initialUserProfile={cartPageData.userProfile}
+      initialUserAddresses={cartPageData.userAddresses}
+    />
+  )
 }
