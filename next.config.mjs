@@ -30,7 +30,12 @@ const withSerwist = withSerwistInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  serverExternalPackages: ["puppeteer-core", "@trigger.dev/sdk"],
+  serverExternalPackages: [
+    "puppeteer-core",
+    "@trigger.dev/sdk",
+    "isomorphic-dompurify",
+    "jsdom",
+  ],
   typescript: {
     ignoreBuildErrors: false,
   },

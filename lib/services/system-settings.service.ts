@@ -1,5 +1,6 @@
 import "server-only"
 
+import { randomBytes } from "crypto"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { redis } from "@/lib/redis"
 import { adminAuditLog } from "@/lib/admin/audit"
@@ -14,13 +15,16 @@ import { createNotification } from "./notification.service"
 
 const REDIS_KEY_MAINTENANCE = "system:maintenance"
 const REDIS_KEY_ANNOUNCEMENT = "system:announcement"
+const LEGACY_DEFAULT_BYPASS_TOKEN = "dudit_sec_bypass"
 
 const DEFAULT_MAINTENANCE_CONFIG: MaintenanceConfig = {
   enabled: false,
   message: "Estamos realizando uma manutenção programada para trazer melhorias na plataforma Dudit. Voltaremos em breve!",
   estimated_end: null,
   allow_admin_bypass: true,
-  bypass_token: "dudit_sec_bypass",
+  // Must be provisioned through MAINTENANCE_BYPASS_TOKEN or the admin flow.
+  // Never ship a known bypass credential as a fallback.
+  bypass_token: process.env.MAINTENANCE_BYPASS_TOKEN || "",
 }
 
 const DEFAULT_ANNOUNCEMENT_CONFIG: GlobalAnnouncementConfig = {
@@ -97,9 +101,18 @@ export async function updateMaintenanceConfig(
 ): Promise<{ success: boolean; config: MaintenanceConfig; error?: string }> {
   try {
     const current = await getMaintenanceConfig()
+    const requestedBypassToken = newConfig.bypass_token?.trim()
+    const currentBypassToken = current.bypass_token?.trim()
+    const bypassToken = requestedBypassToken && requestedBypassToken !== LEGACY_DEFAULT_BYPASS_TOKEN
+      ? requestedBypassToken
+      : currentBypassToken && currentBypassToken !== LEGACY_DEFAULT_BYPASS_TOKEN
+        ? currentBypassToken
+        : process.env.MAINTENANCE_BYPASS_TOKEN || `dudit_${randomBytes(24).toString("hex")}`
+
     const merged: MaintenanceConfig = {
       ...current,
       ...newConfig,
+      bypass_token: bypassToken,
       updated_at: new Date().toISOString(),
       updated_by: adminUser.userId,
     }
@@ -113,7 +126,7 @@ export async function updateMaintenanceConfig(
         key: "maintenance",
         value: merged,
         description: "Configurações do Modo Manutenção Geral da plataforma",
-        is_public: true,
+        is_public: false,
         updated_at: merged.updated_at,
         updated_by: merged.updated_by,
       })

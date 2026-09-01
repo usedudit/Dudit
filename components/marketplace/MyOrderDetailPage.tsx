@@ -530,7 +530,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasActiveReturn = !!activeReturnRequest;
     const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
 
-    const returnEvents = activeReturnRequest?.return_events || [];
+    const returnEvents = activeReturnRequest?.auditLogs || [];
     const mappedReturnHistoryEntries = returnEvents.map((evt: any) => {
         let title = "Solicitação de devolução";
         let lines = [evt.message || "Evento de devolução registrado."];

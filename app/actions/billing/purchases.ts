@@ -3,7 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccess } from "@/lib/auth/authorization"
-import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { getAdminRole, requireAdminScope, requireScope } from "@/lib/auth/admin-authorization"
 import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { logBillingAudit } from "@/lib/billing/audit"
 import type { BillingPurchase, CreatePurchaseInput, PurchaseWithRelations, BillingPageResult, BillingPageData, BillingFilters } from "@/lib/billing/types"
@@ -118,7 +118,13 @@ export async function getPurchaseAction(purchaseId: string): Promise<PurchaseWit
     if (error || !data) return null
 
     const adminUser = await getAdminRole()
-    if (!adminUser) {
+    if (adminUser) {
+        try {
+            requireScope(adminUser, "billing_control")
+        } catch {
+            return null
+        }
+    } else {
         try {
             await requirePartnerAccess(data.partner_id, user)
         } catch {
@@ -145,7 +151,9 @@ export async function createPurchaseAction(
         if (!user) return { success: false, error: "Não autenticado" }
 
         const adminUser = await getAdminRole()
-        if (!adminUser) {
+        if (adminUser) {
+            await requireAdminScope("billing_control", "admin")
+        } else {
             await requirePartnerAccess(input.partner_id, user)
         }
 
@@ -261,7 +269,9 @@ export async function updatePurchaseStatusAction(
         if (!purchase) return { success: false, error: "Compra não encontrada" }
 
         const adminUser = await getAdminRole()
-        if (!adminUser) {
+        if (adminUser) {
+            await requireAdminScope("billing_control", "admin")
+        } else {
             await requirePartnerAccess(purchase.partner_id, user)
             if (status !== "cancelled" || purchase.status !== "pending") {
                 return { success: false, error: "Operação não permitida" }
@@ -395,5 +405,3 @@ export async function getLatestCompletedPurchaseForPartnerAction(partnerId: stri
         return { success: false, error: error.message }
     }
 }
-
-

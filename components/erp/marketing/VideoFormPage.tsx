@@ -70,7 +70,7 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
             } else {
                 setLinkedItem(null)
             }
-            setLinkedCollectionUrl(video.linked_collection_url || "")
+            setLinkedCollectionUrl(video.linked_collection_url || (video.linked_item_type === "collection" && video.linked_collection_short_id ? `/colecoes/${video.linked_collection_short_id}` : ""))
         }
     }, [video])
 

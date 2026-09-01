@@ -31,6 +31,11 @@ export async function resolveBillingPartnerScope(
 
     const adminUser = await getAdminRole()
     if (adminUser) {
+        // Being in admin_roles must not by itself remove the tenant boundary
+        // for financial data. A platform admin also needs billing_control.
+        if (!adminUser.scopes.includes("billing_control")) {
+            return { allowed: false }
+        }
         if (requestedPartnerId) {
             return { allowed: true, partnerIds: [requestedPartnerId] }
         }

@@ -127,6 +127,22 @@ export function requireScope(admin: AdminUser, scope: AdminScope): void {
     }
 }
 
+/**
+ * Require an admin role and one of its explicitly granted admin scopes.
+ *
+ * Role hierarchy alone is intentionally not enough for privileged modules:
+ * a moderator may have moderation/audit access without having access to
+ * enforcement, billing, or system controls.
+ */
+export async function requireAdminScope(
+    scope: AdminScope,
+    minRole: AdminRole = "moderator",
+): Promise<AdminUser> {
+    const admin = await requireAdmin(minRole)
+    requireScope(admin, scope)
+    return admin
+}
+
 // ─── Self-Lock Guards ───────────────────────────────────────────────────────
 
 /**

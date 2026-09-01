@@ -255,6 +255,32 @@ export function ExplorarPageClient({
     const [minPrice, setMinPrice] = useState<number | string>("")
     const [maxPrice, setMaxPrice] = useState<number | string>("")
 
+    const [isFilterLoading, setIsFilterLoading] = useState(false)
+    const filterLoadingTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const isFirstMountParamsRef = useRef(true)
+    const prevParamsKeyRef = useRef("")
+
+    const triggerFilterLoading = useCallback((customMinDuration?: number) => {
+        if (filterLoadingTimerRef.current) {
+            clearTimeout(filterLoadingTimerRef.current)
+        }
+        setIsFilterLoading(true)
+        // Quick, slightly randomized natural duration between 220ms and 380ms
+        const randomDuration = customMinDuration ?? (Math.floor(Math.random() * 160) + 220)
+        filterLoadingTimerRef.current = setTimeout(() => {
+            setIsFilterLoading(false)
+            filterLoadingTimerRef.current = null
+        }, randomDuration)
+    }, [])
+
+    useEffect(() => {
+        return () => {
+            if (filterLoadingTimerRef.current) {
+                clearTimeout(filterLoadingTimerRef.current)
+            }
+        }
+    }, [])
+
     const observerTarget = useRef<HTMLDivElement>(null)
     const MAX_ITEMS = 300 // Memory cap
     const fetchFnMountedRef = useRef(false) // Dev-mode strict-mode guard
@@ -347,12 +373,22 @@ export function ExplorarPageClient({
         }
 
         setSelectedCategories(nextCats)
-    }, [searchParams, params])
+
+        const currentFilterKey = `${urlType}:${urlRadius || ""}:${urlSection || ""}:${urlCity || ""}:${nextCats.join(",")}`
+        if (isFirstMountParamsRef.current) {
+            isFirstMountParamsRef.current = false
+            prevParamsKeyRef.current = currentFilterKey
+        } else if (prevParamsKeyRef.current !== currentFilterKey) {
+            prevParamsKeyRef.current = currentFilterKey
+            triggerFilterLoading()
+        }
+    }, [searchParams, params, triggerFilterLoading])
 
     // Popstate listener to guarantee 0ms responsive Back/Forward sync with window.history.pushState
     useEffect(() => {
         const onPopState = () => {
             if (typeof window === "undefined") return
+            triggerFilterLoading()
             const url = new URL(window.location.href)
             const pathnameParts = url.pathname.replace(/^\/explorar\/?/, "").split("/").filter(Boolean)
             const pCity = pathnameParts[0] || null
@@ -380,7 +416,7 @@ export function ExplorarPageClient({
 
         window.addEventListener("popstate", onPopState)
         return () => window.removeEventListener("popstate", onPopState)
-    }, [])
+    }, [triggerFilterLoading])
 
 
 
@@ -533,6 +569,7 @@ export function ExplorarPageClient({
         refetchOnWindowFocus: false,
     })
 
+    const isContentLoading = isFilterLoading || isLoading || (isFetching && !isFetchingNextPage)
 
     const rawItems = useMemo(() => {
         const all = rawItemsUncapped || []
@@ -870,6 +907,7 @@ export function ExplorarPageClient({
     }, [filteredResults, selectedCategories])
 
     const toggleCategory = (catName: string) => {
+        triggerFilterLoading()
         setSelectedCategories((prev) => {
             const next = prev.includes(catName) ? [] : [catName]
             updateUrl(selectedCitySlug, next, query, currentType)
@@ -878,6 +916,7 @@ export function ExplorarPageClient({
     }
 
     const handleSelectCity = (citySlug: string | null) => {
+        triggerFilterLoading()
         if (citySlug) {
             document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
             localStorage.setItem("dudit_city", citySlug)
@@ -1094,6 +1133,7 @@ export function ExplorarPageClient({
     }, [selectedCitySlug, query, selectedCategories])
 
     const clearFilters = () => {
+        triggerFilterLoading()
         setSelectedCategories([])
         setMinPrice("")
         setMaxPrice("")
@@ -1112,6 +1152,7 @@ export function ExplorarPageClient({
         promoOn: boolean
         radius: number | null
     }) => {
+        triggerFilterLoading()
         setCurrentType(filters.type as any)
         setSelectedCategories(filters.categories)
         setMinPrice(filters.minPrice)
@@ -1143,7 +1184,10 @@ export function ExplorarPageClient({
                 key: "category",
                 label: "Categoria",
                 value: resolveCategoryName(selectedCategories[0]),
-                onRemove: () => toggleCategory(selectedCategories[0]),
+                onRemove: () => {
+                    triggerFilterLoading()
+                    toggleCategory(selectedCategories[0])
+                },
             })
         }
         if (minPrice || maxPrice) {
@@ -1155,7 +1199,11 @@ export function ExplorarPageClient({
                 key: "price",
                 label: "Preço",
                 value,
-                onRemove: () => { setMinPrice(""); setMaxPrice("") },
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setMinPrice("")
+                    setMaxPrice("")
+                },
             })
         }
         if (promoOn) {
@@ -1163,7 +1211,22 @@ export function ExplorarPageClient({
                 key: "promo",
                 label: "Promoção",
                 value: "Ativo",
-                onRemove: () => setPromoOn(false),
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setPromoOn(false)
+                },
+            })
+        }
+        if (selectedRadius) {
+            chips.push({
+                key: "radius",
+                label: "Distância",
+                value: `Até ${selectedRadius} km`,
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setSelectedRadius(null)
+                    updateUrl(selectedCitySlug, selectedCategories, query, currentType, null, selectedSection)
+                },
             })
         }
         if (sortBy !== "relevancia") {
@@ -1172,7 +1235,10 @@ export function ExplorarPageClient({
                 key: "sort",
                 label: "Ordenar",
                 value: sortLabel,
-                onRemove: () => setSortBy("relevancia"),
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setSortBy("relevancia")
+                },
             })
         }
         if (currentType !== "tudo") {
@@ -1182,13 +1248,14 @@ export function ExplorarPageClient({
                 label: "Tipo",
                 value: typeLabel,
                 onRemove: () => {
+                    triggerFilterLoading()
                     setCurrentType("tudo")
                     updateUrl(selectedCitySlug, selectedCategories, query, "tudo")
                 },
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query, resolveCategoryName])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query, selectedRadius, resolveCategoryName, triggerFilterLoading])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -1520,6 +1587,7 @@ export function ExplorarPageClient({
     const showCommunityVideos = communityVideos.length > 0
 
     const goToCategory = (catName: string) => {
+        triggerFilterLoading()
         // "Serviços" usa o tipo de listagem de serviços em vez de uma categoria de produto
         if (catName === "Serviços" || catName.toLowerCase() === "servicos") {
             setCurrentType("servicos")
@@ -1602,6 +1670,7 @@ export function ExplorarPageClient({
                                         <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
                                     )}
                                     onSeeAll={() => {
+                                        triggerFilterLoading()
                                         setCurrentType("vitrines")
                                         updateUrl(selectedCitySlug, selectedCategories, query, "vitrines")
                                     }}
@@ -1635,9 +1704,11 @@ export function ExplorarPageClient({
                             <ExplorarHeaderSection
                                 title={pageTitle}
                                 resultsCount={filteredResults.length}
+                                isLoading={isContentLoading}
                                 showBackButton={!!query || !!selectedSection}
                                 onBack={() => {
                                     if (selectedSection) {
+                                        triggerFilterLoading()
                                         setSelectedSection(null)
                                         updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
                                     } else {
@@ -1648,11 +1719,11 @@ export function ExplorarPageClient({
                         )}
 
                         <div
-                            key={`${currentType}-${selectedCategories.join(",")}-${selectedCitySlug}-${isLoading || (isFetching && !isFetchingNextPage)}`}
+                            key={isContentLoading ? "skeleton" : "content"}
                             style={{ animation: 'fadeIn 0.2s ease-out' }}
                         >
-                            {isLoading || (isFetching && !isFetchingNextPage) ? (
-                                <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} />
+                            {isContentLoading ? (
+                                <ExploreContentSkeleton type={currentType} hasSection={!!selectedSection} hideHeader={true} />
                             ) : !selectedCitySlug && rawItems.length === 0 ? (
                                 <div className="flex justify-center">
                                     <IconPlaceholder
@@ -1871,7 +1942,10 @@ export function ExplorarPageClient({
                 isOpen={isSortBottomSheetOpen}
                 onClose={() => setIsSortBottomSheetOpen(false)}
                 sortBy={sortBy as any}
-                onSortChange={(val) => setSortBy(val as any)}
+                onSortChange={(val) => {
+                    triggerFilterLoading()
+                    setSortBy(val as any)
+                }}
                 sortOptions={contextualSortOptions}
             />
 

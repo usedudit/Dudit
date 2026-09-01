@@ -2,7 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { logBillingAudit, logBillingAdminAudit } from "@/lib/billing/audit"
 import type { BillingPurchase, BillingPayment, BillingPageResult } from "@/lib/billing/types"
 import { validateCSRFForAction } from "@/lib/security/csrf-middleware"
@@ -16,7 +16,7 @@ export async function adminListPurchasesAction(
 ): Promise<BillingPageResult<BillingPurchase & { partner_name?: string }>> {
     const user = await getCurrentUser()
     if (!user) return { data: [], nextCursor: null, hasMore: false }
-    await requireAdmin("moderator")
+    await requireAdminScope("billing_control")
     const rlResult = await requireRateLimit(RateLimitCategory.ADMIN_READ)
     if (!rlResult.success) return { data: [], nextCursor: null, hasMore: false }
 
@@ -60,7 +60,7 @@ export async function adminListPaymentsAction(
 ): Promise<BillingPageResult<BillingPayment>> {
     const user = await getCurrentUser()
     if (!user) return { data: [], nextCursor: null, hasMore: false }
-    await requireAdmin("moderator")
+    await requireAdminScope("billing_control")
     const rlResult2 = await requireRateLimit(RateLimitCategory.ADMIN_READ)
     if (!rlResult2.success) return { data: [], nextCursor: null, hasMore: false }
 
@@ -98,7 +98,7 @@ export async function adminCancelPurchaseAction(
         if (!csrfResult.valid) return { success: false, error: "CSRF inválido" }
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        const admin = await requireAdmin("admin")
+        const admin = await requireAdminScope("billing_control", "admin")
         const rlResult = await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
         if (!rlResult.success) return { success: false, error: rlResult.error }
 
@@ -142,7 +142,7 @@ export async function adminMarkPaymentPaidAction(
         if (!csrfResult.valid) return { success: false, error: "CSRF inválido" }
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requireAdmin("admin")
+        await requireAdminScope("billing_control", "admin")
         const rlResult = await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
         if (!rlResult.success) return { success: false, error: rlResult.error }
 
@@ -170,6 +170,12 @@ export async function adminMarkPaymentPaidAction(
                 payment_id: paymentId,
                 admin_id: user.id,
             }, user.id)
+            await logBillingAdminAudit("billing.admin.marked_paid", "payment", paymentId, {
+                payment_id: paymentId,
+                partner_id: partnerId,
+                status_before: payment.status,
+                status_after: "approved",
+            }, user.id)
         }
 
         return { success: true }
@@ -188,7 +194,7 @@ export async function adminAddNoteAction(
         if (!csrfResult.valid) return { success: false, error: "CSRF inválido" }
         const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autenticado" }
-        await requireAdmin("moderator")
+        await requireAdminScope("billing_control")
 
         const supabase = getAdminClient()
         const { data: purchase } = await supabase

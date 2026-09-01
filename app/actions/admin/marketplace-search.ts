@@ -1,6 +1,6 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdmin, requireAdminScope } from "@/lib/auth/admin-authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -37,7 +37,7 @@ async function revalidateSynonymCache() {
 
 export async function listMarketplaceSynonymGroupsAction(): Promise<SynonymGroupRow[]> {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-  await requireAdmin("moderator")
+  await requireAdminScope("moderation")
 
   const supabase = getAdminClient()
   const { data: groups, error } = await supabase
@@ -233,7 +233,7 @@ export async function removeMarketplaceSynonymTermAction(termId: string) {
 
 export async function setMarketplaceSynonymTermActiveAction(termId: string, isActive: boolean) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-  await requireAdmin("admin")
+  const admin = await requireAdmin("admin")
 
   const supabase = getAdminClient()
   const { error } = await supabase
@@ -242,6 +242,13 @@ export async function setMarketplaceSynonymTermActiveAction(termId: string, isAc
     .eq("id", termId)
 
   if (error) throw new Error(error.message)
+  await adminAuditLog({
+    adminUserId: admin.userId,
+    actionType: AdminActionType.MARKETPLACE_SYNONYM_CHANGE,
+    targetType: "marketplace_synonym_term",
+    targetId: termId,
+    metadata: { isActive },
+  })
   await revalidateSynonymCache()
   return { success: true }
 }

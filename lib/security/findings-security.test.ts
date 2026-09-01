@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
+import { requireScope } from "@/lib/auth/admin-authorization"
+import type { AdminUser } from "@/lib/admin/types"
 
 describe("Security Audit Findings Remediation Tests", () => {
   describe("Finding 1: Stored XSS Prevention in Rich Text", () => {
@@ -34,6 +36,22 @@ describe("Security Audit Findings Remediation Tests", () => {
 
       process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalKey
+    })
+  })
+
+  describe("Admin privilege isolation", () => {
+    const moderator: AdminUser = {
+      userId: "moderator-id",
+      role: "moderator",
+      email: "moderator@example.com",
+      isProtected: false,
+      scopes: ["moderation", "audit_access"],
+    }
+
+    it("should allow moderation but deny financial control to a moderator", () => {
+      expect(() => requireScope(moderator, "moderation")).not.toThrow()
+      expect(() => requireScope(moderator, "billing_control")).toThrow("billing_control")
+      expect(() => requireScope(moderator, "user_enforcement")).toThrow("user_enforcement")
     })
   })
 })

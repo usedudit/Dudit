@@ -10,7 +10,7 @@
  */
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin, assertNotSelf, assertNotProtected } from "@/lib/auth/admin-authorization"
+import { requireAdminScope, assertNotSelf, assertNotProtected } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireStepUp } from "@/lib/admin/step-up-auth"
@@ -80,7 +80,7 @@ export interface AdminUserStats {
 }
 
 export async function getAdminUserStats(): Promise<AdminUserStats> {
-    await requireAdmin("admin")
+    await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -105,7 +105,7 @@ export async function getUsers(
     search?: string,
     status?: string
 ): Promise<CursorPaginatedResult<EnforcementUser>> {
-    await requireAdmin("admin")
+    await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -234,7 +234,7 @@ export async function getUsers(
 }
 
 export async function getAdminUserDetail(userId: string): Promise<any | null> {
-    await requireAdmin("admin")
+    await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -304,7 +304,7 @@ export interface AdminPartnerStats {
 }
 
 export async function getAdminPartnerStats(): Promise<AdminPartnerStats> {
-    await requireAdmin("admin")
+    await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -333,7 +333,7 @@ export async function getAdminPartnerDetail(storeId: string): Promise<any | null
         }
 
         const trimmedId = storeId.trim()
-        await requireAdmin()
+        await requireAdminScope("user_enforcement", "moderator")
         await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
         const supabase: any = getAdminClient()
@@ -567,7 +567,7 @@ export async function updateStoreRiskScore(
     reason: string,
     customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     if (newScore < 0 || newScore > 100) {
@@ -668,7 +668,7 @@ export async function updateUserRiskScore(
     reason: string,
     customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     if (newScore < 0 || newScore > 100) {
@@ -754,7 +754,7 @@ export async function getPartners(
     search?: string,
     status?: string
 ): Promise<CursorPaginatedResult<EnforcementPartner>> {
-    const admin = await requireAdmin()
+    const admin = await requireAdminScope("user_enforcement", "moderator")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase: any = getAdminClient()
@@ -881,7 +881,7 @@ export async function enableTenantAccess(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -995,7 +995,7 @@ export async function banUser(
     riskScore?: number | null,
     notifyUser: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1110,7 +1110,7 @@ export async function unbanUser(
     riskScore?: number | null,
     notifyUser: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1208,7 +1208,7 @@ export async function suspendPartner(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1346,7 +1346,7 @@ export async function unsuspendPartner(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1472,7 +1472,7 @@ export async function suspendStore(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1598,7 +1598,7 @@ export async function unsuspendStore(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1715,7 +1715,7 @@ export async function disableTenantAccess(
     riskScore?: number | null,
     notifyOwner: boolean = true
 ): Promise<{ success: boolean; caseId?: string; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1839,7 +1839,7 @@ export async function softDeleteProduct(
     reason: string,
     stepUpToken: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 
@@ -1898,7 +1898,7 @@ export async function softDeleteService(
     reason: string,
     stepUpToken: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("user_enforcement", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 

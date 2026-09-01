@@ -23,6 +23,16 @@ const EXEMPT_PREFIXES = [
 ]
 
 const BYPASS_COOKIE_NAME = "ddt_maint_bypass"
+const LEGACY_DEFAULT_BYPASS_TOKEN = "dudit_sec_bypass"
+
+function isValidBypassToken(candidate: string | null | undefined, configuredToken: string | null | undefined): boolean {
+  return Boolean(
+    candidate &&
+    configuredToken &&
+    configuredToken !== LEGACY_DEFAULT_BYPASS_TOKEN &&
+    candidate === configuredToken,
+  )
+}
 
 /**
  * Checks if a request path should bypass maintenance mode checks entirely.
@@ -98,13 +108,13 @@ export async function evaluateMaintenanceMode(request: NextRequest): Promise<Nex
   if (maintenance.allow_admin_bypass) {
     // Check bypass cookie
     const bypassCookie = request.cookies.get(BYPASS_COOKIE_NAME)?.value
-    if (bypassCookie && (bypassCookie === maintenance.bypass_token || bypassCookie.length > 5)) {
+    if (isValidBypassToken(bypassCookie, maintenance.bypass_token)) {
       return null
     }
 
     // Check query param bypass (e.g. ?bypass=dudit_sec_bypass)
     const bypassQuery = request.nextUrl.searchParams.get("bypass") || request.nextUrl.searchParams.get("maint_bypass")
-    if (bypassQuery && bypassQuery === maintenance.bypass_token) {
+    if (isValidBypassToken(bypassQuery, maintenance.bypass_token)) {
       // Set cookie and redirect to clean URL
       const cleanUrl = new URL(request.url)
       cleanUrl.searchParams.delete("bypass")
@@ -112,7 +122,7 @@ export async function evaluateMaintenanceMode(request: NextRequest): Promise<Nex
       const response = NextResponse.redirect(cleanUrl)
       response.cookies.set({
         name: BYPASS_COOKIE_NAME,
-        value: bypassQuery,
+        value: bypassQuery!,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",

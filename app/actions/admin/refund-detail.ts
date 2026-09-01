@@ -1,13 +1,13 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 export async function getAdminRefundRequestDetail(refundRequestId: string) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+        await requireAdminScope("billing_control")
 
     const admin = getAdminClient()
 

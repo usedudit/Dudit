@@ -108,6 +108,46 @@ describe("evaluateMaintenanceMode (Edge Guard)", () => {
     expect(result).toBeNull()
   })
 
+  it("rejects arbitrary bypass cookies", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        result: JSON.stringify({
+          enabled: true,
+          message: "Em manutenção",
+          allow_admin_bypass: true,
+          bypass_token: "secret_bypass",
+        }),
+      }),
+    })
+
+    const req = new NextRequest("https://dudit.com.br/explorar", {
+      headers: {
+        cookie: "ddt_maint_bypass=attacker-controlled-value",
+      },
+    })
+    const result = await evaluateMaintenanceMode(req)
+    expect(result?.status).toBe(503)
+  })
+
+  it("rejects the published legacy bypass token", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        result: JSON.stringify({
+          enabled: true,
+          message: "Em manutenção",
+          allow_admin_bypass: true,
+          bypass_token: "dudit_sec_bypass",
+        }),
+      }),
+    })
+
+    const req = new NextRequest("https://dudit.com.br/explorar?bypass=dudit_sec_bypass")
+    const result = await evaluateMaintenanceMode(req)
+    expect(result?.status).toBe(503)
+  })
+
   it("fails open if Redis fetch fails or times out", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network timeout"))
 

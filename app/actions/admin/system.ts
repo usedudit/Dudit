@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import {
   getMaintenanceConfig,
   updateMaintenanceConfig,
@@ -18,6 +18,7 @@ import type {
 } from "@/lib/system/types"
 
 const BYPASS_COOKIE_NAME = "ddt_maint_bypass"
+const LEGACY_DEFAULT_BYPASS_TOKEN = "dudit_sec_bypass"
 
 /**
  * Get all system settings for admin panel.
@@ -28,7 +29,7 @@ export async function getSystemSettingsAdminAction(): Promise<{
   error?: string
 }> {
   try {
-    await requireAdmin("admin")
+    await requireAdminScope("system_settings", "admin")
     const [maintenance, announcement] = await Promise.all([
       getMaintenanceConfig(),
       getGlobalAnnouncementConfig(),
@@ -53,7 +54,7 @@ export async function updateMaintenanceModeAdminAction(
   data: Partial<MaintenanceConfig>
 ): Promise<{ success: boolean; config?: MaintenanceConfig; error?: string }> {
   try {
-    const adminUser = await requireAdmin("admin")
+    const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await updateMaintenanceConfig(data, adminUser)
 
     if (result.success) {
@@ -75,7 +76,7 @@ export async function updateGlobalAnnouncementAdminAction(
   data: Partial<GlobalAnnouncementConfig>
 ): Promise<{ success: boolean; config?: GlobalAnnouncementConfig; error?: string }> {
   try {
-    const adminUser = await requireAdmin("admin")
+    const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await updateGlobalAnnouncementConfig(data, adminUser)
 
     if (result.success) {
@@ -96,7 +97,7 @@ export async function sendMaintenanceBroadcastAdminAction(
   data: MaintenanceBroadcastInput
 ): Promise<{ success: boolean; sentCount?: number; pushCount?: number; error?: string }> {
   try {
-    const adminUser = await requireAdmin("admin")
+    const adminUser = await requireAdminScope("system_settings", "admin")
     const result = await dispatchMaintenanceBroadcast(data, adminUser)
     return result
   } catch (err: any) {
@@ -110,12 +111,13 @@ export async function sendMaintenanceBroadcastAdminAction(
  */
 export async function setBypassCookieAction(token: string): Promise<{ success: boolean; error?: string }> {
   try {
+    await requireAdminScope("system_settings", "admin")
     const config = await getMaintenanceConfig()
     if (!config.allow_admin_bypass) {
       return { success: false, error: "Bypass de manutenção está desativado pelo sistema." }
     }
 
-    if (!token || token.trim() !== config.bypass_token.trim()) {
+    if (!token || token.trim() === LEGACY_DEFAULT_BYPASS_TOKEN || token.trim() !== config.bypass_token.trim()) {
       return { success: false, error: "Chave de bypass inválida." }
     }
 

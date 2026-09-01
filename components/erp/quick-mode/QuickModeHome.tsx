@@ -80,7 +80,7 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
                 onClick={() => setShowModal(true)}
             >
                 <SparklesIcon className="w-3.5 h-3.5" />
-                Gerar Plaquinhas & Posters
+                Gerar Placa com QR Code
             </Button>
 
             {showModal && (
@@ -200,7 +200,7 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                     isOpen={showOptionsModal}
                     onClose={() => setShowOptionsModal(false)}
                     title="Opções da Vitrine Online"
-                    description="Compartilhe seu link, divulgue no WhatsApp ou baixe o poster para o balcão"
+                    description="Compartilhe seu link, divulgue no WhatsApp ou baixe a placa para o balcão"
                     maxWidth="sm"
                 >
                     <div className="flex flex-col items-center justify-center p-2 gap-4">

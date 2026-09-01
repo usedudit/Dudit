@@ -1,7 +1,6 @@
 "use server"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { cache } from "react"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { getProductUrl, getServiceUrl, getCollectionUrl } from "@/lib/utils/url-generator"
@@ -9,6 +8,7 @@ import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-image
 
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { filterMarketplaceVisibleProducts, filterMarketplaceVisibleServices } from "@/lib/resolve-marketplace-visibility"
+import { isUuid } from "@/lib/utils/short-id"
 
 export interface LinkedItemData {
   type: "product" | "service" | "collection"
@@ -132,11 +132,17 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
   }
 
   if (type === "collection") {
-    const { data: collection } = await supabase
+    let collectionQuery = supabase
       .from("collections")
-      .select("id, name, cover_url, items_count")
-      .eq("id", id)
-      .maybeSingle()
+      .select("id, name, cover_url, items_count, short_id")
+
+    if (isUuid(id)) {
+      collectionQuery = collectionQuery.eq("id", id)
+    } else {
+      collectionQuery = collectionQuery.eq("short_id", id)
+    }
+
+    const { data: collection } = await collectionQuery.maybeSingle()
 
     if (!collection) return null
 
@@ -152,7 +158,7 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
       id: collection.id,
       name: collection.name,
       imageUrl,
-      url: getCollectionUrl(collection),
+      url: getCollectionUrl({ short_id: collection.short_id, id: collection.id }),
       itemsCount: collection.items_count || 0,
     }
 
@@ -161,6 +167,6 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
   return null
 }
 
-export const getLinkedItemData = cache(
-  (type: string, id: string, storeId?: string) => _getLinkedItemData(type, id, storeId)
-)
+export async function getLinkedItemData(type: string, id: string, storeId?: string): Promise<LinkedItemData | null> {
+  return _getLinkedItemData(type, id, storeId)
+}

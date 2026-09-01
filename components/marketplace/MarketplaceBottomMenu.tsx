@@ -67,27 +67,73 @@ export function MarketplaceBottomMenu() {
 
     // Detect city slug on client side for the Home and Explorar tabs
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            let stored = localStorage.getItem("dudit_city")
-            if (!stored) {
-                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-                if (match) stored = match[1]
-            }
+        if (typeof window === "undefined") return
 
-            if (!stored && pathname) {
-                const parts = pathname.split('/').filter(Boolean)
-                if (parts[0] === 'explorar' && parts[1]) {
-                    stored = parts[1]
-                } else if (parts.length >= 1 && !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite'].includes(parts[0])) {
-                    stored = parts[0]
-                }
-            }
+        // 1. From profile if available
+        if (profile?.citySlug && profile.citySlug !== "brasil" && !profile.citySlug.startsWith("estado-")) {
+            setCitySlug(profile.citySlug)
+            try {
+                localStorage.setItem("dudit_city", profile.citySlug)
+                document.cookie = `dudit_city=${profile.citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+            } catch {}
+            return
+        }
 
-            if (stored) {
-                setCitySlug(stored)
+        if (profile?.address && profile.address.includes(" - ") && profile.address !== "Brasil" && profile.address !== "Estado de São Paulo") {
+            const [cityName, stateUf] = profile.address.split(" - ")
+            if (cityName && stateUf && stateUf.trim().length === 2) {
+                const normCity = cityName.trim()
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, "")
+                const slug = `${normCity}-${stateUf.trim().toLowerCase()}`
+                setCitySlug(slug)
+                try {
+                    localStorage.setItem("dudit_city", slug)
+                    document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
+                } catch {}
+                return
             }
         }
-    }, [])
+
+        // 2. From localStorage
+        let stored = localStorage.getItem("dudit_city")
+        if (stored === "brasil" || stored?.startsWith("estado-")) {
+            stored = null
+        }
+
+        // 3. From cookie
+        if (!stored) {
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match && match[1] !== "brasil" && !match[1].startsWith("estado-")) {
+                stored = match[1]
+            }
+        }
+
+        // 4. From current URL path
+        if (!stored && pathname) {
+            const parts = pathname.split('/').filter(Boolean)
+            if (parts[0] === 'explorar' && parts[1] && parts[1] !== "brasil" && !parts[1].startsWith("estado-")) {
+                stored = parts[1]
+            } else if (
+                parts.length >= 1 &&
+                !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite', 'institucional', 'ajuda', 'banned', 'brasil'].includes(parts[0]) &&
+                /^[a-z0-9-]+-[a-z]{2}$/.test(parts[0])
+            ) {
+                stored = parts[0]
+            }
+        }
+
+        if (stored) {
+            setCitySlug(stored)
+            try {
+                localStorage.setItem("dudit_city", stored)
+                document.cookie = `dudit_city=${stored}; path=/; max-age=${60 * 60 * 24 * 30}`
+            } catch {}
+        }
+    }, [pathname, profile])
 
     // Do not show on ERP, admin, auth, checkout, quote or print screens
     const isExcluded =
@@ -100,8 +146,8 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/print") ||
         pathname.startsWith("/entregadores")
 
-    const homePath = citySlug ? `/${citySlug}` : "/"
-    const explorePath = citySlug ? `/explorar/${citySlug}` : "/explorar/brasil"
+    const homePath = citySlug && citySlug !== "brasil" ? `/${citySlug}` : "/"
+    const explorePath = citySlug && citySlug !== "brasil" ? `/explorar/${citySlug}` : "/explorar/brasil"
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
 

@@ -82,7 +82,10 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
     setLinkedItemLoading(true)
     getLinkedItemData(video.linked_item_type, video.linked_item_id)
       .then(setLinkedItem)
-      .catch(() => setLinkedItem(null))
+      .catch((err) => {
+        console.error("[VideoModal] Failed to fetch linked item:", err)
+        setLinkedItem(null)
+      })
       .finally(() => setLinkedItemLoading(false))
   }, [video?.id, video?.linked_item_type, video?.linked_item_id])
 

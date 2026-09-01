@@ -1,6 +1,6 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -20,7 +20,7 @@ export interface AdminOrderStats {
 
 export async function getAdminMarketplaceOrdersStats(): Promise<AdminOrderStats> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdminScope("moderation")
 
     const admin = getAdminClient()
 
@@ -55,7 +55,7 @@ export async function getAdminMarketplaceOrders(
     }
 ): Promise<CursorPaginatedResult<any>> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdminScope("moderation")
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)
@@ -144,7 +144,7 @@ export async function getAdminMarketplaceOrders(
 
 export async function getAdminMarketplaceOrderDetail(orderId: string): Promise<any | null> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdminScope("moderation")
 
     const admin = getAdminClient()
 
@@ -312,7 +312,7 @@ export interface AdminReturnStats {
 
 export async function getAdminReturnRequestsStats(): Promise<AdminReturnStats> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdminScope("moderation")
 
     const admin = getAdminClient()
 
@@ -346,7 +346,7 @@ export async function getAdminReturnRequests(
     }
 ): Promise<CursorPaginatedResult<any>> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdminScope("moderation")
 
     const admin = getAdminClient()
     const pageSize = Math.min(limit, 100)

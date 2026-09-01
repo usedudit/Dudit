@@ -11,7 +11,7 @@
  * 5. Marketplace Search & Demand Intelligence (zero-results search terms, conversions)
  */
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -195,7 +195,7 @@ export async function getAdminOverviewAnalyticsAction(
     customStart?: string,
     customEnd?: string
 ): Promise<OverviewAnalyticsData> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -310,7 +310,7 @@ export async function getUserAnalyticsAction(
     customStart?: string,
     customEnd?: string
 ): Promise<UserAnalyticsData> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -388,7 +388,7 @@ export async function getPartnerAnalyticsAction(
     customStart?: string,
     customEnd?: string
 ): Promise<PartnerAnalyticsData> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -540,7 +540,7 @@ export async function getFeatureUsageAnalyticsAction(
     customStart?: string,
     customEnd?: string
 ): Promise<FeatureUsageData> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -694,7 +694,7 @@ export async function getMarketplaceDemandAnalyticsAction(
     customStart?: string,
     customEnd?: string
 ): Promise<MarketplaceDemandMetrics> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()

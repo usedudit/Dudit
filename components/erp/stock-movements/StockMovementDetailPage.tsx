@@ -18,7 +18,7 @@ import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { formatQuantityWithUnit } from '@/lib/utils/formatters';
 import { undoStockMovementAction } from '@/app/actions/erp/stock-movements';
 import { GenericAttachmentsTab } from '@/components/erp/shared/GenericAttachmentsTab';
-import { FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
+import { FormSection, ListItem, Pagination, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/reusable';
 import { AnimatePresence } from 'framer-motion';
 
 interface MovementItemData {
@@ -96,7 +96,13 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
     const [undoReason, setUndoReason] = useState('');
     const [isUndoing, setIsUndoing] = useState(false);
     const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [productsPage, setProductsPage] = useState(1);
+    const PRODUCTS_PER_PAGE = 8;
     const { success: notifySuccess, error: notifyError } = useNotification();
+
+    useEffect(() => {
+        setProductsPage(1);
+    }, [activeTab]);
 
     const handleUndo = async () => {
         if (!movement?.id) return;
@@ -168,6 +174,12 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                 type: data.type,
             }]
             : [];
+
+    const totalProductsPages = Math.max(1, Math.ceil(displayItems.length / PRODUCTS_PER_PAGE));
+    const paginatedItems = displayItems.slice(
+        (productsPage - 1) * PRODUCTS_PER_PAGE,
+        productsPage * PRODUCTS_PER_PAGE
+    );
 
     const movementTitle = data.displayId ? data.displayId.slice(0, 8) : `Mov. ${data.id.slice(0, 8)}`;
     const hasNotes = notes && notes.trim().length > 0;
@@ -243,6 +255,7 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="details">Dados gerais</TabsTrigger>
                                         <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                                        <TabsTrigger value="products" className="xl:hidden">Produtos</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -390,76 +403,6 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                                 className="border-0 bg-transparent px-0 hover:bg-transparent"
                                             />
 
-                                            {/* Items Cards for Mobile */}
-                                            < div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden" >
-                                                {
-                                                    displayItems.map((item, index) => {
-                                                        const delta = item.product.currentStock - item.product.previousStock;
-                                                        const lineIn = data.type === 'adjustment' ? delta > 0 : item.type === 'in';
-                                                        const lineOut = data.type === 'adjustment' ? delta < 0 : item.type === 'out';
-                                                        const deltaFormatted = data.type === 'adjustment'
-                                                            ? (delta > 0 ? `+${delta}` : `${delta}`)
-                                                            : (lineIn ? `+${item.quantity}` : `-${item.quantity}`);
-                                                        const deltaColorClass = lineIn
-                                                            ? 'text-brand-green'
-                                                            : lineOut
-                                                                ? 'text-brand-red'
-                                                                : 'text-brand-dark dark:text-dark-heading';
-
-                                                        return (
-                                                            <div key={item.id}>
-                                                                {index > 0 && (
-                                                                    <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
-                                                                )}
-                                                                <div className="p-4 md:p-6">
-                                                                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                                                                        <div className="flex items-start gap-4 md:gap-5 flex-1">
-                                                                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
-                                                                                <img
-                                                                                    src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
-                                                                                    className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
-                                                                                    alt={item.product.name}
-                                                                                />
-                                                                            </div>
-
-                                                                            <div className="flex-1 min-w-0">
-                                                                                <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{item.product.name}</h4>
-
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
-                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                    <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
-                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                                    <span className={`text-sm font-bold ${deltaColorClass}`}>
-                                                                                        {deltaFormatted}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="flex flex-col md:flex-row items-center md:items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0 w-full">
-                                                                            <div className="text-center md:text-left flex-1">
-                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
-                                                                                <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
-                                                                            </div>
-
-                                                                            <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body w-full md:w-auto">
-                                                                                <ArrowRightIcon size={18} />
-                                                                            </div>
-
-                                                                            <div className="text-center md:text-left flex-1">
-                                                                                <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
-                                                                                <div className={`text-md font-bold ${deltaColorClass}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                }
-                                            </div >
-
                                             {/* Operation Summary below items (like XML import page sidebar) */}
                                             <FormSection title="Resumo da Operação" hasSeparator>
                                                 <div className="space-y-4">
@@ -508,6 +451,91 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             title="Anexos da Movimentação"
                                             subtitle="Gerencie comprovantes, fotos ou notas fiscais desta movimentação."
                                         />
+                                    </FadeIn>
+                                </TabsContent >
+
+                                {/* Produtos - Mobile/Tablet only */}
+                                <TabsContent value="products" className="mt-0 xl:hidden" >
+                                    <FadeIn key="products">
+                                        <div className="space-y-4">
+                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
+                                                {paginatedItems.map((item, index) => {
+                                                    const delta = item.product.currentStock - item.product.previousStock;
+                                                    const lineIn = data.type === 'adjustment' ? delta > 0 : item.type === 'in';
+                                                    const lineOut = data.type === 'adjustment' ? delta < 0 : item.type === 'out';
+                                                    const deltaFormatted = data.type === 'adjustment'
+                                                        ? (delta > 0 ? `+${delta}` : `${delta}`)
+                                                        : (lineIn ? `+${item.quantity}` : `-${item.quantity}`);
+                                                    const deltaColorClass = lineIn
+                                                        ? 'text-brand-green'
+                                                        : lineOut
+                                                            ? 'text-brand-red'
+                                                            : 'text-brand-dark dark:text-dark-heading';
+
+                                                    return (
+                                                        <div key={item.id}>
+                                                            {index > 0 && (
+                                                                <div className="h-px bg-brand-border dark:bg-dark-border mx-6" />
+                                                            )}
+                                                            <div className="p-4 md:p-6">
+                                                                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                                                                    <div className="flex items-start gap-4 md:gap-5 flex-1">
+                                                                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-brand-border dark:border-dark-border overflow-hidden shrink-0 bg-brand-gray dark:bg-dark-border/20">
+                                                                            <img
+                                                                                src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                                className="w-full h-full object-cover rounded-full bg-brand-gray dark:bg-dark-border border border-brand-border dark:border-dark-border"
+                                                                                alt={item.product.name}
+                                                                            />
+                                                                        </div>
+
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <h4 className="font-bold text-lg text-brand-dark dark:text-dark-heading truncate">{item.product.name}</h4>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.sku}</span>
+                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{item.product.category}</span>
+                                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
+                                                                                <span className={`text-sm font-bold ${deltaColorClass}`}>
+                                                                                    {deltaFormatted}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex flex-col md:flex-row items-center md:items-center justify-between md:justify-start gap-4 md:gap-8 min-w-fit px-2 md:px-0 w-full">
+                                                                        <div className="text-center md:text-left flex-1">
+                                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Anterior</div>
+                                                                            <div className="text-md font-bold text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(item.product.previousStock, item.product.unit)}</div>
+                                                                        </div>
+
+                                                                        <div className="flex items-center justify-center text-brand-inactive-text dark:text-dark-body w-full md:w-auto">
+                                                                            <ArrowRightIcon size={18} />
+                                                                        </div>
+
+                                                                        <div className="text-center md:text-left flex-1">
+                                                                            <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-0.5">Estoque Pós-Mov.</div>
+                                                                            <div className={`text-md font-bold ${deltaColorClass}`}>{formatQuantityWithUnit(item.product.currentStock, item.product.unit)}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {totalProductsPages > 1 && (
+                                                <div className="pt-2">
+                                                    <Pagination
+                                                        currentPage={productsPage}
+                                                        totalPages={totalProductsPages}
+                                                        onPageChange={setProductsPage}
+                                                        inline
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                     </FadeIn>
                                 </TabsContent >
                             </AnimatePresence>

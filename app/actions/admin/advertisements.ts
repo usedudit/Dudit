@@ -45,7 +45,7 @@ async function revalidateAdsCache() {
 
 export async function getAdminAdvertisements(): Promise<AdminAdvertisementRow[]> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdmin("admin")
 
     const supabase = getAdminClient()
     const { data, error } = await supabase
@@ -60,7 +60,7 @@ export async function getAdminAdvertisements(): Promise<AdminAdvertisementRow[]>
 
 export async function getAdminAdvertisement(id: string): Promise<AdminAdvertisementRow | null> {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    await requireAdmin()
+    await requireAdmin("admin")
 
     const safeId = sanitizeUUID(id)
     if (!safeId) return null
@@ -79,7 +79,7 @@ export async function getAdminAdvertisement(id: string): Promise<AdminAdvertisem
 
 export async function createAdvertisement(input: AdvertisementFormValues) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const admin = await requireAdmin()
+    const admin = await requireAdmin("admin")
 
     const parsed = advertisementFormSchema.safeParse(input)
     if (!parsed.success) {
@@ -129,7 +129,7 @@ export async function createAdvertisement(input: AdvertisementFormValues) {
 
 export async function updateAdvertisement(id: string, input: AdvertisementFormValues) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const admin = await requireAdmin()
+    const admin = await requireAdmin("admin")
 
     const safeId = sanitizeUUID(id)
     if (!safeId) return { success: false as const, error: "ID inválido" }
@@ -182,7 +182,7 @@ export async function updateAdvertisement(id: string, input: AdvertisementFormVa
 
 export async function updateAdvertisementStatus(id: string, status: AdStatus) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const admin = await requireAdmin()
+    const admin = await requireAdmin("admin")
 
     const safeId = sanitizeUUID(id)
     if (!safeId) return { success: false as const, error: "ID inválido" }
@@ -214,7 +214,7 @@ export async function updateAdvertisementStatus(id: string, status: AdStatus) {
 
 export async function deleteAdvertisement(id: string) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-    const admin = await requireAdmin()
+    const admin = await requireAdmin("admin")
 
     const safeId = sanitizeUUID(id)
     if (!safeId) return { success: false as const, error: "ID inválido" }

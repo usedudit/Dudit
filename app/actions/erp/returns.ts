@@ -321,7 +321,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
             ? (toNumber(row.store_credit_amount) > 0 ? "store_credit" : toNumber(row.refund_amount) > 0 ? "refund" : undefined)
             : undefined)) as any,
         items,
-        returnEvents: (row.return_events || []).map((e: any) => ({
+        returnEvents: (row.auditLogs || []).map((e: any) => ({
             id: e.id,
             return_request_id: e.return_request_id,
             previous_status: e.from_status || null,
@@ -512,7 +512,7 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
             created_at: e.created_at,
         }))
 
-        const normalized = normalizeReturnRow({ ...data, return_events: returnEvents })
+        const normalized = normalizeReturnRow({ ...data, auditLogs: returnEvents })
         if (buyerDetails) {
             normalized.customerEmail = normalized.customerEmail || buyerDetails.email || undefined
             normalized.customerPhone = normalized.customerPhone || buyerDetails.phone || undefined
@@ -1723,9 +1723,15 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
 
         if (error) throw error
 
-        // Batch query to get returned quantities for all retrieved orders
+        // Batch query to get returned quantities and active returns for all retrieved orders
         const orderIds = (orders || []).map((o: any) => o.id)
         const returnedQtyMap: Record<string, number> = {}
+        const ACTIVE_RETURN_STATUSES = new Set([
+            "PENDING_REVIEW", "UNDER_ANALYSIS", "WAITING_CUSTOMER",
+            "WAITING_ITEM_RETURN", "ESCALATED", "PROCESSING",
+        ])
+        const ordersWithActiveReturns = new Set<string>()
+
         if (orderIds.length > 0) {
             const { data: retRequests } = await supabase
                 .from("return_requests")
@@ -1743,6 +1749,9 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
             if (retRequests) {
                 retRequests.forEach((rr: any) => {
                     const status = String(rr.status || "").toUpperCase()
+                    if (ACTIVE_RETURN_STATUSES.has(status)) {
+                        ordersWithActiveReturns.add(rr.order_id)
+                    }
                     if (status === "REJECTED" || status === "EXPIRED" || status === "CANCELLED") return
                     const riList = rr.return_items || []
                     riList.forEach((ri: any) => {
@@ -1769,7 +1778,9 @@ export async function fetchReturnOrderBucketAction(partnerId: string) {
             }
         }
 
-        return (orders || []).map((order: any) => {
+        const filteredOrders = (orders || []).filter((order: any) => !ordersWithActiveReturns.has(order.id))
+
+        return filteredOrders.map((order: any) => {
             const customer = (order.customer_id || order.buyer_id) ? customersMap.get(order.customer_id || order.buyer_id) : null
             const orderItems = order.order_items || []
             const amountPaid = getOrderAmountPaid(order)

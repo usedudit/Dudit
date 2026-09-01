@@ -3,7 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccess, requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
-import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { getAdminRole, requireAdminScope, requireScope } from "@/lib/auth/admin-authorization"
 import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { generateInvoiceForPurchase } from "@/lib/billing/invoice-generation"
 import { logBillingAudit } from "@/lib/billing/audit"
@@ -29,7 +29,9 @@ export async function generateInvoiceAction(
         }
 
         const adminUser = await getAdminRole()
-        if (!adminUser) {
+        if (adminUser) {
+            await requireAdminScope("billing_control", "admin")
+        } else {
             await requirePartnerAccessWithPermission(
                 purchase.partner_id,
                 "billing" as any,
@@ -105,7 +107,13 @@ export async function getInvoiceAction(invoiceId: string): Promise<BillingInvoic
     if (error || !data) return null
 
     const adminUser = await getAdminRole()
-    if (!adminUser && data.partner_id) {
+    if (adminUser) {
+        try {
+            requireScope(adminUser, "billing_control")
+        } catch {
+            return null
+        }
+    } else if (data.partner_id) {
         try {
             await requirePartnerAccess(data.partner_id, user)
         } catch {
@@ -130,7 +138,13 @@ export async function getInvoiceByPurchaseAction(purchaseId: string): Promise<Bi
     if (error || !data) return null
 
     const adminUser = await getAdminRole()
-    if (!adminUser && data.partner_id) {
+    if (adminUser) {
+        try {
+            requireScope(adminUser, "billing_control")
+        } catch {
+            return null
+        }
+    } else if (data.partner_id) {
         try {
             await requirePartnerAccess(data.partner_id, user)
         } catch {
@@ -155,7 +169,13 @@ export async function getInvoiceForPrintAction(invoiceId: string): Promise<Invoi
     if (error || !data) return null
 
     const adminUser = await getAdminRole()
-    if (!adminUser) {
+    if (adminUser) {
+        try {
+            requireScope(adminUser, "billing_control")
+        } catch {
+            return null
+        }
+    } else {
         try {
             await requirePartnerAccessWithPermission(
                 data.billing_purchases.partner_id,
@@ -184,4 +204,3 @@ export async function getInvoiceForPrintAction(invoiceId: string): Promise<Invoi
 
     return (data as any).invoice_data as InvoiceData
 }
-

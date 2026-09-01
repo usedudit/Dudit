@@ -1,7 +1,7 @@
 "use server"
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes } from "@/lib/input-validator"
@@ -10,6 +10,30 @@ import { AdminActionType } from "@/lib/admin/types"
 import type { FetchedProduct, FetchedService, FetchedRecurringPlan, FetchedPartner, FetchedReview } from "@/lib/admin/types"
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+const MODERATION_FIELDS: Record<string, readonly string[]> = {
+    product: ["name", "description", "tags", "video_url"],
+    service: ["name", "description", "tags", "video_url"],
+    recurring_plan: ["name", "description"],
+    partner: ["store_name", "store_description"],
+}
+
+const VARIANT_FIELDS = ["name"] as const
+const IMAGE_FIELDS: Record<string, readonly string[]> = {
+    product: ["images"],
+    service: ["images"],
+    variant: ["variant_options"],
+    partner: ["store_image_url", "logo_url", "banner_url", "gallery"],
+}
+
+function normalizeRiskScoreIncrement(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    return Math.min(Math.max(Math.trunc(value), 0), 100)
+}
+
+function hasAllowedField(type: string, field: string): boolean {
+    return MODERATION_FIELDS[type]?.includes(field) ?? false
+}
 
 const _deleteFromR2 = async (url: string) => {
     if (!url || !url.trim()) return
@@ -139,7 +163,7 @@ export async function fetchModerationTarget(
     type: string,
     id: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -312,10 +336,20 @@ export async function editField(
     notes?: string,
     knownPartnerId?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
-    const partnerId = knownPartnerId ?? await getPartnerIdFromTarget(targetType, targetId)
+    if (!hasAllowedField(targetType, field)) {
+        return { success: false, error: "Campo não permitido para moderação" }
+    }
+
+    const resolvedPartnerId = await getPartnerIdFromTarget(targetType, targetId)
+    if (!resolvedPartnerId) return { success: false, error: "Recurso não encontrado" }
+    if (knownPartnerId && knownPartnerId !== resolvedPartnerId) {
+        return { success: false, error: "Contexto do parceiro inválido" }
+    }
+    const partnerId = resolvedPartnerId
+    const normalizedRiskScoreIncrement = normalizeRiskScoreIncrement(riskScoreIncrement)
 
     try {
         // Fetch previous value for audit
@@ -361,7 +395,7 @@ export async function editField(
             fieldName: field,
             previousValue,
             newValue: value,
-            riskScoreIncrement,
+            riskScoreIncrement: normalizedRiskScoreIncrement,
             notes,
         })
 
@@ -382,8 +416,12 @@ export async function removeImage(
     notes?: string,
     knownPartnerId?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!IMAGE_FIELDS[targetType]?.includes(field)) {
+        return { success: false, error: "Campo de imagem não permitido para moderação" }
+    }
 
     let effectiveType = targetType
     let effectiveId = targetId
@@ -401,7 +439,12 @@ export async function removeImage(
             effectiveId = data.product_id
         }
 
-        const partnerId = knownPartnerId ?? await getPartnerIdFromTarget(effectiveType, effectiveId)
+        const resolvedPartnerId = await getPartnerIdFromTarget(effectiveType, effectiveId)
+        if (!resolvedPartnerId) return { success: false, error: "Recurso não encontrado" }
+        if (knownPartnerId && knownPartnerId !== resolvedPartnerId) {
+            return { success: false, error: "Contexto do parceiro inválido" }
+        }
+        const partnerId = resolvedPartnerId
 
         if (effectiveType === "product") {
             const { data } = await fetchAdmin.from("products").select("images").eq("id", effectiveId).single()
@@ -510,8 +553,12 @@ export async function editVariant(
     notes?: string,
     knownPartnerId?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
+
+    if (!VARIANT_FIELDS.includes(field as (typeof VARIANT_FIELDS)[number])) {
+        return { success: false, error: "Campo de variante não permitido para moderação" }
+    }
 
     try {
         const fetchAdmin = getAdminClient()
@@ -536,7 +583,11 @@ export async function editVariant(
 
         if (error) return { success: false, error: error.message }
 
-        const partnerId = knownPartnerId ?? await getPartnerIdFromTarget("product", variant.product_id)
+        const partnerId = await getPartnerIdFromTarget("product", variant.product_id)
+        if (!partnerId) return { success: false, error: "Produto da variante não encontrado" }
+        if (knownPartnerId && knownPartnerId !== partnerId) {
+            return { success: false, error: "Contexto do parceiro inválido" }
+        }
 
         await logModerationAction({
             adminUserId: admin.userId,
@@ -564,7 +615,7 @@ export async function hideReview(
     riskScoreIncrement: number,
     notes?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     try {
@@ -614,7 +665,7 @@ export async function editReview(
     riskScoreIncrement: number,
     notes?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     try {
@@ -666,7 +717,7 @@ export async function deleteVariant(
     notes?: string,
     knownPartnerId?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     try {
@@ -686,10 +737,14 @@ export async function deleteVariant(
             if (parsed?.image) await _deleteFromR2(parsed.image)
         }
 
+        const partnerId = await getPartnerIdFromTarget("product", variant.product_id)
+        if (!partnerId) return { success: false, error: "Produto da variante não encontrado" }
+        if (knownPartnerId && knownPartnerId !== partnerId) {
+            return { success: false, error: "Contexto do parceiro inválido" }
+        }
+
         // Delete variant
         await fetchAdmin.from("product_variants").delete().eq("id", variantId)
-
-        const partnerId = knownPartnerId ?? await getPartnerIdFromTarget("product", variant.product_id)
 
         await logModerationAction({
             adminUserId: admin.userId,
@@ -718,7 +773,7 @@ export async function updatePartnerRiskScore(
     notes?: string,
     customTitle?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     try {
@@ -813,10 +868,25 @@ export async function saveModerationChanges(params: {
     notes?: string
     knownPartnerId?: string
 }): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
-    const partnerId = params.knownPartnerId ?? await getPartnerIdFromTarget(params.type, params.targetId)
+    if (!MODERATION_FIELDS[params.type]) {
+        return { success: false, error: "Tipo inválido para moderação" }
+    }
+    if (params.changes.length > 20 || params.changes.some((change) => !hasAllowedField(params.type, change.field))) {
+        return { success: false, error: "Um ou mais campos não são permitidos para moderação" }
+    }
+    if (params.removedImages.length > 20 || (params.removedImages.length > 0 && !["product", "service"].includes(params.type))) {
+        return { success: false, error: "Remoção de imagens não permitida para este recurso" }
+    }
+
+    const partnerId = await getPartnerIdFromTarget(params.type, params.targetId)
+    if (!partnerId) return { success: false, error: "Recurso não encontrado" }
+    if (params.knownPartnerId && params.knownPartnerId !== partnerId) {
+        return { success: false, error: "Contexto do parceiro inválido" }
+    }
+    const normalizedRiskScoreIncrement = normalizeRiskScoreIncrement(params.riskScoreIncrement)
 
     try {
         const fetchAdmin = getAdminClient()
@@ -864,7 +934,7 @@ export async function saveModerationChanges(params: {
             fieldName: params.changes.map(c => c.field).join(","),
             previousValue: "",
             newValue: params.changes.map(c => `${c.field}=${c.value}`).join(","),
-            riskScoreIncrement: params.riskScoreIncrement,
+            riskScoreIncrement: normalizedRiskScoreIncrement,
             notes: params.notes,
         })
 
@@ -882,7 +952,7 @@ export async function deleteModerationTarget(
     riskScoreIncrement: number,
     notes?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     try {

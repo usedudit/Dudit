@@ -931,24 +931,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                                                         const tooltipContent = (
                                                                                             <div className="space-y-2 text-left p-1 min-w-[220px]">
-                                                                                                <div className="flex items-center gap-1.5 font-bold border-b border-brand-border/30 dark:border-dark-border/30 pb-1.5 text-xs text-brand-dark dark:text-dark-heading">
+                                                                                                <div className="flex items-center gap-1.5 font-bold border-b border-dark-broder dark:border-brand-border pb-1.5 text-xs text-dark-heading dark:text-brand-dark">
                                                                                                     <ReturnIcon className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                                                                                                     <span>Histórico de Devolução / Troca</span>
                                                                                                 </div>
-                                                                                                <div className="space-y-2 divide-y divide-brand-border/20 dark:divide-dark-border/20 text-xs">
+                                                                                                <div className="space-y-2 divide-y divide-brand-border dark:divide-dark-border text-xs">
                                                                                                     {itemReturns.map((ret: any, idx: number) => {
                                                                                                         const statusMeta = getReturnStatusMeta(ret.requestStatus);
                                                                                                         return (
                                                                                                             <div key={idx} className="pt-1.5 first:pt-0 space-y-1">
                                                                                                                 <div className="flex items-center justify-between gap-2">
-                                                                                                                    <span className="font-mono text-[10px] bg-white/70 dark:bg-black/30 px-1.5 py-0.5 rounded border border-brand-border/50 dark:border-dark-border">
+                                                                                                                    <span className="text-xs font-bold text-dark-heading dark:text-brand-dark">
                                                                                                                         DVL-{ret.requestId.slice(0, 6).toUpperCase()}
                                                                                                                     </span>
                                                                                                                     <Badge variant={statusMeta.variant} className="scale-90 font-medium">
                                                                                                                         {statusMeta.label}
                                                                                                                     </Badge>
                                                                                                                 </div>
-                                                                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body space-y-0.5">
+                                                                                                                <div className="text-xs text-dark-body dark:text-brand-dark space-y-0.5">
                                                                                                                     <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
                                                                                                                     <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
                                                                                                                     <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>

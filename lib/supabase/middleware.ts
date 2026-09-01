@@ -42,6 +42,8 @@ const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/assets/qr-dino",
   "/api/upload-image",
   "/api/r2/video-upload",
+  "/api/r2/returns-evidence",
+  "/api/r2/billing-refund-evidence",
   "/api/mercadopago/webhook/subscription",
   "/api/mercadopago/process-payment",
   "/api/mercadopago/process-erp-payment",

@@ -100,7 +100,15 @@ function HeaderSectionSkeleton() {
     )
 }
 
-export const ExploreContentSkeleton = ({ type, hasSection }: { type: string; hasSection?: boolean }) => {
+export const ExploreContentSkeleton = ({
+    type,
+    hasSection,
+    hideHeader = true,
+}: {
+    type: string
+    hasSection?: boolean
+    hideHeader?: boolean
+}) => {
     const isGridType = type === 'produtos' || type === 'servicos' || hasSection
 
     return (
@@ -133,7 +141,7 @@ export const ExploreContentSkeleton = ({ type, hasSection }: { type: string; has
             )}
 
             {/* Header section */}
-            <HeaderSectionSkeleton />
+            {!hideHeader && <HeaderSectionSkeleton />}
 
             {/* View controls */}
             <ViewControlsSkeleton />

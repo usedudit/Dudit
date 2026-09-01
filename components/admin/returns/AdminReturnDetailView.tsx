@@ -212,7 +212,7 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
     const items = Array.isArray(request?.return_items) ? request.return_items : []
     const evidence = Array.isArray(request?.return_evidence) ? request.return_evidence : []
     const messages = Array.isArray(request?.return_messages) ? request.return_messages : []
-    const events = Array.isArray(request?.return_events) ? request.return_events : []
+    const events = Array.isArray(request?.auditLogs) ? request.auditLogs : []
     const store = request?.stores || {}
 
     const handleShare = useCallback(() => {

@@ -6,7 +6,7 @@
  * (admin_audit_logs has no RLS for authenticated users).
  */
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -26,7 +26,7 @@ export interface AuditLogStats {
 }
 
 export async function getAuditLogStats(): Promise<AuditLogStats> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -171,7 +171,7 @@ export async function getAuditLogs(
         search?: string
     }
 ): Promise<CursorPaginatedResult<AuditLogRow>> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -224,7 +224,7 @@ export async function getAuditLogs(
 // ─── Get Target Audit History ───────────────────────────────────────────────
 
 export async function getTargetAuditHistory(targetId: string): Promise<AuditLogRow[]> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()
@@ -249,7 +249,7 @@ export async function getTargetAuditHistory(targetId: string): Promise<AuditLogR
 // ─── Dashboard Stats ────────────────────────────────────────────────────────
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
-    await requireAdmin("moderator")
+    await requireAdminScope("audit_access")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()

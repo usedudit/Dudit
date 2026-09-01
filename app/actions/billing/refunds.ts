@@ -3,9 +3,9 @@
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/authorization"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { getMpPlatformAccessToken, cancelMpSubscription } from "@/lib/services/mercadopago/subscriptions"
-import { logBillingAudit } from "@/lib/billing/audit"
+import { logBillingAudit, logBillingAdminAudit } from "@/lib/billing/audit"
 import { notifyPartnerTeam } from "@/lib/billing/notifications"
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ export async function adminListRefundRequestsAction(params?: {
     limit?: number
 }) {
     try {
-        await requireAdmin("moderator")
+        await requireAdminScope("billing_control", "admin")
         const supabase = createAdminClient()
 
         const page = params?.page || 1
@@ -398,7 +398,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
 
     try {
         // 1. Permissão Admin
-        await requireAdmin("admin")
+        await requireAdminScope("billing_control", "admin")
         const adminUser = await getCurrentUser()
         if (!adminUser) return { error: "Admin não autenticado." }
 
@@ -451,6 +451,12 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
             return { error: "Esta solicitação já foi aprovada e estornada anteriormente." }
         }
 
+        const targetAmount = data.refundAmount ?? Number(refundReq.amount)
+        const requestedAmount = Number(refundReq.amount)
+        if (!Number.isFinite(targetAmount) || !Number.isFinite(requestedAmount) || targetAmount <= 0 || targetAmount > requestedAmount + 0.009) {
+            return { error: "O valor do estorno deve ser positivo e não pode exceder o valor solicitado." }
+        }
+
         // 4. Bloqueio de concorrência
         const { data: locked, error: lockErr } = await supabase
             .from("billing_refund_requests")
@@ -470,8 +476,6 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
 
         // 5. Identificar o ID de pagamento no Mercado Pago
         const mpPaymentId = payment?.gateway_payment_id || purchase?.gateway_payment_id
-        const targetAmount = data.refundAmount ? Number(data.refundAmount) : Number(refundReq.amount)
-
         let mpRefundId: string | null = null
 
         // 6. Chamar a API do Mercado Pago para efetuar o estorno financeiro
@@ -595,6 +599,14 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
             admin_id: adminUser.id,
             grace_period_ends_at: gracePeriodIso,
         }, adminUser.id)
+        await logBillingAdminAudit("billing.admin.refund_approved", "refund_request", refundReq.id, {
+            refund_request_id: refundReq.id,
+            purchase_id: refundReq.purchase_id,
+            partner_id: refundReq.partner_id,
+            amount_before: requestedAmount,
+            amount_after: targetAmount,
+            mp_refund_id: mpRefundId,
+        }, adminUser.id)
 
         // 12. Notificação ao Lojista
         await notifyPartnerTeam(
@@ -626,7 +638,7 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
     const nowIso = new Date().toISOString()
 
     try {
-        await requireAdmin("moderator")
+        await requireAdminScope("billing_control", "admin")
         const adminUser = await getCurrentUser()
         if (!adminUser) return { error: "Admin não autenticado." }
 
@@ -665,6 +677,14 @@ export async function adminRejectRefundAction(input: z.input<typeof adminRejectR
             status: "rejected",
             admin_response: data.adminResponse,
             admin_id: adminUser.id,
+        }, adminUser.id)
+        await logBillingAdminAudit("billing.admin.refund_rejected", "refund_request", refundReq.id, {
+            refund_request_id: refundReq.id,
+            purchase_id: refundReq.purchase_id,
+            partner_id: refundReq.partner_id,
+            status_before: "pending",
+            status_after: "rejected",
+            admin_response: data.adminResponse,
         }, adminUser.id)
 
         // Notificação

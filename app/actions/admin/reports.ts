@@ -30,7 +30,7 @@
 import { createHash } from "crypto"
 import { headers } from "next/headers"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -351,7 +351,7 @@ export async function getReports(
     limit: number = DEFAULT_PAGE_SIZE,
     filters?: ReportListFilters
 ): Promise<CursorPaginatedResult<Report>> {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const adminClient = getAdminClient()
@@ -571,7 +571,7 @@ export async function getReports(
 // ─── Stats / Aggregates (admin) ────────────────────────────────────────────
 
 export async function getReportsStats(): Promise<ReportsStats> {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase = await getSupabaseServerClient()
@@ -596,7 +596,7 @@ export async function getTargetReportSummary(input: {
     targetType: ReportTargetType
     targetId: string
 }): Promise<TargetReportSummary | null> {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const targetId = sanitizeUUID(input.targetId)
@@ -626,7 +626,7 @@ export async function resolveReport(
     reportId: string,
     reason: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const id = sanitizeUUID(reportId)
@@ -745,7 +745,7 @@ export async function dismissReport(
     reportId: string,
     reason: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const id = sanitizeUUID(reportId)
@@ -829,7 +829,7 @@ export async function markReportSpam(
     reportId: string,
     reason: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const id = sanitizeUUID(reportId)
@@ -872,7 +872,7 @@ export async function revertReportValidation(
     reportId: string,
     reason: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin") // higher bar for reversals
+    const admin = await requireAdminScope("moderation", "admin") // higher bar for reversals
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const id = sanitizeUUID(reportId)
@@ -921,7 +921,7 @@ export async function removeProductFromMarketplace(
     productId: string,
     reason: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const id = sanitizeUUID(productId)
@@ -982,7 +982,7 @@ export async function removeProductFromMarketplace(
 }
 
 export async function getAdminTargetDetails(targetType: string, targetId: string) {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const adminClient = getAdminClient()
@@ -1184,7 +1184,7 @@ export async function getAdminTargetDetails(targetType: string, targetId: string
 }
 
 export async function getAdminReportDetailAction(reportId: string) {
-    await requireAdmin("moderator")
+    await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const admin = getAdminClient()

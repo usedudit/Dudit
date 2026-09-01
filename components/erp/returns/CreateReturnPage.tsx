@@ -650,6 +650,18 @@ export default function CreateReturnPage({
         setIsCustomerSheetOpen(false)
     }, [])
 
+    const handleRemoveCustomer = useCallback(() => {
+        setSelectedOrder((prev: any) => {
+            if (!prev) return null
+            return {
+                ...prev,
+                buyer_id: null,
+                customer_name: "Consumidor Final",
+                customer: null,
+            }
+        })
+    }, [])
+
     const handleConfirmMpWarning = useCallback(() => {
         setIsMpWarningModalOpen(false)
         if (!pendingSaveData) return
@@ -903,6 +915,8 @@ export default function CreateReturnPage({
                                                         }}
                                                         address={customerAddress}
                                                         showMap={false}
+                                                        onSelect={() => setIsCustomerSheetOpen(true)}
+                                                        onRemove={handleRemoveCustomer}
                                                     />
                                                 </div>
                                             )}
@@ -1951,6 +1965,7 @@ export default function CreateReturnPage({
                                                     }}
                                                     address={customerAddress}
                                                     showMap={true}
+                                                    onRemove={handleRemoveCustomer}
                                                 />
                                             ) : (
                                                 <InfoCard color="gray" title="Sem Pedido Selecionado" message="Selecione um pedido para visualizar os dados do cliente e o mapa de entrega aqui." />

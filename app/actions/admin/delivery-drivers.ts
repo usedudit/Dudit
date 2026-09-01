@@ -3,7 +3,7 @@
 import { randomBytes, createHash } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { adminAuditLog } from "@/lib/admin/audit"
 import { AdminActionType } from "@/lib/admin/types"
 import { getAdminClient } from "@/lib/supabase/admin"
@@ -26,7 +26,7 @@ function inviteUrl(token: string) {
 }
 
 export async function listDeliveryDriversAdminAction(params?: { limit?: number; cursor?: string | null }) {
-  await requireAdmin("admin")
+  await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const limit = Math.min(Math.max(Number(params?.limit || 25), 1), 50)
   let query = admin
@@ -76,7 +76,7 @@ export async function listDeliveryDriversAdminAction(params?: { limit?: number; 
 }
 
 export async function getDeliveryDriverAdminAction(driverId: string) {
-  await requireAdmin("admin")
+  await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const { data: driver, error } = await admin
     .from("delivery_drivers")
@@ -138,7 +138,7 @@ export async function createDeliveryDriverInvitationAdminAction(input: {
   latitude?: number | null
   longitude?: number | null
 }) {
-  const adminUser = await requireAdmin("admin")
+  const adminUser = await requireAdminScope("user_enforcement", "admin")
   const email = clean(input.email, 254).toLowerCase()
   const fullName = clean(input.fullName)
   const phone = clean(input.phone, 40)
@@ -233,7 +233,7 @@ export async function updateDeliveryDriverAdminAction(input: {
   latitude?: number | null
   longitude?: number | null
 }) {
-  const adminUser = await requireAdmin("admin")
+  const adminUser = await requireAdminScope("user_enforcement", "admin")
   const city = clean(input.city, 100)
   const neighborhood = clean(input.neighborhood, 100)
   const zipCode = clean(input.zipCode, 20) || null
@@ -278,7 +278,7 @@ export async function updateDeliveryDriverAdminAction(input: {
 }
 
 export async function getDeliveryDriverStatsAdminAction() {
-  await requireAdmin("admin")
+  await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const [totalRes, activeRes, inactiveRes, availableRes, offlineRes, invitesRes] = await Promise.all([
     admin.from("delivery_drivers").select("user_id", { count: "exact", head: true }),
@@ -299,7 +299,7 @@ export async function getDeliveryDriverStatsAdminAction() {
 }
 
 export async function listDeliveryDriverInvitationsAdminAction(params?: { limit?: number }) {
-  await requireAdmin("admin")
+  await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
   const limit = Math.min(Math.max(Number(params?.limit || 50), 1), 100)
 
@@ -320,7 +320,7 @@ export async function listDeliveryDriverInvitationsAdminAction(params?: { limit?
 }
 
 export async function revokeDeliveryDriverInvitationAdminAction(invitationId: string) {
-  const adminUser = await requireAdmin("admin")
+  const adminUser = await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
 
   const { error } = await admin
@@ -345,7 +345,7 @@ export async function revokeDeliveryDriverInvitationAdminAction(invitationId: st
 }
 
 export async function resendDeliveryDriverInvitationAdminAction(invitationId: string) {
-  const adminUser = await requireAdmin("admin")
+  const adminUser = await requireAdminScope("user_enforcement", "admin")
   const admin = getAdminClient()
 
   const { data: inv, error } = await admin
@@ -388,7 +388,12 @@ export async function resendDeliveryDriverInvitationAdminAction(invitationId: st
   }
 
   const emailResult = await SMTP2GOService.sendEmail(emailRequest)
+  await adminAuditLog({
+    adminUserId: adminUser.userId,
+    actionType: AdminActionType.DELIVERY_DRIVER_INVITE_RESEND,
+    targetType: "system",
+    targetId: invitationId,
+    metadata: { invitationId, email: inv.email, emailSent: emailResult.success },
+  })
   return { success: true as const, emailSent: emailResult.success, inviteUrl: url }
 }
-
-

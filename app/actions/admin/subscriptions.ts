@@ -8,7 +8,7 @@
  */
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireStepUp } from "@/lib/admin/step-up-auth"
@@ -24,7 +24,7 @@ export interface AdminSubscriptionStats {
 }
 
 export async function getAdminSubscriptionStats(): Promise<AdminSubscriptionStats> {
-    await requireAdmin("admin")
+    await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase = await getSupabaseServerClient()
@@ -51,7 +51,7 @@ export async function getSubscriptions(
     limit: number = 20,
     statusFilter?: string
 ): Promise<CursorPaginatedResult<SubscriptionEntry>> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase = await getSupabaseServerClient()
@@ -117,7 +117,7 @@ export async function getSubscriptions(
 export async function getSubscriptionDetail(
     partnerId: string
 ): Promise<{ success: boolean; data?: SubscriptionEntry; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase = await getSupabaseServerClient()
@@ -162,7 +162,7 @@ export async function forceCancelSubscription(
     reason: string,
     stepUpToken: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("admin")
+    const admin = await requireAdminScope("billing_control", "admin")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
     await requireStepUp(admin.userId, stepUpToken)
 

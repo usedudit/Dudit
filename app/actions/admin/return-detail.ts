@@ -1,13 +1,13 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getAdminClient } from "@/lib/supabase/admin"
 
 export async function getAdminReturnRequestDetail(returnRequestId: string) {
   await requireRateLimit(RateLimitCategory.ERP_GENERAL)
-  await requireAdmin()
+  await requireAdminScope("moderation")
 
   const admin = getAdminClient()
 
@@ -78,7 +78,7 @@ export async function getAdminReturnRequestDetail(returnRequestId: string) {
   }))
 
   return {
-    request: { ...request, return_events: returnEvents },
+    request: { ...request, auditLogs: returnEvents },
     riskEvents: riskEvents || [],
     moderationActions: moderationActions || [],
     relatedReports: relatedReports || [],

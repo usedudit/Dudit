@@ -133,7 +133,8 @@ export default function VideosManagement() {
                 linkedItemId = data.linked_service_id
             } else if (data.linked_collection_url) {
                 linkedItemType = "collection"
-                linkedItemId = data.linked_collection_url
+                const match = data.linked_collection_url.match(/\/colecoes\/([^/?]+)/)
+                linkedItemId = match ? match[1] : data.linked_collection_url
             }
 
             const result = await createCommunityVideo({

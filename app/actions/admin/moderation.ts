@@ -15,7 +15,7 @@
  */
 
 import { getAdminClient } from "@/lib/supabase/admin"
-import { requireAdmin } from "@/lib/auth/admin-authorization"
+import { requireAdminScope } from "@/lib/auth/admin-authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { adminAuditLog } from "@/lib/admin/audit"
@@ -78,7 +78,7 @@ export async function getModerationQueue(
     limit: number = 20,
     statusFilter?: string
 ): Promise<CursorPaginatedResult<ModerationItem>> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
     const supabase = getAdminClient()
@@ -271,7 +271,7 @@ export async function approveModeration(
     entityId: string,
     type: "product" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const supabase = getAdminClient()
@@ -412,7 +412,7 @@ export async function rejectFlaggedImages(
     reason: string,
     flaggedImageUrls: string[]
 ): Promise<{ success: boolean; error?: string; noImagesLeft?: boolean }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     if (!reason || reason.trim().length < 5) {
@@ -547,7 +547,7 @@ export async function rejectModeration(
     reason: string,
     type: "product" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     if (!reason || reason.trim().length < 5) {
@@ -673,7 +673,7 @@ export async function getAdminCommunityVideos(
     pageSize: number = 12,
 ): Promise<{ success: boolean; data?: any[]; total?: number; error?: string }> {
     try {
-        const admin = await requireAdmin("moderator")
+        const admin = await requireAdminScope("moderation")
         await requireRateLimit(RateLimitCategory.ADMIN_READ)
 
         const supabase = getAdminClient()
@@ -748,7 +748,7 @@ export async function getAdminCommunityVideos(
 export async function reprocessModeration(
     entityId: string
 ): Promise<{ success: boolean; error?: string }> {
-    const admin = await requireAdmin("moderator")
+    const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
 
     const supabase = getAdminClient()

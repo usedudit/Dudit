@@ -3,7 +3,7 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccess } from "@/lib/auth/authorization"
-import { getAdminRole } from "@/lib/auth/admin-authorization"
+import { getAdminRole, requireAdminScope, requireScope } from "@/lib/auth/admin-authorization"
 import { resolveBillingPartnerScope } from "@/lib/billing/auth-helper"
 import { logBillingAudit } from "@/lib/billing/audit"
 import type { BillingPayment, BillingPageResult, BillingFilters } from "@/lib/billing/types"
@@ -76,7 +76,13 @@ export async function getPaymentsForPurchaseAction(purchaseId: string): Promise<
     if (!purchase) return []
 
     const adminUser = await getAdminRole()
-    if (!adminUser) {
+    if (adminUser) {
+        try {
+            requireScope(adminUser, "billing_control")
+        } catch {
+            return []
+        }
+    } else {
         try {
             await requirePartnerAccess(purchase.partner_id, user)
         } catch {
@@ -118,7 +124,9 @@ export async function createPaymentAction(
         if (!purchase) return { success: false, error: "Compra não encontrada" }
 
         const adminUser = await getAdminRole()
-        if (!adminUser) {
+        if (adminUser) {
+            await requireAdminScope("billing_control", "admin")
+        } else {
             await requirePartnerAccess(purchase.partner_id, user)
         }
 
@@ -165,7 +173,9 @@ export async function updatePaymentStatusAction(
 
     const partnerId = (payment as any).billing_purchases?.partner_id
     const adminUser = await getAdminRole()
-    if (!adminUser) {
+    if (adminUser) {
+        await requireAdminScope("billing_control", "admin")
+    } else {
         if (!partnerId) return { success: false, error: "Acesso negado" }
         await requirePartnerAccess(partnerId, user)
     }
@@ -203,4 +213,3 @@ export async function updatePaymentStatusAction(
 
     return { success: true }
 }
-

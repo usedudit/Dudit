@@ -98,23 +98,20 @@ export async function requireStepUp(userId: string, rawToken: string): Promise<v
     const tokenHash = createHash("sha256").update(rawToken).digest("hex")
     const admin = getAdminClient()
 
-    // Find valid, unused, non-expired token for this user
-    const { data: tokenRecord, error } = await admin
+    // Consume atomically: SELECT-then-UPDATE allowed concurrent requests to
+    // both observe the same unused token and use it twice.
+    const consumedAt = new Date().toISOString()
+    const { data: consumedToken, error } = await admin
         .from("admin_step_up_tokens")
-        .select("id, expires_at, used_at")
+        .update({ used_at: consumedAt })
         .eq("user_id", userId)
         .eq("token_hash", tokenHash)
         .is("used_at", null)
-        .gt("expires_at", new Date().toISOString())
-        .single()
+        .gt("expires_at", consumedAt)
+        .select("id")
+        .maybeSingle()
 
-    if (error || !tokenRecord) {
+    if (error || !consumedToken) {
         throw new ForbiddenError("Autenticação adicional necessária. Token inválido ou expirado.")
     }
-
-    // Mark as used (single-use)
-    await admin
-        .from("admin_step_up_tokens")
-        .update({ used_at: new Date().toISOString() })
-        .eq("id", tokenRecord.id)
 }

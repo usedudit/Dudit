@@ -31,6 +31,7 @@ export interface CommunityVideoItem {
   orders_origin_count: number
   published_at: string | null
   created_at: string
+  linked_collection_short_id?: string | null
   partner?: { name: string; store_name: string; store_image_url: string | null }
 }
 
@@ -117,6 +118,21 @@ export async function getPartnerCommunityVideos(partnerId: string, cursor?: stri
   const hasMore = data ? data.length > limit : false
   const items = data ? data.slice(0, limit) as CommunityVideoItem[] : []
   const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].created_at : null
+
+  if (items.length > 0) {
+    const collectionItems = items.filter(i => i.linked_item_type === "collection" && i.linked_item_id)
+    if (collectionItems.length > 0) {
+      const { data: collections } = await supabase
+        .from("collections")
+        .select("id, short_id")
+        .in("id", collectionItems.map(i => i.linked_item_id!))
+
+      const colMap = new Map((collections || []).map(c => [c.id, c.short_id]))
+      for (const item of collectionItems) {
+        item.linked_collection_short_id = colMap.get(item.linked_item_id!) || null
+      }
+    }
+  }
 
   return { items, nextCursor, hasMore }
 }

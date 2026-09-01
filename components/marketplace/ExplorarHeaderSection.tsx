@@ -8,6 +8,7 @@ interface ExplorarHeaderSectionProps {
     resultsCount: number
     showBackButton?: boolean
     onBack?: () => void
+    isLoading?: boolean
 }
 
 export function ExplorarHeaderSection({
@@ -15,6 +16,7 @@ export function ExplorarHeaderSection({
     resultsCount,
     showBackButton = false,
     onBack,
+    isLoading = false,
 }: ExplorarHeaderSectionProps) {
     return (
         <div className="mb-6">
@@ -34,9 +36,15 @@ export function ExplorarHeaderSection({
                     <h1 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-1">
                         {title}
                     </h1>
-                    <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
-                        {resultsCount} resultado{resultsCount !== 1 ? "s" : ""} encontrado{resultsCount !== 1 ? "s" : ""}
-                    </p>
+                    {isLoading ? (
+                        <div className="h-5 flex items-center mt-1">
+                            <span className="inline-block w-28 h-3.5 bg-gray-200 dark:bg-dark-border rounded animate-pulse" />
+                        </div>
+                    ) : (
+                        <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mt-1">
+                            {resultsCount} resultado{resultsCount !== 1 ? "s" : ""} encontrado{resultsCount !== 1 ? "s" : ""}
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
