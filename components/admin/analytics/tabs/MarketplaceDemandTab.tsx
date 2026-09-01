@@ -19,6 +19,7 @@ import {
 import { Badge, Button, Input } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
 import type { MarketplaceDemandMetrics, ZeroResultTerm } from "@/lib/services/analytics.service"
+import { isBotSearch } from "@/lib/services/analytics.service"
 import { DashboardLineChart, DashboardBarChart } from "@/components/erp/dashboard/charts/DashboardCharts"
 
 interface MarketplaceDemandTabProps {
@@ -48,8 +49,9 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
     const demandBusinessRate = activeBusinessesCount > 0 ? Number(((businessesWithDemandCount / activeBusinessesCount) * 100).toFixed(1)) : 0
 
     const filteredZeroTerms = topZeroResultTerms.filter(t =>
-        t.term.toLowerCase().includes(searchTermFilter.toLowerCase()) ||
-        (t.suggestedCategory && t.suggestedCategory.toLowerCase().includes(searchTermFilter.toLowerCase()))
+        !isBotSearch(t.term) &&
+        (t.term.toLowerCase().includes(searchTermFilter.toLowerCase()) ||
+        (t.suggestedCategory && t.suggestedCategory.toLowerCase().includes(searchTermFilter.toLowerCase())))
     )
 
     const lineChartData = dailyTimeline.map(item => ({

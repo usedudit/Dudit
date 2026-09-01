@@ -292,7 +292,7 @@ export function DrePrintModal({
                   forceMount
                 >
                   <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
-                    <div className="w-full h-full min-h-[400px]">
+                    <div className="w-[210mm] h-[297mm] shrink-0">
                       <DreA4Preview
                         report={report}
                         regime={regime}

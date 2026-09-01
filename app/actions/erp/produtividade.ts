@@ -56,6 +56,7 @@ export type SellerCommissionRow = {
   bonusAmount: number
   bonusPending: number
   totalAccumulated: number
+  isOwner: boolean
 }
 
 export type CommissionHistoryRow = {
@@ -365,13 +366,15 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  const { data: partnerUsers } = await admin
-    .from("partner_users")
-    .select("id, user_id, role")
-    .eq("partner_id", partnerId)
+  const [{ data: partnerUsers }, { data: partnerData }] = await Promise.all([
+    admin.from("partner_users").select("id, user_id, role").eq("partner_id", partnerId),
+    admin.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
+  ])
+
+  const ownerUserId = partnerData?.user_id
 
   const sellers = (partnerUsers || []).filter(
-    (pu: any) => String(pu.role || "").toUpperCase() !== "DELIVERY",
+    (pu: any) => String(pu.role || "").toUpperCase() !== "DELIVERY" && pu.user_id !== ownerUserId,
   )
 
   if (sellers.length === 0) {
@@ -479,6 +482,7 @@ export async function getSellersCommissionOverviewAction(partnerId: string): Pro
       bonusAmount: money(bonus.pending),
       bonusPending: money(bonus.pending),
       totalAccumulated: money(estimatedComm + bonus.pending),
+      isOwner: false,
     }
   })
 

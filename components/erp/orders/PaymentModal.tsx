@@ -882,7 +882,7 @@ const PaymentModal = ({
         getMercadoPagoStatusAction().then((res) => {
             if ('connected' in res && res.connected) {
                 setMpConnected(true);
-                setMpPublicKey(res.publicKey || null);
+                setMpPublicKey(process.env.NEXT_PUBLIC_MP_SANDBOX_PUBLIC_KEY || res.publicKey || null);
                 if ('acceptedPaymentMethods' in res) {
                     setMpAcceptedPaymentMethods(res.acceptedPaymentMethods);
                 }

@@ -22,6 +22,7 @@ import {
     FormSection,
     DefaultModal,
     InfoCard,
+    SavingStatusModal,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
@@ -1556,24 +1557,6 @@ export default function CreateReturnPage({
                                                                 ]}
                                                             />
 
-                                                            {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
-                                                                <InfoCard
-                                                                    title="Cliente não cadastrado"
-                                                                    message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
-                                                                    color="orange"
-                                                                    rightElement={
-                                                                        <Button
-                                                                            variant="link"
-                                                                            className="text-orange-700 dark:text-orange-300/80"
-                                                                            onClick={() => setIsCustomerSheetOpen(true)}
-                                                                            type="button"
-                                                                        >
-                                                                            Vincular Cliente
-                                                                        </Button>
-                                                                    }
-                                                                />
-                                                            )}
-
                                                             {resolutionType === "refund" && (
                                                                 <>
                                                                     <FormDropdown
@@ -1865,6 +1848,26 @@ export default function CreateReturnPage({
                                                                         </>
                                                                     )}
                                                                 </>
+                                                            )}
+
+                                                            {isConsumidorFinal && (resolutionType === "store_credit" || (resolutionType === "exchange" && exchangeSurplus > 0 && exchangeBalanceResolution === "store_credit")) && (
+                                                                <div className="md:col-span-2">
+                                                                    <InfoCard
+                                                                        title="Cliente não cadastrado"
+                                                                        message="Este pedido está vinculado a um 'Consumidor Final'. Para gerar vale-compra (crédito), é necessário vincular um cliente registrado no sistema."
+                                                                        color="orange"
+                                                                        rightElement={
+                                                                            <Button
+                                                                                variant="link"
+                                                                                className="text-orange-700 dark:text-orange-300/80"
+                                                                                onClick={() => setIsCustomerSheetOpen(true)}
+                                                                                type="button"
+                                                                            >
+                                                                                Vincular Cliente
+                                                                            </Button>
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             )}
 
                                                             <div className="md:col-span-2 rounded-xl border border-brand-border dark:border-dark-border p-4 text-sm text-brand-inactive-text dark:text-dark-body">
@@ -2188,17 +2191,15 @@ export default function CreateReturnPage({
                 description="Você tem alterações na devolução que ainda não foram salvas."
             />
 
-            {
-                isCustomerSheetOpen && (
-                    <SelectCustomerSheet
-                        isOpen={isCustomerSheetOpen}
-                        onClose={() => setIsCustomerSheetOpen(false)}
-                        partnerId={partnerId}
-                        onSelect={handleSelectCustomer}
-                        selectedCustomerId={selectedOrder?.buyer_id}
-                    />
-                )
-            }
+            <SavingStatusModal isOpen={isSaving} text="Salvando devolução..." />
+
+            <SelectCustomerSheet
+                isOpen={isCustomerSheetOpen}
+                onClose={() => setIsCustomerSheetOpen(false)}
+                partnerId={partnerId}
+                onSelect={handleSelectCustomer}
+                selectedCustomerId={selectedOrder?.buyer_id}
+            />
 
             {isPrintModalOpen && returnRequest && (
                 <ReturnPrintModal

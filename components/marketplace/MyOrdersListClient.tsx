@@ -301,11 +301,11 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
 
                                                             let itemUrl = "";
                                                             if (isService) {
-                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, storeObj);
+                                                                itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, storeObj || order.partners);
                                                             } else if (isPlan) {
-                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, storeObj);
+                                                                itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, storeObj || order.partners);
                                                             } else if (item.product_id) {
-                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, storeObj);
+                                                                itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, storeObj || order.partners);
                                                             }
 
 

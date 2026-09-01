@@ -401,9 +401,9 @@ export function WhatsAppIntegrationPage({
                                 <TabsTrigger value="evolution">
                                     Evolution API
                                 </TabsTrigger>
-                                <TabsTrigger value="meta">
+                                {/* <TabsTrigger value="meta">
                                     Meta API
-                                </TabsTrigger>
+                                </TabsTrigger> */}
                             </TabsList>
                         </div>
 
@@ -541,135 +541,137 @@ export function WhatsAppIntegrationPage({
                                     </motion.div>
                                 </TabsContent>
 
-                                {/* ─── Meta Tab ───────────────────────────────────────────────── */}
-                                <TabsContent value="meta">
-                                    <AnimatePresence mode="wait">
-                                        <motion.div
-                                            key="meta"
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -8 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="space-y-6"
-                                        >
-                                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
-                                                <div className="flex items-center justify-between mb-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                                            WA
-                                                        </div>
-                                                        <div>
-                                                            <h2 className="font-bold text-brand-dark dark:text-dark-heading">WhatsApp Cloud API</h2>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">API Oficial da Meta</p>
-                                                        </div>
-                                                    </div>
-                                                    <Badge variant={isMetaConnected ? "green" : "gray"}>
-                                                        {isMetaConnected ? "Conectado" : "Desconectado"}
-                                                    </Badge>
-                                                </div>
-
-                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4 leading-relaxed">
-                                                    Conecte o número oficial do seu negócio com um clique. Você será redirecionado para autorizar na Meta - sem precisar copiar tokens ou configurar webhooks.
-                                                </p>
-
-                                                {!isMetaConnected ? (
-                                                    <WhatsappConnectButton onSuccess={refresh} className="w-full" />
-                                                ) : (
-                                                    <div className="space-y-4">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                            {metaConnection?.wabaName && (
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Conta WhatsApp</span>
-                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{metaConnection.wabaName}</span>
-                                                                </div>
-                                                            )}
-                                                            {metaConnection?.phoneNumber && (
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Número</span>
-                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{formatBrazilPhone(metaConnection.phoneNumber || "")}</span>
-                                                                </div>
-                                                            )}
-                                                            {metaConnection?.lastSyncedAt && (
-                                                                <div>
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Última sincronização</span>
-                                                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                        {new Date(metaConnection.lastSyncedAt).toLocaleString("pt-BR")}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <hr className="border-brand-border dark:border-dark-border" />
-
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Automação ativa</span>
-                                                            <Switch checked={metaConnection?.isActive || false} onCheckedChange={handleToggle} />
-                                                        </div>
-
-                                                        <div>
-                                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio</h3>
-                                                            <div className="flex gap-2">
-                                                                <Input
-                                                                    placeholder="Telefone para teste (com DDD)"
-                                                                    value={testPhone}
-                                                                    onChange={(e) => setTestPhone(e.target.value)}
-                                                                    disabled={isLoading}
-                                                                />
-                                                                <Button variant="outline" onClick={handleTest} disabled={isLoading || !testPhone.trim()}>
-                                                                    Testar
-                                                                </Button>
+                                {/* ─── Meta Tab (desativado temporariamente) ─────────────── */}
+                                {false && (
+                                    <TabsContent value="meta">
+                                        <AnimatePresence mode="wait">
+                                            <motion.div
+                                                key="meta"
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -8 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="space-y-6"
+                                            >
+                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
+                                                    <div className="flex items-center justify-between mb-5">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-[#25D366] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                                WA
+                                                            </div>
+                                                            <div>
+                                                                <h2 className="font-bold text-brand-dark dark:text-dark-heading">WhatsApp Cloud API</h2>
+                                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">API Oficial da Meta</p>
                                                             </div>
                                                         </div>
-
-                                                        <Button variant="destructive" onClick={handleDisconnect} disabled={isLoading} className="w-full h-[42px]">
-                                                            Desconectar
-                                                        </Button>
+                                                        <Badge variant={isMetaConnected ? "green" : "gray"}>
+                                                            {isMetaConnected ? "Conectado" : "Desconectado"}
+                                                        </Badge>
                                                     </div>
-                                                )}
-                                            </div>
 
-                                            {/* Templates */}
-                                            {isMetaConnected && (
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
-                                                    <div className="flex items-center justify-between gap-3 mb-4">
-                                                        <div>
-                                                            <h2 className="font-bold text-brand-dark dark:text-dark-heading">Modelos de mensagem</h2>
-                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
-                                                                Modelos aprovados na sua conta Meta.
-                                                            </p>
-                                                        </div>
-                                                        <Button variant="outline" size="sm" onClick={handleSyncTemplates} disabled={isLoading}>
-                                                            Sincronizar
-                                                        </Button>
-                                                    </div>
-                                                    {templates.length === 0 ? (
-                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum modelo sincronizado ainda.</p>
+                                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4 leading-relaxed">
+                                                        Conecte o número oficial do seu negócio com um clique. Você será redirecionado para autorizar na Meta - sem precisar copiar tokens ou configurar webhooks.
+                                                    </p>
+
+                                                    {!isMetaConnected ? (
+                                                        <WhatsappConnectButton onSuccess={refresh} className="w-full" />
                                                     ) : (
-                                                        <ul className="divide-y divide-brand-border dark:divide-dark-border">
-                                                            {templates.map((t) => (
-                                                                <li key={t.id} className="py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                {metaConnection?.wabaName && (
                                                                     <div>
-                                                                        <p className="font-medium text-sm text-brand-dark dark:text-dark-heading">{t.templateName}</p>
-                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                            {t.language} · {t.category}
-                                                                        </p>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Conta WhatsApp</span>
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{metaConnection.wabaName}</span>
                                                                     </div>
-                                                                    <Badge
-                                                                        variant={
-                                                                            t.approvalStatus === "APPROVED" ? "green" : t.approvalStatus === "REJECTED" ? "red" : "gray"
-                                                                        }
-                                                                    >
-                                                                        {TEMPLATE_STATUS_LABELS[t.approvalStatus || ""] || t.approvalStatus || "-"}
-                                                                    </Badge>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
+                                                                )}
+                                                                {metaConnection?.phoneNumber && (
+                                                                    <div>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Número</span>
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{formatBrazilPhone(metaConnection.phoneNumber || "")}</span>
+                                                                    </div>
+                                                                )}
+                                                                {metaConnection?.lastSyncedAt && (
+                                                                    <div>
+                                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Última sincronização</span>
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                            {new Date(metaConnection.lastSyncedAt).toLocaleString("pt-BR")}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <hr className="border-brand-border dark:border-dark-border" />
+
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Automação ativa</span>
+                                                                <Switch checked={metaConnection?.isActive || false} onCheckedChange={handleToggle} />
+                                                            </div>
+
+                                                            <div>
+                                                                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio</h3>
+                                                                <div className="flex gap-2">
+                                                                    <Input
+                                                                        placeholder="Telefone para teste (com DDD)"
+                                                                        value={testPhone}
+                                                                        onChange={(e) => setTestPhone(e.target.value)}
+                                                                        disabled={isLoading}
+                                                                    />
+                                                                    <Button variant="outline" onClick={handleTest} disabled={isLoading || !testPhone.trim()}>
+                                                                        Testar
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+
+                                                            <Button variant="destructive" onClick={handleDisconnect} disabled={isLoading} className="w-full h-[42px]">
+                                                                Desconectar
+                                                            </Button>
+                                                        </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </motion.div>
-                                    </AnimatePresence>
-                                </TabsContent>
+
+                                                {/* Templates */}
+                                                {isMetaConnected && (
+                                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface transition-all">
+                                                        <div className="flex items-center justify-between gap-3 mb-4">
+                                                            <div>
+                                                                <h2 className="font-bold text-brand-dark dark:text-dark-heading">Modelos de mensagem</h2>
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-1">
+                                                                    Modelos aprovados na sua conta Meta.
+                                                                </p>
+                                                            </div>
+                                                            <Button variant="outline" size="sm" onClick={handleSyncTemplates} disabled={isLoading}>
+                                                                Sincronizar
+                                                            </Button>
+                                                        </div>
+                                                        {templates.length === 0 ? (
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum modelo sincronizado ainda.</p>
+                                                        ) : (
+                                                            <ul className="divide-y divide-brand-border dark:divide-dark-border">
+                                                                {templates.map((t) => (
+                                                                    <li key={t.id} className="py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                                        <div>
+                                                                            <p className="font-medium text-sm text-brand-dark dark:text-dark-heading">{t.templateName}</p>
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                                {t.language} · {t.category}
+                                                                            </p>
+                                                                        </div>
+                                                                        <Badge
+                                                                            variant={
+                                                                                t.approvalStatus === "APPROVED" ? "green" : t.approvalStatus === "REJECTED" ? "red" : "gray"
+                                                                            }
+                                                                        >
+                                                                            {TEMPLATE_STATUS_LABELS[t.approvalStatus || ""] || t.approvalStatus || "-"}
+                                                                        </Badge>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        </AnimatePresence>
+                                    </TabsContent>
+                                )}
                             </AnimatePresence>
                         </div>
                     </div>

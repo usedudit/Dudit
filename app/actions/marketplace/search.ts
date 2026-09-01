@@ -5,6 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { redis } from "@/lib/redis"
+import { unstable_cache } from "next/cache"
 
 // Funções Helpers
 import { cache } from "react"
@@ -628,11 +629,11 @@ async function _searchMarketplaceInternal(
                 if (item.name && item.description !== undefined && item.logo_url !== undefined) {
                     // This is a store record from stores table
                     return {
-                        id: item.id, name: item.name, slug: item.slug, description: item.description,
+                        id: item.id, short_id: item.short_id || null, name: item.name, slug: item.slug, description: item.description,
                         images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
                         rating: item.rating, itemType: 'loja', category: item.partners?.category?.parent?.name || item.partners?.category?.name || 'Loja Parceira',
                         partners: {
-                            id: item.id, store_name: item.name, slug: item.slug,
+                            id: item.id, short_id: item.short_id || null, store_name: item.name, slug: item.slug,
                             store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
                             banner_url: item.banner_url || null,
                             latitude: item.addresses?.[0]?.latitude,
@@ -1231,6 +1232,7 @@ async function searchMarketplaceByCity(
         const categoryName = item.partners?.category?.parent?.name || item.partners?.category?.name || 'Loja Parceira'
         return {
             id: storeId,
+            short_id: item.short_id || null,
             name: storeName,
             slug: item.slug,
             description: item.description,
@@ -1240,6 +1242,7 @@ async function searchMarketplaceByCity(
             category: categoryName,
             partners: {
                 id: item.partner_id,
+                short_id: item.short_id || null,
                 store_id: storeId,
                 store_name: storeName,
                 slug: item.slug,
@@ -1483,5 +1486,62 @@ async function browseMarketplaceByScore(
     const diversified = applySellerDiversity(results)
     const finalIds = diversified.map((r) => `${r.itemType}:${r.id}`)
     return { results: diversified, filteredIds: finalIds }
+}
+
+// ─── City name resolution for accent-correct display ────────────────────────
+
+const normalizeSlug = (name: string): string =>
+    name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+
+/**
+ * Returns a map of ASCII slug → accented city name for all cities with addresses in the DB.
+ * Cached for 1 hour to avoid repeated DB queries.
+ */
+const getCachedCityAccentMap = unstable_cache(
+    async (): Promise<Record<string, string>> => {
+        const supabase = getAdminClient()
+        const { data: addresses, error } = await supabase
+            .from("addresses")
+            .select("city, state")
+            .not("city", "is", null)
+            .not("state", "is", null)
+
+        if (error || !addresses) return {}
+
+        const map: Record<string, string> = {}
+        for (const addr of addresses) {
+            const city = (addr as any).city as string
+            const state = (addr as any).state as string
+            if (!city || !state) continue
+            const slug = `${normalizeSlug(city)}-${state.toLowerCase()}`
+            if (!map[slug]) {
+                map[slug] = city
+            }
+        }
+        return map
+    },
+    ["city-accent-map"],
+    { revalidate: 3600, tags: ["addresses"] }
+)
+
+/**
+ * Server action: resolve a batch of city slugs to their accented names.
+ * Returns a Record<slug, accentedName> for all resolved slugs.
+ */
+export async function resolveCityAccentBatch(slugs: string[]): Promise<Record<string, string>> {
+    if (!slugs || slugs.length === 0) return {}
+    const accentMap = await getCachedCityAccentMap()
+    const result: Record<string, string> = {}
+    for (const slug of slugs) {
+        if (accentMap[slug]) {
+            result[slug] = accentMap[slug]
+        }
+    }
+    return result
 }
 

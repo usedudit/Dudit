@@ -381,26 +381,9 @@ export default function PaymentStatusModal({
                 })
                 : updatedBreakdown;
 
-            let totalLegDiscount = 0;
-            let totalLegExtra = 0;
-            for (const leg of finalBreakdown) {
-                if (leg.adjustmentType === 'discount' && Number(leg.adjustmentAmount || 0) > 0) {
-                    totalLegDiscount += Number(leg.adjustmentAmount);
-                } else if (leg.adjustmentType === 'surcharge' && Number(leg.adjustmentAmount || 0) > 0) {
-                    totalLegExtra += Number(leg.adjustmentAmount);
-                }
-            }
-
-            const currentDiscount = Number(targetOrder.payment_method_discount_amount || 0);
-            const currentExtra = Number(targetOrder.payment_method_extra_amount || 0);
-            const itemsBase = totalOrder + currentDiscount - currentExtra;
-            const newTotalOrder = (totalLegDiscount > 0 || totalLegExtra > 0)
-                ? Math.max(0, Math.round((itemsBase - totalLegDiscount + totalLegExtra) * 100) / 100)
-                : totalOrder;
-
-            const isFullPaymentOfBalance = pendingNewAmount >= totalRemaining - 0.005 || pendingNewAmount >= newTotalOrder - 0.005;
-            const nextPaidAmount = isFullPaymentOfBalance ? newTotalOrder : (totalPaid + pendingNewAmount);
-            const nextSituation = resolveSituationFromPaid(nextPaidAmount, newTotalOrder);
+            const isFullPaymentOfBalance = pendingNewAmount >= totalRemaining - 0.005 || pendingNewAmount >= totalOrder - 0.005;
+            const nextPaidAmount = isFullPaymentOfBalance ? totalOrder : (totalPaid + pendingNewAmount);
+            const nextSituation = resolveSituationFromPaid(nextPaidAmount, totalOrder);
 
             const res = await updateOrdersStatusInBatchAction({
                 orderIds: [targetOrderId],
@@ -414,21 +397,20 @@ export default function PaymentStatusModal({
             if (res.success) {
                 const updated = {
                     ...targetOrder,
-                    total_amount: newTotalOrder,
-                    totalAmount: newTotalOrder,
+                    order_number: targetOrder.order_number ?? targetOrder.orderNumber ?? targetOrder.number,
+                    total_amount: totalOrder,
+                    totalAmount: totalOrder,
                     paid_amount: nextPaidAmount,
                     paidAmount: nextPaidAmount,
                     situation: nextSituation,
                     payment_breakdown: finalBreakdown,
-                    payment_method_discount_amount: totalLegDiscount,
-                    payment_method_extra_amount: totalLegExtra,
                 };
                 setCurrentOrder(updated);
                 setSuccessSnapshot({
-                    displayOrderTotal: newTotalOrder,
+                    displayOrderTotal: totalOrder,
                     totalPaid: nextPaidAmount,
                     isUnderpaid: nextSituation !== "paid",
-                    remainingPartial: Math.max(0, newTotalOrder - nextPaidAmount),
+                    remainingPartial: Math.max(0, totalOrder - nextPaidAmount),
                     paymentBreakdown: updatedBreakdown,
                 });
                 setPaymentStatus('success');

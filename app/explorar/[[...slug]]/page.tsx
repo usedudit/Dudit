@@ -17,7 +17,7 @@ import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 import { QueryClient, dehydrate } from "@tanstack/react-query"
 import { HydrationBoundary } from "@tanstack/react-query"
 import { cookies } from "next/headers"
-import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS } from "@/components/marketplace/explorar-constants"
+import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS, ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 import { FormSection } from "@/components/reusable/FormSection"
 import { ListItem } from "@/components/reusable/ListItem"
 
@@ -31,17 +31,6 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "pets": "Pets",
     "servicos": "Serviços",
     "outros": "Outros"
-}
-
-const ESTADO_MAP: Record<string, string> = {
-    ac: "Acre", al: "Alagoas", ap: "Amapá", am: "Amazonas",
-    ba: "Bahia", ce: "Ceará", df: "Distrito Federal",
-    es: "Espírito Santo", go: "Goiás", ma: "Maranhão",
-    mt: "Mato Grosso", ms: "Mato Grosso do Sul", mg: "Minas Gerais",
-    pa: "Pará", pb: "Paraíba", pr: "Paraná", pe: "Pernambuco",
-    pi: "Piauí", rj: "Rio de Janeiro", rn: "Rio Grande do Norte",
-    rs: "Rio Grande do Sul", ro: "Rondônia", rr: "Roraima",
-    sc: "Santa Catarina", sp: "São Paulo", se: "Sergipe", to: "Tocantins",
 }
 
 export async function generateMetadata({
@@ -315,13 +304,15 @@ export default async function ExplorarPage({
             <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col">
                 <script
                     type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: safeJsonLdStringify({
-                        "@context": "https://schema.org",
-                        "@type": "CollectionPage",
-                        name: "Explorar | Dudit",
-                        description: "Descubra produtos, serviços e negócios perto de você.",
-                        url: "https://dudit.com.br/explorar",
-                    }) }}
+                    dangerouslySetInnerHTML={{
+                        __html: safeJsonLdStringify({
+                            "@context": "https://schema.org",
+                            "@type": "CollectionPage",
+                            name: "Explorar | Dudit",
+                            description: "Descubra produtos, serviços e negócios perto de você.",
+                            url: "https://dudit.com.br/explorar",
+                        })
+                    }}
                 />
                 <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
@@ -358,6 +349,7 @@ export default async function ExplorarPage({
                                                             <span className="text-lg">📦</span>
                                                         )
                                                     }
+                                                    className="px-4 py-3 gap-4"
                                                     title={cat.name}
                                                     showChevron
                                                 />
@@ -654,10 +646,10 @@ export default async function ExplorarPage({
 
             <HydrationBoundary state={dehydratedState}>
                 <Suspense fallback={
-                        <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
-                            <ThreeDotsLoader />
-                        </div>
-                    }>
+                    <div className="min-h-screen bg-white dark:bg-dark-background pt-[40px] lg:pt-[110px] font-sans flex flex-col items-center justify-center">
+                        <ThreeDotsLoader />
+                    </div>
+                }>
                     <ExplorarPageClient
                         initialResults={productsWithDistance}
                         initialMoreDistantSellers={moreDistantSellersWithDistance}

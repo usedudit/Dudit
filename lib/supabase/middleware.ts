@@ -360,7 +360,8 @@ export async function middleware(request: NextRequest) {
         https://www.facebook.com
         https://web.facebook.com
         https://*.facebook.com
-        https://graph.facebook.com;
+        https://graph.facebook.com
+        https://connect.facebook.net;
     frame-src 'self' 
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 

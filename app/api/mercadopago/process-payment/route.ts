@@ -43,6 +43,7 @@ interface ProcessPaymentRequest {
     paymentMethodDiscount: number
     paymentMethodInterest: number
     paymentMethodFee: number
+    paymentMethodFixedFee?: number
     deliveryFee: number
     finalTotal: number
   }
@@ -63,6 +64,7 @@ function normalizeCheckoutPricing(input?: ProcessPaymentRequest["checkoutPricing
     paymentMethodDiscount: moneyOrZero(input.paymentMethodDiscount),
     paymentMethodInterest: moneyOrZero(input.paymentMethodInterest),
     paymentMethodFee: moneyOrZero(input.paymentMethodFee),
+    paymentMethodFixedFee: moneyOrZero(input.paymentMethodFixedFee),
     deliveryFee: moneyOrZero(input.deliveryFee),
     finalTotal: moneyOrZero(input.finalTotal),
   }
@@ -72,7 +74,8 @@ function normalizeCheckoutPricing(input?: ProcessPaymentRequest["checkoutPricing
     - snapshot.couponDiscount
     - snapshot.paymentMethodDiscount
     + snapshot.paymentMethodInterest
-    + snapshot.paymentMethodFee,
+    + snapshot.paymentMethodFee
+    + snapshot.paymentMethodFixedFee,
   )
   if (Math.abs(expected - snapshot.finalTotal) > 0.01) return null
   return snapshot

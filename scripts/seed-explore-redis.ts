@@ -209,7 +209,7 @@ async function seedRedis() {
     const { data: vitrines } = await supabase
         .from("stores")
         .select(`
-            id, name, slug, description, logo_url, banner_url, rating, created_at, partner_id,
+            id, short_id, name, slug, description, logo_url, banner_url, rating, created_at, partner_id,
             addresses(city, state, neighborhood, latitude, longitude),
             partners(id, category_id, category:marketplace_partner_categories!category_id(name, slug, parent:marketplace_partner_categories!parent_id(name)), reviews(count))
         `)
@@ -231,6 +231,7 @@ async function seedRedis() {
             if (!isExploreStorePublic(item)) continue
             const vitrineNormalizada = serializeExploreItem({
                 id: item.id,
+                short_id: item.short_id || null,
                 name: storeName,
                 slug: item.slug || undefined,
                 description: item.description || "",
@@ -241,6 +242,7 @@ async function seedRedis() {
                 partners: {
                     id: item.partner_id || item.id,
                     store_id: item.id,
+                    short_id: item.short_id || null,
                     store_name: storeName,
                     slug: item.slug || null,
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",

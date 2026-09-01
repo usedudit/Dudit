@@ -1169,11 +1169,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                     let itemUrl = "";
                     if (isService) {
-                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store);
+                        itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store || order.partners);
                     } else if (isPlan) {
-                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store);
+                        itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store || order.partners);
                     } else if (item.product_id) {
-                        itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store);
+                        itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store || order.partners);
                     }
 
 
@@ -1424,11 +1424,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                                 let itemUrl = "";
                                                 if (isService) {
-                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store);
+                                                    itemUrl = getServiceUrl({ ...item.services, id: item.service_id, short_id: item.services?.short_id }, store || order.partners);
                                                 } else if (isPlan) {
-                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store);
+                                                    itemUrl = getPlanUrl({ ...item.recurring_plans, id: item.recurring_plan_id, short_id: item.recurring_plans?.short_id }, store || order.partners);
                                                 } else if (item.product_id) {
-                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store);
+                                                    itemUrl = getProductUrl({ ...item.products, id: item.product_id, short_id: item.products?.short_id }, store || order.partners);
                                                 }
 
 
@@ -1564,7 +1564,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 }
                                             />
                                             {canRetryPixPayment && order.payment_expires_at && (
-                                                <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' rightElement={<Button variant='link' onClick={handlePixClick}>Pagar agora</Button>} />
+                                                <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
                                             )}
                                         </div>
                                     </FormSection>
@@ -1644,7 +1644,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                             </div>
                                         ) : (
-                                            <Link href={getStoreUrl({ ...store, id: store?.store_id || store?.id || order.store_id || order.partner_id, short_id: store?.short_id, name: store?.name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
+                                            <Link href={getStoreUrl({ ...(store || order.partners), id: store?.store_id || store?.id || order.store_id || order.partner_id, short_id: store?.short_id || order.partners?.short_id, name: store?.name || order.partners?.store_name || sellerName })} prefetch={true} className="flex items-center gap-4 block cursor-pointer">
 
                                                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                                     <img src={storeImage} alt={sellerName} className="w-full h-full object-cover" />

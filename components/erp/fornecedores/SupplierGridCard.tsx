@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatDate } from "@/lib/utils"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 
 interface SupplierGridCardProps {
   supplier: any
@@ -72,11 +73,9 @@ const SupplierGridCard = React.memo(
               </div>
             </div>
 
-            {supplier.supplier_code && (
-              <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
-                <span>{supplier.supplier_code}</span>
-              </div>
-            )}
+            <div className="text-xs text-brand-inactive-text dark:text-dark-body font-medium truncate">
+              <span>{supplier.id || supplier.supplier_code || "-"}</span>
+            </div>
           </div>
         </div>
 
@@ -90,10 +89,12 @@ const SupplierGridCard = React.memo(
             </div>
 
             <div className="flex flex-col gap-0.5 items-end min-w-0">
-              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Última Compra</span>
-              <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate">
-                {supplier.last_import_at ? formatDate(supplier.last_import_at) : "-"}
-              </span>
+              <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Contato</span>
+              <div className="flex flex-col items-end min-w-0">
+                {supplier.email && <span className="text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-full">{supplier.email}</span>}
+                {supplier.phone && <span className="text-xs text-brand-inactive-text dark:text-dark-body">{formatBrazilPhone(supplier.phone)}</span>}
+                {!supplier.email && !supplier.phone && <span className="text-[13px] text-brand-inactive-text">-</span>}
+              </div>
             </div>
           </div>
 
@@ -120,6 +121,8 @@ const SupplierGridCard = React.memo(
     prev.supplier.supplier_code === next.supplier.supplier_code &&
     prev.supplier.city === next.supplier.city &&
     prev.supplier.state === next.supplier.state &&
+    prev.supplier.email === next.supplier.email &&
+    prev.supplier.phone === next.supplier.phone &&
     prev.supplier.last_import_at === next.supplier.last_import_at &&
     (prev.supplier.image_url || null) === (next.supplier.image_url || null)
 )

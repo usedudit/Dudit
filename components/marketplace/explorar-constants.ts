@@ -96,5 +96,16 @@ export const COMMON_CITY_ACCENTS: Record<string, string> = {
     "joao-pessoa": "João Pessoa",
 }
 
+export const ESTADO_MAP: Record<string, string> = {
+    ac: "Acre", al: "Alagoas", ap: "Amapá", am: "Amazonas",
+    ba: "Bahia", ce: "Ceará", df: "Distrito Federal",
+    es: "Espírito Santo", go: "Goiás", ma: "Maranhão",
+    mt: "Mato Grosso", ms: "Mato Grosso do Sul", mg: "Minas Gerais",
+    pa: "Pará", pb: "Paraíba", pr: "Paraná", pe: "Pernambuco",
+    pi: "Piauí", rj: "Rio de Janeiro", rn: "Rio Grande do Norte",
+    rs: "Rio Grande do Sul", ro: "Rondônia", rr: "Roraima",
+    sc: "Santa Catarina", sp: "São Paulo", se: "Sergipe", to: "Tocantins",
+}
+
 export type SortOption = "relevancia" | "preco_menor" | "preco_maior" | "recentes"
 export type ViewMode = "grid" | "list"

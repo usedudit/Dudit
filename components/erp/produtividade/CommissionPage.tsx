@@ -6,7 +6,8 @@ import { IconPlaceholder } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { usePermissions } from "@/lib/permission-context"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { KPICard } from "@/components/erp/dashboard/cards/KPICard"
+import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
+import Pagination from "@/components/reusable/Pagination"
 import CommissionPaymentModal from "@/components/erp/produtividade/CommissionPaymentModal"
 import CommissionPageControls from "@/components/erp/produtividade/CommissionPageControls"
 import CommissionListItem from "@/components/erp/produtividade/CommissionListRow"
@@ -16,7 +17,6 @@ import type { CommissionOverview, SellerCommissionRow } from "@/app/actions/erp/
 import {
   MoneyIcon,
   ChartIcon,
-  AwardIcon,
   TargetIcon,
   ArrowUpDownIcon,
 } from "@/lib/icons"
@@ -30,15 +30,6 @@ const COLUMNS: ColumnDef[] = [
   { id: "bonus", label: "Bônus a pagar", align: "right", width: "140px", sortable: true, key: "bonus" },
   { id: "total", label: "Total", align: "right", width: "120px", sortable: true, key: "total" },
   { id: "actions", label: "Ações", align: "center", width: "100px" },
-]
-
-const metricIcons = [MoneyIcon, MoneyIcon, ChartIcon, AwardIcon, TargetIcon]
-const metricTones = [
-  "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
-  "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
-  "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
-  "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
 ]
 
 type Props = {
@@ -55,7 +46,7 @@ export default function CommissionPage({ partnerId, overview }: Props) {
   const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
   const [search, setSearch] = useState("")
   const [sortConfig, setSortConfig] = useState<{ key: string; dir: "asc" | "desc" } | null>(null)
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
   const [paymentModal, setPaymentModal] = useState<{
     partnerUserId: string
     name: string
@@ -108,11 +99,11 @@ export default function CommissionPage({ partnerId, overview }: Props) {
     return sortedSellers.filter((s) => s.name.toLowerCase().includes(q))
   }, [sortedSellers, search])
 
-  const pagedSellers = useMemo(() => {
-    return filteredSellers.slice(0, (page + 1) * PER_PAGE)
-  }, [filteredSellers, page])
+  const totalPages = Math.ceil(filteredSellers.length / PER_PAGE)
 
-  const hasMore = pagedSellers.length < filteredSellers.length
+  const pagedSellers = useMemo(() => {
+    return filteredSellers.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+  }, [filteredSellers, page])
 
   return (
     <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -140,17 +131,38 @@ export default function CommissionPage({ partnerId, overview }: Props) {
 
         <CommissionPageControls
           search={search}
-          onSearchChange={(v) => { setSearch(v); setPage(0) }}
+          onSearchChange={(v) => { setSearch(v); setPage(1) }}
           viewMode={effectiveViewMode}
           onViewModeChange={setViewModeState}
         />
 
         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-            <KPICard title="Comissão Prevista" value={formatCurrency(overview.estimatedCommission)} />
-            <KPICard title="Comissão Paga" value={formatCurrency(overview.totalPaid)} />
-            <KPICard title="Comissão Pendente" value={formatCurrency(overview.totalPending)} />
-          </div>
+          <HorizontalKPICard
+            items={[
+              {
+                title: "Comissão Prevista",
+                value: formatCurrency(overview.estimatedCommission),
+                icon: ChartIcon,
+                iconBg: "bg-blue-100 dark:bg-blue-900/30",
+                iconColor: "text-blue-600 dark:text-blue-400",
+              },
+              {
+                title: "Comissão Paga",
+                value: formatCurrency(overview.totalPaid),
+                icon: MoneyIcon,
+                iconBg: "bg-green-100 dark:bg-green-900/30",
+                iconColor: "text-green-600 dark:text-green-400",
+              },
+              {
+                title: "Comissão Pendente",
+                value: formatCurrency(overview.totalPending),
+                icon: TargetIcon,
+                iconBg: "bg-orange-100 dark:bg-orange-900/30",
+                iconColor: "text-orange-600 dark:text-orange-400",
+              },
+            ]}
+            className="mb-8"
+          />
 
           {filteredSellers.length === 0 ? (
             <FadeIn
@@ -236,14 +248,13 @@ export default function CommissionPage({ partnerId, overview }: Props) {
                 </div>
               )}
 
-              {hasMore && (
-                <div className="flex justify-center py-6">
-                  <button
-                    onClick={() => setPage((p) => p + 1)}
-                    className="text-sm font-bold text-brand-dark dark:text-dark-heading hover:text-brand-inactive-text transition-colors"
-                  >
-                    Carregar mais ({filteredSellers.length - pagedSellers.length} restantes)
-                  </button>
+              {totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
                 </div>
               )}
             </FadeIn>

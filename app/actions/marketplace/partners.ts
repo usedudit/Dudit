@@ -286,7 +286,7 @@ async function _getPartnerReviews(partnerId: string) {
   }
 
   const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-  const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
+  const profilesMap = new Map<string, { full_name: string }>()
 
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
@@ -298,7 +298,6 @@ async function _getPartnerReviews(partnerId: string) {
       profilesData.forEach((p: any) => {
         profilesMap.set(p.user_id, {
           full_name: p.full_name,
-          profile_image_url: null
         })
       })
     }
@@ -310,7 +309,7 @@ async function _getPartnerReviews(partnerId: string) {
     created_at: r.created_at,
     products: r.products || null,
     services: r.services || null,
-    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
+    profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
   }))
 }
 
@@ -574,7 +573,7 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
       }
 
       const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-      const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
+      const profilesMap = new Map<string, { full_name: string }>()
 
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
@@ -586,7 +585,6 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
           profilesData.forEach((p: any) => {
             profilesMap.set(p.user_id, {
               full_name: p.full_name,
-              profile_image_url: null
             })
           })
         }
@@ -598,7 +596,7 @@ export const getCachedPartnerReviews = async (partnerId: string) => {
         created_at: r.created_at,
         products: r.products || null,
         services: r.services || null,
-        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
+        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
       }))
     },
     [`partner-reviews-list-${partnerId}`],

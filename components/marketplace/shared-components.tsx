@@ -64,7 +64,6 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const rawStoreAvatar =
         partner.store_avatar ||
         partner.store_image_url ||
-        partner.profile_image_url ||
         null
     const storeAvatar = rawStoreAvatar ? getR2ImageUrl(rawStoreAvatar, "thumb") : null
     const hasPartnerLogo = !!rawStoreAvatar && !String(rawStoreAvatar).includes("Placeholder.png")
@@ -288,7 +287,6 @@ interface ItemCardProps {
         partners?: {
             store_name: string
             store_avatar?: string
-            profile_image_url?: string
             store_image_url?: string
             latitude?: number | null
             longitude?: number | null
@@ -349,7 +347,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
         await toggleFavorite(product.id, itemType as "produto" | "servico")
     }, [user, router, toggleFavorite, product.id, itemType, isOwner])
 
-    const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || partner?.profile_image_url || null
+    const rawPartnerImage = partner?.store_avatar || partner?.store_image_url || null
     const partnerImageUrl = rawPartnerImage ? getR2ImageUrl(rawPartnerImage, "thumb") : null
     const partnerId = partner?.id || null
     const sellerName = partner?.store_name || (product.partners as any)?.store_name || 'Vendedor'

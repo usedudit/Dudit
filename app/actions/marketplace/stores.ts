@@ -166,12 +166,12 @@ export const getCachedStoreReviews = async (storeId: string) => {
                 if (!reviewsData || reviewsData.length === 0) return []
 
                 const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-                const profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null; profile_image_url: string | null }>()
+                const profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null }>()
 
                 if (userIds.length > 0) {
                     const { data: profilesData } = await supabase
                         .from("user_profiles")
-                        .select("user_id, full_name, avatar_url, profile_image_url")
+                        .select("user_id, full_name, avatar_url")
                         .in("user_id", userIds)
 
                     if (profilesData) {
@@ -179,7 +179,6 @@ export const getCachedStoreReviews = async (storeId: string) => {
                             profilesMap.set(p.user_id, {
                                 full_name: p.full_name,
                                 avatar_url: p.avatar_url,
-                                profile_image_url: p.profile_image_url,
                             })
                         })
                     }
@@ -246,7 +245,7 @@ export const getCachedStoreReviews = async (storeId: string) => {
                         unit: product?.unit || service?.unit || null,
                         products: product ? { name: product.name, images: product.images, unit: product.unit } : null,
                         services: service ? { name: service.name, images: service.images, unit: service.unit } : null,
-                        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", avatar_url: null, profile_image_url: null },
+                        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", avatar_url: null },
                         itemUrl,
                     }
                 })

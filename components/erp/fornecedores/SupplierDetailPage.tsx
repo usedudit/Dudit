@@ -15,7 +15,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { FadeIn } from '@/components/animations/FadeIn';
 import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
-import { KPICard } from '@/components/erp/dashboard/cards/KPICard';
+import { HorizontalKPICard } from '@/components/erp/dashboard/cards/HorizontalKPICard';
 import { fetchCSRFTokenSingleton } from '@/hooks/use-csrf-token';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -341,12 +341,15 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                             ) : (
                                                 <>
                                                     {/* Desktop: KPI Stats Row */}
-                                                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-10">
-                                                        <KPICard title="Importações" value={stats.xml_count} />
-                                                        <KPICard title="Total NF-e" value={stats.total_imported_value ? formatCurrency(stats.total_imported_value) : "R$ 0,00"} />
-                                                        <KPICard title="Valor médio" value={stats.avgImport ? formatCurrency(stats.avgImport) : "R$ 0,00"} />
-                                                        <KPICard title="Última NF-e" value={stats.last_import_at} />
-                                                    </div>
+                                                    <HorizontalKPICard
+                                                        items={[
+                                                            { title: "Importações", value: stats.xml_count, icon: FileTextIcon },
+                                                            { title: "Total NF-e", value: stats.total_imported_value ? formatCurrency(stats.total_imported_value) : "R$ 0,00", icon: FileTextIcon },
+                                                            { title: "Valor médio", value: stats.avgImport ? formatCurrency(stats.avgImport) : "R$ 0,00", icon: FileTextIcon },
+                                                            { title: "Última NF-e", value: stats.last_import_at, icon: FileTextIcon },
+                                                        ]}
+                                                        className="mb-10"
+                                                    />
 
                                                     {/* Desktop: XML Imports Table */}
                                                     <ImportsContent
@@ -372,12 +375,15 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                     {isTablet && (
                                         <TabsContent value="Imports" className="mt-0">
                                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-                                                <div className="grid grid-cols-2 gap-4 mb-6">
-                                                    <KPICard title="Importações" value={stats.xml_count} />
-                                                    <KPICard title="Total NF-e" value={stats.total_imported_value ? formatCurrency(stats.total_imported_value) : "R$ 0,00"} />
-                                                    <KPICard title="Valor médio" value={stats.avgImport ? formatCurrency(stats.avgImport) : "R$ 0,00"} />
-                                                    <KPICard title="Última NF-e" value={stats.last_import_at} />
-                                                </div>
+                                                <HorizontalKPICard
+                                                    items={[
+                                                        { title: "Importações", value: stats.xml_count, icon: FileTextIcon },
+                                                        { title: "Total NF-e", value: stats.total_imported_value ? formatCurrency(stats.total_imported_value) : "R$ 0,00", icon: FileTextIcon },
+                                                        { title: "Valor médio", value: stats.avgImport ? formatCurrency(stats.avgImport) : "R$ 0,00", icon: FileTextIcon },
+                                                        { title: "Última NF-e", value: stats.last_import_at, icon: FileTextIcon },
+                                                    ]}
+                                                    className="mb-6"
+                                                />
 
                                                 <ImportsContent
                                                     isLoadingImports={isLoadingImports}

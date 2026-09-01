@@ -12,6 +12,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
 import { getStoreUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
@@ -161,14 +162,8 @@ const formatCheckoutInstallmentOptionLabel = (opt: MarketplaceInstallmentOption)
     const interestAmount = Number(opt.totalInterest || 0)
     const feeAmount = Number(opt.totalFee || 0)
     const pricingAmount = interestAmount + feeAmount
-    const pricingName = interestAmount > 0.009 && feeAmount > 0.009
-        ? "juros/taxa"
-        : interestAmount > 0.009
-            ? "juros"
-            : "taxa"
-    const pricingLabel = pricingAmount > 0.009
-        ? ` · ${formatCurrency(pricingAmount)} ${opt.feeBearer !== "merchant" ? `de ${pricingName}` : `${pricingName} absorvida`}`
-        : " sem juros"
+    const hasInterest = pricingAmount > 0.009
+    const pricingLabel = hasInterest ? "" : " sem juros"
     return `${installmentsCount}x de ${formatCurrency(opt.installmentValue)}${pricingLabel}`
 }
 
@@ -368,7 +363,8 @@ export function CheckoutPageClient() {
             notifyError("Erro", "Erro ao atualizar forma de atendimento.")
         }
     }
-    const storeImage = checkoutContext?.store?.logo_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const storeImageRaw = checkoutContext?.store?.logo_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
+    const storeImage = getR2ImageUrl(storeImageRaw)
     const sellerName = checkoutContext?.store?.name || checkoutContext?.partner?.storeName || partnerInfo?.store_name || "Loja"
 
     const quantities = useMemo<Record<string, number>>(() => {
@@ -1586,7 +1582,7 @@ export function CheckoutPageClient() {
                                 ? "Grátis"
                                 : deliveryQuoteLoading
                                     ? "Calculando..."
-                                    : (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller")
+                                    : (deliveryFee === 0 && (deliverySettings?.deliveryPayer === "seller" || (deliveryBreakdown as any)?.deliveryPayer === "seller" || hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold))
                                         ? (
                                             <span className="flex items-center gap-1.5 justify-end">
                                                 {(deliveryBreakdown as any)?.originalFee != null && Number((deliveryBreakdown as any).originalFee) > 0 && (
@@ -1594,21 +1590,19 @@ export function CheckoutPageClient() {
                                                         {formatCurrency(Number((deliveryBreakdown as any).originalFee))}
                                                     </span>
                                                 )}
-                                                <span className="text-brand-green font-semibold">Grátis (Pago pela loja)</span>
+                                                <span className="text-brand-green font-semibold">Grátis</span>
                                             </span>
                                         )
                                         : deliveryFee > 0
                                             ? formatCurrency(deliveryFee)
-                                            : (hasFreeDeliveryCoupon || (deliveryBreakdown as any)?.isFreeByThreshold)
-                                                ? "Grátis"
-                                                : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress || !hasConfiguredDeliveryRates
-                                                    ? "A combinar"
-                                                    : "Grátis"
+                                            : !productDeliveryQuoteActive || deliveryError || !formData.deliveryAddress || !hasConfiguredDeliveryRates
+                                                ? "A combinar"
+                                                : "Grátis"
                             }
                         </span>
                     </div>
                 )}
-                {showDeliveryFeeRow && !isPickup && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
+                {showDeliveryFeeRow && !isPickup && deliveryFee > 0 && deliveryBreakdown && (Number(deliveryBreakdown.distanceFee) > 0 || (deliveryBreakdown.timeAdjustmentTotal != null && Number(deliveryBreakdown.timeAdjustmentTotal) !== 0)) && (
                     <div className="space-y-1 text-xs text-brand-inactive-text dark:text-dark-body">
                         {Number(deliveryBreakdown.baseFee) > 0 && <div className="flex justify-between"><span>Taxa base</span><span>{formatCurrency(Number(deliveryBreakdown.baseFee))}</span></div>}
                         {Number(deliveryBreakdown.distanceFee) > 0 && <div className="flex justify-between"><span>Distância {deliveryDistanceKm != null ? `(${deliveryDistanceKm.toFixed(2)} km)` : ""}</span><span>{formatCurrency(Number(deliveryBreakdown.distanceFee))}</span></div>}

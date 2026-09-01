@@ -78,7 +78,7 @@ export function DreA4Preview({
         >
           {/* Folha A4 Padronizada */}
           <div
-            className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans min-h-[297mm] flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-xs"
+            className={`w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-xs"
               }`}
           >
             <div>

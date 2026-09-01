@@ -205,7 +205,7 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
   }
 
   const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-  const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
+  const profilesMap = new Map<string, { full_name: string }>()
 
   if (userIds.length > 0) {
     const { data: profilesData } = await supabase
@@ -217,7 +217,6 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
       profilesData.forEach((p: any) => {
         profilesMap.set(p.user_id, {
           full_name: p.full_name,
-          profile_image_url: null
         })
       })
     }
@@ -258,7 +257,7 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
       quantity: orderItem?.quantity || null,
       variant_name: orderItem?.variant_name || null,
       variant_options: orderItem?.variant_options || null,
-      profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
+      profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
     }
   })
 }
@@ -324,7 +323,7 @@ export const getCachedReviews = async (productId: string) => {
       }
 
       const userIds = Array.from(new Set(reviewsData.map((r: any) => r.user_id).filter(Boolean)))
-      const profilesMap = new Map<string, { full_name: string; profile_image_url: string | null }>()
+      const profilesMap = new Map<string, { full_name: string }>()
 
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
@@ -336,7 +335,6 @@ export const getCachedReviews = async (productId: string) => {
           profilesData.forEach((p: any) => {
             profilesMap.set(p.user_id, {
               full_name: p.full_name,
-              profile_image_url: null
             })
           })
         }
@@ -346,7 +344,7 @@ export const getCachedReviews = async (productId: string) => {
         rating: r.rating,
         comment: r.comment,
         created_at: r.created_at,
-        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário", profile_image_url: null }
+        profiles: profilesMap.get(r.user_id) || { full_name: "Usuário" }
       }))
     },
     [`marketplace-reviews-${productId}`],
@@ -693,6 +691,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
   const normalizedVitrines = filteredStores.map((item: any) => {
     return {
       id: item.id,
+      short_id: item.short_id || null,
       name: item.name,
       description: item.description,
       images: [item.banner_url || item.logo_url || "https://img.dudit.com.br/static/Placeholder.png"],
@@ -701,6 +700,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       category: 'Loja Parceira',
 partners: {
         id: item.partner_id,
+        short_id: item.short_id || null,
         store_name: item.name,
         store_avatar: item.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
         banner_url: item.banner_url || null,

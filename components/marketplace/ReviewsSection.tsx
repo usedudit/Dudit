@@ -17,7 +17,6 @@ interface ReviewItem {
     profiles?: {
         full_name?: string | null
         avatar_url?: string | null
-        profile_image_url?: string | null
     } | null
     products?: { name: string; images?: string[] | null; unit?: string | null } | null
     services?: { name: string; images?: string[] | null; unit?: string | null } | null
@@ -171,7 +170,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                             <div className="flex items-start gap-3 mb-3">
                                 <UserProfileImage
                                     fullName={rev.profiles?.full_name || "Usuário"}
-                                    imageUrl={rev.profiles?.avatar_url || rev.profiles?.profile_image_url || null}
+                                    imageUrl={rev.profiles?.avatar_url || null}
                                     className="w-9 h-9 rounded-full shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">

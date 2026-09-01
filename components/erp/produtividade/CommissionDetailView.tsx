@@ -187,12 +187,9 @@ export default function CommissionDetailView({ isOpen, seller, partnerId, onClos
             className="fixed right-4 top-4 bottom-4 z-50 w-[450px] flex flex-col bg-white shadow-2xl dark:bg-dark-surface overflow-hidden rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <header className="flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">{sellerData.name}</h2>
-                <p className="text-xs text-brand-inactive-text dark:text-dark-body">Detalhes da Comissão</p>
-              </div>
-              <Button variant="filled" onClick={onClose} size="icon" className="w-8 h-8 shrink-0 ml-2">
+            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+              <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes da comissão</h2>
+              <Button variant="filled" onClick={onClose} size="icon" className="hidden lg:flex">
                 <XIcon className="h-5 w-5" />
               </Button>
             </header>

@@ -53,7 +53,7 @@ export default async function ERPLayout({
   const [profileDataRes, allAccess] = await Promise.all([
     createAdminClient()
       .from("user_profiles")
-      .select("avatar_url")
+      .select("full_name, avatar_url")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(
@@ -64,9 +64,9 @@ export default async function ERPLayout({
   ])
 
   const userProfile = {
-    fullName: user.email?.split("@")[0] || "Usuário",
+    fullName: profileDataRes?.data?.full_name || user.email?.split("@")[0] || "Usuário",
     email: user.email || "",
-    initials: (user.email?.[0] || "U").toUpperCase(),
+    initials: (profileDataRes?.data?.full_name?.[0] || user.email?.[0] || "U").toUpperCase(),
     avatarColor: "bg-brand-primary",
     imageUrl: profileDataRes?.data?.avatar_url || null,
   }

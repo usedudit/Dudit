@@ -87,6 +87,7 @@ export function PaymentWrapper({
     mpAcceptedPaymentMethods,
     partnerPhone, pixKey, pixKeyType, payDepositOnly,
 }: PixPaymentWrapperProps) {
+    const effectiveMpPublicKey = process.env.NEXT_PUBLIC_MP_SANDBOX_PUBLIC_KEY || mpPublicKey
     const [copied, setCopied] = useState(false)
     const [isChecking, setIsChecking] = useState(false)
     const [paymentConfirmed, setPaymentConfirmed] = useState(false)
@@ -221,11 +222,11 @@ export function PaymentWrapper({
             return
         }
         try {
-            if (!mpPublicKey) {
+            if (!effectiveMpPublicKey) {
                 setBrickError("Chave pública do Mercado Pago não configurada")
                 return
             }
-            const mp = new (window as any).MercadoPago(mpPublicKey)
+            const mp = new (window as any).MercadoPago(effectiveMpPublicKey)
             const bricksBuilder = mp.bricks()
             mpInstanceRef.current = mp
             bricksBuilderRef.current = bricksBuilder

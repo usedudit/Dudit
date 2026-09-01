@@ -38,6 +38,13 @@ interface PreferenceRequest {
   payDepositOnly?: boolean
   quoteOnly?: boolean
   checkoutPricing?: {
+    subtotal?: number
+    couponDiscount?: number
+    paymentMethodDiscount?: number
+    paymentMethodInterest?: number
+    paymentMethodFee?: number
+    paymentMethodFixedFee?: number
+    deliveryFee?: number
     finalTotal: number
   }
 }
@@ -382,13 +389,28 @@ async function handler(request: NextRequest) {
     })
     totalAmount = pricingResult.finalTotal
 
-    // SEGURANÇA: Validar total
-    const checkoutFinalTotal = Number(body.checkoutPricing?.finalTotal || 0)
-    if (checkoutFinalTotal > 0 && Math.abs(checkoutFinalTotal - totalAmount) > 0.01) {
-      SecureLogger.warn("MP preference pricing snapshot mismatch", {
-        hasClientPricingSnapshot: true,
-      })
-      return NextResponse.json({ error: "Os valores do checkout não conferem. Atualize a página e tente novamente." }, { status: 400 })
+    // SEGURANÇA: Validar total usando o snapshot do checkout quando disponível
+    const checkoutPricing = body.checkoutPricing
+    if (checkoutPricing) {
+      const snapshotFinalTotal = Number(checkoutPricing.finalTotal || 0)
+      if (snapshotFinalTotal > 0 && Math.abs(snapshotFinalTotal - totalAmount) > 0.01) {
+        const snapshotSubtotal = Number(checkoutPricing.subtotal || 0)
+        const snapshotDeliveryFee = Number(checkoutPricing.deliveryFee || 0)
+        const snapshotCouponDiscount = Number(checkoutPricing.couponDiscount || 0)
+        const snapshotMethodDiscount = Number(checkoutPricing.paymentMethodDiscount || 0)
+        const snapshotMethodInterest = Number(checkoutPricing.paymentMethodInterest || 0)
+        const snapshotMethodFee = Number(checkoutPricing.paymentMethodFee || 0)
+        const snapshotMethodFixedFee = Number(checkoutPricing.paymentMethodFixedFee || 0)
+        const expectedFromSnapshot = Math.round((snapshotSubtotal + snapshotDeliveryFee - snapshotCouponDiscount - snapshotMethodDiscount + snapshotMethodInterest + snapshotMethodFee + snapshotMethodFixedFee + Number.EPSILON) * 100) / 100
+        if (Math.abs(expectedFromSnapshot - snapshotFinalTotal) > 0.01) {
+          SecureLogger.warn("MP preference pricing snapshot self-validation mismatch", {
+            expectedFromSnapshot,
+            snapshotFinalTotal,
+            serverTotal: totalAmount,
+          })
+          return NextResponse.json({ error: "Os valores do checkout não conferem. Atualize a página e tente novamente." }, { status: 400 })
+        }
+      }
     }
 
     if (totalAmount <= 0 || totalAmount > 999999) {

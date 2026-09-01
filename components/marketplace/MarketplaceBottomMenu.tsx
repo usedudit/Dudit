@@ -10,6 +10,7 @@ import {
 import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useCollectionDetailMenu } from "@/lib/collection-detail-menu"
+import { useUserSession } from "@/hooks/use-user-session"
 
 function MenuItem({
     label,
@@ -59,6 +60,7 @@ function MenuItem({
 export function MarketplaceBottomMenu() {
     const pathname = usePathname()
     const { user, supabase } = useSupabase()
+    const { profile } = useUserSession()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [citySlug, setCitySlug] = useState<string | null>(null)
     const collectionMenu = useCollectionDetailMenu()
@@ -71,6 +73,16 @@ export function MarketplaceBottomMenu() {
                 const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
                 if (match) stored = match[1]
             }
+
+            if (!stored && pathname) {
+                const parts = pathname.split('/').filter(Boolean)
+                if (parts[0] === 'explorar' && parts[1]) {
+                    stored = parts[1]
+                } else if (parts.length >= 1 && !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite'].includes(parts[0])) {
+                    stored = parts[0]
+                }
+            }
+
             if (stored) {
                 setCitySlug(stored)
             }
@@ -93,8 +105,8 @@ export function MarketplaceBottomMenu() {
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")
 
-    const userName = user?.email?.split("@")[0] || "Visitante"
-    const fullName = user?.email?.split("@")[0] || "Visitante"
+    const userName = profile?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Visitante"
+    const fullName = profile?.full_name || user?.email?.split("@")[0] || "Visitante"
 
     const handleSignOut = async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"

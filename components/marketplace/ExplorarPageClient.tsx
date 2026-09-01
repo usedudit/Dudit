@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { applySellerDiversity, calcCategoryBrowseScore } from "@/lib/marketplace/ranking"
-import { searchMarketplace, type MarketplaceListCursor } from "@/app/actions/marketplace/search"
+import { searchMarketplace, type MarketplaceListCursor, resolveCityAccentBatch } from "@/app/actions/marketplace/search"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
@@ -36,7 +36,7 @@ import { ExplorarViewControls } from "./ExplorarViewControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { ExploreContentSkeleton } from "./explorar-skeleton"
-import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES } from "./explorar-constants"
+import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP } from "./explorar-constants"
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 
@@ -92,14 +92,21 @@ export function ExplorarPageClient({
     const slug = (params?.slug as string[]) || []
     const pathCity = slug[0] || ""
 
+    const [cityAccentCache, setCityAccentCache] = useState<Record<string, string>>({})
+
     const formatCitySlug = useCallback((slug: string | null) => {
         if (!slug) return ""
         if (slug === "brasil") return "Brasil"
         if (slug.startsWith("estado-")) {
-            return slug.replace("estado-", "").toUpperCase()
+            const uf = slug.replace("estado-", "").toLowerCase()
+            return ESTADO_MAP[uf] || uf.toUpperCase()
         }
         if (slug === cidade && resolvedCityName) {
             return resolvedCityName
+        }
+        if (cityAccentCache[slug]) {
+            const state = slug.split("-").pop()?.toUpperCase() || ""
+            return `${cityAccentCache[slug]} - ${state}`
         }
         const parts = slug.split("-")
         const state = parts.pop()?.toUpperCase() || ""
@@ -125,7 +132,7 @@ export function ExplorarPageClient({
                 .join(" ")
         }
         return `${city} - ${state}`
-    }, [cidade, resolvedCityName])
+    }, [cidade, resolvedCityName, cityAccentCache])
 
     const categoryToSlug = useCallback((name: string) => {
         return name
@@ -224,6 +231,18 @@ export function ExplorarPageClient({
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
 
+    // Resolve city accents from DB when modal opens
+    const cityAccentFetchDoneRef = useRef(false)
+    useEffect(() => {
+        if (!isCityModalOpen || cityAccentFetchDoneRef.current) return
+        cityAccentFetchDoneRef.current = true
+        resolveCityAccentBatch(citiesData.slice(0, 200)).then((resolved) => {
+            if (Object.keys(resolved).length > 0) {
+                setCityAccentCache((prev) => ({ ...prev, ...resolved }))
+            }
+        }).catch(() => {})
+    }, [isCityModalOpen])
+
     // Filters state
     const [promoOn, setPromoOn] = useState(false)
     const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
@@ -290,11 +309,7 @@ export function ExplorarPageClient({
             targetUrl = `/explorar${queryPart}`
         }
 
-        if (forceFullNavigation) {
-            router.push(targetUrl)
-        } else if (typeof window !== "undefined") {
-            window.history.pushState(null, "", targetUrl)
-        }
+        router.push(targetUrl)
     }
 
     // Handles browser Back/Forward navigation syncing path params and searchParams back to component state
@@ -926,7 +941,11 @@ export function ExplorarPageClient({
 
     const pageTitle = useMemo(() => {
         const citySuffix = selectedCitySlug
-            ? (selectedCitySlug === "brasil" ? " no Brasil" : ` em ${formatCitySlug(selectedCitySlug)}`)
+            ? (selectedCitySlug === "brasil"
+                ? " no Brasil"
+                : selectedCitySlug.startsWith("estado-")
+                    ? ` no estado de ${formatCitySlug(selectedCitySlug)}`
+                    : ` em ${formatCitySlug(selectedCitySlug)}`)
             : ""
         if (query) return `Resultados para "${query}"${citySuffix}`
         if (selectedSection) {

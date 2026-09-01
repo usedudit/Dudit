@@ -226,7 +226,6 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     storeName: store.name || "Loja",
     storeDescription: store.description || "",
     storeImageUrl: store.logo_url || null,
-    profile_image_url: null,
     city: address?.city || store.city || "",
     state: address?.state || store.state || "",
     street: address?.street || "",

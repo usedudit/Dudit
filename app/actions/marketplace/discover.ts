@@ -221,12 +221,11 @@ function sectionDisplay(
 type WithTier = { _tier: number }
 
 function determineDisplayScope(items: WithTier[], ctx: DiscoverCtx): "city" | "state" | "country" {
-    const min = 1
     const cityCount = items.filter(i => i._tier === 0).length
     const stateCount = items.filter(i => i._tier === 1).length
 
-    if (ctx.scope === "city" && cityCount >= min) return "city"
-    if ((ctx.scope === "city" || ctx.scope === "state") && cityCount + stateCount >= min) return "state"
+    if (ctx.scope === "city") return "city"
+    if (ctx.scope === "state" && cityCount + stateCount >= 1) return "state"
     return "country"
 }
 

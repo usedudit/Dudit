@@ -81,7 +81,6 @@ const normalizeItemForCard = (item: any, partner: any) => {
             partners: {
                 store_name: partner.storeName,
                 store_avatar: partner.storeImageUrl,
-                profile_image_url: partner.profile_image_url,
                 city: partner.city,
                 state: partner.state,
                 distance_km_formatted: partner.distance_km_formatted,
@@ -102,7 +101,6 @@ const normalizeItemForCard = (item: any, partner: any) => {
             id: partner.id,
             store_name: partner.storeName,
             store_avatar: partner.storeImageUrl,
-            profile_image_url: partner.profile_image_url,
             city: partner.city,
             state: partner.state,
             distance_km_formatted: partner.distance_km_formatted,

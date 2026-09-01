@@ -37,7 +37,7 @@ import {
     generateReturnsInsights, generateDeliveryInsights, generateProductivityInsights,
 } from "./insights"
 
-type TabId = "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas" | "assinaturas"
+type TabId = "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas"
 
 interface TabDefinition {
     id: TabId
@@ -56,7 +56,6 @@ const REPORT_TABS: TabDefinition[] = [
     { id: "marketing", label: "Marketing", icon: MegaphoneIcon },
     { id: "produtividade", label: "Produtividade", icon: AwardIcon },
     { id: "trocas", label: "Trocas/Devoluções", icon: ReturnIcon },
-    { id: "assinaturas", label: "Assinaturas", icon: CalendarIcon },
 ]
 
 interface ReportsPageProps {
@@ -93,10 +92,9 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
             case "clientes": return props.customerData !== null
             case "produtividade": return props.productivityData !== null
             case "trocas": return props.returnsData !== null
-            case "assinaturas": return props.subscriptionData !== null
             default: return true
         }
-    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, props.subscriptionData])
+    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData])
 }
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
@@ -189,7 +187,6 @@ export function ReportsPage(props: ReportsPageProps) {
             <TabsContent value="marketing"><MarketingSection {...props} /></TabsContent>
             <TabsContent value="produtividade"><ProductivitySection productivityData={props.productivityData} goalData={props.goalData} /></TabsContent>
             <TabsContent value="trocas"><ReturnsSection {...props} /></TabsContent>
-            <TabsContent value="assinaturas"><SubscriptionSection subscriptionData={props.subscriptionData} /></TabsContent>
         </Tabs>
     )
 }
@@ -265,7 +262,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                             title="Evolução de Vendas"
                             legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
-                        <DashboardLineChart data={evoData} />
+                        <DashboardLineChart data={evoData} valueFormatter={v => brl(v)} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -311,6 +308,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                             totalValue={salesData.metrics.revenueFormatted}
                             totalLabel="Faturamento"
                             colors={CHART_COLORS_CATEGORY}
+                            valueFormatter={v => brl(v)}
                         />
                     </div>
                 </div>
@@ -427,6 +425,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                             totalValue={String(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0)}
                             totalLabel="Produtos"
                             colors={CHART_COLORS_CATEGORY}
+                            valueFormatter={v => brl(v)}
                         />
                     </div>
                 </div>
@@ -441,7 +440,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                             title="Faturamento vs Devoluções"
                             legendItems={[{ label: "Vendido", color: "#059669" }, { label: "Devolvido", color: "#ef4444" }, { label: "Líquido", color: "#0284c7" }]}
                         />
-                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} />
+                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} valueFormatter={v => brl(v)} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -563,6 +562,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                             totalValue={String(totalCategoryServices)}
                             totalLabel="Serviços"
                             colors={CHART_COLORS_CATEGORY}
+                            valueFormatter={v => brl(v)}
                         />
                     </div>
                 </div>
@@ -1004,7 +1004,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                             title="Fluxo de Caixa"
                             legendItems={[{ label: "Entradas", color: "#059669" }, { label: "Saídas", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} />
+                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} valueFormatter={v => brl(v)} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1015,6 +1015,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                             totalValue={brl(totalExpenses)}
                             totalLabel="Despesas"
                             colors={CHART_COLORS_CATEGORY}
+                            valueFormatter={v => brl(v)}
                         />
                     </div>
                 </div>
@@ -1129,7 +1130,7 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
             totalCustomers: customerData.totalCustomers, newCustomers: customerData.newCustomers, activeCustomers: customerData.activeCustomers,
             avgTicket: customerData.avgTicket, previousAvgTicket: customerData.previousAvgTicket,
             topCustomerName: customerData.topCustomers[0]?.label,
-            topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")),
+            topCustomerRevenue: parseFloat(String(customerData.topCustomers[0]?.value || "0").replace(/[^\d,]/g, "").replace(",", ".")),
         })
     }, [customerData])
 
@@ -1224,7 +1225,7 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={AwardIcon} title="Top Clientes" />
                         <HorizontalBarRankingList
-                            items={customerData.topCustomers.slice(0, 5).map(c => ({ label: c.label, value: parseFloat(String(c.value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")) || 0 }))}
+                            items={customerData.topCustomers.slice(0, 5).map(c => ({ label: c.label, value: parseFloat(String(c.value || "0").replace(/[^\d,]/g, "").replace(",", ".")) || 0 }))}
                             colors={CHART_COLORS_VIVID}
                             valueFormatter={v => brl(v)}
                         />
@@ -1235,13 +1236,16 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
             {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
-                    <ReportRankingCard
-                        title="Clientes VIP"
-                        items={customerData.vipCustomers.slice(0, 6).map(c => ({ id: c.id, label: c.label, value: c.value, subtitle: `${c.orders} pedidos` }))}
-                        variant="compact"
-                        icon={AwardIcon}
-                        className="h-full"
-                    />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={CreditCardIcon} title="Ticket Médio" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[44px] font-extrabold text-brand-green dark:text-dark-heading leading-none">
+                                {customerData.avgTicketFormatted}
+                            </p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">por cliente ativo</p>
+                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">média de gasto no período</p>
+                        </div>
+                    </div>
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
@@ -1332,7 +1336,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                             title="Evolução de Faturamento por Canal"
                             legendItems={[{ label: "Online", color: "#059669" }, { label: "Presencial", color: "#2563eb" }, { label: "Outros", color: "#f59e0b" }]}
                         />
-                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} />
+                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} valueFormatter={v => brl(v)} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1343,6 +1347,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                             totalValue={marketingData.totalRevenueFormatted}
                             totalLabel="Total"
                             colors={CHART_COLORS_CATEGORY}
+                            valueFormatter={v => brl(v)}
                         />
                     </div>
                 </div>
@@ -1393,12 +1398,14 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={AwardIcon} title="Desempenho de Canais" />
-                        <HorizontalBarRankingList
-                            items={sourceData}
-                            colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
-                        />
+                        <CardHeader icon={MoneyIcon} title="Desconto Total" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[44px] font-extrabold text-brand-green dark:text-dark-heading leading-none">
+                                {marketingData.couponStats.totalDiscountFormatted}
+                            </p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">concedido via cupons</p>
+                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">{marketingData.couponStats.used} cupons utilizados</p>
+                        </div>
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1637,7 +1644,6 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
     if (!returnsData) return <SectionPlaceholder title="Trocas e Devoluções" description="Relatórios de devoluções disponíveis com o plano Crescer." />
 
     const reasonData = returnsData.byReason.map(r => ({ label: r.label, value: r.value }))
-    const statusData = returnsData.byStatus.map(s => ({ label: s.label, value: s.value }))
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -1706,13 +1712,14 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={ListIcon} title="Devoluções por Status" />
-                        <DashboardDonutChart
-                            data={statusData}
-                            totalValue={String(returnsData.byStatus.reduce((a: any, s: any) => a + s.value, 0))}
-                            totalLabel="Total"
-                            colors={CHART_COLORS_CATEGORY}
-                        />
+                        <CardHeader icon={MoneyIcon} title="Ticket Médio de Devolução" />
+                        <div className="my-auto text-center py-4">
+                            <p className="text-[38px] font-extrabold text-brand-red leading-none">
+                                {brl(returnsData.returnCount > 0 ? returnsData.totalRefunded / returnsData.returnCount : 0)}
+                            </p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">valor médio reembolsado</p>
+                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">{returnsData.returnCount} devoluções no período</p>
+                        </div>
                     </div>
                 </div>
                 <div className="lg:col-span-4">

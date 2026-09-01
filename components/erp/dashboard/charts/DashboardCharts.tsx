@@ -66,13 +66,16 @@ export function CustomChartTooltip({ active, payload, label, formatter, valuePre
   )
 }
 
-export const CustomPieTooltip = ({ active, payload }: any) => {
+export const CustomPieTooltip = ({ active, payload, formatter }: any) => {
   if (active && payload && payload.length) {
     const entry = payload[0]
     const color = entry.payload.fill || entry.color || "var(--color-brand-green, #059669)"
-    const valFormatted = typeof entry.value === "number"
-      ? entry.value.toLocaleString("pt-BR")
-      : entry.value
+    const rawVal = entry.value
+    const valFormatted = formatter
+      ? formatter(rawVal)
+      : typeof rawVal === "number"
+        ? rawVal.toLocaleString("pt-BR")
+        : rawVal
 
     return (
       <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-3.5 shadow-xl flex flex-col gap-2 font-sans min-w-[150px] pointer-events-none z-50">
@@ -267,7 +270,7 @@ export function DashboardDonutChart({
         </div>
         <ChartContainer config={config} className="w-[160px] h-[160px]">
           <PieChart>
-            <Tooltip content={<CustomPieTooltip />} />
+            <Tooltip content={<CustomPieTooltip formatter={valueFormatter} />} />
             <Pie
               data={sortedData}
               dataKey="value"

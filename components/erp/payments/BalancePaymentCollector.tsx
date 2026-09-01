@@ -414,14 +414,6 @@ export function BalancePaymentCollector({
             totalNeed={remainingBalance}
             showNumpad={false}
           />
-          {amount > remainingBalance && (
-            <div className="w-full max-w-sm mx-auto mt-4 p-4 bg-blue-50 dark:bg-dark-border/20 border border-blue-200 dark:border-blue-900/30 rounded-xl text-sm flex justify-between items-center font-medium">
-              <span className="text-brand-dark dark:text-dark-heading">Troco a devolver:</span>
-              <span className="font-bold text-brand-primary">
-                {formatCurrency(amount - remainingBalance)}
-              </span>
-            </div>
-          )}
         </>
       )}
 
