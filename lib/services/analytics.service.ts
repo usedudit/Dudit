@@ -1,151 +1,26 @@
 import { redis } from "@/lib/redis"
 import { normalizeSearchQuery } from "@/lib/search/normalize"
+import { isBotSearch } from "@/lib/search/bot-detection"
+import type {
+    SearchTelemetryInput,
+    DemandEventInput,
+    ZeroResultTerm,
+    MarketplaceDemandMetrics,
+} from "@/lib/types/analytics"
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Re-exports ─────────────────────────────────────────────────────────────
 
-export interface SearchTelemetryInput {
-    query: string
-    hasResults: boolean
-    resultsCount: number
-    citySlug?: string | null
-    itemType?: string
-}
-
-export interface DemandEventInput {
-    type: "whatsapp_click" | "phone_click" | "quote_request" | "appointment_request" | "order_created"
-    partnerId?: string | null
-    storeId?: string | null
-    citySlug?: string | null
-    metadata?: Record<string, unknown>
-}
-
-export interface ZeroResultTerm {
-    term: string
-    count: number
-    suggestedCategory?: string
-}
-
-export interface MarketplaceDemandMetrics {
-    totalSearches: number
-    searchesWithResults: number
-    searchesWithoutResults: number
-    contactClicks: number
-    appointmentsCount: number
-    ordersCount: number
-    activeBusinessesCount: number
-    businessesWithDemandCount: number
-    topZeroResultTerms: ZeroResultTerm[]
-    dailyTimeline: Array<{
-        date: string
-        totalSearches: number
-        withResults: number
-        withoutResults: number
-        contacts: number
-    }>
+export { isBotSearch }
+export type {
+    SearchTelemetryInput,
+    DemandEventInput,
+    ZeroResultTerm,
+    MarketplaceDemandMetrics,
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const TELEMETRY_TTL_SECONDS = 60 * 60 * 24 * 90 // 90 days TTL
-
-/**
- * Detects bot/scanner searches that should not be recorded in telemetry.
- * These are typically security scanners, crawlers, or automated tools
- * that probe for files like phpinfo.php, manifest.json, etc.
- */
-export function isBotSearch(query: string): boolean {
-    const q = query.toLowerCase().trim()
-
-    // File extensions commonly targeted by scanners
-    const botFilePatterns = [
-        /\.php$/i,
-        /\.php\//i,
-        /\.json$/i,
-        /\.png$/i,
-        /\.jpg$/i,
-        /\.jpeg$/i,
-        /\.gif$/i,
-        /\.svg$/i,
-        /\.css$/i,
-        /\.js$/i,
-        /\.txt$/i,
-        /\.xml$/i,
-        /\.env$/i,
-        /\.git/i,
-        /\.htaccess/i,
-        /\.htpasswd/i,
-        /\.sql$/i,
-        /\.bak$/i,
-        /\.old$/i,
-        /\.tmp$/i,
-        /\.log$/i,
-        /\.config$/i,
-    ]
-
-    // Specific scanner probe patterns
-    const scannerPatterns = [
-        "phpinfo",
-        "wp-admin",
-        "wp-login",
-        "wp-content",
-        "wp-includes",
-        "xmlrpc",
-        "admin.php",
-        "login.php",
-        "config.php",
-        "setup.php",
-        "install.php",
-        "backup",
-        "shell",
-        "webshell",
-        "cmd.php",
-        "c99",
-        "r57",
-        "eval(",
-        "base64",
-        "/etc/passwd",
-        "/etc/shadow",
-        "proc/self",
-        "cgi-bin",
-        ".git/",
-        ".env",
-        "debug",
-        "test.php",
-        "info.php",
-        "phpinfo",
-        "server-status",
-        "server-info",
-        "elmah.axd",
-        "trace.axd",
-        "web.config",
-        "crossdomain.xml",
-        "favicon.ico",
-        "robots.txt",
-        "sitemap.xml",
-        "manifest.json",
-        "browserconfig.xml",
-        "security.txt",
-        "humans.txt",
-    ]
-
-    // Check for file extensions
-    for (const pattern of botFilePatterns) {
-        if (pattern.test(q)) return true
-    }
-
-    // Check for scanner probe patterns
-    for (const pattern of scannerPatterns) {
-        if (q.includes(pattern)) return true
-    }
-
-    // Check if query looks like a file path (contains slashes and file-like extensions)
-    if (q.includes("/") && /\.\w{2,4}$/.test(q)) return true
-
-    // Check for very short queries that are likely noise
-    if (q.length < 2) return true
-
-    return false
-}
 
 function formatDateKey(d: Date = new Date()): string {
     return d.toISOString().slice(0, 10) // YYYY-MM-DD

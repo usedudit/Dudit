@@ -581,20 +581,20 @@ export function WhatsAppIntegrationPage({
                                                                 {metaConnection?.wabaName && (
                                                                     <div>
                                                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Conta WhatsApp</span>
-                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{metaConnection.wabaName}</span>
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{metaConnection!.wabaName}</span>
                                                                     </div>
                                                                 )}
                                                                 {metaConnection?.phoneNumber && (
                                                                     <div>
                                                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Número</span>
-                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{formatBrazilPhone(metaConnection.phoneNumber || "")}</span>
+                                                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">{formatBrazilPhone(metaConnection!.phoneNumber || "")}</span>
                                                                     </div>
                                                                 )}
                                                                 {metaConnection?.lastSyncedAt && (
                                                                     <div>
                                                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body block mb-1">Última sincronização</span>
                                                                         <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                                                            {new Date(metaConnection.lastSyncedAt).toLocaleString("pt-BR")}
+                                                                            {new Date(metaConnection!.lastSyncedAt!).toLocaleString("pt-BR")}
                                                                         </span>
                                                                     </div>
                                                                 )}

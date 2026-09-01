@@ -30,7 +30,7 @@ import {
     type PartnerAnalyticsData,
     type FeatureUsageData,
 } from "@/app/actions/admin/analytics"
-import type { MarketplaceDemandMetrics } from "@/lib/services/analytics.service"
+import type { MarketplaceDemandMetrics } from "@/lib/types/analytics"
 import { toast } from "@/hooks/use-notification"
 
 interface AdminAnalyticsDashboardProps {

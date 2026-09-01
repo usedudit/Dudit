@@ -18,8 +18,8 @@ import {
 } from "@/lib/icons"
 import { Badge, Button, Input } from "@/components/reusable"
 import { HorizontalKPICard } from "@/components/erp/dashboard/cards/HorizontalKPICard"
-import type { MarketplaceDemandMetrics, ZeroResultTerm } from "@/lib/services/analytics.service"
-import { isBotSearch } from "@/lib/services/analytics.service"
+import type { MarketplaceDemandMetrics, ZeroResultTerm } from "@/lib/types/analytics"
+import { isBotSearch } from "@/lib/search/bot-detection"
 import { DashboardLineChart, DashboardBarChart } from "@/components/erp/dashboard/charts/DashboardCharts"
 
 interface MarketplaceDemandTabProps {
