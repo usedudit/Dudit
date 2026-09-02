@@ -1584,7 +1584,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                                                 <span className="text-brand-inactive-text dark:text-dark-body mb-2">Movimentações de Estoque</span>
                                                                 <div className="space-y-1">
                                                                     {stockData.map((m: any, i: number) => (
-                                                                        <div key={i} className="text-xs text-brand-dark dark:text-dark-heading">
+                                                                        <div key={i} className="text-brand-dark dark:text-dark-heading">
                                                                             <span className="font-medium">
                                                                                 {m.movement_type === "adjustment" ? "Ajuste (reversão)" : "Entrada"}:
                                                                             </span>{' '}

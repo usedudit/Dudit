@@ -28,6 +28,9 @@ export interface SalesReportData {
     grossMargin: number
     grossMarginFormatted: string
     costCoveragePct: number
+    previousRevenue: number
+    previousOrderCount: number
+    previousTicketMedio: number
   }
   bySource: { label: string; value: number }[]
   byPaymentMethod: { label: string; value: number }[]
@@ -328,6 +331,9 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           grossMargin,
           grossMarginFormatted: `${grossMargin}%`,
           costCoveragePct,
+          previousRevenue: prevRevenue,
+          previousOrderCount: prevOrders.length,
+          previousTicketMedio: prevTicket,
         },
         bySource: Array.from(bySource.entries())
           .sort((a, b) => b[1] - a[1])

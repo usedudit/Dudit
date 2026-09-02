@@ -1,10 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, IconPlaceholder, AlertModal, FormDropdown, Input, SkeletonLoader } from "@/components/reusable"
+import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
+import { resolveDatePeriodBounds, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
@@ -64,9 +66,7 @@ export default function DeliveriesPage({
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
     userRole?: string
 }) {
-    const router = useRouter()
     const searchParams = useSearchParams()
-    const pathname = usePathname()
     const { openPlanUpgrade } = usePlanUpgrade()
 
     const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
@@ -95,19 +95,17 @@ export default function DeliveriesPage({
     }, [])
 
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
-    const [filters, setFilters] = useState<{ status: string[] }>({ status: [] })
+    const [filters, setFilters] = useState<{ status: string[]; datePeriod: DatePeriodFilterValue }>({
+        status: [],
+        datePeriod: { presets: ["Últimos 3 dias"], from: "", to: "" },
+    })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [viewMode, setViewMode] = useState<"kanban">("kanban")
 
-    const initialTab = searchParams?.get("tab") === "closed" || searchParams?.get("tab") === "cancelled" ? "closed" : "active"
-    const [activeTab, setActiveTabState] = useState<"active" | "closed">(initialTab)
+    const [activeTab, setActiveTabState] = useState<"active" | "closed">("active")
 
-    // Sync activeTab and search with URL searchParams
+    // Sync search with URL searchParams
     useEffect(() => {
-        const currentTabParam = searchParams?.get("tab") === "closed" || searchParams?.get("tab") === "cancelled" ? "closed" : "active"
-        if (currentTabParam !== activeTab) {
-            setActiveTabState(currentTabParam)
-        }
         const currentSearchParam = searchParams?.get("search") || ""
         if (currentSearchParam !== search) {
             setSearchState(currentSearchParam)
@@ -117,15 +115,6 @@ export default function DeliveriesPage({
 
     const setActiveTab = useCallback((tab: "active" | "closed") => {
         setActiveTabState(tab)
-        if (typeof window !== "undefined") {
-            const url = new URL(window.location.href)
-            if (tab === "closed") {
-                url.searchParams.set("tab", "closed")
-            } else {
-                url.searchParams.delete("tab")
-            }
-            window.history.replaceState(window.history.state, "", url.toString())
-        }
     }, [])
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: "asc" | "desc" } | null>(null)
     const [scrollState, setScrollState] = useState({ left: false, right: false })
@@ -248,6 +237,14 @@ export default function DeliveriesPage({
         return { active, closed }
     }, [items, statusOverrides])
 
+    const filterSections: FilterSectionConfig[] = [
+        {
+            id: "datePeriod",
+            title: "Período",
+            type: "date-period",
+        },
+    ]
+
     const mapped = useMemo(() => {
         const term = debouncedSearch.toLowerCase().trim()
         const nowMs = Date.now()
@@ -306,7 +303,15 @@ export default function DeliveriesPage({
             const isClosedTab = ["cancelled", "delivery_failed"].includes(d.status)
             const matchTab = activeTab === "closed" ? isClosedTab : !isClosedTab
 
-            return matchSearch && matchStatus && matchTab
+            const { startYmd, endYmd } = resolveDatePeriodBounds(filters.datePeriod)
+            const createdYmd = d.createdAtMs ? new Date(d.createdAtMs).toISOString().slice(0, 10) : null
+            const matchDate = !startYmd && !endYmd
+                ? true
+                : createdYmd
+                    ? createdYmd >= (startYmd || "") && createdYmd <= (endYmd || "9999-12-31")
+                    : false
+
+            return matchSearch && matchStatus && matchTab && matchDate
         })
 
         if (sortConfig) {
@@ -497,10 +502,10 @@ export default function DeliveriesPage({
                                                 planGate
                                                     ? planGate.message
                                                     : isDelivery
-                                                    ? "Nenhuma entrega atribuída a você no momento."
-                                                    : activeTab === "closed"
-                                                    ? "Nenhuma entrega cancelada ou com falha encontrada."
-                                                    : "Crie uma entrega a partir de um pedido para começar."
+                                                        ? "Nenhuma entrega atribuída a você no momento."
+                                                        : activeTab === "closed"
+                                                            ? "Nenhuma entrega cancelada ou com falha encontrada."
+                                                            : "Crie uma entrega a partir de um pedido para começar."
                                             }
                                             itemButton={
                                                 planGate ? {
@@ -536,36 +541,31 @@ export default function DeliveriesPage({
                 onClose={() => setSuggestionsOpen(false)}
                 title="Sugestões de entregas"
                 maxWidth="4xl"
-                footer={
-                    <Button variant="outline" onClick={() => setSuggestionsOpen(false)}>
-                        Fechar
-                    </Button>
-                }
             >
                 <div className="space-y-4">
                     {suggestionsLoading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[1, 2, 3, 4].map((i) => (
                                 <div key={i} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between space-y-3">
-                                    <SkeletonLoader height={84} className="rounded-xl w-full" />
+                                    <div className="h-[84px] w-full bg-gray-200 dark:bg-dark-border rounded-xl animate-pulse" />
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="space-y-2 flex-1 min-w-0">
-                                            <SkeletonLoader height={16} width="65%" className="rounded" />
+                                            <div className="h-4 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
                                             <div className="flex gap-1.5 pt-1">
-                                                <SkeletonLoader height={20} width={70} className="rounded-full" />
-                                                <SkeletonLoader height={20} width={50} className="rounded-full" />
+                                                <div className="h-5 w-[70px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+                                                <div className="h-5 w-[50px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
                                             </div>
                                         </div>
-                                        <SkeletonLoader height={32} width={90} className="rounded-lg shrink-0" />
+                                        <div className="h-8 w-[90px] bg-gray-200 dark:bg-dark-border rounded-lg shrink-0 animate-pulse" />
                                     </div>
                                     <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
                                         <div className="flex justify-between items-center">
-                                            <SkeletonLoader height={14} width="55%" className="rounded" />
-                                            <SkeletonLoader height={14} width={40} className="rounded" />
+                                            <div className="h-3.5 w-[55%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                            <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <SkeletonLoader height={14} width="65%" className="rounded" />
-                                            <SkeletonLoader height={14} width={40} className="rounded" />
+                                            <div className="h-3.5 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                            <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
                                         </div>
                                     </div>
                                 </div>
@@ -769,6 +769,15 @@ export default function DeliveriesPage({
                     }
                 }}
                 variant="info"
+            />
+
+            <FilterSheet
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => setFilters({ status: [], datePeriod: { presets: [], from: "", to: "" } })}
             />
         </AnimatePresence>
     )

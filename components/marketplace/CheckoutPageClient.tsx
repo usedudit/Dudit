@@ -1586,9 +1586,7 @@ export function CheckoutPageClient() {
                                         ? (
                                             <span className="flex items-center gap-1.5 justify-end">
                                                 {(deliveryBreakdown as any)?.originalFee != null && Number((deliveryBreakdown as any).originalFee) > 0 && (
-                                                    <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">
-                                                        {formatCurrency(Number((deliveryBreakdown as any).originalFee))}
-                                                    </span>
+                                                    <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number((deliveryBreakdown as any).originalFee))} | </span>
                                                 )}
                                                 <span className="text-brand-green font-semibold">Grátis</span>
                                             </span>
@@ -2168,9 +2166,74 @@ export function CheckoutPageClient() {
                 }
                 return
             } else if (paymentOption === "mercadopago") {
+                const token = csrfToken || await fetchCSRFTokenSingleton() || ""
+                let orderId, orderNumber
+                if (sessionData?.source === "cart") {
+                    const items = sessionData.cartItems || []
+                    const result = await checkoutCartAction(
+                        items.map(item => {
+                            const matchedLine = checkoutContext?.lines?.find(l => l.lineId === item.cartItemId);
+                            return {
+                                cartItemId: item.cartItemId,
+                                productId: item.productId || "",
+                                variantId: item.variantId,
+                                quantity:
+                                    quantities[item.cartItemId]
+                                    || quantities[item.productId || item.serviceId || item.recurringPlanId || ""]
+                                    || item.quantity,
+                                fulfillmentMode: item.productId ? (formData.deliveryType === "delivery" ? "delivery" : "pickup") : (matchedLine?.fulfillmentMode || undefined),
+                            }
+                        }),
+                        formData.deliveryType,
+                        formData.deliveryAddress,
+                        "mercadopago",
+                        1,
+                        formData.notes,
+                        couponCode || null,
+                        false,
+                        token,
+                        wantsChange || false,
+                        payWithAmount || undefined,
+                        payDepositOnly,
+                        checkoutPricingSnapshot,
+                        isPickupPayment,
+                        storeId,
+                        useStoreCredit && availableStoreCredit > 0,
+                    )
+                    if (result.error) throw new Error(result.error)
+                    orderId = result.orderId
+                    orderNumber = result.orderNumber
+                    invalidateCartCache()
+                    sessionStorage.removeItem("checkout_session")
+                } else {
+                    const result = await createOrderAction({
+                        itemId: sessionData?.itemId || products[0]?.id || "",
+                        itemType: sessionData?.itemType || "product",
+                        quantity: quantities[products[0]?.id] || products[0]?.quantity || 1,
+                        totalAmount: checkoutChargeTotal,
+                        deliveryType: formData.deliveryType,
+                        deliveryAddress: formData.deliveryAddress,
+                        paymentMethod: "mercadopago",
+                        installments: 1,
+                        notes: formData.notes,
+                        partnerId: partnerId,
+                        csrf_token: token,
+                        couponCode: couponCode || null,
+                        wantsChange: wantsChange || false,
+                        payWithAmount: payWithAmount || undefined,
+                        checkoutPricingSnapshot,
+                    })
+                    if ('error' in result && result.error) throw new Error(result.error)
+                    const successResult = result as any
+                    orderId = successResult.orderId
+                    orderNumber = successResult.orderNumber
+                    sessionStorage.removeItem("checkout_session")
+                }
+
                 const amount = checkoutChargeTotal
                 setPixPaymentData({
-                    orderId: "temp-" + Date.now(),
+                    orderId: orderId,
+                    orderNumber: orderNumber,
                     amount,
                     orderDetails: {
                         items: products.map(p => ({

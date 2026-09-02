@@ -143,7 +143,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
                 entityId: quoteId,
                 data: {
                     audience: "seller",
-                    href: `/erp/orcamentos?quote=${quoteId}`,
+                    href: `/erp/orcamentos?view=${quoteId}`,
                     quoteId,
                     quote_number: quoteNum,
                 },
@@ -162,7 +162,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
                 entityId: quoteId,
                 data: {
                     audience: "seller",
-                    href: `/erp/orcamentos?quote=${quoteId}`,
+                    href: `/erp/orcamentos?view=${quoteId}`,
                     quoteId,
                     quote_number: quoteNum,
                     rejection_reason: rejectionReason || null,
@@ -182,7 +182,7 @@ export async function notifyQuoteEvent(input: QuoteNotificationInput): Promise<v
                 entityId: quoteId,
                 data: {
                     audience: "seller",
-                    href: `/erp/orcamentos?quote=${quoteId}`,
+                    href: `/erp/orcamentos?view=${quoteId}`,
                     quoteId,
                     quote_number: quoteNum,
                 },

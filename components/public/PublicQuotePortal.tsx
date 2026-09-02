@@ -129,7 +129,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         setIsProcessingAction(true)
         setApproveModalError(null)
         try {
-            const res = await approvePublicQuoteAction(token, "Cliente", (isClientEmailMatched || !!currentUser) ? "" : approvalCode, ip, userAgent)
+            const codeToSend = approvalCode.trim()
+            const res = await approvePublicQuoteAction(token, "Cliente", codeToSend, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento aprovado com sucesso!")
                 setShowApproveModal(false)
@@ -158,7 +159,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
         setIsProcessingAction(true)
         setRejectModalError(null)
         try {
-            const res = await rejectPublicQuoteAction(token, "Cliente", (isClientEmailMatched || !!currentUser) ? "" : approvalCode, rejectionReason, ip, userAgent)
+            const codeToSend = approvalCode.trim()
+            const res = await rejectPublicQuoteAction(token, "Cliente", codeToSend, rejectionReason, ip, userAgent)
             if (res.success) {
                 setSuccessMessage("Orçamento recusado com sucesso.")
                 setShowRejectModal(false)
@@ -203,17 +205,31 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const partnerName = useMemo(() => {
         const snapName = snapshot?.partner?.name
         if (snapName && snapName !== "Parceiro") return snapName
-        return resolvedPartner?.stores?.[0]?.name || resolvedPartner?.store_name || snapName || "Parceiro"
+        return resolvedPartner?.name || resolvedPartner?.store_name || resolvedPartner?.stores?.[0]?.name || snapName || "Parceiro"
     }, [snapshot, resolvedPartner])
 
     const partnerLogo = useMemo(() => {
         const snapLogo = snapshot?.partner?.image_url
-        return getR2ImageUrl(snapLogo || resolvedPartner?.store_image_url || null)
+        const raw = snapLogo || resolvedPartner?.logo_url || resolvedPartner?.store_image_url || null
+        if (!raw || (typeof raw === "string" && raw.includes("Placeholder.png"))) return null
+        return getR2ImageUrl(raw)
     }, [snapshot, resolvedPartner])
 
-    const partnerAddress = snapshot?.partner?.address || "Endereço comercial não disponível"
-    const partnerEmail = snapshot?.partner?.email || resolvedPartner?.email || "vendas@dudit.com"
-    const partnerPhone = snapshot?.partner?.phone || resolvedPartner?.phone || ""
+    const partnerAddress = useMemo(() => {
+        const snapAddr = snapshot?.partner?.address
+        if (snapAddr && snapAddr !== "Endereço não cadastrado" && snapAddr !== "Endereço comercial não disponível") {
+            return snapAddr
+        }
+        return resolvedPartner?.address || snapAddr || "Endereço não cadastrado"
+    }, [snapshot?.partner?.address, resolvedPartner?.address])
+
+    const partnerPhone = useMemo(() => {
+        return snapshot?.partner?.phone || resolvedPartner?.phone || ""
+    }, [snapshot?.partner?.phone, resolvedPartner?.phone])
+
+    const partnerEmail = useMemo(() => {
+        return snapshot?.partner?.email || resolvedPartner?.email || "vendas@dudit.com"
+    }, [snapshot?.partner?.email, resolvedPartner?.email])
 
     const sellerName = snapshot?.seller?.name || "Vendedor Responsável"
     const sellerEmail = snapshot?.seller?.email || ""
@@ -226,6 +242,8 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     const isClientEmailMatched = useMemo(() => {
         return !!(currentUser && customerEmail && currentUser.email?.toLowerCase() === customerEmail.toLowerCase())
     }, [currentUser, customerEmail])
+
+    const isDirectApprover = Boolean(quote?.can_direct_approve || isClientEmailMatched)
 
     // Address rendering for customer
     const customerAddressText = (() => {
@@ -245,342 +263,387 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     }, [items])
 
     const isFinalized = quote.status === "approved" || quote.status === "rejected" || quote.status === "expired" || quote.status === "cancelled" || quote.converted
-    const isActionable = !isFinalized && (quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed")
+    const isActionable = !isFinalized && (quote.status === "sent" || quote.status === "pending_client" || quote.status === "viewed" || quote.status === "draft")
 
     return (
-        <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
-            <style>{`
+        <>
+            <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
+                <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
+                    <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
+                        <img
+                            src="https://img.dudit.com.br/static/Logo.png"
+                            alt="Dudit"
+                            width={140}
+                            height={40}
+                            className="h-10 w-auto object-contain"
+                        />
+                    </a>
+                </div>
+            </header>
+
+            <div className="flex flex-col h-screen bg-white dark:bg-dark-background overflow-hidden relative">
+                <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
-                <div className="flex-1 w-full h-full relative pb-20 md:pb-0 flex flex-col overflow-hidden">
-                    <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
+                    <div className="flex-1 w-full h-full relative pb-20 md:pb-0 flex flex-col overflow-hidden">
+                        <div className="flex-1 flex flex-col lg:flex-row w-full overflow-hidden">
 
-                        {/* LEFT COLUMN: INFO & ACTIONS */}
-                        <div
-                            className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative`}
-                        >
-                            {/* Sticky Header inside left column */}
-                            <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                <div className="px-4 md:px-6 pt-4">
-                                    <div className="flex items-center justify-between pb-2">
-                                        <div className="flex items-center gap-3">
-                                            {partnerLogo ? (
-                                                <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-full border border-brand-border dark:border-dark-border" />
-                                            ) : (
-                                                <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                                    {partnerName.substring(0, 2).toUpperCase()}
+                            {/* LEFT COLUMN: INFO & ACTIONS */}
+                            <div
+                                className={`w-full lg:w-1/2 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative`}
+                            >
+                                {/* Sticky Header inside left column */}
+                                <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+                                    <div className="px-4 md:px-6 pt-4">
+                                        <div className="flex items-center justify-between pb-2">
+                                            <div className="flex items-center gap-3">
+                                                {partnerLogo ? (
+                                                    <img src={partnerLogo} alt={partnerName} className="h-9 w-9 object-cover rounded-full border border-brand-border dark:border-dark-border" />
+                                                ) : (
+                                                    <div className="h-9 w-9 rounded-lg bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                        {partnerName.substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
+                                                    <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">Proposta comercial</span>
                                                 </div>
-                                            )}
-                                            <div>
-                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">{partnerName}</span>
-                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">Proposta comercial</span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={getStatusBadgeVariant(quote.status)}>
+                                                    {getStatusLabel(quote.status)}
+                                                </Badge>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={getStatusBadgeVariant(quote.status)}>
-                                                {getStatusLabel(quote.status)}
-                                            </Badge>
+                                        {/* Responsive Tabs List */}
+                                        <div className="w-full mt-4">
+                                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                                <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
+                                                <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
+                                            </TabsList>
                                         </div>
-                                    </div>
-
-                                    {/* Responsive Tabs List */}
-                                    <div className="w-full mt-4">
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
-                                            <TabsTrigger value="Visualização" className="lg:hidden">Visualização</TabsTrigger>
-                                        </TabsList>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Scrollable Content inside left column */}
-                            <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
-                                {/* Success and Error Banners */}
-                                {successMessage && (
-                                    <InfoCard message={successMessage} color='green' className="mb-8" rightElement={<Button variant="link" className="text-brand-green" onClick={() => setSuccessMessage(null)} value="X" />} />
-                                )}
-
-                                {errorMessage && (
-                                    <InfoCard message={errorMessage} color='red' className="mb-8" rightElement={<Button variant="link" className="text-brand-red" onClick={() => setErrorMessage(null)} value="X" />} />
-                                )}
-
-                                {/* TABS CONTENT */}
-                                <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
-                                    {/* Messages */}
-                                    {isFinalized && (
-                                        <div className="mb-8">
-                                            {quote.status === "approved" ? (
-                                                <InfoCard
-                                                    title={
-                                                        quote.approval_method === "erp_manual"
-                                                            ? "Aprovado no ERP"
-                                                            : quote.approval_method === "erp_portal"
-                                                                ? "Aprovado pelo lojista"
-                                                                : "Aprovado pelo cliente"
-                                                    }
-                                                    message={`Aprovador: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`}
-                                                    color='green'
-                                                />
-                                            ) : quote.status === "rejected" ? (
-                                                <InfoCard
-                                                    title={
-                                                        quote.approval_method === "erp_manual"
-                                                            ? "Recusado no ERP"
-                                                            : quote.approval_method === "erp_portal"
-                                                                ? "Recusado pelo lojista"
-                                                                : "Recusado pelo cliente"
-                                                    }
-                                                    message={`Autor: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.rejected_at)}` + (quote.rejection_reason ? ` - Motivo: ${quote.rejection_reason}` : "")}
-                                                    color='red'
-                                                />
-                                            ) : quote.status === "expired" ? (
-                                                <InfoCard title="Proposta Expirada" message={`A proposta atingiu seu limite de validade em ${formatDateString(quote.expiration_date)} e expirou.`} color="orange" />
-                                            ) : (
-                                                <InfoCard title="Proposta Cancelada" message="Orçamento cancelado pelo vendedor." color="red" />
-                                            )}
-                                        </div>
+                                {/* Scrollable Content inside left column */}
+                                <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24">
+                                    {/* Success and Error Banners */}
+                                    {successMessage && (
+                                        <InfoCard message={successMessage} color='green' className="mb-8" rightElement={<Button variant="link" className="text-brand-green" onClick={() => setSuccessMessage(null)} value="X" />} />
                                     )}
 
-                                    {/* ─── TAB: DADOS GERAIS ─── */}
-                                    {activeTab === "Dados Gerais" && (
-                                        <div className="space-y-8 text-left">
-                                            {/* Code & Expiry FormSection */}
-                                            <FormSection title="Informações da proposta">
-                                                <div className="space-y-3">
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da proposta</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de emissão</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center text-sm">
-                                                        <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Validade da proposta</span>
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
-                                                    </div>
-                                                </div>
-                                            </FormSection>
+                                    {errorMessage && (
+                                        <InfoCard message={errorMessage} color='red' className="mb-8" rightElement={<Button variant="link" className="text-brand-red" onClick={() => setErrorMessage(null)} value="X" />} />
+                                    )}
 
-                                            {/* Customer FormSection */}
-                                            <FormSection title="Cliente" hasSeparator>
-                                                {selectedCustomer ? (
-                                                    <CustomerCard customer={selectedCustomer} chrome="minimal" />
+                                    {/* TABS CONTENT */}
+                                    <div className={`${activeTab === "Visualização" ? "hidden lg:block" : "block"}`}>
+                                        {/* Messages */}
+                                        {isFinalized && (
+                                            <div className="mb-8">
+                                                {quote.status === "approved" ? (
+                                                    <InfoCard
+                                                        title={
+                                                            quote.approval_method === "erp_manual"
+                                                                ? "Aprovado no ERP"
+                                                                : quote.approval_method === "erp_portal"
+                                                                    ? "Aprovado pelo lojista"
+                                                                    : "Aprovado pelo cliente"
+                                                        }
+                                                        message={`Aprovador: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.approved_at)}`}
+                                                        color='green'
+                                                    />
+                                                ) : quote.status === "rejected" ? (
+                                                    <InfoCard
+                                                        title={
+                                                            quote.approval_method === "erp_manual"
+                                                                ? "Recusado no ERP"
+                                                                : quote.approval_method === "erp_portal"
+                                                                    ? "Recusado pelo lojista"
+                                                                    : "Recusado pelo cliente"
+                                                        }
+                                                        message={`Autor: ${maskEmail(quote.approver_name) || "Cliente"} - Data: ${formatDateTime(quote.rejected_at)}` + (quote.rejection_reason ? ` - Motivo: ${quote.rejection_reason}` : "")}
+                                                        color='red'
+                                                    />
+                                                ) : quote.status === "expired" ? (
+                                                    <InfoCard title="Proposta Expirada" message={`A proposta atingiu seu limite de validade em ${formatDateString(quote.expiration_date)} e expirou.`} color="orange" />
                                                 ) : (
-                                                    <div className="space-y-2">
-                                                        <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
-                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
-                                                        {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {formatBrazilPhone(customerPhone)}</p>}
-                                                        {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {maskEmail(customerEmail)}</p>}
+                                                    <InfoCard title="Proposta Cancelada" message="Orçamento cancelado pelo vendedor." color="red" />
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* ─── TAB: DADOS GERAIS ─── */}
+                                        {activeTab === "Dados Gerais" && (
+                                            <div className="space-y-8 text-left">
+                                                {/* Code & Expiry FormSection */}
+                                                <FormSection title="Informações da proposta">
+                                                    <div className="space-y-3">
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Código da proposta</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{dataQuote.quote_number || "Orçamento"}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data de emissão</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.issue_date)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Validade da proposta</span>
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateString(dataQuote.expiration_date)}</span>
+                                                        </div>
+                                                    </div>
+                                                </FormSection>
+
+                                                {/* Customer FormSection */}
+                                                <FormSection title="Cliente" hasSeparator>
+                                                    {selectedCustomer ? (
+                                                        <CustomerCard customer={selectedCustomer} chrome="minimal" />
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{customerName}</p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço especificado.</p>
+                                                            {customerPhone && <p className="text-xs text-brand-inactive-text dark:text-dark-body">Telefone: {formatBrazilPhone(customerPhone)}</p>}
+                                                            {customerEmail && <p className="text-xs text-brand-inactive-text dark:text-dark-body">E-mail: {maskEmail(customerEmail)}</p>}
+                                                        </div>
+                                                    )}
+                                                </FormSection>
+
+                                                {/* Commercial Notes / Observation FormSection */}
+                                                {dataQuote.notes && (
+                                                    <FormSection title="Observações comerciais" hasSeparator>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{dataQuote.notes}</p>
+                                                    </FormSection>
+                                                )}
+
+                                                {isActionable && (
+                                                    <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
+                                                        <Button
+                                                            onClick={() => { setShowRejectModal(true); setRejectModalError(null); }}
+                                                            variant="outlinered"
+                                                            className="flex-1 h-12"
+                                                        >
+                                                            Recusar proposta
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => { setShowApproveModal(true); setApproveModalError(null); }}
+                                                            className="flex-1 h-12"
+                                                        >
+                                                            Aprovar proposta
+                                                        </Button>
                                                     </div>
                                                 )}
-                                            </FormSection>
+                                            </div>
+                                        )}
 
-                                            {/* Commercial Notes / Observation FormSection */}
-                                            {dataQuote.notes && (
-                                                <FormSection title="Observações comerciais" hasSeparator>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body whitespace-pre-wrap leading-relaxed">{dataQuote.notes}</p>
-                                                </FormSection>
-                                            )}
-
-                                            {isActionable && (
-                                                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-brand-border dark:border-dark-border">
-                                                    <Button
-                                                        onClick={() => { setShowRejectModal(true); setRejectModalError(null); }}
-                                                        variant="outlinered"
-                                                        className="flex-1 h-12"
-                                                    >
-                                                        Recusar proposta
-                                                    </Button>
-                                                    <Button
-                                                        onClick={() => { setShowApproveModal(true); setApproveModalError(null); }}
-                                                        className="flex-1 h-12"
-                                                    >
-                                                        Aprovar proposta
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                </div>
-
-                                {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
-                                <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
-                                    <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
-                                        <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
-                                            <QuotePreview
-                                                invoiceNumber={dataQuote.quote_number || "ORC00000"}
-                                                quoteDate={dataQuote.issue_date || ""}
-                                                expiryDate={dataQuote.expiration_date || ""}
-                                                selectedCustomer={selectedCustomer}
-                                                quoteItems={mappedPreviewItems}
-                                                subtotal={Number(dataQuote.subtotal || 0)}
-                                                shippingNum={Number(dataQuote.shipping_cost || 0)}
-                                                otherCosts={Number(dataQuote.additional_costs || 0)}
-                                                discountValue={Number(dataQuote.discount_value || 0)}
-                                                total={Number(dataQuote.total || 0)}
-                                                note={dataQuote.notes || undefined}
-                                                primaryColor={previewMeta.primaryColor}
-                                                secondaryColor={previewMeta.secondaryColor}
-                                                quoteTitle={previewMeta.quoteTitle}
-                                                quoteSubtitle={previewMeta.quoteSubtitle}
-                                                showDecoration={previewMeta.showDecoration}
-                                                partnerName={partnerName}
-                                                partnerAddress={partnerAddress}
-                                                partnerPhone={partnerPhone}
-                                                partnerAvatar={partnerLogo || undefined}
-                                                printMode={false}
-                                                showCustomerContact={false}
-                                                salespersonName={dataQuote.seller_name || undefined}
-                                            />
-                                        </div>
                                     </div>
-                                </TabsContent>
+
+                                    {/* ─── TAB: VISUALIZAÇÃO (MOBILE ONLY) ─── */}
+                                    <TabsContent value="Visualização" className="mt-0 focus-visible:outline-none h-full lg:hidden" forceMount>
+                                        <div className={`${activeTab === "Visualização" ? "block" : "hidden"}`}>
+                                            <div className="w-full h-[calc(100vh-220px)] bg-brand-gray dark:bg-dark-border/20 rounded-2xl overflow-hidden">
+                                                <QuotePreview
+                                                    invoiceNumber={dataQuote.quote_number || "ORC00000"}
+                                                    quoteDate={dataQuote.issue_date || ""}
+                                                    expiryDate={dataQuote.expiration_date || ""}
+                                                    selectedCustomer={selectedCustomer}
+                                                    quoteItems={mappedPreviewItems}
+                                                    subtotal={Number(dataQuote.subtotal || 0)}
+                                                    shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                                    otherCosts={Number(dataQuote.additional_costs || 0)}
+                                                    discountValue={Number(dataQuote.discount_value || 0)}
+                                                    total={Number(dataQuote.total || 0)}
+                                                    note={dataQuote.notes || undefined}
+                                                    primaryColor={previewMeta.primaryColor}
+                                                    secondaryColor={previewMeta.secondaryColor}
+                                                    quoteTitle={previewMeta.quoteTitle}
+                                                    quoteSubtitle={previewMeta.quoteSubtitle}
+                                                    showDecoration={previewMeta.showDecoration}
+                                                    partnerName={partnerName}
+                                                    partnerAddress={partnerAddress}
+                                                    partnerPhone={partnerPhone}
+                                                    partnerAvatar={partnerLogo || undefined}
+                                                    printMode={false}
+                                                    showCustomerContact={false}
+                                                    salespersonName={dataQuote.seller_name || undefined}
+                                                />
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
-                        <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
-                            <QuotePreview
-                                invoiceNumber={dataQuote.quote_number || "ORC00000"}
-                                quoteDate={dataQuote.issue_date || ""}
-                                expiryDate={dataQuote.expiration_date || ""}
-                                selectedCustomer={selectedCustomer}
-                                quoteItems={mappedPreviewItems}
-                                subtotal={Number(dataQuote.subtotal || 0)}
-                                shippingNum={Number(dataQuote.shipping_cost || 0)}
-                                otherCosts={Number(dataQuote.additional_costs || 0)}
-                                discountValue={Number(dataQuote.discount_value || 0)}
-                                total={Number(dataQuote.total || 0)}
-                                note={dataQuote.notes || undefined}
-                                primaryColor={previewMeta.primaryColor}
-                                secondaryColor={previewMeta.secondaryColor}
-                                quoteTitle={previewMeta.quoteTitle}
-                                quoteSubtitle={previewMeta.quoteSubtitle}
-                                showDecoration={previewMeta.showDecoration}
-                                partnerName={partnerName}
-                                partnerAddress={partnerAddress}
-                                partnerAvatar={partnerLogo || undefined}
-                                printMode={false}
-                                showCustomerContact={false}
-                                salespersonName={dataQuote.seller_name || undefined}
-                            />
-                        </div>
+                            {/* RIGHT COLUMN: PREVIEW (DESKTOP ONLY) */}
+                            <div className="hidden lg:flex lg:w-1/2 bg-brand-gray/30 dark:bg-dark-border/10 overflow-auto no-scrollbar relative flex-col h-full">
+                                <QuotePreview
+                                    invoiceNumber={dataQuote.quote_number || "ORC00000"}
+                                    quoteDate={dataQuote.issue_date || ""}
+                                    expiryDate={dataQuote.expiration_date || ""}
+                                    selectedCustomer={selectedCustomer}
+                                    quoteItems={mappedPreviewItems}
+                                    subtotal={Number(dataQuote.subtotal || 0)}
+                                    shippingNum={Number(dataQuote.shipping_cost || 0)}
+                                    otherCosts={Number(dataQuote.additional_costs || 0)}
+                                    discountValue={Number(dataQuote.discount_value || 0)}
+                                    total={Number(dataQuote.total || 0)}
+                                    note={dataQuote.notes || undefined}
+                                    primaryColor={previewMeta.primaryColor}
+                                    secondaryColor={previewMeta.secondaryColor}
+                                    quoteTitle={previewMeta.quoteTitle}
+                                    quoteSubtitle={previewMeta.quoteSubtitle}
+                                    showDecoration={previewMeta.showDecoration}
+                                    partnerName={partnerName}
+                                    partnerAddress={partnerAddress}
+                                    partnerPhone={partnerPhone}
+                                    partnerAvatar={partnerLogo || undefined}
+                                    printMode={false}
+                                    showCustomerContact={false}
+                                    salespersonName={dataQuote.seller_name || undefined}
+                                />
+                            </div>
 
+                        </div>
                     </div>
-                </div>
-            </Tabs >
+                </Tabs >
 
-            {/* ─── MODAL: APPROVE PROPOSAL ─────────────────────────────────────── */}
-            < DefaultModal
-                isOpen={showApproveModal}
-                onClose={() => setShowApproveModal(false)
-                }
-                title="Aprovar proposta"
-                maxWidth="md"
-                footer={
-                    < div className="flex gap-3 w-full" >
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowApproveModal(false)}
-                            className="flex-1 h-auto"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={handleApprove}
-                            disabled={(!isClientEmailMatched && approvalCode.length < 4) || isProcessingAction}
-                            className="flex-1 h-auto"
-                        >
-                            {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
-                        </Button>
-                    </div >
-                }
-            >
-                <div className="space-y-4 text-left">
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {isClientEmailMatched
-                            ? `Você está conectado como ${currentUser.email} e pode aprovar esta proposta diretamente.`
-                            : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
-                        }
-                    </p>
-
-                    {!isClientEmailMatched && (
-                        <div className="space-y-3">
-                            <Input
-                                label="Código de aprovação (4 dígitos)"
-                                maxLength={4}
-                                value={approvalCode}
-                                onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                                placeholder="0000"
-                            />
+                {/* ─── MODAL: APPROVE PROPOSAL ─────────────────────────────────────── */}
+                <DefaultModal
+                    isOpen={showApproveModal}
+                    onClose={() => {
+                        setShowApproveModal(false)
+                        setApproveModalError(null)
+                    }}
+                    title="Aprovar proposta"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex gap-3 w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowApproveModal(false)
+                                    setApproveModalError(null)
+                                }}
+                                className="flex-1 h-auto"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleApprove}
+                                disabled={(!isDirectApprover && approvalCode.length < 4) || isProcessingAction}
+                                className="flex-1 h-auto"
+                            >
+                                {isProcessingAction ? "Aprovando..." : "Confirmar aprovação"}
+                            </Button>
                         </div>
-                    )}
-                </div>
-            </DefaultModal >
-
-            {/* ─── MODAL: REJECT PROPOSAL ─────────────────────────────────────── */}
-            < DefaultModal
-                isOpen={showRejectModal}
-                onClose={() => setShowRejectModal(false)}
-                title="Recusar proposta"
-                maxWidth="md"
-                footer={
-                    < div className="flex gap-3 w-full" >
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowRejectModal(false)}
-                            className="flex-1 h-auto"
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={handleReject}
-                            disabled={(!isClientEmailMatched && approvalCode.length < 4) || !rejectionReason.trim() || isProcessingAction}
-                            className="flex-1 h-auto"
-                        >
-                            {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
-                        </Button>
-                    </div >
-                }
-            >
-                <div className="space-y-4 text-left">
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
-                        {isClientEmailMatched
-                            ? `Você está conectado como ${currentUser.email} e pode recusar esta proposta diretamente.`
-                            : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
-                        }
-                    </p>
-
-                    <div className="space-y-3">
-                        {!isClientEmailMatched && (
-                            <Input
-                                label="Código de aprovação (4 dígitos)"
-                                maxLength={4}
-                                value={approvalCode}
-                                onChange={(e) => setApprovalCode(e.target.value.replace(/\D/g, ""))}
-                                placeholder="0000"
-                            />
+                    }
+                >
+                    <div className="space-y-4 text-left">
+                        {approveModalError && (
+                            <InfoCard message={approveModalError} color="red" />
                         )}
 
-                        <FormTextarea
-                            label="Motivo da recusa"
-                            name="rejectionReason"
-                            rows={3}
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            placeholder="Ex: Preço acima do orçamento planejado / Prazo de entrega inviável..."
-                            maxLength={500}
-                            showCharacterCount
-                        />
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            {isDirectApprover
+                                ? `Você está conectado como ${currentUser?.email || "usuário autorizado"} e pode aprovar esta proposta diretamente.`
+                                : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
+                            }
+                        </p>
+
+                        {!isDirectApprover && (
+                            <div className="space-y-3">
+                                <Input
+                                    label="Código de aprovação (4 dígitos)"
+                                    maxLength={4}
+                                    value={approvalCode}
+                                    onChange={(e) => {
+                                        setApprovalCode(e.target.value.replace(/\D/g, ""))
+                                        if (approveModalError) setApproveModalError(null)
+                                    }}
+                                    placeholder="0000"
+                                />
+                            </div>
+                        )}
                     </div>
-                </div>
-            </DefaultModal >
-        </div >
+                </DefaultModal>
+
+                {/* ─── MODAL: REJECT PROPOSAL ─────────────────────────────────────── */}
+                <DefaultModal
+                    isOpen={showRejectModal}
+                    onClose={() => {
+                        setShowRejectModal(false)
+                        setRejectModalError(null)
+                    }}
+                    title="Recusar proposta"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex gap-3 w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setShowRejectModal(false)
+                                    setRejectModalError(null)
+                                }}
+                                className="flex-1 h-auto"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleReject}
+                                disabled={(!isDirectApprover && approvalCode.length < 4) || !rejectionReason.trim() || isProcessingAction}
+                                className="flex-1 h-auto"
+                            >
+                                {isProcessingAction ? "Recusando..." : "Confirmar recusa"}
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4 text-left">
+                        {rejectModalError && (
+                            <InfoCard message={rejectModalError} color="red" />
+                        )}
+
+                        <p className="text-xs text-brand-inactive-text dark:text-dark-body leading-relaxed">
+                            {isDirectApprover
+                                ? `Você está conectado como ${currentUser?.email || "usuário autorizado"} e pode recusar esta proposta diretamente.`
+                                : "Insira o código de aprovação de 4 dígitos gerado pelo vendedor responsável."
+                            }
+                        </p>
+
+                        <div className="space-y-3">
+                            {!isDirectApprover && (
+                                <Input
+                                    label="Código de aprovação (4 dígitos)"
+                                    maxLength={4}
+                                    value={approvalCode}
+                                    onChange={(e) => {
+                                        setApprovalCode(e.target.value.replace(/\D/g, ""))
+                                        if (rejectModalError) setRejectModalError(null)
+                                    }}
+                                    placeholder="0000"
+                                />
+                            )}
+
+                            <FormTextarea
+                                label="Motivo da recusa"
+                                name="rejectionReason"
+                                rows={3}
+                                value={rejectionReason}
+                                onChange={(e) => {
+                                    setRejectionReason(e.target.value)
+                                    if (rejectModalError) setRejectModalError(null)
+                                }}
+                                placeholder="Ex: Preço acima do orçamento planejado / Prazo de entrega inviável..."
+                                maxLength={500}
+                                showCharacterCount
+                            />
+                        </div>
+                    </div>
+                </DefaultModal>
+            </div>
+        </>
     )
 }

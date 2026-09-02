@@ -5,6 +5,7 @@ import { AccessDenied } from "@/components/erp/access-denied"
 import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
+import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { IconPlaceholder } from "@/components/reusable"
@@ -14,18 +15,6 @@ import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 import type { Period, CompareMode } from "@/lib/period-types"
 
 export const dynamic = "force-dynamic"
-
-function DashboardSkeleton() {
-    return (
-        <div className="space-y-6">
-            <div className="h-[140px] animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20" />
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <div className="h-72 animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20 xl:col-span-2" />
-                <div className="h-72 animate-pulse rounded-[24px] border border-brand-border bg-brand-gray/40 dark:border-dark-border dark:bg-dark-border/20" />
-            </div>
-        </div>
-    )
-}
 
 export default async function ERPDashboardPage(props: { searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }> }) {
     const context = await getCurrentPartnerContext()
@@ -91,7 +80,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
                                 <GlobalPeriodFilter />
                             </Suspense>
                         </header>
-                        <Suspense fallback={<DashboardSkeleton />}>
+                        <Suspense fallback={<ReportsSkeleton />}>
                             <GeneralTab partnerId={partnerId} sells={activeResources} period={period} compare={compare} compareFrom={compareFrom} compareTo={compareTo} />
                         </Suspense>
                     </div>

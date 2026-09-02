@@ -47,6 +47,7 @@ interface ProcessPaymentRequest {
     deliveryFee: number
     finalTotal: number
   }
+  existingOrderId?: string
 }
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -105,7 +106,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId } = body
+    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId } = body
     const claimedPartnerId = body.partnerId
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
     if (body.checkoutPricing && !checkoutPricing) {
@@ -918,60 +919,123 @@ async function handler(request: NextRequest) {
       ) as Record<string, unknown>
     }
 
-    const { data: newOrder, error: orderError } = await adminClient
-      .from("orders")
-      .insert({
-        partner_id: partnerId,
-        buyer_id: buyerId,
-        customer_id: resolvedCustomerId,
-        customer_name: customerName,
-        delivery_type: resolvedOrderDeliveryType,
-        delivery_address: resolvedOrderDeliveryAddress,
-        notes: notes,
-        total_amount: fullOrderTotal,
-        situation: orderSituation,
-        payment_method: paymentMethodDisplayName,
-        payment_provider: "Mercado Pago",
-        mp_payment_id: mpPaymentId.toString(),
-        coupon_id: couponIdToSave,
-        discount_amount: couponDiscountAmount,
-        payment_method_discount_amount: paymentMethodDiscountAmount,
-        payment_method_extra_amount: paymentMethodExtraAmount,
-        delivery_fee: deliveryFee,
-        delivery_payer: effectiveDeliveryPayer,
-        seller_commission_amount: sellerCommissionAmount,
-        payment_breakdown: [{
-          method: paymentMethodDisplayName,
-          amount: chargeAmount,
-          effectiveAmount: chargeAmount,
-          amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
-          provider: "Mercado Pago",
-          adjustmentType: "none",
-          checkoutPricing: checkoutPricing || {
-            subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
-            couponDiscount: couponDiscountAmount,
-            paymentMethodDiscount: paymentMethodDiscountAmount,
-            paymentMethodInterest: 0,
-            paymentMethodFee: paymentMethodExtraAmount,
-            deliveryFee,
-            finalTotal: fullOrderTotal,
-          },
-        }],
-        checkout_fulfillment: checkoutFulfillment,
-        order_source: "Vitrine Online",
-        promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
-        pricing_version: "2.0",
-        amount_paid: approvedPaidAmount,
-        paid_amount: approvedPaidAmount,
-        paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
-        payment_expires_at: paymentExpiresAt,
-      })
-      .select()
-      .single()
+    let newOrder: any
+    let orderError: any
+    
+    if (existingOrderId) {
+      // Buscar pedido existente
+      const { data: existingOrder, error: fetchError } = await adminClient
+        .from("orders")
+        .select("*")
+        .eq("id", existingOrderId)
+        .single()
+      
+      if (fetchError || !existingOrder) {
+        SecureLogger.error("Failed to fetch existing order", { orderId: existingOrderId, error: fetchError?.message })
+        return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
+      }
+      
+      // Validar que o pedido pertence ao comprador
+      if (existingOrder.buyer_id !== buyerId) {
+        SecureLogger.warn("Order ID mismatch attempt", { orderId: existingOrderId, buyerId, userId: buyerId })
+        return NextResponse.json({ error: "Acesso negado ao pedido" }, { status: 403 })
+      }
+      
+      // Atualizar pedido existente com dados do pagamento
+      const { data: updatedOrder, error: updateError } = await adminClient
+        .from("orders")
+        .update({
+          payment_provider: "Mercado Pago",
+          mp_payment_id: mpPaymentId.toString(),
+          payment_status: paymentStatus,
+          payment_breakdown: [{
+            method: paymentMethodDisplayName,
+            amount: chargeAmount,
+            effectiveAmount: chargeAmount,
+            amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
+            provider: "Mercado Pago",
+            adjustmentType: "none",
+            checkoutPricing: checkoutPricing || {
+              subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+              couponDiscount: couponDiscountAmount,
+              paymentMethodDiscount: paymentMethodDiscountAmount,
+              paymentMethodInterest: 0,
+              paymentMethodFee: paymentMethodExtraAmount,
+              deliveryFee,
+              finalTotal: fullOrderTotal,
+            },
+          }],
+          paid_amount: approvedPaidAmount,
+          amount_paid: approvedPaidAmount,
+          paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
+          payment_expires_at: paymentExpiresAt,
+        })
+        .eq("id", existingOrderId)
+        .select()
+        .single()
+      
+      newOrder = updatedOrder
+      orderError = updateError
+    } else {
+      // Criar novo pedido (fluxo original)
+      const { data: insertedOrder, error: insertError } = await adminClient
+        .from("orders")
+        .insert({
+          partner_id: partnerId,
+          buyer_id: buyerId,
+          customer_id: resolvedCustomerId,
+          customer_name: customerName,
+          delivery_type: resolvedOrderDeliveryType,
+          delivery_address: resolvedOrderDeliveryAddress,
+          notes: notes,
+          total_amount: fullOrderTotal,
+          situation: orderSituation,
+          payment_method: paymentMethodDisplayName,
+          payment_provider: "Mercado Pago",
+          mp_payment_id: mpPaymentId.toString(),
+          coupon_id: couponIdToSave,
+          discount_amount: couponDiscountAmount,
+          payment_method_discount_amount: paymentMethodDiscountAmount,
+          payment_method_extra_amount: paymentMethodExtraAmount,
+          delivery_fee: deliveryFee,
+          delivery_payer: effectiveDeliveryPayer,
+          seller_commission_amount: sellerCommissionAmount,
+          payment_breakdown: [{
+            method: paymentMethodDisplayName,
+            amount: chargeAmount,
+            effectiveAmount: chargeAmount,
+            amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
+            provider: "Mercado Pago",
+            adjustmentType: "none",
+            checkoutPricing: checkoutPricing || {
+              subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+              couponDiscount: couponDiscountAmount,
+              paymentMethodDiscount: paymentMethodDiscountAmount,
+              paymentMethodInterest: 0,
+              paymentMethodFee: paymentMethodExtraAmount,
+              deliveryFee,
+              finalTotal: fullOrderTotal,
+            },
+          }],
+          checkout_fulfillment: checkoutFulfillment,
+          order_source: "Vitrine Online",
+          promotions_applied: promotionsApplied.length > 0 ? promotionsApplied : null,
+          pricing_version: "2.0",
+          amount_paid: approvedPaidAmount,
+          paid_amount: approvedPaidAmount,
+          paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
+          payment_expires_at: paymentExpiresAt,
+        })
+        .select()
+        .single()
+      
+      newOrder = insertedOrder
+      orderError = insertError
+    }
 
     if (orderError || !newOrder) {
-      SecureLogger.error("Failed to create order", { errorCode: orderError?.code, errorMessage: orderError?.message })
-      return NextResponse.json({ error: "Erro ao criar pedido" }, { status: 500 })
+      SecureLogger.error("Failed to create/update order", { errorCode: orderError?.code, errorMessage: orderError?.message })
+      return NextResponse.json({ error: "Erro ao processar pedido" }, { status: 500 })
     }
 
     if (couponIdToSave) {

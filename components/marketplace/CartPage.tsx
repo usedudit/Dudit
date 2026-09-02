@@ -725,8 +725,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             const fee = Number(quote?.breakdown?.originalFee || settings?.base_fee || 0)
             return (
                 <span className="flex items-center gap-1.5 justify-end">
-                    {fee > 0 && <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(fee)}</span>}
-                    <span className="text-brand-green font-semibold">Grátis (Pago pela loja)</span>
+                    {fee > 0 && <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(fee)} | </span>}
+                    <span className="text-brand-green font-semibold">Grátis</span>
                 </span>
             )
         }
@@ -1394,7 +1394,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                 className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${isSelected
                                                     ? "border-brand-green bg-brand-green/5 shadow-sm ring-1 ring-brand-green"
                                                     : "border-brand-border dark:border-dark-border hover:border-brand-dark/40 dark:hover:border-dark-heading/40 bg-white dark:bg-dark-surface"
-                                                }`}
+                                                    }`}
                                             >
                                                 <div className="mt-0.5">
                                                     <RadioButton

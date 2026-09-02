@@ -50,7 +50,7 @@ export function getNotificationHref(params: {
 
   if (entityType === "quote") {
     if (audience === "seller" || audience === "admin") {
-      return entityId ? `/erp/orcamentos?quote=${encodeURIComponent(entityId)}` : `/erp/orcamentos`
+      return entityId ? `/erp/orcamentos?view=${encodeURIComponent(entityId)}` : `/erp/orcamentos`
     }
     if (typeof data?.href === "string" && data.href.startsWith("/")) {
       return data.href

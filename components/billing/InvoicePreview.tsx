@@ -50,13 +50,14 @@ const InvoicePreview = ({ data, invoiceId, printMode = false }: InvoicePreviewPr
     const pages = useMemo(() => {
         const ROW_HEIGHT = 40
         const TOTALS_SECTION_HEIGHT = 150
+        const FOOTER_HEIGHT = 40
 
         const P1_FIXED_CONTENT_HEIGHT = 449
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123
-        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
+        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT
 
         const PN_FIXED_CONTENT_HEIGHT = 246
-        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT
+        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT
 
         const chunks: { items: typeof items; hasTotals: boolean; type: string }[] = []
         let remainingItems = [...items]

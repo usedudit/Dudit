@@ -570,10 +570,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const getSourceSubtitle = () => {
         if (sourceServiceOrder) {
-            return `Ordem de Serviço • OS #${sourceServiceOrder.order_number}`
+            return `Ordem de Serviço • OS #${sourceServiceOrder?.order_number || ""}`
         }
         if (sourceQuote) {
-            return `Orçamento • ${sourceQuote.quote_number}`
+            return `Orçamento • ${sourceQuote?.quote_number || ""}`
         }
         return normalizeOrderSource(order.order_source)
     }
@@ -837,14 +837,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         Origem da venda:
                                                                         {sourceServiceOrder ? (
                                                                             <a
-                                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
+                                                                                href={`/erp/ordens-de-servico?view=${sourceServiceOrder.id}`}
                                                                                 className="font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
                                                                             >
-                                                                                Ordem de Serviço #{sourceServiceOrder.order_number}
+                                                                                Ordem de Serviço #{sourceServiceOrder?.order_number || ""}
                                                                             </a>
                                                                         ) : sourceQuote ? (
                                                                             <a
-                                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
+                                                                                href={`/erp/orcamentos?view=${sourceQuote.id}`}
                                                                                 className="font-bold text-brand-primary hover:underline inline-flex items-center gap-1"
                                                                             >
                                                                                 Orçamento {sourceQuote.quote_number}
@@ -1146,10 +1146,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             ? formatCurrency(order.delivery_fee)
                                                                             : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
                                                                         {Number(order.delivery_fee || 0) === 0 && (
-                                                                            <Badge variant="orange">Frete Grátis (Subsidiado pela loja)</Badge>
+                                                                            <span className="text-brand-green">- Frete Grátis (Subsidiado pela loja)</span>
                                                                         )}
                                                                         {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
-                                                                            <Badge variant="orange">Subsidiado pela loja</Badge>
+                                                                            <span className="text-brand-orange">- Subsidiado pela loja</span>
                                                                         )}
                                                                         {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
                                                                             <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
@@ -1230,42 +1230,39 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
                                                     {sourceServiceOrder && (
-                                                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-center justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
-                                                                    Ordem de Serviço #{sourceServiceOrder.order_number}
-                                                                </span>
-                                                                {sourceServiceOrder.title && (
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate mt-0.5">
-                                                                        {sourceServiceOrder.title}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <a
-                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
-                                                                className="text-xs font-bold text-brand-primary hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
-                                                            >
-                                                                Ver OS
-                                                            </a>
-                                                        </div>
+                                                        <InfoCard
+                                                            title="Origem do Pedido"
+                                                            message={`Ordem de Serviço #${sourceServiceOrder?.order_number || ""}`}
+                                                            color="blue"
+                                                            rightElement={
+                                                                <Button
+                                                                    variant="link"
+                                                                    className="text-brand-blue hover:text-brand-blue/70"
+                                                                    onClick={() => window.open(`/erp/ordens-de-servico?view=${sourceServiceOrder.id}`)}
+                                                                    type="button"
+                                                                >
+                                                                    Ver OS
+                                                                </Button>
+                                                            }
+                                                        />
                                                     )}
 
                                                     {sourceQuote && (
-                                                        <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
-                                                                    Orçamento {sourceQuote.quote_number}
-                                                                </span>
-                                                            </div>
-                                                            <a
-                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
-                                                                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
-                                                            >
-                                                                Ver Orçamento
-                                                            </a>
-                                                        </div>
+                                                        <InfoCard
+                                                            title="Origem do Pedido"
+                                                            message={`Orçamento #${sourceQuote.quote_number}`}
+                                                            color="blue"
+                                                            rightElement={
+                                                                <Button
+                                                                    variant="link"
+                                                                    className="text-brand-blue hover:text-brand-blue/70"
+                                                                    onClick={() => window.open(`/erp/orcamentos?view=${sourceQuote.id}`)}
+                                                                    type="button"
+                                                                >
+                                                                    Ver Orçamento
+                                                                </Button>
+                                                            }
+                                                        />
                                                     )}
 
                                                     {hasPendingPayment && (
@@ -1414,44 +1411,41 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 {/* 1b. Origem da OS/Orçamento */}
                                                 {sourceServiceOrder && (
                                                     <FormSection title="" className="mt-0">
-                                                        <div className="p-4 bg-brand-primary/5 dark:bg-brand-primary/10 border border-brand-primary/20 rounded-2xl flex items-center justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
-                                                                    Ordem de Serviço #{sourceServiceOrder.order_number}
-                                                                </span>
-                                                                {sourceServiceOrder.title && (
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate mt-0.5">
-                                                                        {sourceServiceOrder.title}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <a
-                                                                href={`/erp/ordens-de-servico/${sourceServiceOrder.id}`}
-                                                                className="text-xs font-bold text-brand-primary hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
-                                                            >
-                                                                Ver OS
-                                                            </a>
-                                                        </div>
+                                                        <InfoCard
+                                                            title="Origem do Pedido"
+                                                            message={`Ordem de Serviço #${sourceServiceOrder?.order_number || ""}`}
+                                                            color="blue"
+                                                            rightElement={
+                                                                <Button
+                                                                    variant="link"
+                                                                    className="text-brand-blue hover:text-brand-blue/70"
+                                                                    onClick={() => window.open(`/erp/ordens-de-servico?view=${sourceServiceOrder.id}`)}
+                                                                    type="button"
+                                                                >
+                                                                    Ver OS
+                                                                </Button>
+                                                            }
+                                                        />
                                                     </FormSection>
                                                 )}
 
                                                 {sourceQuote && (
                                                     <FormSection title="" className="mt-0">
-                                                        <div className="p-4 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block">Origem do Pedido</span>
-                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block truncate">
-                                                                    Orçamento {sourceQuote.quote_number}
-                                                                </span>
-                                                            </div>
-                                                            <a
-                                                                href={`/erp/orcamentos?quote=${sourceQuote.id}`}
-                                                                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline shrink-0 bg-white dark:bg-dark-surface px-3 py-1.5 rounded-lg border border-brand-border dark:border-dark-border shadow-xs"
-                                                            >
-                                                                Ver Orçamento
-                                                            </a>
-                                                        </div>
+                                                        <InfoCard
+                                                            title="Origem do Pedido"
+                                                            message={`Orçamento #${sourceQuote.quote_number}`}
+                                                            color="blue"
+                                                            rightElement={
+                                                                <Button
+                                                                    variant="link"
+                                                                    className="text-brand-blue hover:text-brand-blue/70"
+                                                                    onClick={() => window.open(`/erp/orcamentos?view=${sourceQuote.id}`)}
+                                                                    type="button"
+                                                                >
+                                                                    Ver Orçamento
+                                                                </Button>
+                                                            }
+                                                        />
                                                     </FormSection>
                                                 )}
 

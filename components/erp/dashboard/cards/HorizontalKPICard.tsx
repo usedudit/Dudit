@@ -71,8 +71,8 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                             )}
                         </div>
 
-                        <div className="flex items-baseline space-x-2 mt-2">
-                            <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{item.value}</h2>
+                        <div className="flex items-baseline space-x-2 mt-2 min-w-0">
+                            <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{item.value}</h2>
                             {item.trend && (
                                 <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
                                     <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}

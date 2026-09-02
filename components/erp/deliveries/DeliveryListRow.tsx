@@ -3,7 +3,6 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown } from "@/components/reusable"
-import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { TruckIcon } from "@/lib/icons"
@@ -90,13 +89,11 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
         return (
           <div className="flex justify-center action-btn" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown
-              onView={() => onDetails(delivery)}
+              onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? () => onEdit(delivery) : undefined}
               onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
-            >
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
-            </ActionsDropdown>
+            />
           </div>
         )
       default:

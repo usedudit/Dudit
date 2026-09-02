@@ -30,6 +30,14 @@ const parseNumberField = (val: any): number | null => {
     return isNaN(num) ? null : num;
 }
 
+const REQUIRED_FIELDS = [
+    { field: "campName", tab: "general" },
+    { field: "discount_value", tab: "rules" },
+    { field: "buy_quantity", tab: "rules" },
+    { field: "pay_quantity", tab: "rules" },
+    { field: "gift_selection", tab: "rules" },
+]
+
 function getAutoPromotionName(
     campName: string,
     type: string,
@@ -73,6 +81,7 @@ export default function PromotionFormPage({
     const [createdCampaignId, setCreatedCampaignId] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [activeTab, setActiveTab] = useState("general")
+    const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
 
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -82,6 +91,40 @@ export default function PromotionFormPage({
     }, [])
 
     const isReadOnly = currentMode === "details"
+
+    const getTabErrorCount = useCallback((tab: string) => {
+        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors])
+
+    const validateFields = useCallback(() => {
+        const errors = new Set<string>()
+
+        if (!campName.trim()) {
+            errors.add("campName")
+        }
+
+        if (editingRule) {
+            if (editingRule.promotion_type === "discount") {
+                if (!editingRule.discount_value) {
+                    errors.add("discount_value")
+                }
+            } else if (editingRule.promotion_type === "buy_x_pay_y") {
+                if (!editingRule.buy_quantity) {
+                    errors.add("buy_quantity")
+                }
+                if (!editingRule.pay_quantity) {
+                    errors.add("pay_quantity")
+                }
+            } else if (editingRule.promotion_type === "gift") {
+                if (!editingRule.gift_product_id && !editingRule.gift_service_id) {
+                    errors.add("gift_selection")
+                }
+            }
+        }
+
+        setFieldErrors(errors)
+        return errors.size === 0
+    }, [campName, editingRule])
 
     // A promoção nunca pode ficar sem loja nem valer para todas as lojas.
     // Usa a loja ativa do contexto; se não houver, usa a primeira loja ativa disponível.
@@ -229,8 +272,8 @@ export default function PromotionFormPage({
     // Save the overall Campaign + Promotion Rule
     const handleSaveCampaign = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
-        if (!campName.trim()) {
-            toast({ title: "Nome da campanha é obrigatório.", variant: "destructive" })
+        if (!validateFields()) {
+            toast({ title: "Preencha todos os campos obrigatórios.", variant: "destructive" })
             return
         }
 
@@ -1137,8 +1180,14 @@ export default function PromotionFormPage({
                                 {/* Tabs list */}
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                        <TabsTrigger value="general">Dados gerais</TabsTrigger>
-                                        <TabsTrigger value="rules">Regra de promoção</TabsTrigger>
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        <TabsTrigger value="rules">
+                                            Regra de promoção
+                                            {getTabErrorCount("rules") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
                                     </TabsList>
                                 </div>
 
@@ -1162,11 +1211,20 @@ export default function PromotionFormPage({
                                                         onChange={(e) => {
                                                             markDirty()
                                                             setCampName(e.target.value)
+                                                            if (fieldErrors.has("campName")) {
+                                                                setFieldErrors(prev => {
+                                                                    const next = new Set(prev)
+                                                                    next.delete("campName")
+                                                                    return next
+                                                                })
+                                                            }
                                                         }}
                                                         required
                                                         maxLength={150}
                                                         disabled={isReadOnly}
                                                         placeholder="Ex: Dia dos Namorados"
+                                                        error={fieldErrors.has("campName")}
+                                                        errorMessage={fieldErrors.has("campName") ? "Nome da campanha é obrigatório" : undefined}
                                                     />
 
                                                     <FormTextarea
@@ -1298,7 +1356,16 @@ export default function PromotionFormPage({
                                                                             onChange={(val) => {
                                                                                 markDirty()
                                                                                 setEditingRule({ ...editingRule, discount_value: val })
+                                                                                if (fieldErrors.has("discount_value")) {
+                                                                                    setFieldErrors(prev => {
+                                                                                        const next = new Set(prev)
+                                                                                        next.delete("discount_value")
+                                                                                        return next
+                                                                                    })
+                                                                                }
                                                                             }}
+                                                                            error={fieldErrors.has("discount_value")}
+                                                                            errorMessage={fieldErrors.has("discount_value") ? "Valor do desconto é obrigatório" : undefined}
                                                                         />
                                                                     ) : (
                                                                         <MoneyInput
@@ -1310,7 +1377,16 @@ export default function PromotionFormPage({
                                                                             onChange={(val) => {
                                                                                 markDirty()
                                                                                 setEditingRule({ ...editingRule, discount_value: val })
+                                                                                if (fieldErrors.has("discount_value")) {
+                                                                                    setFieldErrors(prev => {
+                                                                                        const next = new Set(prev)
+                                                                                        next.delete("discount_value")
+                                                                                        return next
+                                                                                    })
+                                                                                }
                                                                             }}
+                                                                            error={fieldErrors.has("discount_value")}
+                                                                            errorMessage={fieldErrors.has("discount_value") ? "Valor do desconto é obrigatório" : undefined}
                                                                         />
                                                                     )}
                                                                     <MoneyInput
@@ -1339,7 +1415,16 @@ export default function PromotionFormPage({
                                                                         onChange={(e) => {
                                                                             markDirty()
                                                                             setEditingRule({ ...editingRule, buy_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                            if (fieldErrors.has("buy_quantity")) {
+                                                                                setFieldErrors(prev => {
+                                                                                    const next = new Set(prev)
+                                                                                    next.delete("buy_quantity")
+                                                                                    return next
+                                                                                })
+                                                                            }
                                                                         }}
+                                                                        error={fieldErrors.has("buy_quantity")}
+                                                                        errorMessage={fieldErrors.has("buy_quantity") ? "Quantidade de compra é obrigatória" : undefined}
                                                                     />
                                                                     <Input
                                                                         label="Pague (Qtd a Pagar)"
@@ -1352,7 +1437,16 @@ export default function PromotionFormPage({
                                                                         onChange={(e) => {
                                                                             markDirty()
                                                                             setEditingRule({ ...editingRule, pay_quantity: e.target.value === "" ? "" : parseInt(e.target.value) })
+                                                                            if (fieldErrors.has("pay_quantity")) {
+                                                                                setFieldErrors(prev => {
+                                                                                    const next = new Set(prev)
+                                                                                    next.delete("pay_quantity")
+                                                                                    return next
+                                                                                })
+                                                                            }
                                                                         }}
+                                                                        error={fieldErrors.has("pay_quantity")}
+                                                                        errorMessage={fieldErrors.has("pay_quantity") ? "Quantidade paga é obrigatória" : undefined}
                                                                     />
                                                                 </div>
                                                             )}
@@ -1361,10 +1455,22 @@ export default function PromotionFormPage({
                                                                 <FormSection title="Brinde">
                                                                     <div className="flex flex-col gap-4">
                                                                         <div className="flex justify-end">
-                                                                            <Button variant="outline" type="button" onClick={() => setIsGiftSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                                                                            <Button variant="outline" type="button" onClick={() => {
+                                                                                setIsGiftSheetOpen(true)
+                                                                                if (fieldErrors.has("gift_selection")) {
+                                                                                    setFieldErrors(prev => {
+                                                                                        const next = new Set(prev)
+                                                                                        next.delete("gift_selection")
+                                                                                        return next
+                                                                                    })
+                                                                                }
+                                                                            }} leftIcon={<PlusIcon size={16} />}>
                                                                                 Selecionar Brinde
                                                                             </Button>
                                                                         </div>
+                                                                        {fieldErrors.has("gift_selection") && (
+                                                                            <p className="text-sm text-red-500">Selecione um brinde</p>
+                                                                        )}
 
                                                                         {(() => {
                                                                             const giftProdId = editingRule.gift_product_id

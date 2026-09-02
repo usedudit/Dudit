@@ -1677,11 +1677,9 @@ export function ProductDetailsPageClient({
                                                     ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
                                                         <div className="flex flex-col items-end">
                                                             {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
-                                                                <span className="text-xs line-through text-brand-inactive-text dark:text-dark-body font-normal">
-                                                                    {formatMoney(Number(deliveryBreakdown.originalFee))}
-                                                                </span>
+                                                                <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(deliveryBreakdown.originalFee))} | </span>
                                                             )}
-                                                            <span className="text-sm font-bold text-brand-green">Grátis (Pago pela loja)</span>
+                                                            <span className="text-sm font-bold text-brand-green">Grátis</span>
                                                         </div>
                                                     ) : isFreeByThreshold || deliveryBreakdown?.isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>

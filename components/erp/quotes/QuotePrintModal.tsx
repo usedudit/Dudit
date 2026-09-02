@@ -117,7 +117,7 @@ export default function QuotePrintModal({ isOpen, onClose, quoteId, partnerId }:
         if (!quoteId || isDownloading) return
         setIsDownloading(true)
         try {
-            await downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteId}.pdf`)
+            await downloadPdf(`/api/pdf/orcamento/${quoteId}`, `orcamento-${quoteData.invoiceNumber || quoteId}.pdf`)
             onClose()
         } catch (error: any) {
             console.error("[QuotePrintModal] Error downloading PDF:", error)

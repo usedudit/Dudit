@@ -300,6 +300,14 @@ export default function ReturnReceiptA4Preview({
                             <p className="font-semibold text-gray-400">Assinatura do Responsável</p>
                         </div>
                     </div>
+
+                    {/* Footer */}
+                    <div
+                        className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
+                        style={{ backgroundColor: primary }}
+                    >
+                        <span>Criado via Dudit - dudit.com.br</span>
+                    </div>
                 </div>
             </div>
         </div>

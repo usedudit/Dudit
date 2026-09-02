@@ -3,7 +3,6 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
-import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 
@@ -69,13 +68,11 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
           </div>
           <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown
-              onView={onDetails}
+              onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? onEdit : undefined}
               onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
-            >
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
-            </ActionsDropdown>
+            />
           </div>
         </div>
       </div>

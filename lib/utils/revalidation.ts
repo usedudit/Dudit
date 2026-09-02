@@ -14,9 +14,19 @@ export async function safeRevalidateTag(tag: string) {
         // @ts-ignore - Ignora erro se a tipagem local mudar, mas garante o envio do 'max'
         revalidateTag(tag, "max")
     } catch (err) {
-        // Next.js 16 pode lançar unhandledRejection se revalidateTag for chamado
+        // Next.js pode lançar unhandledRejection se revalidateTag for chamado
         // durante renderização. Engolimos silenciosamente porque o cache
         // será eventualmente consistente via outras tags.
+    }
+}
+
+// Helper interno para evitar erros se revalidatePath for chamado durante renderização
+export async function safeRevalidatePath(path: string, type?: "layout" | "page") {
+    try {
+        revalidatePath(path, type)
+    } catch (err) {
+        // Next.js lança erro se revalidatePath for chamado durante o ciclo de renderização
+        // (ex: rotas públicas ou componentes do servidor executando GET/SSR).
     }
 }
 
@@ -63,8 +73,8 @@ export async function revalidateOrders(partnerId: string) {
         await safeRevalidateTag(DASHBOARD_TAGS.categories(partnerId))
         await safeRevalidateTag(partnerId)
         await safeRevalidateTag(`partner-${partnerId}-orders`)
-        revalidatePath("/erp/entregas")
-        revalidatePath("/erp/logistica")
+        await safeRevalidatePath("/erp/entregas")
+        await safeRevalidatePath("/erp/logistica")
     }
     await safeRevalidateTag("orders")
 }
@@ -75,7 +85,7 @@ export async function revalidateCoupons(partnerId: string) {
         await safeRevalidateTag(partnerId)
     }
     await safeRevalidateTag("coupons")
-    revalidatePath("/erp/cupons")
+    await safeRevalidatePath("/erp/cupons")
 }
 
 /**
@@ -103,7 +113,7 @@ export async function revalidateQuotes(partnerId: string, quoteId?: string) {
         await safeRevalidateTag(`quote-${quoteId}`)
     }
     await safeRevalidateTag("quotes")
-    revalidatePath("/erp/orcamentos")
+    await safeRevalidatePath("/erp/orcamentos")
 }
 
 export async function revalidateQuoteHistory(quoteId: string) {
@@ -205,9 +215,9 @@ export async function revalidateTransactions(partnerId: string) {
         await safeRevalidateTag(DASHBOARD_TAGS.activity(partnerId))
     }
     await safeRevalidateTag("transactions")
-    revalidatePath("/erp/painel")
-    revalidatePath("/erp/inicio")
-    revalidatePath("/erp/transacoes/cadastros-financeiro")
+    await safeRevalidatePath("/erp/painel")
+    await safeRevalidatePath("/erp/inicio")
+    await safeRevalidatePath("/erp/transacoes/cadastros-financeiro")
 }
 
 /**

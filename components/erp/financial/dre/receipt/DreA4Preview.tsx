@@ -254,7 +254,7 @@ export function DreA4Preview({
 
             {/* ── 6. Rodapé Oficial Dudit ───────────────────────────────────────── */}
             <div
-              className="text-white/80 px-8 py-2 text-[10px] flex justify-between items-center w-full h-[36px] shrink-0"
+              className="text-white/80 px-8 py-2 text-[10px] flex justify-between items-center absolute bottom-0 w-full h-[36px]"
               style={{ backgroundColor: primaryColor }}
             >
               <span>Demonstração Contábil Gerencial</span>

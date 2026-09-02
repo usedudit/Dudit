@@ -1,4 +1,4 @@
-export const DATE_PERIOD_PRESETS = ["Últimos 7 dias", "Últimos 30 dias", "Mês atual", "Ano atual"] as const
+export const DATE_PERIOD_PRESETS = ["Últimos 3 dias", "Últimos 7 dias", "Últimos 30 dias", "Mês atual", "Ano atual"] as const
 
 export type DatePeriodFilterValue = {
   presets: string[]
@@ -42,6 +42,7 @@ export function resolveDatePeriodBounds(period: DatePeriodFilterValue): {
   const p = period.presets[0]
   if (!p) return { startYmd: null, endYmd: null }
 
+  if (p === "Últimos 3 dias") return { startYmd: addCalendarDaysYmd(today, -2), endYmd: today }
   if (p === "Últimos 7 dias") return { startYmd: addCalendarDaysYmd(today, -6), endYmd: today }
   if (p === "Últimos 30 dias") return { startYmd: addCalendarDaysYmd(today, -29), endYmd: today }
   if (p === "Mês atual") {

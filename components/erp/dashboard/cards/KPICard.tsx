@@ -44,8 +44,8 @@ export function KPICard({ title, value, trend, className }: KPICardProps) {
             </div>
 
             {/* Bottom Row: Value -> Subtext */}
-            <div className="flex items-end justify-between gap-4">
-                <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none">
+            <div className="flex items-end justify-between gap-4 min-w-0">
+                <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none truncate">
                     {value}
                 </span>
                 

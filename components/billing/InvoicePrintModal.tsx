@@ -50,7 +50,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
         if (!invoiceId || isDownloading) return
         setIsDownloading(true)
         try {
-            await downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceId}.pdf`)
+            await downloadPdf(`/api/pdf/invoice/${invoiceId}`, `fatura-${invoiceData?.invoice_number || invoiceId}.pdf`)
             onClose()
         } catch (error: any) {
             console.error("[InvoicePrintModal] Error downloading PDF:", error)
@@ -58,7 +58,7 @@ export function InvoicePrintModal({ isOpen, onClose, invoiceData, invoiceId }: I
         } finally {
             setIsDownloading(false)
         }
-    }, [invoiceId, isDownloading, onClose])
+    }, [invoiceId, isDownloading, onClose, invoiceData])
 
     if (!isVisible) return null
 

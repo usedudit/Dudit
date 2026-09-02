@@ -461,6 +461,7 @@ export default function DeliveryDetailPage({
                 <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
+
                 <div className="min-w-0">
                     <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
                         Entrega {delivery?.delivery_number ? `#${delivery.delivery_number}` : ""}
@@ -476,11 +477,6 @@ export default function DeliveryDetailPage({
             </div>
 
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                {canEdit && onEdit && (
-                    <Button variant="outline" size="sm" onClick={() => onEdit(delivery.id)} leftIcon={<EditIcon size={16} />} className="hidden sm:inline-flex">
-                        Editar
-                    </Button>
-                )}
                 <ActionsDropdown
                     onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
                     onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
@@ -561,9 +557,6 @@ export default function DeliveryDetailPage({
 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                    <Button variant="filled" onClick={handleBack} className="flex-1 h-12">
-                        <ChevronLeftIcon className="w-5 h-5" />
-                    </Button>
                     <ActionsDropdown
                         onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
                         onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}

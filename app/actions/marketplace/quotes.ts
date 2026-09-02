@@ -200,7 +200,7 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
                     entityType: "quote",
                     entityId: quoteId,
                     data: {
-                        href: `/erp/orcamentos?quote=${quoteId}`,
+                        href: `/erp/orcamentos?view=${quoteId}`,
                         quoteId,
                         serviceId: service.id,
                         serviceName: service.name,

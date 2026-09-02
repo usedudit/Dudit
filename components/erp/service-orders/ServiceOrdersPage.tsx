@@ -7,7 +7,7 @@ import { useMediaQuery } from "../hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
+import { Button, Checkbox, DefaultModal, FormDropdown, IconPlaceholder, Input, SelectionBanner, Tabs, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import FilterChip from "@/components/reusable/FilterChip"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
@@ -175,6 +175,12 @@ export default function ServiceOrdersPage({
     search: searchVal, setSearch: setSearchVal,
     afterMutation, queryClient,
   } = entityPage
+
+  const activeOrder = useMemo(() => {
+    if (!entityState.isOpen || !entityState.entityId) return null
+    if (currentEntity) return currentEntity
+    return (effectiveOrders || []).find((o: any) => o.id === entityState.entityId) || null
+  }, [entityState.isOpen, entityState.entityId, currentEntity, effectiveOrders])
 
   const handleMutation = useCallback(() => {
     afterMutation()
@@ -545,26 +551,48 @@ export default function ServiceOrdersPage({
       <AnimatePresence mode="wait">
         {entityState.isOpen && (entityState.action === "create" || entityState.action === "edit") ? (
           <FadeIn key={entityState.action} className="w-full h-full bg-white dark:bg-dark-background">
-            <ServiceOrderForm
-              partnerId={partnerId}
-              storeId={storeId}
-              onBack={() => closeEntity()}
-              onSaved={() => {
-                closeEntity()
-                handleMutation()
-              }}
-              editData={entityState.action === "edit" ? currentEntity : undefined}
-            />
+            {entityState.action === "edit" && isLoadingDetail && !activeOrder ? (
+              <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+              </div>
+            ) : entityState.action === "edit" && !isLoadingDetail && !activeOrder ? (
+              <div className="flex flex-col items-center justify-center h-[calc(100vh-65px)] w-full gap-4">
+                <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
+                <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
+              </div>
+            ) : (
+              <ServiceOrderForm
+                partnerId={partnerId}
+                storeId={storeId}
+                onBack={() => closeEntity()}
+                onSaved={() => {
+                  closeEntity()
+                  handleMutation()
+                }}
+                editData={entityState.action === "edit" ? activeOrder : undefined}
+              />
+            )}
           </FadeIn>
         ) : entityState.isOpen && entityState.action === "view" ? (
           <FadeIn key="detail" className="w-full h-full bg-white dark:bg-dark-background">
-            <ServiceOrderDetail
-              data={currentEntity}
-              partnerId={partnerId}
-              onBack={() => closeEntity()}
-              onMutation={() => handleMutation()}
-              onEdit={(id) => openEntity("edit", id)}
-            />
+            {isLoadingDetail && !activeOrder ? (
+              <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+              </div>
+            ) : !isLoadingDetail && !activeOrder ? (
+              <div className="flex flex-col items-center justify-center h-[calc(100vh-65px)] w-full gap-4">
+                <p className="text-brand-inactive-text">Ordem de serviço não encontrada.</p>
+                <Button variant="outline" onClick={() => closeEntity()}>Voltar</Button>
+              </div>
+            ) : (
+              <ServiceOrderDetail
+                data={activeOrder}
+                partnerId={partnerId}
+                onBack={() => closeEntity()}
+                onMutation={() => handleMutation()}
+                onEdit={(id) => openEntity("edit", id)}
+              />
+            )}
           </FadeIn>
         ) : (
           <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">

@@ -200,9 +200,9 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
     const insights = useMemo(() => {
         if (!salesData) return []
         return generateSalesInsights({
-            revenue: salesData.metrics.revenue, previousRevenue: 0,
-            orderCount: salesData.metrics.orderCount, previousOrderCount: 0,
-            ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: 0,
+            revenue: salesData.metrics.revenue, previousRevenue: salesData.metrics.previousRevenue,
+            orderCount: salesData.metrics.orderCount, previousOrderCount: salesData.metrics.previousOrderCount,
+            ticketMedio: salesData.metrics.ticketMedio, previousTicketMedio: salesData.metrics.previousTicketMedio,
         })
     }, [salesData])
 

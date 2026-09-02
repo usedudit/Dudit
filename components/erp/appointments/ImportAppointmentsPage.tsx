@@ -869,6 +869,7 @@ export function ImportAppointmentsPage({ partnerId }: ImportAppointmentsPageProp
                                                     onChange={() => setDuplicateStrategy("skip")}
                                                 />
                                             }
+                                            className="px-4 py-3"
                                             title="Ignorar agendamentos duplicados"
                                             description="Mantém o agendamento atual e não altera nada caso já exista um com mesmo cliente, data e horário."
                                             onClick={() => setDuplicateStrategy("skip")}
@@ -882,6 +883,7 @@ export function ImportAppointmentsPage({ partnerId }: ImportAppointmentsPageProp
                                                     onChange={() => setDuplicateStrategy("update")}
                                                 />
                                             }
+                                            className="px-4 py-3"
                                             title="Atualizar agendamentos existentes"
                                             description="Sobrescreve os dados do agendamento já existente com as informações mais recentes da planilha."
                                             onClick={() => setDuplicateStrategy("update")}

@@ -995,7 +995,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto px-4 xl:px-0 max-w-[1400px] animate-fade-in lg:mt-6">
+        <div className="container mx-auto px-4 max-w-[1400px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -1034,7 +1034,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
                 <div className="w-full max-w-[1400px] mx-auto sm:px-4 lg:px-0">
-                    <div className="relative w-full aspect-[1400/300] sm:rounded-xl lg:rounded-2xl overflow-hidden bg-gray-100 dark:bg-dark-border/50 lg:mb-4 shadow-xs">
+                    <div className="relative w-full aspect-[1400/300] md:rounded-2xl overflow-hidden bg-gray-100 dark:bg-dark-border/50 lg:mb-4 shadow-xs">
                         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                     </div>
                 </div>

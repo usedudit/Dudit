@@ -51,11 +51,12 @@ const SaleReceiptA4Preview = ({
     const pages = useMemo(() => {
         const ROW_HEIGHT = 40
         const TOTALS_SECTION_HEIGHT = 380
+        const FOOTER_HEIGHT = 40
         const P1_FIXED_CONTENT_HEIGHT = 450
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123
-        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT
+        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT
         const PN_FIXED_CONTENT_HEIGHT = 220
-        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT
+        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT
 
         const chunks: { items: typeof quoteItems; hasTotals: boolean; type: string }[] = []
         let remainingItems = [...quoteItems]
@@ -292,7 +293,7 @@ const SaleReceiptA4Preview = ({
                                             <div className="flex justify-between items-center">
                                                 <span className="font-bold text-sm">Total do Pedido</span>
                                                 <div
-                                                    className="text-white px-3.5 py-1.5 rounded-xl text-sm font-bold shadow-sm"
+                                                    className="text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"
                                                     style={{ backgroundColor: primaryColor }}
                                                 >
                                                     {formatCurrency(total)}

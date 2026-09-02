@@ -13,6 +13,7 @@ import {
     CheckCircleIcon,
 } from '@/lib/icons';
 import { Button, Badge, ActionsDropdown, ThreeDotsLoader, FormDropdown, AlertModal, DefaultModal, FormSection, Tabs, TabsList, TabsTrigger, TabsContent, ListItem, CustomerMobileBar } from '@/components/reusable';
+import Pagination from '@/components/reusable/Pagination';
 import { getQuoteDetailsAction, updateQuoteStatusAction, deleteQuoteAction, convertQuoteToOrderAction, getQuoteHistoryAction, getPartnerAddressAction, regenerateQuoteApprovalCodeAction } from '@/app/actions/erp/quotes';
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { QuoteHistoryTab } from "./QuoteHistoryTab"
@@ -115,6 +116,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
     const [isConverting, setIsConverting] = useState(false);
     const [historyEntries, setHistoryEntries] = useState<QuoteHistoryEntryRow[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [itemsPage, setItemsPage] = useState(1);
     const csrfToken = useCSRFToken();
     const { success: notifySuccess, error: notifyError } = useNotification();
     const { planSlug } = usePermissions();
@@ -234,6 +236,10 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quoteId, partnerId]);
+
+    useEffect(() => {
+        setItemsPage(1);
+    }, [quoteId]);
 
     useEffect(() => {
         if (lastLoadedHistoryQuoteId.current === quoteId) return;
@@ -670,27 +676,6 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         );
                                                     })()}
                                                 </FormSection>
-
-                                                {canConvertToOrder && (
-                                                    <Button
-                                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 mt-3"
-                                                        disabled={isConverting}
-                                                        onClick={handleConvertClick}
-                                                        leftIcon={<ArrowRightIcon size={14} />}
-                                                    >
-                                                        {isConverting ? "Convertendo…" : "Converter em Pedido"}
-                                                    </Button>
-                                                )}
-                                                {quote.converted && quote.converted_order_id && (
-                                                    <Button
-                                                        variant="outline"
-                                                        className="w-full h-12 mt-3"
-                                                        onClick={() => router.push(`/erp/pedidos?view=${quote.converted_order_id}`)}
-                                                        leftIcon={<ArrowRightIcon size={14} />}
-                                                    >
-                                                        Abrir pedido
-                                                    </Button>
-                                                )}
                                             </div>
 
                                             {/* Customer - Mobile/Tablet only */}
@@ -707,20 +692,37 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                         <div className="flex items-center justify-center py-14">
                                                             <ThreeDotsLoader />
                                                         </div>
-                                                    ) : (
-                                                        quote.items?.map((item: any) => (
-                                                            <QuoteItem
-                                                                key={item.id}
-                                                                image={getR2ImageUrl(item.image || item.products?.images || null, "thumbnail")}
-                                                                name={item.custom_name || item.products?.name || "Produto sem nome"}
-                                                                sku={item.products?.sku || item.sku || "N/A"}
-                                                                qty={item.quantity}
-                                                                price={item.unit_price}
-                                                                total={item.quantity * item.unit_price}
-                                                                unit={item.products?.unit}
-                                                            />
-                                                        ))
-                                                    )}
+                                                    ) : (() => {
+                                                        const allItems = quote.items || [];
+                                                        const itemsPerPage = 8;
+                                                        const totalPages = Math.ceil(allItems.length / itemsPerPage) || 1;
+                                                        const paginatedItems = allItems.slice((itemsPage - 1) * itemsPerPage, itemsPage * itemsPerPage);
+                                                        return (
+                                                            <>
+                                                                {paginatedItems.map((item: any) => (
+                                                                    <QuoteItem
+                                                                        key={item.id}
+                                                                        image={getR2ImageUrl(item.image || item.products?.images || null, "thumbnail")}
+                                                                        name={item.custom_name || item.products?.name || "Produto sem nome"}
+                                                                        sku={item.products?.sku || item.sku || "N/A"}
+                                                                        qty={item.quantity}
+                                                                        price={item.unit_price}
+                                                                        total={item.quantity * item.unit_price}
+                                                                        unit={item.products?.unit}
+                                                                    />
+                                                                ))}
+                                                                {totalPages > 1 && (
+                                                                    <div className="pt-2">
+                                                                        <Pagination
+                                                                            currentPage={itemsPage}
+                                                                            totalPages={totalPages}
+                                                                            onPageChange={setItemsPage}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </FormSection>
 
@@ -732,7 +734,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
                                                     </div>
                                                     <div className="flex justify-between items-center text-[14px]">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Desconto</span>
-                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(discount)}</span>
+                                                        <span className="text-brand-green font-bold text-sm">{formatCurrency(discount)}</span>
                                                     </div>
                                                     <div className="flex justify-between items-center text-[14px]">
                                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>

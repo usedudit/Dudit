@@ -173,7 +173,7 @@ async function handler(request: NextRequest) {
       payment_method_id: paymentFormData.payment_method_id,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       payer: {
-        ...(!isPix && { email: hasCustomerEmail ? customerEmail : user.email }),
+        email: hasCustomerEmail ? customerEmail : user.email,
         first_name: firstName,
         ...(lastName ? { last_name: lastName } : {}),
         ...(identificationNumber ? {

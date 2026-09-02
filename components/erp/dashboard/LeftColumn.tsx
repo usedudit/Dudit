@@ -68,9 +68,9 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
                 </span>
               </div>
 
-              <div className="flex items-baseline space-x-2 mt-2">
-                <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{metric.value}</h2>
-                  <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+              <div className="flex items-baseline space-x-2 mt-2 min-w-0">
+                <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{metric.value}</h2>
+                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
                   <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
                 </span>
               </div>
@@ -106,8 +106,8 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
               </span>
             </div>
 
-            <div className="flex items-baseline space-x-2 mt-2">
-              <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">{metric.value}</h2>
+            <div className="flex items-baseline space-x-2 mt-2 min-w-0">
+              <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{metric.value}</h2>
                 <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
                 <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
               </span>

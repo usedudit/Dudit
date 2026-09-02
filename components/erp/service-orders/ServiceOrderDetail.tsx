@@ -155,16 +155,17 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     const { setHeaderOverride } = useSidebar()
 
     useEffect(() => {
+        if (!order?.order_number) return
         setHeaderOverride({
             title: `OS #${order.order_number}`,
             onBack: handleBack,
             isSubPage: true
         })
         return () => setHeaderOverride(null)
-    }, [order.order_number, handleBack, setHeaderOverride])
+    }, [order?.order_number, handleBack, setHeaderOverride])
 
-    const statusMeta = SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]
-    const availableTransitions = STATUS_TRANSITIONS[order.status] || []
+    const statusMeta = order?.status ? SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus] : null
+    const availableTransitions = order?.status ? (STATUS_TRANSITIONS[order.status] || []) : []
 
     // Load team members to resolve technician's name
     useEffect(() => {
@@ -263,17 +264,19 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
     // Financial calculations
     const subtotal = useMemo(() => {
+        if (!order) return 0
         const totalS = (order.services || []).reduce((sum: number, s: any) => sum + (Number(svcPrice(s)) * (s.quantity || 1)), 0)
         const totalP = (order.products || []).reduce((sum: number, p: any) => sum + (Number(prodPrice(p)) * (p.quantity || 1)), 0)
         return totalS + totalP
-    }, [order.services, order.products])
+    }, [order?.services, order?.products])
 
     const discountAmount = useMemo(() => {
+        if (!order) return 0
         if (order.discount_type === 'percentage') {
             return (subtotal * Number(order.discount_value || 0)) / 100
         }
         return Number(order.discount_value || 0)
-    }, [subtotal, order.discount_value, order.discount_type])
+    }, [subtotal, order?.discount_value, order?.discount_type])
 
     function svcPrice(s: any) {
         return s.service_price !== undefined ? s.service_price : (s.price || 0)
@@ -281,6 +284,14 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
     function prodPrice(p: any) {
         return p.unit_price !== undefined ? p.unit_price : (p.price || 0)
+    }
+
+    if (!order) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
+                <ThreeDotsLoader />
+            </div>
+        )
     }
 
     const assignedMember = teamMembers.find(m => m.userId === order.assigned_user_id)

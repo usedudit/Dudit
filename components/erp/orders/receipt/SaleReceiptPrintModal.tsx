@@ -124,7 +124,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
             showAcknowledgment: String(showAcknowledgment),
         })
         try {
-            await downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${orderId}.pdf`)
+            await downloadPdf(`/api/pdf/recibo/${orderId}?${params.toString()}`, `recibo-${data?.orderNumber || orderId}.pdf`)
             onClose()
         } catch (error: any) {
             console.error("[SaleReceiptPrintModal] Error downloading PDF:", error)
@@ -132,7 +132,7 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
         } finally {
             setIsDownloading(false)
         }
-    }, [orderId, format, footerMessage, showAcknowledgment, isDownloading, onClose])
+    }, [orderId, format, footerMessage, showAcknowledgment, isDownloading, onClose, data])
 
     const handlePrint = useCallback(() => {
         if (!orderId) return

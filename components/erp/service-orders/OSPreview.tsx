@@ -134,13 +134,14 @@ const OSPreview = ({
         const ROW_HEIGHT = 40;
         const TOTALS_SECTION_HEIGHT = 150;
         const NOTES_SECTION_HEIGHT = (description || diagnosis || signatureImageKey) ? 120 : 0;
+        const FOOTER_HEIGHT = 40;
 
         const P1_FIXED_CONTENT_HEIGHT = 449;
         const P1_TOTAL_AVAILABLE_HEIGHT = 1123;
-        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT;
+        const P1_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - P1_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT;
 
         const PN_FIXED_CONTENT_HEIGHT = 246;
-        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT;
+        const PN_AVAILABLE_FOR_ROWS_AND_TOTALS = P1_TOTAL_AVAILABLE_HEIGHT - PN_FIXED_CONTENT_HEIGHT - FOOTER_HEIGHT;
 
         const chunks: { items: any[]; hasTotals: boolean; type: string }[] = [];
         let remainingItems = [...items];
@@ -290,11 +291,11 @@ const OSPreview = ({
                                     <table className="w-full text-left border-separate border-spacing-0">
                                         <thead>
                                             <tr className="bg-brand-gray/40">
-                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 tracking-wider rounded-tl-xl border-b border-gray-100">Descrição do Item</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-center w-16 border-b border-gray-100">Tipo</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-center w-16 border-b border-gray-100">Qtd</th>
-                                                <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 tracking-wider text-right w-24 border-b border-gray-100">Preço</th>
-                                                <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 tracking-wider text-right w-28 rounded-tr-xl border-b border-gray-100">Total</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">Descrição do Item</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Tipo</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-center">Qtd</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Preço</th>
+                                                <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100 text-right">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody>

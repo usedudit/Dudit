@@ -71,7 +71,11 @@ export async function invalidateProductCache(
     safeRevalidateTag('products')
 
     // Force the Next.js router cache to refresh the products page
-    revalidatePath('/erp/produtos')
+    try {
+      revalidatePath('/erp/produtos')
+    } catch {
+      // Silently ignore if called during render
+    }
   } catch (error) {
     console.error(`[CACHE] Erro ao revalidar Next.js cache layers:`, error)
   }

@@ -94,7 +94,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
         setIsDownloading(true)
         const params = new URLSearchParams({ format })
         try {
-            await downloadPdf(`/api/pdf/troca/${returnId}?${params.toString()}`, `troca-${returnId}.pdf`)
+            await downloadPdf(`/api/pdf/troca/${returnId}?${params.toString()}`, `troca-${returnRequest?.orderNumber || returnId}.pdf`)
             onClose()
         } catch (error: any) {
             console.error("[ReturnPrintModal] Error downloading PDF:", error)
@@ -102,7 +102,7 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
         } finally {
             setIsDownloading(false)
         }
-    }, [returnId, format, isDownloading, onClose])
+    }, [returnId, format, isDownloading, onClose, returnRequest])
 
     const partnerName = selectedStore?.name || partnerHeader.fantasyName || "Estabelecimento"
     const partnerAvatar = selectedStore?.logo_url || selectedStore?.image_url

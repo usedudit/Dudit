@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown } from "@/components/reusable"
-import { DropdownItem } from "@/components/reusable/Dropdown"
 import { formatCurrency } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { ClockIcon, TruckIcon, UserIcon } from "@/lib/icons"
@@ -77,13 +76,11 @@ export default function DeliveryKanbanCard({
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
             <ActionsDropdown
-              onView={onDetails}
+              onStatus={() => onQuickStatusChange?.(delivery.id, delivery.status)}
               onEdit={canEdit && onEdit ? onEdit : undefined}
               onCancel={delivery.status !== "cancelled" ? () => onQuickStatusChange?.(delivery.id, "cancelled") : undefined}
               cancelLabel="Cancelar entrega"
-            >
-              <DropdownItem onClick={() => onQuickStatusChange?.(delivery.id, delivery.status)}>Alterar Status de Entrega</DropdownItem>
-            </ActionsDropdown>
+            />
           </div>
         </div>
 

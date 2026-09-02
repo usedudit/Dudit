@@ -838,27 +838,21 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         .single()
     if (quoteErr || !quote) return
 
-    // 2. Fetch partner, store and default address
-    const [partnerRes, storeRes] = await Promise.all([
-        supabase.from("partners").select("user_id").eq("id", partnerId).maybeSingle(),
-        supabase.from("stores").select("name, logo_url, phone").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
+    // 2. Fetch partner, store and address details
+    const [partnerRes, storeRes, addressRes] = await Promise.all([
+        supabase.from("partners").select("id, user_id, name, store_name, logo_url, store_image_url, phone, address").eq("id", partnerId).maybeSingle(),
+        quote.store_id
+            ? supabase.from("stores").select("id, name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
+            : supabase.from("stores").select("id, name, logo_url, image_url, phone").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+        getPartnerAddressAction(partnerId, quote.store_id || undefined)
     ])
     const partner = partnerRes.data
     const store = storeRes.data
 
-    const { data: partnerAddr } = await supabase
-        .from("addresses")
-        .select("*")
-        .eq("partner_id", partnerId)
-        .eq("is_default", true)
-        .maybeSingle()
-
-    let partnerAddressFormatted = "Endereço não cadastrado"
-    if (partnerAddr) {
-        const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
-        const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
-        partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
-    }
+    const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || partner?.address || "Endereço não cadastrado"
+    const resolvedPartnerName = store?.name || partner?.store_name || partner?.name || "Parceiro"
+    const resolvedPartnerLogo = store?.logo_url || store?.image_url || partner?.logo_url || partner?.store_image_url || null
+    const resolvedPartnerPhone = store?.phone || partner?.phone || null
 
     let partnerEmail = null
     if (partner?.user_id) {
@@ -946,10 +940,10 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
         additional_costs: Number(quote.additional_costs || 0),
         total: Number(quote.total || 0),
         partner: {
-            name: store?.name || "Parceiro",
-            image_url: store?.logo_url || null,
+            name: resolvedPartnerName,
+            image_url: resolvedPartnerLogo,
             email: partnerEmail,
-            phone: store?.phone || null,
+            phone: resolvedPartnerPhone,
             address: partnerAddressFormatted
         },
         seller: sellerInfo,
@@ -1006,7 +1000,7 @@ export async function updateQuoteStatusAction(data: {
 
             // Define allowed transitions
             const allowedTransitions: Record<string, string[]> = {
-                draft: ["sent", "pending_client", "approved", "rejected", "cancelled"],
+                draft: ["sent", "pending_client", "viewed", "approved", "rejected", "cancelled"],
                 sent: ["pending_client", "viewed", "approved", "rejected", "draft", "cancelled", "expired"],
                 pending_client: ["viewed", "approved", "rejected", "draft", "cancelled", "expired"],
                 viewed: ["approved", "rejected", "draft", "cancelled", "expired"],
@@ -1647,11 +1641,6 @@ function quoteIsEffectivelyExpired(quote: { status: string; expiration_date: str
     return quote.expiration_date < getTodayYmd()
 }
 
-function pickPrimaryCustomerAddress(addresses: any[] | undefined | null) {
-    if (!addresses?.length) return null
-    return addresses.find((a) => a.address_type === "primary" || a.is_default) || addresses[0]
-}
-
 function buildConversionOrderNotes(quoteNumber: string, quoteNotes: string | null | undefined) {
     const header = `Pedido criado a partir do orçamento ${quoteNumber}.`
     const body = (quoteNotes || "").trim()
@@ -1913,7 +1902,6 @@ export async function convertQuoteToOrderAction(data: {
             })
 
             const customer = Array.isArray(quote.customers) ? quote.customers[0] : quote.customers
-            const primaryAddress = pickPrimaryCustomerAddress(customer?.addresses)
             const defaultFinanceAccountId = await resolveMarketplaceOrderFinanceAccountId(
                 getAdminClient(),
                 data.partnerId,
@@ -1924,14 +1912,7 @@ export async function convertQuoteToOrderAction(data: {
                     "Cadastre contas financeiras (conta bancária ou caixa) para converter o orçamento em pedido.",
                 )
             }
-            const hasFullDeliveryAddress = Boolean(
-                primaryAddress?.street
-                && primaryAddress?.number
-                && primaryAddress?.neighborhood
-                && primaryAddress?.city
-                && primaryAddress?.state
-                && primaryAddress?.zip_code,
-            )
+            const hasShippingCost = Number(quote.shipping_cost || 0) > 0
 
             const orderPayload = {
                 partnerId: data.partnerId,
@@ -1940,23 +1921,13 @@ export async function convertQuoteToOrderAction(data: {
                 customerName: customer?.name || QUOTE_DEFAULT_CUSTOMER_LABEL,
                 sourceQuoteId: data.quoteId,
                 salesChannel: "Orçamento",
-                deliveryMethod: hasFullDeliveryAddress ? ("delivery" as const) : ("pickup" as const),
+                deliveryMethod: hasShippingCost ? ("delivery" as const) : ("pickup" as const),
                 financeAccountId: defaultFinanceAccountId,
                 paymentStatus: "unpaid" as const,
                 deliveryStatus: "not_sent" as const,
                 paymentMethod: "Método não definido",
                 paymentBreakdown: [] as { method: string; amount: number }[],
-                address: hasFullDeliveryAddress && primaryAddress
-                    ? {
-                        zipCode: String(primaryAddress.zip_code || ""),
-                        street: String(primaryAddress.street || ""),
-                        number: String(primaryAddress.number || ""),
-                        complement: primaryAddress.complement ? String(primaryAddress.complement) : undefined,
-                        neighborhood: String(primaryAddress.neighborhood || ""),
-                        city: String(primaryAddress.city || ""),
-                        state: String(primaryAddress.state || ""),
-                    }
-                    : undefined,
+                address: undefined,
                 items: erpItems,
                 subtotal: Number(quote.subtotal || 0),
                 discountValue: Number(quote.discount_value || 0),
@@ -2390,7 +2361,7 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         addresses (*)
                     ),
                     partners (
-                        id, user_id
+                        id, user_id, name, store_name, logo_url, store_image_url, phone, address
                     )
                 `)
                 .eq("public_token", cleanToken)
@@ -2426,13 +2397,17 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         ipAddress: ip,
                         userAgent: userAgent
                     })
-                    await revalidateQuotes(quote.partner_id, quote.id)
+                    try {
+                        await revalidateQuotes(quote.partner_id, quote.id)
+                    } catch (revalErr) {
+                        console.warn("[getPublicQuoteAction] Warning revalidating expired quote:", revalErr)
+                    }
                 }
             }
 
             // 3. Debounced view updates
             let statusChangedToViewed = false
-            if (quote.status === "sent" || quote.status === "pending_client") {
+            if (quote.status === "draft" || quote.status === "sent" || quote.status === "pending_client") {
                 const { error: viewStatusErr } = await admin
                     .from("quotes")
                     .update({
@@ -2483,15 +2458,12 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     ipAddress: ip,
                     userAgent: userAgent
                 })
-                await revalidateQuotes(quote.partner_id, quote.id)
+                try {
+                    await revalidateQuotes(quote.partner_id, quote.id)
+                } catch (revalErr) {
+                    console.warn("[getPublicQuoteAction] Warning revalidating viewed quote:", revalErr)
+                }
             }
-
-            // Fetch store details to resolve partner name/logo override
-            const storeQuery = quote.store_id
-                ? admin.from("stores").select("name, logo_url, phone").eq("id", quote.store_id).maybeSingle()
-                : admin.from("stores").select("name, logo_url, phone").eq("partner_id", quote.partner_id).limit(1).maybeSingle()
-            const { data: store } = await storeQuery
-            const storeLogo = store?.logo_url || null
 
             // 5. Fetch live details and items
             let sellerInfo = null
@@ -2570,28 +2542,36 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 };
             })
 
-            let partnerAddressFormatted = "Endereço não cadastrado"
-            const { data: partnerAddr } = await admin
-                .from("addresses")
-                .select("*")
-                .eq("partner_id", quote.partner_id)
-                .eq("is_default", true)
-                .maybeSingle()
-            if (partnerAddr) {
-                const streetNumber = [partnerAddr.street, partnerAddr.number].filter(Boolean).join(", ")
-                const neighborhoodCityState = [partnerAddr.neighborhood, [partnerAddr.city, partnerAddr.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
-                partnerAddressFormatted = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
-            }
+            // 6. Fetch store, partner and address details with full fallbacks
+            const [storeRes, partnerRes, addressRes] = await Promise.all([
+                quote.store_id
+                    ? admin.from("stores").select("id, name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
+                    : admin.from("stores").select("id, name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+                admin.from("partners").select("id, user_id, name, store_name, logo_url, store_image_url, phone, address").eq("id", quote.partner_id).maybeSingle(),
+                getPartnerAddressAction(quote.partner_id, quote.store_id || undefined)
+            ])
+
+            const store = storeRes.data
+            const partnerRow = partnerRes.data || (Array.isArray(quote.partners) ? quote.partners[0] : quote.partners)
+            const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || partnerRow?.address || "Endereço não cadastrado"
+            const resolvedPartnerName = store?.name || partnerRow?.store_name || partnerRow?.name || "Parceiro"
+            const resolvedPartnerLogo = store?.logo_url || store?.image_url || partnerRow?.logo_url || partnerRow?.store_image_url || null
+            const resolvedPartnerPhone = store?.phone || partnerRow?.phone || null
 
             let partnerEmail = null
-            if (quote.partners?.user_id) {
+            const partnerOwnerId = partnerRow?.user_id || (Array.isArray(quote.partners) ? quote.partners[0]?.user_id : quote.partners?.user_id)
+            if (partnerOwnerId) {
                 try {
-                    const { data: authData } = await admin.auth.admin.getUserById(quote.partners.user_id)
+                    const { data: authData } = await admin.auth.admin.getUserById(partnerOwnerId)
                     partnerEmail = authData?.user?.email || null
                 } catch (err) {
                     console.error("Error fetching partner email:", err)
                 }
             }
+
+            const { getPartnerPlan } = await import("@/lib/services/subscription.service")
+            const plan = await getPartnerPlan(quote.partner_id).catch(() => null)
+            const planTier = plan?.slug || "free"
 
             const liveSnapshot = {
                 quote_number: quote.quote_number,
@@ -2605,10 +2585,10 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                 additional_costs: Number(quote.additional_costs || 0),
                 total: Number(quote.total || 0),
                 partner: {
-                    name: store?.name || "Parceiro",
-                    image_url: storeLogo,
+                    name: resolvedPartnerName,
+                    image_url: resolvedPartnerLogo,
                     email: partnerEmail,
-                    phone: store?.phone || null,
+                    phone: resolvedPartnerPhone,
                     address: partnerAddressFormatted
                 },
                 seller: sellerInfo,
@@ -2640,16 +2620,47 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             }
             if (resolvedSnapshot && resolvedSnapshot.partner) {
                 if (!resolvedSnapshot.partner.name || resolvedSnapshot.partner.name === "Parceiro") {
-                    const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
-                    resolvedSnapshot.partner.name = store?.name || "Parceiro"
+                    resolvedSnapshot.partner.name = resolvedPartnerName
                 }
                 if (!resolvedSnapshot.partner.image_url) {
-                    const partnerObj = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
-                    resolvedSnapshot.partner.image_url = store?.logo_url || null
+                    resolvedSnapshot.partner.image_url = resolvedPartnerLogo
+                }
+                if (!resolvedSnapshot.partner.phone) {
+                    resolvedSnapshot.partner.phone = resolvedPartnerPhone
+                }
+                if (!resolvedSnapshot.partner.address || resolvedSnapshot.partner.address === "Endereço não cadastrado" || resolvedSnapshot.partner.address === "Endereço comercial não disponível") {
+                    resolvedSnapshot.partner.address = partnerAddressFormatted
+                }
+                if (!resolvedSnapshot.partner.email) {
+                    resolvedSnapshot.partner.email = partnerEmail
                 }
             }
 
             const previewMeta = quote.metadata?.preview || {}
+
+            const currentUser = await getCurrentUser().catch(() => null)
+            let canDirectApprove = false
+            if (currentUser) {
+                const { data: partnerUser } = await admin
+                    .from("partner_users")
+                    .select("role")
+                    .eq("partner_id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                const { data: partnerOwner } = await admin
+                    .from("partners")
+                    .select("id")
+                    .eq("id", quote.partner_id)
+                    .eq("user_id", currentUser.id)
+                    .maybeSingle()
+
+                if (partnerOwner || partnerUser) {
+                    canDirectApprove = true
+                } else if (quote.customers?.email && currentUser.email && currentUser.email.toLowerCase() === quote.customers.email.toLowerCase()) {
+                    canDirectApprove = true
+                }
+            }
 
             return successResponse({
                 quote: {
@@ -2674,8 +2685,18 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     rejection_reason: quote.rejection_reason,
                     lockout_until: quote.lockout_until,
                     partner_id: quote.partner_id,
+                    can_direct_approve: canDirectApprove,
                     customers: quote.customers || null,
-                    partners: Array.isArray(quote.partners) ? quote.partners[0] : (quote.partners || null),
+                    partners: {
+                        id: quote.partner_id,
+                        name: resolvedPartnerName,
+                        store_name: partnerRow?.store_name || null,
+                        logo_url: resolvedPartnerLogo,
+                        store_image_url: partnerRow?.store_image_url || null,
+                        phone: resolvedPartnerPhone,
+                        address: partnerAddressFormatted,
+                        plan_tier: planTier,
+                    },
                     items: formattedItems,
                     metadata: quote.metadata || {},
                     primary_color: previewMeta.primaryColor || null,
@@ -2702,17 +2723,37 @@ export async function approvePublicQuoteAction(
 ) {
     return withTelemetry("approvePublicQuoteAction", async () => {
         try {
-            const supabase = await getSupabaseServerClient()
+            await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+            const cleanToken = String(publicToken || "").trim()
+            if (!cleanToken || cleanToken.length < 6) {
+                return errorResponse("Link ou código de aprovação inválido")
+            }
 
-            // 1. Fetch quote by public_token
-            const { data: quote, error: quoteErr } = await supabase
+            const admin = getAdminClient()
+
+            // 1. Fetch quote by public_token using admin client to bypass RLS (matches OS flow)
+            const { data: quote, error: quoteErr } = await admin
                 .from("quotes")
-                .select("id, partner_id, status, quote_number, expiration_date, customers(email)")
-                .eq("public_token", publicToken)
+                .select("id, partner_id, status, quote_number, expiration_date, customers(email, name)")
+                .eq("public_token", cleanToken)
                 .maybeSingle()
 
             if (quoteErr || !quote) {
                 return errorResponse("Link ou código de aprovação inválido")
+            }
+
+            // Ensure draft quotes accessed via public link are treated as viewed
+            if (quote.status === "draft") {
+                await admin
+                    .from("quotes")
+                    .update({
+                        status: "viewed",
+                        first_viewed_at: new Date().toISOString(),
+                        last_viewed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", quote.id)
+                quote.status = "viewed"
             }
 
             // 2. Determine auth method and check permission
@@ -2724,15 +2765,14 @@ export async function approvePublicQuoteAction(
             let approverDisplayName = approverName?.trim() || "Cliente"
 
             if (currentUser) {
-                const adminClient = getAdminClient()
-                const { data: partnerUser } = await adminClient
+                const { data: partnerUser } = await admin
                     .from("partner_users")
                     .select("role")
                     .eq("partner_id", quote.partner_id)
                     .eq("user_id", currentUser.id)
                     .maybeSingle()
 
-                const { data: partnerOwner } = await adminClient
+                const { data: partnerOwner } = await admin
                     .from("partners")
                     .select("id")
                     .eq("id", quote.partner_id)
@@ -2744,7 +2784,7 @@ export async function approvePublicQuoteAction(
                 if (isErpMember) {
                     isAuthorized = true
                     method = "erp_portal"
-                    const { data: profile } = await adminClient
+                    const { data: profile } = await admin
                         .from("user_profiles")
                         .select("full_name")
                         .eq("user_id", currentUser.id)
@@ -2766,7 +2806,7 @@ export async function approvePublicQuoteAction(
             }
 
             // 3. Call RPC to approve public quote
-            const { data: rpcRes, error: rpcErr } = await supabase.rpc("approve_public_quote", {
+            const { data: rpcRes, error: rpcErr } = await admin.rpc("approve_public_quote", {
                 p_quote_id: quote.id,
                 p_name: approverDisplayName,
                 p_code: method === "code" ? approvalCode.trim() : "",
@@ -2787,7 +2827,7 @@ export async function approvePublicQuoteAction(
             }
 
             // 4. Fetch updated quote with customer info to notify
-            const { data: updatedQuote } = await supabase
+            const { data: updatedQuote } = await admin
                 .from("quotes")
                 .select("*, customers(id, name, email)")
                 .eq("id", quote.id)
@@ -2796,7 +2836,7 @@ export async function approvePublicQuoteAction(
             // 5. Send notification and audit log
             await notifyQuoteEvent({
                 event: "approved",
-                quote: updatedQuote,
+                quote: updatedQuote || quote,
                 actorName: approverDisplayName,
                 actorUserId: currentUser?.id || null,
                 approvalMethod: method,
@@ -2824,21 +2864,41 @@ export async function rejectPublicQuoteAction(
 ) {
     return withTelemetry("rejectPublicQuoteAction", async () => {
         try {
-            const supabase = await getSupabaseServerClient()
+            await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+            const cleanToken = String(publicToken || "").trim()
+            if (!cleanToken || cleanToken.length < 6) {
+                return errorResponse("Link ou código de aprovação inválido")
+            }
 
-            // 1. Fetch quote by public_token
-            const { data: quote, error: quoteErr } = await supabase
+            if (!reason || !reason.trim()) {
+                return errorResponse("O motivo da recusa é obrigatório.")
+            }
+
+            const admin = getAdminClient()
+
+            // 1. Fetch quote by public_token using admin client to bypass RLS (matches OS flow)
+            const { data: quote, error: quoteErr } = await admin
                 .from("quotes")
-                .select("id, partner_id, status, quote_number, expiration_date, customers(email)")
-                .eq("public_token", publicToken)
+                .select("id, partner_id, status, quote_number, expiration_date, customers(email, name)")
+                .eq("public_token", cleanToken)
                 .maybeSingle()
 
             if (quoteErr || !quote) {
                 return errorResponse("Link ou código de aprovação inválido")
             }
 
-            if (!reason || !reason.trim()) {
-                return errorResponse("O motivo da recusa é obrigatório.")
+            // Ensure draft quotes accessed via public link are treated as viewed
+            if (quote.status === "draft") {
+                await admin
+                    .from("quotes")
+                    .update({
+                        status: "viewed",
+                        first_viewed_at: new Date().toISOString(),
+                        last_viewed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", quote.id)
+                quote.status = "viewed"
             }
 
             // 2. Determine auth method and check permission
@@ -2850,15 +2910,14 @@ export async function rejectPublicQuoteAction(
             let rejectorDisplayName = rejectorName?.trim() || "Cliente"
 
             if (currentUser) {
-                const adminClient = getAdminClient()
-                const { data: partnerUser } = await adminClient
+                const { data: partnerUser } = await admin
                     .from("partner_users")
                     .select("role")
                     .eq("partner_id", quote.partner_id)
                     .eq("user_id", currentUser.id)
                     .maybeSingle()
 
-                const { data: partnerOwner } = await adminClient
+                const { data: partnerOwner } = await admin
                     .from("partners")
                     .select("id")
                     .eq("id", quote.partner_id)
@@ -2870,7 +2929,7 @@ export async function rejectPublicQuoteAction(
                 if (isErpMember) {
                     isAuthorized = true
                     method = "erp_portal"
-                    const { data: profile } = await adminClient
+                    const { data: profile } = await admin
                         .from("user_profiles")
                         .select("full_name")
                         .eq("user_id", currentUser.id)
@@ -2892,7 +2951,7 @@ export async function rejectPublicQuoteAction(
             }
 
             // 3. Call RPC to reject public quote
-            const { data: rpcRes, error: rpcErr } = await supabase.rpc("reject_public_quote", {
+            const { data: rpcRes, error: rpcErr } = await admin.rpc("reject_public_quote", {
                 p_quote_id: quote.id,
                 p_name: rejectorDisplayName,
                 p_code: method === "code" ? approvalCode.trim() : "",
@@ -2914,7 +2973,7 @@ export async function rejectPublicQuoteAction(
             }
 
             // 4. Fetch updated quote with customer info to notify
-            const { data: updatedQuote } = await supabase
+            const { data: updatedQuote } = await admin
                 .from("quotes")
                 .select("*, customers(id, name, email)")
                 .eq("id", quote.id)
@@ -2923,7 +2982,7 @@ export async function rejectPublicQuoteAction(
             // 5. Send notification and audit log
             await notifyQuoteEvent({
                 event: "rejected",
-                quote: updatedQuote,
+                quote: updatedQuote || quote,
                 actorName: rejectorDisplayName,
                 actorUserId: currentUser?.id || null,
                 rejectionReason: reason.trim(),

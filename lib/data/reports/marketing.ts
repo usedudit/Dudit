@@ -18,6 +18,7 @@ export interface MarketingReportData {
     total: number
     used: number
     usageRate: number
+    ordersWithCoupon: number
     totalDiscount: number
     totalDiscountFormatted: string
   }
@@ -97,7 +98,9 @@ const fetchMarketingDataStatic = unstable_cache(
 
     const totalCoupons = coupons.length
     const usedCoupons = Array.from(usageCountMap.keys()).length
-    const usageRate = totalCoupons > 0 ? Math.round((usedCoupons / totalCoupons) * 100) : 0
+    const ordersWithCoupon = new Set(couponUsages.map(u => u.order_id)).size
+    const orderCount = orders.length
+    const usageRate = orderCount > 0 ? Math.round((ordersWithCoupon / orderCount) * 100) : 0
 
     const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
     const todayDate = new Date(today + "T12:00:00Z")
@@ -151,6 +154,7 @@ const fetchMarketingDataStatic = unstable_cache(
         total: totalCoupons,
         used: usedCoupons,
         usageRate,
+        ordersWithCoupon,
         totalDiscount,
         totalDiscountFormatted: brl(totalDiscount),
       },
@@ -159,7 +163,7 @@ const fetchMarketingDataStatic = unstable_cache(
       campaigns,
     }
   },
-  ["report-marketing-static"],
+  [`report-marketing-${partnerId}-${period}`],
   { tags: ["reports"], revalidate: 120 }
 )
 
