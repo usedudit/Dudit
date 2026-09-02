@@ -182,7 +182,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
         .select("id, short_id, name, price, promotional_price, images, stock_available, availability_value, availability_unit")
         .eq("partner_id", resolved.partnerId)
         .eq("is_active", true)
-        .eq("moderation_status", "approved")
+        .neq("moderation_status", "rejected")
         .eq("show_in_marketplace", true)
         .gt("stock_available", 0)
         .order("created_at", { ascending: false })

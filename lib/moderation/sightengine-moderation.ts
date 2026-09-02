@@ -25,6 +25,7 @@ export interface ModerationAnalysis {
   }[]
   rawResponse: SightengineResult | null
   error?: string
+  isUnavailable?: boolean
 }
 
 // Apenas 4 categorias conforme solicitado
@@ -126,7 +127,7 @@ export function analyzeModerationResult(
       confidence: 0,
       categories: [],
       rawResponse: result,
-      error: 'Erro ao analisar resultado',
+      isUnavailable: true,
     }
   }
 }
@@ -139,21 +140,19 @@ export async function moderateImageWithBase64(
   base64Image: string
 ): Promise<ModerationAnalysis> {
   try {
-    const apiUser = process.env.SIGHTENGINE_API_USER
-    const apiSecret = process.env.SIGHTENGINE_API_SECRET
+    const apiUser = process.env.SIGHTENGINE_API_USER?.trim()
+    const apiSecret = process.env.SIGHTENGINE_API_SECRET?.trim()
 
     if (!apiUser || !apiSecret) {
-      console.error('[SIGHTENGINE] Missing API credentials')
+      console.warn('[SIGHTENGINE] Missing API credentials, failing open (approved)')
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: null,
-        error: 'API credentials not configured',
+        isUnavailable: true,
       }
     }
-
-    console.log('[SIGHTENGINE] Starting moderation with base64 image')
 
     // 1. Criar o FormData
     const formData = new FormData()
@@ -174,10 +173,7 @@ export async function moderateImageWithBase64(
     // Anexa como se fosse um arquivo chamado 'image.jpg'
     formData.append('media', blob, 'image.jpg')
 
-    console.log('[SIGHTENGINE] Sending POST request (FormData)')
-
     // 3. O Fetch gerencia o Content-Type automaticamente (boundary)
-    // NÃO defina 'Content-Type': 'multipart/form-data' manualmente!
     const response = await safeFetch('https://api.sightengine.com/1.0/check.json', {
       method: 'POST',
       body: formData,
@@ -185,46 +181,43 @@ export async function moderateImageWithBase64(
       maxResponseBytes: 1 * 1024 * 1024, // 1 MB - API response is JSON
     })
 
-    console.log('[SIGHTENGINE] Response status:', response.status)
-
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[SIGHTENGINE] API error:', response.status, errorText.slice(0, 300))
+      console.warn('[SIGHTENGINE] API error or rate limit, failing open:', response.status, errorText.slice(0, 300))
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: null,
-        error: `API error: ${response.status}`,
+        isUnavailable: true,
       }
     }
 
     const result: SightengineResult = await response.json()
 
-    // Tratamento específico para o erro de limite de requisições ou erro de argumentos
+    // Tratamento específico para quota atingida ou falha de argumentos
     if (result.status === 'failure') {
-      console.warn('[SIGHTENGINE] API Failure:', result)
+      console.warn('[SIGHTENGINE] API failure or quota limit exceeded, failing open:', result.error?.message)
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: result,
-        error: result.error?.message || 'API Failure',
+        isUnavailable: true,
       }
     }
 
     const analysis = analyzeModerationResult(result)
-
     return analysis
 
   } catch (error) {
-    console.error('[SIGHTENGINE] Exception:', error instanceof Error ? error.message : error)
+    console.warn('[SIGHTENGINE] Exception caught, failing open:', error instanceof Error ? error.message : error)
     return {
       riskLevel: 'low',
       confidence: 0,
       categories: [],
       rawResponse: null,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      isUnavailable: true,
     }
   }
 }
@@ -252,21 +245,19 @@ export async function moderateImageWithUrl(
       }
     }
 
-    const apiUser = process.env.SIGHTENGINE_API_USER
-    const apiSecret = process.env.SIGHTENGINE_API_SECRET
+    const apiUser = process.env.SIGHTENGINE_API_USER?.trim()
+    const apiSecret = process.env.SIGHTENGINE_API_SECRET?.trim()
 
     if (!apiUser || !apiSecret) {
-      console.error('[SIGHTENGINE] Missing API credentials')
+      console.warn('[SIGHTENGINE] Missing API credentials, failing open (approved)')
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: null,
-        error: 'API credentials not configured',
+        isUnavailable: true,
       }
     }
-
-    console.log('[SIGHTENGINE] Starting moderation with URL:', imageUrl.slice(0, 50))
 
     const params = new URLSearchParams({
       url: imageUrl,
@@ -274,8 +265,6 @@ export async function moderateImageWithUrl(
       api_user: apiUser,
       api_secret: apiSecret,
     })
-
-    console.log('[SIGHTENGINE] Sending request to API')
 
     const response = await safeFetch(
       `https://api.sightengine.com/1.0/check.json?${params.toString()}`,
@@ -286,50 +275,41 @@ export async function moderateImageWithUrl(
       }
     )
 
-    console.log('[SIGHTENGINE] Response status:', response.status)
-
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('[SIGHTENGINE] API error:', response.status, errorText.slice(0, 200))
+      console.warn('[SIGHTENGINE] API error or rate limit, failing open:', response.status, errorText.slice(0, 200))
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: null,
-        error: `API error: ${response.status}`,
+        isUnavailable: true,
       }
     }
 
     const result: SightengineResult = await response.json()
-    console.log('[SIGHTENGINE] Analysis complete, status:', result.status)
 
     if (result.status !== 'success') {
-      console.warn('[SIGHTENGINE] API returned non-success status:', result.status)
+      console.warn('[SIGHTENGINE] API returned non-success status or quota limit, failing open:', result.status, result.error?.message)
       return {
         riskLevel: 'low',
         confidence: 0,
         categories: [],
         rawResponse: result,
-        error: 'API returned error status',
+        isUnavailable: true,
       }
     }
 
     const analysis = analyzeModerationResult(result)
-    console.log('[SIGHTENGINE] Final analysis:', {
-      riskLevel: analysis.riskLevel,
-      confidence: analysis.confidence,
-      categoriesCount: analysis.categories.length,
-    })
-
     return analysis
   } catch (error) {
-    console.error('[SIGHTENGINE] Exception:', error instanceof Error ? error.message : error)
+    console.warn('[SIGHTENGINE] Exception caught in moderateImageWithUrl, failing open:', error instanceof Error ? error.message : error)
     return {
       riskLevel: 'low',
       confidence: 0,
       categories: [],
       rawResponse: null,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      isUnavailable: true,
     }
   }
 }

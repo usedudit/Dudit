@@ -22,7 +22,8 @@ describe("Redis explore public projection", () => {
 
   it("requires all product publication predicates", () => {
     expect(isExploreProductPublic(base)).toBe(true)
-    expect(isExploreProductPublic({ ...base, moderation_status: "pending" })).toBe(false)
+    expect(isExploreProductPublic({ ...base, moderation_status: "pending" })).toBe(true)
+    expect(isExploreProductPublic({ ...base, moderation_status: "rejected" })).toBe(false)
     expect(isExploreProductPublic({ ...base, deleted_at: new Date().toISOString() })).toBe(false)
     expect(isExploreProductPublic({ ...base, show_in_marketplace: false })).toBe(false)
   })

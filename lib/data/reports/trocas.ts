@@ -179,7 +179,7 @@ const fetchReturnsDataStatic = unstable_cache(
       topReturnedProducts,
     }
   },
-  [`report-returns-${partnerId}-${period}`],
+  ["report-returns"],
   { tags: ["reports"], revalidate: 120 }
 )
 

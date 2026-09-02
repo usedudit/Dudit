@@ -93,7 +93,7 @@ async function seedRedis() {
         `)
         .eq("status", "ativo")
         .eq("is_active", true)
-        .eq("moderation_status", "approved")
+        .neq("moderation_status", "rejected")
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
 
@@ -159,7 +159,7 @@ async function seedRedis() {
         `)
         .eq("status", "ativo")
         .eq("is_active", true)
-        .eq("moderation_status", "approved")
+        .neq("moderation_status", "rejected")
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
 

@@ -98,7 +98,7 @@ const fetchMarketingDataStatic = unstable_cache(
 
     const totalCoupons = coupons.length
     const usedCoupons = Array.from(usageCountMap.keys()).length
-    const ordersWithCoupon = new Set(couponUsages.map(u => u.order_id)).size
+    const ordersWithCoupon = new Set(couponUsages.map((u: any) => u.order_id)).size
     const orderCount = orders.length
     const usageRate = orderCount > 0 ? Math.round((ordersWithCoupon / orderCount) * 100) : 0
 
@@ -163,7 +163,7 @@ const fetchMarketingDataStatic = unstable_cache(
       campaigns,
     }
   },
-  [`report-marketing-${partnerId}-${period}`],
+  ["report-marketing"],
   { tags: ["reports"], revalidate: 120 }
 )
 

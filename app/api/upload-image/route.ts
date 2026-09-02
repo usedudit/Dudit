@@ -197,31 +197,22 @@ async function handleUpload(request: NextRequest) {
     let decision: ReturnType<typeof decideImageStatus>
 
     if (cachedModeration) {
-      if (cachedModeration.status === "BLOCKED") {
-        return NextResponse.json(
-          { error: "Imagem bloqueada pela moderação de conteúdo." },
-          { status: 400 },
-        )
-      }
+      // Trata status legado BLOCKED como FLAGGED para nunca bloquear upload
+      const effectiveStatus = cachedModeration.status === "BLOCKED" ? "FLAGGED" : cachedModeration.status
       decision = {
-        status: cachedModeration.status,
-        message: cachedModeration.status === "FLAGGED"
+        status: effectiveStatus,
+        message: effectiveStatus === "FLAGGED"
           ? "Imagem encaminhada para revisão."
           : "Imagem aprovada.",
         shouldSaveToR2: true,
       }
     } else {
       const analysis = await moderateImageWithBase64(buffer.toString("base64"))
-      if (analysis.error) {
-        if (!user && uploadType === "partner-logo") {
-          return NextResponse.json(
-            { error: "A moderação está temporariamente indisponível. Tente novamente." },
-            { status: 503 },
-          )
-        }
+      if (analysis.isUnavailable) {
+        // Fail-open: Se o Sightengine estiver indisponível, der erro ou bater a cota mensal gratuita, deixa passar aprovado
         decision = {
-          status: "FLAGGED",
-          message: "Imagem encaminhada para revisão.",
+          status: "APPROVED",
+          message: "Imagem aprovada.",
           shouldSaveToR2: true,
         }
       } else {
@@ -233,13 +224,11 @@ async function handleUpload(request: NextRequest) {
         analysis.riskLevel,
         analysis.confidence,
         analysis.categories,
-        analysis.error
-          ? "FLAGGED"
-          : decision.status === "BLOCKED" ? "BLOCKED" : decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
+        decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
       )
     }
 
-    if (decision.status === "BLOCKED" || !decision.shouldSaveToR2) {
+    if (!decision.shouldSaveToR2) {
       return NextResponse.json({ error: decision.message }, { status: 400 })
     }
 

@@ -53,6 +53,16 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
   return { fallback_variant_image: image, fallback_variant_price: lowestPrice }
 }
 
+function normalizeCityToSlug(city: string, state: string): string {
+  const normCity = city
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+  return `${normCity}-${state.toLowerCase()}`
+}
+
 /**
  * Utilitário para sincronizar itens com o cache/índice do Explorar no Redis.
  * Garante que a criação/edição no ERP reflita instantaneamente no Marketplace.
@@ -74,11 +84,28 @@ export async function syncToExploreRedis({
   try {
     if (removeFromRedis) {
       // Remove de todos os índices e do cache de objeto
-      await Promise.all([
+      const removePromises: Promise<any>[] = [
         redis.zrem(typeIndexKey, memberId),
         redis.zrem(globalIndexKey, memberId),
         redis.del(dataKey)
-      ])
+      ]
+
+      // Remove também do índice por cidade se tiver informação de endereço no objeto
+      try {
+        const existingRaw = await redis.get<string | Record<string, any>>(dataKey)
+        const existing = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw
+        const partnerCity = existing?.partners?.city
+        const partnerState = existing?.partners?.state
+        if (partnerCity && partnerState) {
+          const citySlug = normalizeCityToSlug(partnerCity, partnerState)
+          removePromises.push(
+            redis.zrem(`explore:index:cidade:${citySlug}`, memberId),
+            redis.zrem(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, memberId)
+          )
+        }
+      } catch { }
+
+      await Promise.all(removePromises)
       // Invalidate Next.js cache so home/explore reflect the removal immediately
       await revalidateExploreSearch({ silent })
       console.log(`[RedisSync] Removido: ${memberId} silent:${silent}`)
@@ -260,11 +287,24 @@ export async function syncToExploreRedis({
     // 1. Atualiza o Cache do Objeto (JSON) com TTL de 7 dias
     // 2. Atualiza o Índice Específico (zset)
     // 3. Atualiza o Índice Global (zset)
-    await Promise.all([
+    // 4. Atualiza o Índice da Cidade (zset) se houver endereço
+    const syncPromises: Promise<any>[] = [
       redis.set(dataKey, JSON.stringify(publicData), { ex: 604800 }),
       redis.zadd(typeIndexKey, { score: finalScore, member: memberId }),
       redis.zadd(globalIndexKey, { score: finalScore, member: memberId })
-    ])
+    ]
+
+    const partnerCity = (publicData as any)?.partners?.city || (finalData as any)?.partners?.city
+    const partnerState = (publicData as any)?.partners?.state || (finalData as any)?.partners?.state
+    if (partnerCity && partnerState) {
+      const citySlug = normalizeCityToSlug(partnerCity, partnerState)
+      syncPromises.push(
+        redis.zadd(`explore:index:cidade:${citySlug}`, { score: finalScore, member: memberId }),
+        redis.zadd(`explore:index:cidade:${citySlug}:${type === 'produto' ? 'produtos' : type === 'servico' ? 'servicos' : 'vitrines'}`, { score: finalScore, member: memberId })
+      )
+    }
+
+    await Promise.all(syncPromises)
 
     // 4. Invalidate Next.js cache tags so home/explore reflect changes immediately
     await revalidateExploreSearch({ silent })

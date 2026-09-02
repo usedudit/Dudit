@@ -186,7 +186,7 @@ async function _getPartnerProducts(partnerId: string, storeId?: string) {
   if (!isOwner) {
     query = query
       .eq("status", "ativo")
-      .eq("moderation_status", "approved")
+      .neq("moderation_status", "rejected")
       .eq("show_in_marketplace", true)
   }
 
@@ -1075,7 +1075,7 @@ export async function getPartnerOrderBumps(partnerId: string, limit = 5, storeId
     .select("id, name, price, promotional_price, images, stock_available, availability_value, availability_unit, status")
     .eq("partner_id", partnerId)
     .eq("status", "ativo")
-    .eq("moderation_status", "approved")
+    .neq("moderation_status", "rejected")
     .eq("show_in_marketplace", true)
     .gt("stock_available", 0)
     .order("created_at", { ascending: false })

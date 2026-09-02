@@ -638,7 +638,7 @@ export async function createProductComprehensiveAction(data: {
             technical_specs: data.technicalSpecs || {},
             delivery_format: data.deliveryFormat || null,
             show_in_marketplace: data.showInMarketplace !== false,
-            moderation_status: 'approved',
+            moderation_status: data.requiresManualModeration ? 'pending_moderation' : 'approved',
             tags: data.tags || [],
             allow_sell_without_stock: data.allow_sell_without_stock || false,
             created_at: getBrasiliaTime(),
@@ -1046,7 +1046,9 @@ export async function updateProductComprehensiveAction(productId: string, data: 
         if (data.tags !== undefined) payload.tags = data.tags
         if (data.showInMarketplace !== undefined) payload.show_in_marketplace = data.showInMarketplace
 
-        payload.moderation_status = 'approved'
+        payload.moderation_status = data.requiresManualModeration
+            ? 'pending_moderation'
+            : (product.moderation_status || 'approved')
 
         const { data: updatedProduct, error: transactionError } = await supabase.rpc(
             "update_product_transaction",

@@ -3,7 +3,7 @@
 import React, { useState, useTransition, useCallback, useRef, useEffect } from "react"
 import {
     CheckCircleIcon, CancelCircleIcon, ClockIcon, TrashIcon, RemoveImageIcon,
-    StoreIcon, UserIcon, InfoIcon, XIcon
+    StoreIcon, UserIcon, InfoIcon, XIcon, EditIcon
 } from "@/lib/icons"
 import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import Portal from "@/components/Portal"
@@ -56,11 +56,12 @@ interface ProductModerationSheetProps {
     onApprove: (id: string, type: ModerationItem["type"]) => void
     onRejectImages: (id: string, urls: string[], reason: string) => void
     onFullReject: (id: string, reason: string, type: ModerationItem["type"]) => void
+    onEditItem?: (type: string, id: string) => void
     isPending: boolean
 }
 
 function ProductModerationSheet({
-    item, isOpen, onClose, onApprove, onRejectImages, onFullReject, isPending,
+    item, isOpen, onClose, onApprove, onRejectImages, onFullReject, onEditItem, isPending,
 }: ProductModerationSheetProps) {
     const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
     const [showRejectImagesModal, setShowRejectImagesModal] = useState(false)
@@ -344,7 +345,7 @@ function ProductModerationSheet({
                 </div>
 
                 {/* Actions Section */}
-                {item.moderation_status === "pending_moderation" && (
+                {item.moderation_status !== "approved" && (
                     <div className="pt-4 border-t border-brand-border dark:border-dark-border space-y-3">
                         <Button
                             variant="filled"
@@ -352,8 +353,21 @@ function ProductModerationSheet({
                             onClick={() => setShowApproveModal(true)}
                             disabled={isPending}
                         >
-                                <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
+                            <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
                         </Button>
+
+                        {(item.type === "product" || item.type === "service") && onEditItem && (
+                            <Button
+                                variant="outline"
+                                className="w-full rounded-full h-11 text-[14px] font-medium"
+                                onClick={() => {
+                                    onClose()
+                                    onEditItem(item.type, item.id)
+                                }}
+                            >
+                                <EditIcon size={18} className="mr-2" /> Editar {item.type === "product" ? "Produto" : "Serviço"} no Painel
+                            </Button>
+                        )}
 
                         <div className="flex gap-3">
                             {selectedImages.size > 0 && (item.type === "product" || item.type === "service") && (
@@ -587,9 +601,10 @@ function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
 
 interface ModerationListProps {
     initialData?: CursorPaginatedResult<ModerationItem>
+    onEditItem?: (type: string, id: string) => void
 }
 
-const ModerationList = ({ initialData }: ModerationListProps) => {
+const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const observerTarget = useRef<HTMLDivElement>(null)
     const [statusFilter, setStatusFilter] = useState("all")
@@ -690,19 +705,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-            <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-
-                {/* Header Title/Subtitle (ERP Standard) */}
-                <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                    <div className="flex flex-col gap-2 pt-1">
-                        <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">
-                            Moderação de Conteúdo
-                        </h1>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">
-                            Revise e aprove produtos enviados pelos parceiros para garantir a qualidade do marketplace.
-                        </p>
-                    </div>
-                </div>
+            <div className="mx-auto w-full flex flex-col h-full overflow-hidden relative">
 
                 {/* Controls (ERP Standard) */}
                 <ModerationPageControls
@@ -847,6 +850,7 @@ const ModerationList = ({ initialData }: ModerationListProps) => {
                 onApprove={handleApprove}
                 onRejectImages={handleRejectImages}
                 onFullReject={handleFullReject}
+                onEditItem={onEditItem}
                 isPending={isPending}
             />
 

@@ -43,11 +43,24 @@ function isExemptPath(pathname: string): boolean {
   )
 }
 
+let memoryCache: { data: CachedMaintenance | null; expiresAt: number } | null = null
+const MAINTENANCE_CACHE_TTL_MS = 30_000 // 30 seconds local in-memory cache
+
+export function clearMaintenanceMemoryCache(): void {
+  memoryCache = null
+}
+
 /**
  * Fetch maintenance status from Upstash Redis REST API (Edge compatible).
  * Fails OPEN (returns disabled) if Redis is down, unreachable, or times out.
+ * Uses a 30s local memory cache to avoid exhausting Redis request limits on page loads.
  */
 async function fetchMaintenanceStatus(): Promise<CachedMaintenance | null> {
+  const now = Date.now()
+  if (memoryCache && memoryCache.expiresAt > now) {
+    return memoryCache.data
+  }
+
   const kvUrl = process.env.KV_REST_API_URL
   const kvToken = process.env.KV_REST_API_TOKEN
 
@@ -72,14 +85,16 @@ async function fetchMaintenanceStatus(): Promise<CachedMaintenance | null> {
     if (!res.ok) return null
 
     const data = await res.json()
-    if (!data?.result) return null
-
-    const parsed = typeof data.result === "string" ? JSON.parse(data.result) : data.result
-    if (parsed && typeof parsed === "object" && parsed.enabled === true) {
-      return parsed as CachedMaintenance
+    let result: CachedMaintenance | null = null
+    if (data?.result) {
+      const parsed = typeof data.result === "string" ? JSON.parse(data.result) : data.result
+      if (parsed && typeof parsed === "object" && parsed.enabled === true) {
+        result = parsed as CachedMaintenance
+      }
     }
 
-    return null
+    memoryCache = { data: result, expiresAt: now + MAINTENANCE_CACHE_TTL_MS }
+    return result
   } catch {
     // Fail OPEN on network errors or timeouts
     return null

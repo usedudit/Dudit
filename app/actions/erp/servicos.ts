@@ -10,11 +10,9 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sanitizeNotes, sanitizeInput } from "@/lib/input-validator"
 import { errorResponse, successResponse } from "@/lib/utils/action-helpers"
 import type { ActionResponse } from "@/lib/types/action-response"
-import { requireCSRF } from "@/lib/security/csrf-action-wrapper"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
-import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -269,6 +267,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             payment_requirement: data.payment_requirement || data.paymentRequirement || "full_payment",
             images: data.images || [],
             is_unavailable_type: data.isUnavailableType || data.is_unavailable_type || false,
+            moderation_status: data.requiresManualModeration || data.requires_manual_moderation ? 'pending_moderation' : 'approved',
             created_at: getBrasiliaTime(),
             updated_at: getBrasiliaTime(),
         }
@@ -402,6 +401,9 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.paymentRequirement !== undefined) payload.payment_requirement = data.paymentRequirement
         if (data.show_price_in_store !== undefined) payload.show_price_in_store = data.show_price_in_store
         if (data.showPriceInStore !== undefined) payload.show_price_in_store = data.showPriceInStore
+        if (data.requiresManualModeration || data.requires_manual_moderation) {
+            payload.moderation_status = 'pending_moderation'
+        }
 
         const { data: updated, error } = await supabase.from("services").update(payload).eq("id", serviceId).select().single()
         if (error) return errorResponse(error.message)

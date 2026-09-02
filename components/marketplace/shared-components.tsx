@@ -129,7 +129,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                 <img
                     src={bannerImage}
                     alt={storeName}
-                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover object-center transition-transform duration-500"
                     loading="lazy"
                 />
                 <div className="absolute inset-0" />

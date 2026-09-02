@@ -378,7 +378,7 @@ export function WhatsAppIntegrationPage({
                                 <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                            <span className="hidden md:inline truncate">WhatsApp API</span>
+                                            WhatsApp API
                                             {(isMetaConnected || isEvoConnected) && (
                                                 <Badge variant="green">
                                                     <CheckCircleIcon size={12} className="mr-1" />
@@ -392,19 +392,19 @@ export function WhatsAppIntegrationPage({
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Tabs */}
-                        <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                            <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                <TabsTrigger value="evolution">
-                                    Evolution API
-                                </TabsTrigger>
-                                {/* <TabsTrigger value="meta">
+                                {/* Tabs */}
+                                <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="evolution">
+                                            Evolution API
+                                        </TabsTrigger>
+                                        {/* <TabsTrigger value="meta">
                                     Meta API
                                 </TabsTrigger> */}
-                            </TabsList>
+                                    </TabsList>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Content Body */}
@@ -485,8 +485,8 @@ export function WhatsAppIntegrationPage({
                                                         </div>
                                                     )}
 
-                                                    {/* 2. Disconnected / Error State */}
-                                                    {(evoStatus === "disconnected" || evoStatus === "error") && !evoQrCode && (
+                                                    {/* 2. Disconnected / Error / Pending State */}
+                                                    {(evoStatus === "disconnected" || evoStatus === "error" || evoStatus === "pending") && !evoQrCode && (
                                                         <IconPlaceholder
                                                             icon={QRCodeIcon}
                                                             title="WhatsApp Desconectado"

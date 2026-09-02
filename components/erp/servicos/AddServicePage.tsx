@@ -20,7 +20,6 @@ import { fetchWithCSRF, fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ShareModal } from "@/components/marketplace/ShareModal"
 import { getServiceUrl } from "@/lib/utils/url-generator"
-
 import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
@@ -384,6 +383,8 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 else finalImages[idx] = img
             })
 
+            let hasFlaggedUploads = false
+
             if (filesToUpload.length > 0) {
                 const signedResults = await Promise.all(
                     filesToUpload.map(async ({ file, index }) => {
@@ -398,6 +399,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
 
                 let hasErrors = false
                 let errorMessage = "Falha na validação de algumas imagens."
+                hasFlaggedUploads = signedResults.some(({ result }) => result.moderation?.status === "FLAGGED")
 
                 signedResults.forEach(({ result, index }) => {
                     if (result.success && result.key) {
@@ -430,6 +432,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                 id: serviceData.id || undefined,
                 partnerId, storeId, csrf_token: csrfToken,
                 name: serviceData.name, description: serviceData.description,
+                requiresManualModeration: hasFlaggedUploads || (serviceData as any).moderation_status === "pending_moderation",
                 sku: serviceData.sku, category_id: serviceData.category_id,
                 subcategory_id: serviceData.subcategory_id,
                 price: Number(serviceData.price),

@@ -92,6 +92,20 @@ export default function PromotionFormPage({
 
     const isReadOnly = currentMode === "details"
 
+    // Campaign Form State (declared before validateFields which depends on them)
+    const [campName, setCampName] = useState("")
+    const [campDesc, setCampDesc] = useState("")
+    const [campScope, setCampScope] = useState<"all" | "specific">("all")
+    const [campStarts, setCampStarts] = useState("")
+    const [campEnds, setCampEnds] = useState("")
+    const [campActive, setCampActive] = useState(true)
+    const [campCustIds, setCampCustIds] = useState<string[]>([])
+    const [custSearch, setCustSearch] = useState("")
+    const [custPage, setCustPage] = useState(1)
+
+    // Subform Rule State
+    const [editingRule, setEditingRule] = useState<any | null>(null)
+
     const getTabErrorCount = useCallback((tab: string) => {
         return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
     }, [fieldErrors])
@@ -134,19 +148,7 @@ export default function PromotionFormPage({
         return activeStores.length > 0 ? activeStores[0].id : null
     }, [storeId, scopeData.stores])
 
-    // Campaign Form State
-    const [campName, setCampName] = useState("")
-    const [campDesc, setCampDesc] = useState("")
-    const [campScope, setCampScope] = useState<"all" | "specific">("all")
-    const [campStarts, setCampStarts] = useState("")
-    const [campEnds, setCampEnds] = useState("")
-    const [campActive, setCampActive] = useState(true)
-    const [campCustIds, setCampCustIds] = useState<string[]>([])
-    const [custSearch, setCustSearch] = useState("")
-    const [custPage, setCustPage] = useState(1)
 
-    // Subform Rule State
-    const [editingRule, setEditingRule] = useState<any | null>(null)
 
     // Selection states for scope items
     const [editingRuleProductIds, setEditingRuleProductIds] = useState<string[]>([])

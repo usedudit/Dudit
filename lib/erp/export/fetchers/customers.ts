@@ -63,7 +63,13 @@ export async function fetchCustomersExport(
     },
   })
 
+  const { decryptCPF } = await import("@/lib/crypto")
   const filtered = rawRows.filter((row) => applyCustomerStatusFilter(row, statusLabels))
+  for (const row of filtered) {
+    if (row.cpf && String(row.cpf).startsWith("v")) {
+      try { row.cpf = await decryptCPF(row.cpf) } catch { /* keep encrypted */ }
+    }
+  }
   const rows = filtered.map((r) => mapCustomerRow(r))
   return { columns: CUSTOMER_EXPORT_COLUMNS, rows, rowCount: rows.length }
 }

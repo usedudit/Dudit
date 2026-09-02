@@ -115,11 +115,42 @@ export async function getModerationQueue(
         console.error("[ADMIN_MODERATION] Failed to fetch products queue:", error.message)
     }
 
-    const hasMore = (products?.length || 0) > pageSize
+    // Query services pending moderation
+    let serviceQuery = supabase
+        .from("services")
+        .select(`
+      id, name, description, price, images, moderation_status, created_at, store_id,
+      video_url, video_type, video_thumbnail,
+      partner:partners!inner(id, user_id),
+      store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
+    `)
+        .is("deleted_at", null)
+
+    if (statusFilter && statusFilter !== "all") {
+        serviceQuery = serviceQuery.eq("moderation_status", statusFilter)
+    } else {
+        serviceQuery = serviceQuery.in("moderation_status", ["pending_moderation", "flagged", "needs_images"])
+    }
+
+    if (cursor) {
+        serviceQuery = serviceQuery.lt("created_at", cursor)
+    }
+
+    serviceQuery = serviceQuery.order("created_at", { ascending: false }).limit(pageSize + 1)
+
+    const { data: services, error: serviceError } = await serviceQuery
+
+    if (serviceError) {
+        console.error("[ADMIN_MODERATION] Failed to fetch services queue:", serviceError.message)
+    }
+
+    const hasMore = (products?.length || 0) > pageSize || (services?.length || 0) > pageSize
     const items = (products || []).slice(0, pageSize)
+    const serviceItems = (services || []).slice(0, pageSize)
 
     // Fetch owner names + store profiles
-    const ownerIds = [...new Set(items.map((p: any) => p.partner?.user_id).filter(Boolean))]
+    const allItems = [...items, ...serviceItems]
+    const ownerIds = [...new Set(allItems.map((p: any) => p.partner?.user_id).filter(Boolean))]
     let ownerMap = new Map<string, string>()
     if (ownerIds.length > 0) {
         const { data: owners } = await supabase
@@ -130,7 +161,7 @@ export async function getModerationQueue(
     }
 
     // Also fetch store extras (phone, description, banner, gallery) not returned by the join
-    const storeIds = [...new Set(items.map((p: any) => p.store_id).filter(Boolean))]
+    const storeIds = [...new Set(allItems.map((p: any) => p.store_id).filter(Boolean))]
     let storeExtraMap = new Map<string, any>()
     if (storeIds.length > 0) {
         const { data: storeExtras } = await supabase
@@ -170,6 +201,37 @@ export async function getModerationQueue(
             video_url: p.video_url || null,
             video_type: p.video_type || null,
             video_thumbnail: p.video_thumbnail || null,
+        }
+    })
+
+    const mappedServices: ModerationItem[] = serviceItems.map((s: any) => {
+        const st = s.store || storeExtraMap.get(s.store_id)
+        return {
+            id: s.id,
+            type: "service" as const,
+            title: s.name,
+            description: s.description,
+            price: s.price || 0,
+            images: s.images || [],
+            owner_store_name: st?.name || "Desconhecido",
+            owner_user_name: ownerMap.get(s.partner?.user_id) || "",
+            partner_id: s.partner?.id || "",
+            store_id: s.store_id || undefined,
+            store_name: st?.name || undefined,
+            store_phone: st?.phone || undefined,
+            store_description: st?.description || undefined,
+            store_banner_url: st?.banner_url || undefined,
+            store_gallery: st?.gallery || undefined,
+            store_logo_url: st?.logo_url || undefined,
+            owner_user_id: s.partner?.user_id || undefined,
+            moderation_status: s.moderation_status,
+            risk_score: st?.risk_score ?? 0,
+            created_at: s.created_at,
+            category_name: null,
+            brand_name: null,
+            video_url: s.video_url || null,
+            video_type: s.video_type || null,
+            video_thumbnail: s.video_thumbnail || null,
         }
     })
 
@@ -253,7 +315,7 @@ export async function getModerationQueue(
     }))
 
     // Combine and sort
-    const combined = [...mappedVideos, ...mappedProducts, ...mappedReturns]
+    const combined = [...mappedVideos, ...mappedProducts, ...mappedServices, ...mappedReturns]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, pageSize)
 
@@ -269,7 +331,7 @@ export async function getModerationQueue(
 
 export async function approveModeration(
     entityId: string,
-    type: "product" | "partner" | "return_dispute" | "community_video" = "product"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -366,19 +428,22 @@ export async function approveModeration(
         return { success: true }
     }
 
+    const isItem = type === "product" || type === "service"
+    const targetTable = type === "product" ? "products" : type === "service" ? "services" : "partners"
+
     const { data: entity, error: fetchError } = await supabase
-        .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, images" : "id, stores!left(name)")
+        .from(targetTable)
+        .select(isItem ? "id, name, moderation_status, images" : "id, stores!left(name)")
         .eq("id", entityId)
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: `${type === "product" ? "Produto" : "Perfil"} não encontrado` }
+        return { success: false, error: `${type === "product" ? "Produto" : type === "service" ? "Serviço" : "Perfil"} não encontrado` }
     }
 
-    if (type === "product") {
+    if (isItem) {
         const { error: updateError } = await supabase
-            .from("products")
+            .from(targetTable)
             .update({
                 moderation_status: "approved",
                 moderation_reviewed_by: admin.userId,
@@ -397,8 +462,8 @@ export async function approveModeration(
         targetType: type,
         targetId: entityId,
         metadata: {
-            previousStatus: type === "product" ? entity.moderation_status : "approved",
-            name: type === "product" ? entity.name : entity.stores?.[0]?.name
+            previousStatus: isItem ? entity.moderation_status : "approved",
+            name: isItem ? entity.name : entity.stores?.[0]?.name
         },
     })
 
@@ -410,7 +475,8 @@ export async function approveModeration(
 export async function rejectFlaggedImages(
     entityId: string,
     reason: string,
-    flaggedImageUrls: string[]
+    flaggedImageUrls: string[],
+    type: "product" | "service" = "product"
 ): Promise<{ success: boolean; error?: string; noImagesLeft?: boolean }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -425,16 +491,17 @@ export async function rejectFlaggedImages(
 
     const supabase = getAdminClient()
 
+    const targetTable = type === "service" ? "services" : "products"
     // Anti-IDOR: re-fetch entity with all relevant data
     const { data: entity, error: fetchError } = await supabase
-        .from("products")
+        .from(targetTable)
         .select("id, name, images, moderation_status, partner_id")
         .eq("id", entityId)
         .is("deleted_at", null)
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: "Produto não encontrado" }
+        return { success: false, error: `${type === "service" ? "Serviço" : "Produto"} não encontrado` }
     }
 
     const currentImages: string[] = entity.images || []
@@ -452,7 +519,7 @@ export async function rejectFlaggedImages(
     if (remainingImages.length === 0) {
         // Update product: remove images, keep pending status, save reason
         const { error: updateError } = await supabase
-            .from("products")
+            .from(targetTable)
             .update({
                 images: [],
                 moderation_status: "needs_images",
@@ -545,7 +612,7 @@ export async function rejectFlaggedImages(
 export async function rejectModeration(
     entityId: string,
     reason: string,
-    type: "product" | "partner" | "return_dispute" | "community_video" = "product"
+    type: "product" | "service" | "partner" | "return_dispute" | "community_video" = "product"
 ): Promise<{ success: boolean; error?: string }> {
     const admin = await requireAdminScope("moderation")
     await requireRateLimit(RateLimitCategory.ADMIN_ACTION)
@@ -619,20 +686,23 @@ export async function rejectModeration(
         return { success: true }
     }
 
+    const isItem = type === "product" || type === "service"
+    const targetTable = type === "product" ? "products" : type === "service" ? "services" : "partners"
+
     // Anti-IDOR
     const { data: entity, error: fetchError } = await supabase
-        .from(type === "product" ? "products" : "partners")
-        .select(type === "product" ? "id, name, moderation_status, partner_id" : "id, stores!left(name)")
+        .from(targetTable)
+        .select(isItem ? "id, name, moderation_status, partner_id" : "id, stores!left(name)")
         .eq("id", entityId)
         .single()
 
     if (fetchError || !entity) {
-        return { success: false, error: `${type === "product" ? "Produto" : "Perfil"} não encontrado` }
+        return { success: false, error: `${type === "product" ? "Produto" : type === "service" ? "Serviço" : "Perfil"} não encontrado` }
     }
 
-    if (type === "product") {
+    if (isItem) {
         const { error: updateError } = await supabase
-            .from("products")
+            .from(targetTable)
             .update({
                 moderation_status: "rejected",
                 moderation_reason: reason.trim(),
@@ -657,9 +727,9 @@ export async function rejectModeration(
         targetId: entityId,
         metadata: {
             reason: reason.trim(),
-            previousStatus: type === "product" ? entity.moderation_status : "approved",
-            name: type === "product" ? entity.name : entity.stores?.[0]?.name,
-            riskScoreAdded: type === "product" ? 3 : 0
+            previousStatus: isItem ? entity.moderation_status : "approved",
+            name: isItem ? entity.name : entity.stores?.[0]?.name,
+            riskScoreAdded: isItem ? 3 : 0
         },
     })
 

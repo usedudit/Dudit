@@ -507,9 +507,9 @@ export const BusinessDataSubPage = ({
                                                                 setGeneralInfo({ ...generalInfo, storeName: e.target.value })
                                                                 setFieldErrors(prev => { const n = new Set(prev); n.delete("storeName"); return n })
                                                             }}
-                                                        error={fieldErrors.has("storeName")}
-                                                        maxLength={150}
-                                                        dataField="storeName"
+                                                            error={fieldErrors.has("storeName")}
+                                                            maxLength={150}
+                                                            dataField="storeName"
                                                         />
                                                     </div>
                                                     <div className="col-span-12 md:col-span-6">

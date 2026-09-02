@@ -136,9 +136,11 @@ export async function updateMaintenanceConfig(
       return { success: false, config: current, error: dbError.message }
     }
 
-    // 2. Sync to Redis
+    // 2. Sync to Redis and invalidate local memory cache
     try {
       await redis.set(REDIS_KEY_MAINTENANCE, JSON.stringify(merged))
+      const { clearMaintenanceMemoryCache } = await import("@/lib/system/maintenance-guard")
+      clearMaintenanceMemoryCache()
     } catch (redisErr) {
       console.warn("[system-settings] Redis sync failed for maintenance:", redisErr)
     }

@@ -355,8 +355,38 @@ export const searchMarketplace = async (
 
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
+let cachedGlobalVersion: { version: number; expiresAt: number } | null = null
+
+async function getCachedGlobalVersion(): Promise<number> {
+    const now = Date.now()
+    if (cachedGlobalVersion && cachedGlobalVersion.expiresAt > now) {
+        return cachedGlobalVersion.version
+    }
+    let version = 3
+    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch { }
+    cachedGlobalVersion = { version, expiresAt: now + 30_000 } // 30s in-memory TTL
+    return version
+}
+
+const searchMemoryCache = new Map<string, { results: any[]; filteredIds: string[]; expiresAt: number }>()
+const SEARCH_MEMORY_TTL_MS = 20_000 // 20s in-memory SWR cache
+
 const serializeSearchKey = (query: string, type: string, limits: any) => {
-    return [query, type, limits.vitrines, limits.produtos, limits.servicos, limits.geral, limits.cursor, limits.lastId].map(String).join(":")
+    return [
+        query || '',
+        type || 'tudo',
+        limits.vitrines || '',
+        limits.produtos || '',
+        limits.servicos || '',
+        limits.geral || '',
+        limits.cursor || '',
+        limits.lastId || '',
+        limits.cidade || 'all',
+        limits.section || 'all',
+        limits.radius || '',
+        limits.latitude || '',
+        limits.longitude || '',
+    ].map(String).join(":")
 }
 
 async function _searchMarketplaceCore(
@@ -379,71 +409,60 @@ async function _searchMarketplaceCore(
         section?: string;
     } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
-    if (limits.cidade) {
-        if (limits.cidade === "brasil") {
-            const { cidade: _, ...limitsWithoutCity } = limits
-            return _searchMarketplaceInternal(query, type, limitsWithoutCity)
-        }
-        return searchMarketplaceByCity(query, type, limits.cidade, limits)
-    }
-
-
     const isPagination = limits.cursor !== undefined || limits.lastId !== undefined
 
-    // Inline version read
-    const tV0 = performance.now()
-    let version: number = 3 // Bumping to v3 for the latitude/longitude cache format change
-    try { version = (await redis.get<number>(GLOBAL_VERSION_KEY)) || 3 } catch { }
-    const tV1 = performance.now()
-    if (tV1 - tV0 > 1000) console.warn(`[REDIS] SLOW VERSION READ: ${(tV1 - tV0).toFixed(1)}ms`)
+    // Inline version read with 30s in-memory cache to save Redis commands
+    const version = await getCachedGlobalVersion()
 
     const queryHash = serializeSearchKey(query, type, limits)
     const safeHash = Buffer.from(queryHash).toString('base64').replace(/=/g, '')
-    const cacheKey = `mp:cache:v${version}:ids:${safeHash}` // Specific key for IDs
+    const cacheKey = `mp:cache:v${version}:ids:${safeHash}`
 
-    // 1. TRY CACHE HIT (IDs only)
+    // 0. TRY IN-MEMORY SWR HIT (Zero network, 0ms, 0 Redis commands)
+    if (!isPagination) {
+        const memHit = searchMemoryCache.get(cacheKey)
+        if (memHit && memHit.expiresAt > Date.now()) {
+            return { results: memHit.results, filteredIds: memHit.filteredIds }
+        }
+    }
+
+    // 1. TRY CACHE HIT (IDs in Redis -> hydrate via MGET)
     if (!isPagination) {
         try {
-            const tR0 = performance.now()
             const cachedIds = await redis.get<string[]>(cacheKey)
-            const tR1 = performance.now()
-
-            if (tR1 - tR0 > 1000) console.warn(`[REDIS] SLOW ID FETCH (${cacheKey}): ${(tR1 - tR0).toFixed(1)}ms`)
             if (cachedIds && Array.isArray(cachedIds)) {
-                console.log(`[REDIS] HIT (IDs) ${cacheKey} | Fetching ${cachedIds.length} objects...`)
-
                 const dataKeys = cachedIds.map(id => `data:v2:${id}`)
                 const objectsRaw = await redis.mget(...dataKeys)
 
-                const objects = objectsRaw
+                const objects = (objectsRaw || [])
                     .map((obj: any) => typeof obj === 'string' ? JSON.parse(obj) : obj)
                     .filter(Boolean)
 
-                // If we found ALL objects in Redis, we can return immediately (Instant Update!)
+                // If we found ALL objects in Redis, return immediately
                 if (objects.length === cachedIds.length) {
                     const penalized = applyShowcasePenalty(objects)
-                    return { results: penalized, filteredIds: penalized.map((r: any) => `${r.itemType}:${r.id}`) }
+                    const filteredIds = penalized.map((r: any) => `${r.itemType}:${r.id}`)
+                    searchMemoryCache.set(cacheKey, { results: penalized, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
+                    return { results: penalized, filteredIds }
                 }
-
-                console.log(`[REDIS] Partial Miss (${objects.length}/${cachedIds.length}). Falling back to Internal Search.`)
             }
         } catch (err) {
             console.error("[REDIS] Error reading ID cache", err)
         }
     }
 
-    // 2. CACHE MISS / PARTIAL MISS: Run heavy search logic
+    // 2. CACHE MISS / PARTIAL MISS: Run search logic
     let { results, filteredIds } = await _searchMarketplaceInternal(query, type, limits)
 
     // 3. Apply showcase penalty for items from inactive vitrines
     results = applyShowcasePenalty(results)
     filteredIds = results.map(r => `${r.itemType}:${r.id}`)
 
-    // 4. WRITE TO CACHE (IDs only)
+    // 4. WRITE TO CACHE (Redis + local in-memory)
     if (!isPagination && filteredIds && filteredIds.length > 0) {
+        searchMemoryCache.set(cacheKey, { results, filteredIds, expiresAt: Date.now() + SEARCH_MEMORY_TTL_MS })
         try {
             await redis.set(cacheKey, JSON.stringify(filteredIds), { ex: 60 * 60 * 24 })
-            console.log(`[REDIS] SET (IDs) ${cacheKey}`)
         } catch (err) {
             console.error("[REDIS] Error setting ID cache", err)
         }
@@ -459,7 +478,22 @@ async function _searchMarketplaceCore(
 async function _searchMarketplaceInternal(
     query: string,
     type: 'produtos' | 'servicos' | 'vitrines' | 'tudo' | 'planos' = 'tudo',
-    limits: { vitrines?: number; produtos?: number; servicos?: number; planos?: number; geral?: number; cursor?: number; lastId?: string; cursorRank?: number } = {}
+    limits: {
+        vitrines?: number;
+        produtos?: number;
+        servicos?: number;
+        planos?: number;
+        geral?: number;
+        cursor?: number;
+        lastId?: string;
+        cursorRank?: number;
+        cidade?: string;
+        radius?: number;
+        latitude?: number;
+        longitude?: number;
+        centerCoords?: { lat: number; lng: number } | null;
+        section?: string;
+    } = {}
 ): Promise<{ results: any[], filteredIds: string[] }> {
     const { vitrines: vitLimit = 4, produtos: prodLimit = 20, servicos: servLimit = 20, planos: planosLimit = 20, geral = 40, cursor, lastId, cursorRank } = limits
 
@@ -467,6 +501,11 @@ async function _searchMarketplaceInternal(
     if (cursor && Date.now() - cursor > 1000 * 60 * 60 * 24 * 365 * 10) {
         console.warn(`[Security] Scraping attempt or invalid cursor depth: ${cursor}`)
         return { results: [], filteredIds: [] }
+    }
+
+    // Se tem filtro de cidade e não é "brasil"
+    if (limits.cidade && limits.cidade !== "brasil") {
+        return searchMarketplaceByCity(query, type, limits.cidade, limits)
     }
 
     // Se tem query de busca em texto puro, fazemos fallback pro Postgres FTS (busca aproximada)
@@ -732,6 +771,25 @@ async function hydrateMarketplaceSearchHits(
     supabase: ReturnType<typeof getAdminClient>
 ): Promise<any[]> {
     if (!hits.length) return []
+
+    // 0. Tentativa de hidratação ultrarrápida via Redis MGET (Zero DB queries se todos existirem no cache)
+    try {
+        const dataKeys = hits.map(h => `data:v2:${h.item_type}:${h.id}`)
+        const cachedRaw = await redis.mget(...dataKeys)
+        const cachedObjects = (cachedRaw || [])
+            .map((raw: any) => typeof raw === 'string' ? JSON.parse(raw) : raw)
+            .filter(Boolean)
+
+        if (cachedObjects.length === hits.length) {
+            const hitRankMap = new Map(hits.map(h => [`${h.item_type}:${h.id}`, h.rank]))
+            return cachedObjects.map(obj => ({
+                ...obj,
+                _searchRank: hitRankMap.get(`${obj.itemType}:${obj.id}`) ?? 0
+            }))
+        }
+    } catch {
+        // Fallback transparente para o Supabase abaixo
+    }
 
     const produtosIds = hits.filter(h => h.item_type === "produto").map(h => h.id)
     const servicosIds = hits.filter(h => h.item_type === "servico").map(h => h.id)

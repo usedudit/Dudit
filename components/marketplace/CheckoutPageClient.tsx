@@ -11,7 +11,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { useSupabase } from "@/providers/supabase-provider"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import Link from "next/link"
-import { getStoreUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { getServiceUrl } from "@/lib/utils/url-generator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
@@ -2166,6 +2166,7 @@ export function CheckoutPageClient() {
                 }
                 return
             } else if (paymentOption === "mercadopago") {
+                const isPickupPayment = false
                 const token = csrfToken || await fetchCSRFTokenSingleton() || ""
                 let orderId, orderNumber
                 if (sessionData?.source === "cart") {

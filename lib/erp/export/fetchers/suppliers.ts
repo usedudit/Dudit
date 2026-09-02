@@ -74,6 +74,12 @@ export async function fetchSuppliersExport(
     },
   })
 
+  const { decryptCPF } = await import("@/lib/crypto")
+  for (const row of rawRows) {
+    if (row.cpf && String(row.cpf).startsWith("v")) {
+      try { row.cpf = await decryptCPF(row.cpf) } catch { /* keep encrypted */ }
+    }
+  }
   const rows = rawRows.map((r) => mapSupplierRow(r, includeAllColumns))
   const columns = includeAllColumns ? SUPPLIER_EXPORT_ALL_COLUMNS : SUPPLIER_EXPORT_COLUMNS
   return { columns, rows, rowCount: rows.length }

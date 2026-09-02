@@ -348,6 +348,7 @@ export function getLimiter(category: RateLimitCategory): Ratelimit {
     limiter: Ratelimit.slidingWindow(config.maxRequests, config.window as any),
     analytics: false,
     prefix: `@rl/${category}`,
+    ephemeralCache: new Map(),
   })
 
   limiterCache.set(category, limiter)

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useTheme } from "next-themes"
 import confetti from "canvas-confetti"
 import { CopyIcon, BoxIcon, MapPinIcon, CheckCircleIcon, PrinterIcon } from "@/lib/icons"
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
@@ -87,6 +88,8 @@ export function PaymentWrapper({
     mpAcceptedPaymentMethods,
     partnerPhone, pixKey, pixKeyType, payDepositOnly,
 }: PixPaymentWrapperProps) {
+    const { theme } = useTheme()
+    const isDark = theme === "dark"
     const [copied, setCopied] = useState(false)
     const [isChecking, setIsChecking] = useState(false)
     const [paymentConfirmed, setPaymentConfirmed] = useState(false)
@@ -282,22 +285,67 @@ export function PaymentWrapper({
                     visual: {
                         style: {
                             theme: "flat",
-                            customVariables: {
-                                textPrimaryColor: "#003229", textSecondaryColor: "#6b7280",
-                                inputBackgroundColor: "#FFFFFF", formBackgroundColor: "#FFFFFF",
-                                baseColor: "#059669", baseColorFirstVariant: "#059669E6", baseColorSecondVariant: "#059669E6",
-                                errorColor: "#f04438", successColor: "#059669",
-                                outlinePrimaryColor: "#ebebeb", outlineSecondaryColor: "#ebebeb",
+                            customVariables: isDark ? {
+                                textPrimaryColor: "#f0f0f0",
+                                textSecondaryColor: "#a1a1aa",
+                                inputBackgroundColor: "#24252b",
+                                formBackgroundColor: "#18181b",
+                                baseColor: "#059669",
+                                baseColorFirstVariant: "#059669E6",
+                                baseColorSecondVariant: "#059669E6",
+                                errorColor: "#f04438",
+                                successColor: "#059669",
+                                outlinePrimaryColor: "#3f3f46",
+                                outlineSecondaryColor: "#3f3f46",
                                 buttonTextColor: "#FFFFFF",
-                                fontSizeExtraSmall: "12px", fontSizeSmall: "14px", fontSizeMedium: "15px",
-                                fontSizeLarge: "17px", fontSizeExtraLarge: "20px",
-                                fontWeightNormal: "400", fontWeightSemiBold: "600",
+                                fontSizeExtraSmall: "12px",
+                                fontSizeSmall: "14px",
+                                fontSizeMedium: "15px",
+                                fontSizeLarge: "17px",
+                                fontSizeExtraLarge: "20px",
+                                fontWeightNormal: "400",
+                                fontWeightSemiBold: "600",
                                 formInputsTextTransform: "none",
-                                inputVerticalPadding: "12px", inputHorizontalPadding: "16px",
-                                inputBorderWidth: "1px", inputFocusedBorderWidth: "1px",
+                                inputVerticalPadding: "12px",
+                                inputHorizontalPadding: "16px",
+                                inputBorderWidth: "1px",
+                                inputFocusedBorderWidth: "1px",
+                                inputFocusedBoxShadow: "0 0 0 3px rgba(5,150,105,0.3)",
+                                inputErrorFocusedBoxShadow: "0 0 0 3px rgba(239,68,68,0.3)",
+                                borderRadiusSmall: "6px",
+                                borderRadiusMedium: "8px",
+                                borderRadiusLarge: "12px",
+                                formPadding: "16px",
+                            } : {
+                                textPrimaryColor: "#003229",
+                                textSecondaryColor: "#6b7280",
+                                inputBackgroundColor: "#FFFFFF",
+                                formBackgroundColor: "#FFFFFF",
+                                baseColor: "#059669",
+                                baseColorFirstVariant: "#059669E6",
+                                baseColorSecondVariant: "#059669E6",
+                                errorColor: "#f04438",
+                                successColor: "#059669",
+                                outlinePrimaryColor: "#ebebeb",
+                                outlineSecondaryColor: "#ebebeb",
+                                buttonTextColor: "#FFFFFF",
+                                fontSizeExtraSmall: "12px",
+                                fontSizeSmall: "14px",
+                                fontSizeMedium: "15px",
+                                fontSizeLarge: "17px",
+                                fontSizeExtraLarge: "20px",
+                                fontWeightNormal: "400",
+                                fontWeightSemiBold: "600",
+                                formInputsTextTransform: "none",
+                                inputVerticalPadding: "12px",
+                                inputHorizontalPadding: "16px",
+                                inputBorderWidth: "1px",
+                                inputFocusedBorderWidth: "1px",
                                 inputFocusedBoxShadow: "0 0 0 3px rgba(5,150,105,0.15)",
                                 inputErrorFocusedBoxShadow: "0 0 0 3px rgba(239,68,68,0.15)",
-                                borderRadiusSmall: "6px", borderRadiusMedium: "8px", borderRadiusLarge: "12px",
+                                borderRadiusSmall: "6px",
+                                borderRadiusMedium: "8px",
+                                borderRadiusLarge: "12px",
                                 formPadding: "16px",
                             },
                         },

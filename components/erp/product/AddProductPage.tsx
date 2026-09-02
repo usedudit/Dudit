@@ -543,6 +543,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
             let signedUploads: { file: File; uploadUrl: string; key: string }[] = []
 
+            let hasFlaggedUploads = false
+
             if (filesToUpload.length > 0) {
                 setUploadingImages(new Set(filesToUpload.map((f) => f.index)))
 
@@ -560,6 +562,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 const newBlocked = new Set<number>()
                 let hasErrors = false
                 let errorMessage = "Falha na validação de algumas imagens. Tente novamente."
+                hasFlaggedUploads = signedResults.some(({ result }) => result.moderation?.status === "FLAGGED")
 
                 signedResults.forEach(({ result, file, index }) => {
                     if (result.success && result.key) {
@@ -618,6 +621,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 name: d.name,
                 description: d.description,
                 sku: hasVariants ? null : (d.sku || null),
+                requiresManualModeration: hasFlaggedUploads || productData.moderation_status === "pending_moderation",
                 gtin: d.gtin,
                 brand: d.brand || null,
                 brand_id: d.brand_id || null,

@@ -33,27 +33,18 @@ export function decideImageStatus(
 
   const { riskLevel, categories } = analysis
 
-  // === HARD BLOCK (Risco Alto) ===
-  if (riskLevel === 'high') {
-    const blockedCategories = categories.map(c => c.name).join(', ')
-    return {
-      status: 'BLOCKED',
-      message: `Imagem bloqueada: Conteúdo impróprio detectado (${blockedCategories}).`,
-      shouldSaveToR2: false,
-    }
-  }
-
-  // === SOFT BLOCK / REVIEW (Risco Médio) ===
-  if (riskLevel === 'medium') {
+  // === REVISÃO / MODERAÇÃO PENDENTE (Risco Alto ou Médio) ===
+  // Não bloqueia upload nem impede de salvar no R2: marca como FLAGGED para aprovação/revisão manual
+  if (riskLevel === 'high' || riskLevel === 'medium') {
     const flaggedCategories = categories.map(c => c.name).join(', ')
     return {
       status: 'FLAGGED',
-      message: `Imagem marcada para revisão: ${flaggedCategories}`,
+      message: `Imagem marcada para revisão: ${flaggedCategories || 'conteúdo sinalizado'}`,
       shouldSaveToR2: true,
     }
   }
 
-  // === APPROVE (Risco Baixo) ===
+  // === APPROVE (Risco Baixo ou Moderação Indisponível) ===
   return {
     status: 'APPROVED',
     message: 'Imagem aprovada.',
