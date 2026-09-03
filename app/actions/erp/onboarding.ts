@@ -24,7 +24,7 @@ export type ERPOnboardingWizardInput = {
     pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
 }
 
-export function detectPixKeyType(key: string): "cpf" | "cnpj" | "email" | "phone" | "random" {
+function detectPixKeyType(key: string): "cpf" | "cnpj" | "email" | "phone" | "random" {
     const clean = key.trim()
     if (clean.includes("@")) return "email"
     const digits = clean.replace(/\D/g, "")
