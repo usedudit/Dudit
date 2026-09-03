@@ -960,6 +960,16 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
         }))
     }, [financialData.alertsAndPendings, financialData.overdueAccounts])
 
+    const expensesByDay = useMemo(() => {
+        return Object.entries(financialData.dailyMovements || {})
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-14)
+            .map(([date, mov]) => ({
+                label: date.slice(5, 10).split("-").reverse().join("/"),
+                value: mov.expense,
+            }))
+    }, [financialData.dailyMovements])
+
     const insights = useMemo(() => generateFinancialInsights({
         balance: Number(financialData.metrics.find((m: any) => m.title.toLowerCase().includes("saldo"))?.value?.replace(/[^\d,.-]/g, "").replace(",", ".") || 0),
         receivable: 0,
@@ -995,7 +1005,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                 <div className="lg:col-span-12"><SummaryCards metrics={financialData.metrics} variant="horizontal" /></div>
             </div>
 
-            {/* Row 2: Fluxo de Caixa (8) + Despesas por Categoria (4) */}
+            {/* Row 2: Fluxo de Caixa (8) + Saídas por Dia (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
@@ -1009,43 +1019,21 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Despesas por Categoria" />
-                        <DashboardDonutChart
-                            data={(financialData.expensesByCategory || []).map(e => ({ label: e.label, value: Number(e.value) }))}
-                            totalValue={brl(totalExpenses)}
-                            totalLabel="Despesas"
-                            colors={CHART_COLORS_CATEGORY}
+                        <CardHeader icon={TagIcon} title="Saídas por Dia" />
+                        <DashboardBarChart
+                            data={expensesByDay}
+                            colors={["#ef4444"]}
                             valueFormatter={v => brl(v)}
+                            height="h-[260px]"
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Row 3: Últimas Movimentações (8) + Alertas e Pendências (4) */}
+            {/* Row 3: Calendário Financeiro (8) + Alertas e Pendências (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={ListIcon} title="Últimas Movimentações" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2.5 my-auto">
-                            {(financialData.latestMovements || []).slice(0, 8).map(m => (
-                                <div key={m.id} className="flex items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-0">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${m.tone === "red"
-                                            ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
-                                            : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
-                                            }`}>
-                                            <MoneyIcon size={15} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{m.title}</p>
-                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
-                                        </div>
-                                    </div>
-                                    <span className={`text-[13px] font-bold shrink-0 ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    <FinancialCalendarCard dailyMovements={financialData.dailyMovements} className="h-full" />
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
@@ -1089,29 +1077,46 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                 </div>
             </div>
 
-            {/* Row 4: 3 Cards Iguais (4 + 4 + 4) */}
+            {/* Row 4: Maiores Despesas (8) + Últimas Movimentações (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-                <div className="lg:col-span-4">
-                    <FinancialCalendarCard dailyMovements={financialData.dailyMovements} className="h-full" />
-                </div>
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-8">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Maiores Despesas" />
-                        <HorizontalBarRankingList
-                            items={(financialData.expensesByCategory || []).slice(0, 5).map(e => ({ label: String(e.label), value: Number(e.value) }))}
+                        <CardHeader
+                            icon={TagIcon}
+                            title="Maiores Despesas"
+                            legendItems={[{ label: "Categoria", color: "#059669" }]}
+                        />
+                        <DashboardBarChart
+                            data={(financialData.expensesByCategory || []).slice(0, 6).map(e => ({ label: String(e.label), value: Number(e.value) }))}
                             colors={CHART_COLORS_VIVID}
                             valueFormatter={v => brl(v)}
+                            height="h-[260px]"
                         />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
-                    <ReportRankingCard
-                        title="Contas a Pagar Críticas"
-                        items={(financialData.overdueAccounts || []).slice(0, 6).map(a => ({ id: a.id, label: a.title, value: a.value ?? 0, subtitle: a.subtitle }))}
-                        variant="compact"
-                        icon={AlertCircleIcon}
-                        className="h-full"
-                    />
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ListIcon} title="Últimas Movimentações" />
+                        <div className="flex-1 space-y-2">
+                            {(financialData.latestMovements || []).slice(0, 6).map(m => (
+                                <div key={m.id} className="flex items-center justify-between py-2 border-b border-brand-border dark:border-dark-border last:border-0">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${m.tone === "red"
+                                            ? "bg-rose-50 dark:bg-rose-950/40 text-brand-red"
+                                            : "bg-emerald-50 dark:bg-emerald-950/40 text-brand-green"
+                                            }`}>
+                                            <MoneyIcon size={15} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">{m.title}</p>
+                                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body truncate">{m.subtitle}{m.meta ? ` · ${m.meta}` : ""}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`text-[13px] font-bold shrink-0 ${m.tone === "red" ? "text-brand-red" : "text-brand-green"}`}>{m.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

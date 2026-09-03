@@ -67,7 +67,7 @@ export const SecurityView = ({
     <motion.div key="password" {...fade} className="w-full">
         <PageHeader title="Segurança" subtitle="Gerencie seu acesso e segurança da conta." onBack={() => navigate("main")} />
 
-        <SectionCard title="Acesso e segurança">
+        <SectionCard title="Acesso e segurança" className="mb-8">
             <div className="space-y-4">
                 {/* Phone */}
                 <AnimatePresence mode="wait">

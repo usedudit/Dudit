@@ -799,7 +799,7 @@ export function ERPSidebar() {
             <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                 <Drawer.Portal>
                     <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
-                    <Drawer.Content className="bg-brand-dark border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none">
+                    <Drawer.Content className="bg-brand-dark dark:bg-dark-background border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-60 outline-none">
                         <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
 
                         {/* Top Bar: Logo Dudit with link to homepage / marketplace */}

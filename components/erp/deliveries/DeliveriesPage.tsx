@@ -6,7 +6,7 @@ import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { resolveDatePeriodBounds, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import { resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
@@ -483,6 +483,9 @@ export default function DeliveriesPage({
                             addDisabled={!!planGate}
                             tabCounts={tabCounts}
                             userRole={initialUserRole}
+                            filters={filters}
+                            setFilters={setFilters}
+                            hasActiveFilters={filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod)}
                         />
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">

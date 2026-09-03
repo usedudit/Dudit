@@ -119,14 +119,13 @@ export default function SaleReceiptThermalPreview({
                         <span>{data.saleDateTime}</span>
                     </div>
                     <p className="leading-tight">
+                        <span className="font-bold">Canal / Origem:</span>{" "}
                         {data.isOnlineOrder ? (
                             <span className="font-bold uppercase">
                                 {data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"}
                             </span>
                         ) : (
-                            <>
-                                <span className="font-bold">Vendedor:</span> {data.sellerName}
-                            </>
+                            data.orderSource || data.sellerName || "Não informado"
                         )}
                     </p>
 

@@ -56,6 +56,7 @@ export type SaleReceiptData = {
     shippingFee: number
     otherCosts: number
     sellerName: string
+    orderSource?: string
     isOnlineOrder?: boolean
     deliveryType?: "delivery" | "pickup" | string
     isOnlinePayment?: boolean
@@ -369,6 +370,7 @@ export function buildSaleReceiptFromOrder(
         shippingFee,
         otherCosts,
         sellerName: options?.sellerName || order.seller_name || "Não informado",
+        orderSource: order.order_source || undefined,
         isOnlineOrder,
         deliveryType,
         isOnlinePayment,
@@ -441,6 +443,7 @@ export function buildSaleReceiptFromCartSnapshot(
         shippingFee: Math.max(0, Number(snapshot.shippingFee || 0)),
         otherCosts: Math.max(0, Number(snapshot.otherCosts || 0)),
         sellerName: snapshot.sellerName || "Não informado",
+        orderSource: undefined,
         isOnlineOrder: false,
         deliveryType: "pickup",
         isOnlinePayment: false,

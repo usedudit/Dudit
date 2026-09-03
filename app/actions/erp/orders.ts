@@ -30,6 +30,7 @@ import {
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { createCommissionExpenseForEntity, reverseCommissionForEntity } from "@/lib/services/commission-ledger.service"
 import { applySaleToGoals, reverseSaleFromGoals } from "@/lib/services/sales-goals.service"
+import { syncReceivableForOrder, cancelPendingSettlementsForOrder } from "@/lib/services/transaction.service"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { resolveDeliverySettingsRow } from "@/app/actions/shared/delivery"
@@ -1506,6 +1507,7 @@ async function createOrderStockMovement(params: {
     supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>
     partnerId: string
     orderId: string
+    orderNumber?: string | null
     createdBy: string
     type: "in" | "out"
     reason: string
@@ -1549,12 +1551,15 @@ async function createOrderStockMovement(params: {
 
     const movementId = (movementRecord as any)?.id
     if (movementId) {
-        const { data: orderRef } = await params.supabase
-            .from("orders")
-            .select("order_number")
-            .eq("id", params.orderId)
-            .single()
-        const orderNumber = (orderRef as any)?.order_number || params.orderId
+        let orderNumber = params.orderNumber
+        if (!orderNumber) {
+            const { data: orderRef } = await params.supabase
+                .from("orders")
+                .select("order_number")
+                .eq("id", params.orderId)
+                .single()
+            orderNumber = (orderRef as any)?.order_number || params.orderId
+        }
         const { error: linkError } = await params.supabase
             .from("stock_movements")
             .update({
@@ -3621,7 +3626,7 @@ export async function updateOrdersStatusInBatchAction(payload: {
 
     const { data: currentOrders } = await supabase
         .from("orders")
-        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_items(product_id, variant_id, quantity)")
+        .select("id, order_number, situation, delivery_status, notes, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, finance_account_id, buyer_id, customer_name, customer_id, previous_situation_before_cancel, stock_restored_on_cancel, inventory_deducted, created_by, store_id, order_source, exchange_return_request_id, order_items(product_id, variant_id, quantity)")
         .in("id", payload.orderIds)
         .eq("partner_id", payload.partnerId)
     const overallWarnings: string[] = []
@@ -3630,102 +3635,101 @@ export async function updateOrdersStatusInBatchAction(payload: {
     }
 
     if (payload.actionType === "cancel") {
-        const { data: profile } = await supabase
-            .from("user_profiles")
-            .select("full_name")
-            .eq("user_id", user.id)
-            .single()
+        const ordersToCancel = (currentOrders || []).filter((o: any) => o.situation !== "cancelled")
+        if (ordersToCancel.length === 0) {
+            return { error: "Nenhum pedido válido foi encontrado para cancelar." }
+        }
 
-        const effectiveUserName = profile?.full_name || payload.userName || "Usuario"
-        const processingWarnings: string[] = []
-        let processedCount = 0
-
-        // P2: Pré-carrega o mapa user_id -> partner_user_id de TODOS os vendedores
-        // dos pedidos em UMA única query, evitando N+1 (1 SELECT por pedido no loop).
-        const sellerPartnerUserIdMap = new Map<string, string>()
         const creatorUserIds = Array.from(
             new Set(
-                (currentOrders || [])
+                ordersToCancel
                     .map((o: any) => o.created_by)
                     .filter((id: any): id is string => Boolean(id)),
             ),
         )
-        if (capabilities.hasProductivity && creatorUserIds.length > 0) {
-            const { data: partnerUsersRows } = await supabase
-                .from("partner_users")
-                .select("id, user_id")
-                .eq("partner_id", payload.partnerId)
-                .in("user_id", creatorUserIds)
-            for (const row of partnerUsersRows || []) {
-                if (row.user_id && row.id) {
-                    sellerPartnerUserIdMap.set(String(row.user_id), String(row.id))
-                }
+
+        const [profileRes, partnerUsersRes] = await Promise.all([
+            supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", user.id)
+                .single(),
+            capabilities.hasProductivity && creatorUserIds.length > 0
+                ? supabase
+                    .from("partner_users")
+                    .select("id, user_id")
+                    .eq("partner_id", payload.partnerId)
+                    .in("user_id", creatorUserIds)
+                : Promise.resolve({ data: null }),
+        ])
+
+        const effectiveUserName = profileRes.data?.full_name || payload.userName || "Usuario"
+        const sellerPartnerUserIdMap = new Map<string, string>()
+        for (const row of partnerUsersRes.data || []) {
+            if (row.user_id && row.id) {
+                sellerPartnerUserIdMap.set(String(row.user_id), String(row.id))
             }
         }
 
-        for (const order of currentOrders || []) {
-            if (payload.actionType === "cancel") {
-                if (order.situation === "cancelled") continue
+        const processCancelSingleOrder = async (order: any) => {
+            const nextNotes = buildCancelledOrderNotes({
+                currentNotes: order.notes,
+                userName: effectiveUserName,
+                timestamp: formatDateTime(new Date()),
+                reason: payload.cancelReason?.trim(),
+            })
 
-                const nextNotes = buildCancelledOrderNotes({
-                    currentNotes: order.notes,
-                    userName: effectiveUserName,
-                    timestamp: formatDateTime(new Date()),
-                    reason: payload.cancelReason?.trim(),
-                })
-
-                const shouldRestoreStockWithMovement = Boolean(
-                    capabilities.hasStockMovements &&
-                    payload.restoreStock && (
-                        order.inventory_deducted ||
-                        shouldDeductInventory(order.delivery_status || null)
-                    )
+            const shouldRestoreStockWithMovement = Boolean(
+                capabilities.hasStockMovements &&
+                payload.restoreStock && (
+                    order.inventory_deducted ||
+                    shouldDeductInventory(order.delivery_status || null)
                 )
-                const stockWasRestoredOnCancel = shouldRestoreStockWithMovement
-                const { error } = await supabase
-                    .from("orders")
-                    .update({
-                        situation: "cancelled",
-                        previous_situation_before_cancel: order.situation || "pending",
-                        stock_restored_on_cancel: stockWasRestoredOnCancel,
-                        notes: nextNotes || null,
-                    })
-                    .eq("id", order.id)
-                    .eq("partner_id", payload.partnerId)
+            )
+            const stockWasRestoredOnCancel = shouldRestoreStockWithMovement
 
-                if (error) {
-                    processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao cancelar (${error.message})`)
-                    continue
-                }
-                processedCount += 1
-
-                // Log audit event for the cancelled order (visible to buyer in order history)
-                await logAuditEvent({
-                    partnerId: payload.partnerId,
-                    actorUserId: user.id,
-                    entityType: "order",
-                    entityId: order.id,
-                    actionType: "cancelled",
-                    changeLines: [payload.cancelReason?.trim() ? `Pedido cancelado: ${payload.cancelReason.trim()}` : "Pedido cancelado pelo vendedor."],
-                    source: "erp",
-                    storeId: order.store_id,
+            const { error: updateOrderErr } = await supabase
+                .from("orders")
+                .update({
+                    situation: "cancelled",
+                    previous_situation_before_cancel: order.situation || "pending",
+                    stock_restored_on_cancel: stockWasRestoredOnCancel,
+                    notes: nextNotes || null,
                 })
+                .eq("id", order.id)
+                .eq("partner_id", payload.partnerId)
 
-                await syncCancelledOrderAppointmentsAndTransactions(supabase, order.id)
+            if (updateOrderErr) {
+                return {
+                    success: false,
+                    order,
+                    stockWasRestoredOnCancel,
+                    warning: `Pedido ${order.order_number || order.id}: falha ao cancelar (${updateOrderErr.message})`,
+                }
+            }
 
-                if (capabilities.hasFinancial) {
-                    const { syncReceivableForOrder, cancelPendingSettlementsForOrder } = await import("@/lib/services/transaction.service")
-                    await syncReceivableForOrder(supabase, {
+            const orderWarnings: string[] = []
+
+            const appointmentsSyncPromise = syncCancelledOrderAppointmentsAndTransactions(supabase, order.id, {
+                orderData: {
+                    ...order,
+                    partner_id: payload.partnerId,
+                },
+            }).catch((err) => {
+                console.error("[orders_cancel_appointments] error:", err)
+            })
+
+            const financialSyncPromise = (async () => {
+                if (!capabilities.hasFinancial) return
+                await Promise.all([
+                    syncReceivableForOrder(supabase, {
                         order_number: order.order_number || order.id,
                         partner_id: payload.partnerId,
                         total_amount: 0,
                         paid_amount: 0,
                         situation: "cancelled",
-                    })
-                    // Ledger Fase 2: venda cancelada não tem mais obrigação de
-                    // recebimento futuro - cancela settlements pendentes (sempre,
-                    // independente do refund automático). Idempotente.
-                    await cancelPendingSettlementsForOrder({
+                    }),
+                    cancelPendingSettlementsForOrder({
                         supabase,
                         partnerId: payload.partnerId,
                         orderId: order.id,
@@ -3733,154 +3737,42 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         reason: payload.cancelReason?.trim() || "Cancelamento de pedido",
                         reconcileKey: `order-cancel:${order.id}`,
                         actorUserId: user.id,
-                    })
-                }
+                    }),
+                ])
+            })().catch((err) => {
+                console.error("[orders_cancel_financial] error:", err)
+            })
 
-                if (capabilities.hasStockMovements) {
-                    if (stockWasRestoredOnCancel) {
-                        const restoreResult = await createOrderStockMovement({
-                            supabase,
-                            partnerId: payload.partnerId,
-                            orderId: order.id,
-                            createdBy: user.id,
-                            type: "in",
-                            reason: "Cancelamento de pedido",
-                            notes: nextNotes || undefined,
-                            items: order.order_items || [],
-                            storeId: order.store_id,
-                        })
-
-                        if ("error" in restoreResult) {
-                            console.error("[orders_cancel_stock] failed_to_restore_stock_movement", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, restoreStock: payload.restoreStock, inventoryDeducted: order.inventory_deducted, deliveryStatus: order.delivery_status, error: restoreResult.error })
-                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
-                        }
-                    } else if (!order.inventory_deducted) {
-                        const releaseResult = await releaseOrderInventory({
-                            client: supabase,
-                            partnerId: payload.partnerId,
-                            orderId: order.id,
-                            items: order.order_items || [],
-                            storeId: order.store_id,
-                        })
-
-                        if ("error" in releaseResult) {
-                            console.error("[orders_cancel_stock] failed_to_release_stock_reservation", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, error: releaseResult.error })
-                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
-                        }
-                    }
-                }
-
-                if (capabilities.hasFinancial && payload.generateAutomaticRefund) {
-                    const refundAmount = Math.max(0, Number(order.paid_amount || 0))
-                    if (refundAmount > 0.009) {
-                        const refundResult = await createRefundTransactionForCancelledOrderSafe({
-                            supabase,
-                            partnerId: payload.partnerId,
-                            orderNumber: order.order_number || order.id,
-                            orderId: order.id,
-                            customerId: order.customer_id || order.buyer_id || null,
-                            customerName: order.customer_name || null,
-                            paidAmount: refundAmount,
-                            financeAccountId: order.finance_account_id || null,
-                            createdByUserId: user.id,
-                            storeId: order.store_id || null,
-                            paymentBreakdown: Array.isArray(order.payment_breakdown) ? order.payment_breakdown : null,
-                            paymentMethod: order.payment_method || null,
-                        })
-
-                        if ("error" in refundResult) {
-                            console.error("[orders_cancel_refund] failed_to_generate_automatic_refund", { orderId: order.id, orderNumber: order.order_number, partnerId: payload.partnerId, refundAmount, financeAccountId: order.finance_account_id || null, error: refundResult.error })
-                            processingWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível gerar reembolso (${refundResult.error})`)
-                        }
-                    }
-                }
-
-                const sellerPartnerUserId = order.created_by
-                    ? sellerPartnerUserIdMap.get(String(order.created_by)) ?? null
-                    : null
-                if (capabilities.hasProductivity && sellerPartnerUserId) {
-                    await reverseCommissionForEntity({
-                        supabase,
-                        partnerId: payload.partnerId,
-                        storeId: order.store_id || null,
-                        entityType: "sale",
-                        entityId: order.id,
-                        partnerUserId: sellerPartnerUserId,
-                        accountId: order.finance_account_id || null,
-                        createdByUserId: user.id,
-                    })
-                }
-
-                if (capabilities.hasGoals && order.created_by) {
-                    await reverseSaleFromGoals({
-                        supabase,
-                        partnerId: payload.partnerId,
-                        sellerUserId: String(order.created_by),
-                        saleAmount: Number(order.total_amount || 0),
-                        createdByUserId: user.id,
-                        accountId: order.finance_account_id || null,
-                    })
-                }
-            }
-
-            if (false) {
-                if (order.situation !== "cancelled") continue
-
-                const restoredSituation = order.previous_situation_before_cancel || "pending"
-                const shouldReverseStock = Boolean(order.stock_restored_on_cancel)
-                const orderItems = (order.order_items || []) as OrderStockItem[]
-
-                if (shouldReverseStock) {
-                    const stockValidationError = await validateERPItemsStock({
-                        supabase,
-                        partnerId: payload.partnerId,
-                        items: orderItems.map((item) => ({
-                            productId: item.product_id || null,
-                            variantId: item.variant_id || null,
-                            quantity: Number(item.quantity || 0),
-                        })),
-                    })
-
-                    if (stockValidationError) {
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: não foi possível reabrir por estoque insuficiente`)
-                        continue
-                    }
-                }
-
-                const { error } = await supabase
-                    .from("orders")
-                    .update({
-                        situation: restoredSituation,
-                        previous_situation_before_cancel: null,
-                        stock_restored_on_cancel: false,
-                        notes: normalizeOrderNotes(order.notes) || null,
-                    })
-                    .eq("id", order.id)
-                    .eq("partner_id", payload.partnerId)
-
-                if (error) {
-                    processingWarnings.push(`Pedido ${order.order_number || order.id}: falha ao reabrir (${error.message})`)
-                    continue
-                }
-                processedCount += 1
-
-                if (shouldReverseStock) {
-                    const movementResult = await createOrderStockMovement({
+            const stockPromise = (async () => {
+                if (!capabilities.hasStockMovements) return
+                if (stockWasRestoredOnCancel) {
+                    const restoreResult = await createOrderStockMovement({
                         supabase,
                         partnerId: payload.partnerId,
                         orderId: order.id,
+                        orderNumber: order.order_number,
                         createdBy: user.id,
-                        type: "out",
-                        reason: "Reabertura de pedido",
+                        type: "in",
+                        reason: "Cancelamento de pedido",
+                        notes: nextNotes || undefined,
                         items: order.order_items || [],
                         storeId: order.store_id,
                     })
 
-                    if ("error" in movementResult) {
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: reaberto, mas não foi possível remover itens novamente do estoque (${movementResult.error})`)
+                    if ("error" in restoreResult) {
+                        console.error("[orders_cancel_stock] failed_to_restore_stock_movement", {
+                            orderId: order.id,
+                            orderNumber: order.order_number,
+                            partnerId: payload.partnerId,
+                            restoreStock: payload.restoreStock,
+                            inventoryDeducted: order.inventory_deducted,
+                            deliveryStatus: order.delivery_status,
+                            error: restoreResult.error,
+                        })
+                        orderWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível restaurar estoque (${restoreResult.error})`)
                     }
                 } else if (!order.inventory_deducted) {
-                    const reserveResult = await reserveOrderInventory({
+                    const releaseResult = await releaseOrderInventory({
                         client: supabase,
                         partnerId: payload.partnerId,
                         orderId: order.id,
@@ -3888,74 +3780,222 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         storeId: order.store_id,
                     })
 
-                    if ("error" in reserveResult) {
-                        processingWarnings.push(`Pedido ${order.order_number || order.id}: reaberto, mas não foi possível reservar estoque (${reserveResult.error})`)
+                    if ("error" in releaseResult) {
+                        console.error("[orders_cancel_stock] failed_to_release_stock_reservation", {
+                            orderId: order.id,
+                            orderNumber: order.order_number,
+                            partnerId: payload.partnerId,
+                            error: releaseResult.error,
+                        })
+                        orderWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível liberar reserva de estoque (${releaseResult.error})`)
                     }
                 }
+            })().catch((err) => {
+                console.error("[orders_cancel_stock] error:", err)
+            })
+
+            const refundPromise = (async () => {
+                if (!capabilities.hasFinancial || !payload.generateAutomaticRefund) return
+                const refundAmount = Math.max(0, Number(order.paid_amount || 0))
+                if (refundAmount > 0.009) {
+                    const refundResult = await createRefundTransactionForCancelledOrderSafe({
+                        supabase,
+                        partnerId: payload.partnerId,
+                        orderNumber: order.order_number || order.id,
+                        orderId: order.id,
+                        customerId: order.customer_id || order.buyer_id || null,
+                        customerName: order.customer_name || null,
+                        paidAmount: refundAmount,
+                        financeAccountId: order.finance_account_id || null,
+                        createdByUserId: user.id,
+                        storeId: order.store_id || null,
+                        paymentBreakdown: Array.isArray(order.payment_breakdown) ? order.payment_breakdown : null,
+                        paymentMethod: order.payment_method || null,
+                    })
+
+                    if ("error" in refundResult) {
+                        console.error("[orders_cancel_refund] failed_to_generate_automatic_refund", {
+                            orderId: order.id,
+                            orderNumber: order.order_number,
+                            partnerId: payload.partnerId,
+                            refundAmount,
+                            financeAccountId: order.finance_account_id || null,
+                            error: refundResult.error,
+                        })
+                        orderWarnings.push(`Pedido ${order.order_number || order.id}: cancelado, mas não foi possível gerar reembolso (${refundResult.error})`)
+                    }
+                }
+            })().catch((err) => {
+                console.error("[orders_cancel_refund] error:", err)
+            })
+
+            const sellerPartnerUserId = order.created_by
+                ? sellerPartnerUserIdMap.get(String(order.created_by)) ?? null
+                : null
+
+            const commissionsGoalsPromise = (async () => {
+                const tasks: Promise<any>[] = []
+                if (capabilities.hasProductivity && sellerPartnerUserId) {
+                    tasks.push(
+                        reverseCommissionForEntity({
+                            supabase,
+                            partnerId: payload.partnerId,
+                            storeId: order.store_id || null,
+                            entityType: "sale",
+                            entityId: order.id,
+                            partnerUserId: sellerPartnerUserId,
+                            accountId: order.finance_account_id || null,
+                            createdByUserId: user.id,
+                        })
+                    )
+                }
+                if (capabilities.hasGoals && order.created_by) {
+                    tasks.push(
+                        reverseSaleFromGoals({
+                            supabase,
+                            partnerId: payload.partnerId,
+                            sellerUserId: String(order.created_by),
+                            saleAmount: Number(order.total_amount || 0),
+                            createdByUserId: user.id,
+                            accountId: order.finance_account_id || null,
+                        })
+                    )
+                }
+                await Promise.all(tasks)
+            })().catch((err) => {
+                console.error("[orders_cancel_commissions_goals] error:", err)
+            })
+
+            await Promise.all([
+                appointmentsSyncPromise,
+                financialSyncPromise,
+                stockPromise,
+                refundPromise,
+                commissionsGoalsPromise,
+            ])
+
+            return {
+                success: true,
+                order,
+                stockWasRestoredOnCancel,
+                warning: orderWarnings.join(" | "),
             }
         }
 
-        try {
-            await Promise.all(
-                (currentOrders || []).map((order: { id: string; situation: string | null; previous_situation_before_cancel?: string | null; stock_restored_on_cancel?: boolean | null; inventory_deducted?: boolean | null }) => {
-                    const lines: string[] = []
+        // Execução paralela com concorrência controlada para máxima performance sem sobrecarga no banco
+        const CONCURRENCY = 6
+        const cancelResults: Awaited<ReturnType<typeof processCancelSingleOrder>>[] = []
+        let currentQueueIndex = 0
 
-                    if (payload.actionType === "cancel") {
-                        lines.push("cancelou o pedido")
+        const workers = new Array(Math.min(CONCURRENCY, ordersToCancel.length)).fill(0).map(async () => {
+            while (currentQueueIndex < ordersToCancel.length) {
+                const idx = currentQueueIndex++
+                const res = await processCancelSingleOrder(ordersToCancel[idx])
+                cancelResults.push(res)
+            }
+        })
+        await Promise.all(workers)
+
+        const successfulOrders = cancelResults.filter((r) => r.success)
+        const processedCount = successfulOrders.length
+        const processingWarnings = cancelResults.map((r) => r.warning).filter(Boolean)
+
+        if (processedCount > 0) {
+            // Log de auditoria consolidado (1 evento por pedido)
+            try {
+                await Promise.allSettled(
+                    successfulOrders.map(({ order, stockWasRestoredOnCancel }) => {
+                        const lines: string[] = ["cancelou o pedido"]
                         if (payload.cancelReason?.trim()) {
                             lines.push(`informou motivo do cancelamento: ${payload.cancelReason.trim()}`)
                         }
                         if (payload.restoreStock && order.inventory_deducted) {
                             lines.push("restaurou o estoque dos itens do pedido")
-                        } else if (!order.stock_restored_on_cancel) {
+                        } else if (!stockWasRestoredOnCancel) {
                             lines.push("liberou a reserva de estoque dos itens do pedido")
                         }
                         if (payload.generateAutomaticRefund && Number((order as any).paid_amount || 0) > 0.009) {
                             lines.push("gerou reembolso automático no financeiro")
                         }
-                    }
 
-                    if (false) {
-                        lines.push(`reabriu o pedido e restaurou o status para ${getPaymentStatusLabel(order.previous_situation_before_cancel || "pending")}`)
-                        if (order.stock_restored_on_cancel) {
-                            lines.push("removeu novamente os itens do estoque")
-                        } else {
-                            lines.push("reservou novamente o estoque dos itens do pedido")
-                        }
-                    }
-
-                    return logAuditEvent({
-                        partnerId: payload.partnerId,
-                        actorUserId: user.id,
-                        entityType: "order",
-                        entityId: order.id,
-                        actionType: payload.actionType,
-                        changeLines: lines,
-                        metadata: {
-                            oldStatus: getPaymentStatusLabel(order.situation),
-                            newStatus: "Cancelado",
-                            statusScope: "payment",
-                        },
-                        source: "manual",
+                        return logAuditEvent({
+                            partnerId: payload.partnerId,
+                            actorUserId: user.id,
+                            entityType: "order",
+                            entityId: order.id,
+                            actionType: "cancelled",
+                            changeLines: lines,
+                            metadata: {
+                                oldStatus: getPaymentStatusLabel(order.situation),
+                                newStatus: "Cancelado",
+                                statusScope: "payment",
+                            },
+                            source: "erp",
+                            storeId: order.store_id,
+                        })
                     })
-                })
-            )
-        } catch (historyError) {
-            console.error("[orders_history] updateOrdersStatusInBatchAction:", historyError)
+                )
+            } catch (historyError) {
+                console.error("[orders_history] updateOrdersStatusInBatchAction:", historyError)
+            }
+
+            // Disparo de notificação Dudit & Push (FCM) apenas para pedidos vinculados ao Marketplace
+            const marketplaceOrders = successfulOrders
+                .map((r) => r.order)
+                .filter((o: any) => Boolean(o.buyer_id))
+
+            if (marketplaceOrders.length > 0) {
+                // Agrupa pedidos por comprador (buyer_id) para que, se um mesmo cliente
+                // tiver mais de um pedido cancelado no lote, receba apenas 1 notificação consolidada!
+                const ordersByBuyer = new Map<string, any[]>()
+                for (const order of marketplaceOrders) {
+                    const buyerId = String(order.buyer_id)
+                    if (!ordersByBuyer.has(buyerId)) {
+                        ordersByBuyer.set(buyerId, [])
+                    }
+                    ordersByBuyer.get(buyerId)!.push(order)
+                }
+
+                import("@/lib/services/notification-automation.service")
+                    .then(async ({ notifyCustomerBatchOrders }) => {
+                        await Promise.allSettled(
+                            Array.from(ordersByBuyer.entries()).map(([buyerId, buyerOrders]) =>
+                                notifyCustomerBatchOrders({
+                                    userId: buyerId,
+                                    partnerId: payload.partnerId,
+                                    type: "order_cancelled",
+                                    orders: buyerOrders.map((o: any) => ({
+                                        id: o.id,
+                                        orderNumber: o.order_number,
+                                    })),
+                                    customerName: buyerOrders[0]?.customer_name,
+                                    origin: "manual",
+                                    cancellationReason: payload.cancelReason?.trim(),
+                                })
+                            )
+                        )
+                    })
+                    .catch((notifError) => {
+                        console.error("[orders_cancel_marketplace_notification] error:", notifError)
+                    })
+            }
+
+            await Promise.all([
+                invalidateInventoryItems(
+                    payload.partnerId,
+                    successfulOrders.flatMap((r) => r.order.order_items || []),
+                ),
+                revalidateOrders(payload.partnerId),
+            ])
         }
 
-        await invalidateInventoryItems(
-            payload.partnerId,
-            (currentOrders || []).flatMap((order: any) => order.order_items || [])
-        )
-        await revalidateOrders(payload.partnerId)
         if (processedCount === 0) {
-            return { error: payload.actionType === "cancel" ? "Nenhum pedido foi cancelado." : "Nenhum pedido foi reaberto." }
+            return { error: "Nenhum pedido foi cancelado." }
         }
         if (processingWarnings.length > 0) {
             return { success: true, warning: processingWarnings.join(" | ") }
         }
-        return { success: true, orderNumber: currentOrders?.[0]?.order_number }
+        return { success: true, orderNumber: successfulOrders[0]?.order?.order_number }
     }
 
     const paymentStatusMap: Record<string, ERPOrderPayload["paymentStatus"]> = {

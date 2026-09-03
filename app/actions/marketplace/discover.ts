@@ -252,11 +252,16 @@ const getCachedPartnerIdsByTier = (
 ) => unstable_cache(
     async (): Promise<PartnerTiersRaw> => {
         const supabase = getAdminClient()
-
-        const { data: stores, error } = await supabase
+        let query = supabase
             .from("stores")
             .select("partner_id, addresses!store_id!inner(city, state)")
             .eq("is_active", true)
+
+        if (state && state.trim()) {
+            query = query.ilike("addresses.state", state.trim())
+        }
+
+        const { data: stores, error } = await query
 
         if (error) {
             dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
@@ -1843,12 +1848,10 @@ const getSharedHomeSections = (
     scope: string,
     citySlug: string,
     stateOnly: boolean,
-    lat: string,
-    lng: string,
     ctx: DiscoverCtx,
 ) => unstable_cache(
-    async () => getHomeSectionsUncached({ ...ctx, userId: null }),
-    [`discover:home:shared:${scope}:${citySlug}:${stateOnly ? "state" : "city"}:${lat}:${lng}`],
+    async () => getHomeSectionsUncached({ ...ctx, userId: null, coords: null }),
+    [`discover:home:shared:${scope}:${citySlug}:${stateOnly ? "state" : "city"}`],
     {
         revalidate: 300, // Cache for 5 minutes (was 60s)
         tags: [TAGS.marketplace, TAGS.products(), "services", "campaigns", TAGS.advertisements],
@@ -1856,15 +1859,10 @@ const getSharedHomeSections = (
 )
 
 export async function getHomeSections(ctx: DiscoverCtx): Promise<HomeSection[]> {
-    const lat = ctx.coords?.lat != null ? ctx.coords.lat.toFixed(2) : "na"
-    const lng = ctx.coords?.lng != null ? ctx.coords.lng.toFixed(2) : "na"
-
     const shared = await getSharedHomeSections(
         ctx.scope,
         ctx.citySlug,
         ctx.stateOnly,
-        lat,
-        lng,
         ctx
     )()
 

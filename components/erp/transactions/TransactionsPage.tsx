@@ -28,9 +28,12 @@ import { getInstallmentGroupDetailsAction, updateInstallmentGroupNotesAction } f
 import { recordInstallmentPaymentAction } from "@/app/actions/erp/transactions"
 import { settleInstallmentGroupAction } from "@/app/actions/erp/transactions"
 import { getFinancialTransactionsAction, getTransactionDetailsAction, type TransactionDetailPayload } from "@/app/actions/erp/transactions"
-import { cancelPendingTransactionAction } from "@/app/actions/erp/transactions"
+import { cancelPendingTransactionAction, updateFinancialTransactionsInBatchAction } from "@/app/actions/erp/transactions"
 import { getPaymentMethodsAction } from "@/app/actions/erp/payment-methods"
 import { getFinanceAccountsAction } from "@/app/actions/erp/finance-accounts"
+import { BulkEditActionsModal, type BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
+import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
+import { UndoGracePeriodToast } from "@/components/reusable/UndoGracePeriodToast"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { STANDARD_PAYMENT_METHODS, resolveStandardPaymentMethod, pickBankThenCashDefaultFinanceAccountId } from "@/lib/finance-utils"
 import { sanitizeUUID } from "@/lib/security/input-sanitizer"
@@ -187,13 +190,18 @@ export default function TransactionsPage({
     const [activeTab, setActiveTabState] = useState<TransactionTab>(forcedTab || "Transações")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
-    const setActiveTab = setActiveTabState
+    const setActiveTab = useCallback((tab: TransactionTab) => {
+        setActiveTabState(tab)
+        setSelection({ ids: new Set() })
+    }, [])
     const [viewMode, setViewModeState] = useState<"list" | "grid">(isMobile ? "grid" : "list")
     const effectiveViewMode = isTablet ? "grid" : viewMode
     const [page, setPage] = useState(1)
     const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
     const [modals, setModals] = useState({ filter: false })
     const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [bulkModalOpen, setBulkModalOpen] = useState(false)
+    const undoManager = useUndoGracePeriod(10000)
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null)
     const [installmentDetailLoading, setInstallmentDetailLoading] = useState(false)
     const [installmentDetail, setInstallmentDetail] = useState<any | null>(null)
@@ -988,6 +996,91 @@ export default function TransactionsPage({
             return { ids }
         })
     }, [])
+
+    const selectedTransactions = useMemo(() => {
+        return paginatedTransactions.filter((tx) => selection.ids.has(tx.id))
+    }, [paginatedTransactions, selection.ids])
+
+    const financialSelectionGuards = useMemo(() => {
+        const totalCount = selectedTransactions.length
+        const pendingCount = selectedTransactions.filter((tx) => String(tx.rawStatus || tx.status || "").toLowerCase() === "pending").length
+        const paidCount = selectedTransactions.filter((tx) => String(tx.rawStatus || tx.status || "").toLowerCase() === "paid").length
+        const cancelledCount = selectedTransactions.filter((tx) => isCancelledTransaction(tx)).length
+        const installmentCount = selectedTransactions.filter((tx) => Boolean(tx.installmentGroupId || tx.isInstallmentGroup)).length
+        return {
+            totalCount,
+            pendingCount,
+            paidCount,
+            cancelledCount,
+            installmentCount,
+        }
+    }, [selectedTransactions])
+
+    const handleBulkApply = useCallback(async (payload: BulkActionPayload) => {
+        const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        let actionLabel = "Processando transações"
+        if (payload.type === "financial_cancel") actionLabel = "Cancelando transações"
+        else if (payload.type === "financial_settle") actionLabel = "Quitando transações"
+        else if (payload.type === "financial_reschedule") actionLabel = "Prorrogando vencimento"
+        else if (payload.type === "financial_category") actionLabel = "Alterando categoria"
+
+        setBulkModalOpen(false)
+        setSelection({ ids: new Set() })
+
+        undoManager.schedule({
+            id: `financial-batch-${Date.now()}`,
+            title: `${actionLabel} (${ids.length} selecionadas)`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: ids.length,
+            payload,
+            onExecute: async (p) => {
+                const actionType = p.type === "financial_cancel"
+                    ? "cancel"
+                    : p.type === "financial_settle"
+                        ? "settle"
+                        : p.type === "financial_reschedule"
+                            ? "reschedule"
+                            : "category"
+
+                const res = await updateFinancialTransactionsInBatchAction({
+                    partnerId,
+                    transactionIds: ids,
+                    actionType,
+                    cancelReason: p.cancelReason,
+                    settleAccountId: p.settleAccountId,
+                    settlePaymentMethodId: p.settlePaymentMethodId,
+                    settlePaymentDate: p.settlePaymentDate,
+                    rescheduleMode: p.rescheduleMode,
+                    rescheduleDays: p.rescheduleDays,
+                    rescheduleDate: p.rescheduleDate,
+                    categoryId: p.categoryId,
+                    categoryName: p.categoryName,
+                })
+
+                if (!res.success) {
+                    throw new Error(res.error || "Erro ao processar transações")
+                }
+                return res
+            },
+            onUndo: () => {
+                notifySuccess("Ação desfeita", "Nenhuma alteração foi realizada nas transações.")
+                void refreshTransactionsNow()
+            },
+            onSuccess: (res) => {
+                notifySuccess("Sucesso", `${res.processedCount} transação(ões) atualizada(s).${res.skippedCount ? ` (${res.skippedCount} ignorada(s) por regra)` : ""}`)
+                if (res.warning) {
+                    notifyError("Atenção", res.warning)
+                }
+                void refreshTransactionsNow()
+            },
+            onError: (err) => {
+                notifyError(err?.message || "Falha ao processar transações em massa")
+                void refreshTransactionsNow()
+            },
+        })
+    }, [selection.ids, undoManager, partnerId, notifySuccess, notifyError, refreshTransactionsNow])
 
     const handleExport = useCallback(() => {
         void exportData({
@@ -2393,26 +2486,29 @@ export default function TransactionsPage({
                                             <table className="w-full text-left border-separate border-spacing-0 min-w-[1460px]">
                                                 <thead>
                                                     <tr className="bg-brand-gray dark:bg-dark-border/50">
-                                                        <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                            <div className="flex items-center">
-                                                                <Checkbox
-                                                                    checked={selection.ids.size === paginatedTransactions.length && paginatedTransactions.length > 0}
-                                                                    onChange={(checked) => {
-                                                                        setSelection({ ids: checked ? new Set(paginatedTransactions.map((item) => item.id)) : new Set() })
-                                                                    }}
-                                                                    className="bg-white dark:bg-dark-background"
-                                                                />
-                                                            </div>
-                                                        </th>
+                                                        {!isSettledTab(activeTab) && (
+                                                            <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
+                                                                <div className="flex items-center">
+                                                                    <Checkbox
+                                                                        checked={selection.ids.size === paginatedTransactions.length && paginatedTransactions.length > 0}
+                                                                        onChange={(checked) => {
+                                                                            setSelection({ ids: checked ? new Set(paginatedTransactions.map((item) => item.id)) : new Set() })
+                                                                        }}
+                                                                        className="bg-white dark:bg-dark-background"
+                                                                    />
+                                                                </div>
+                                                            </th>
+                                                        )}
                                                         {COLUMNS.map((col, idx) => {
                                                             const isSortable = col.id !== "actions"
                                                             const isSorted = sortConfig?.key === col.id
+                                                            const isFirst = isSettledTab(activeTab) && idx === 0
                                                             const isLast = idx === COLUMNS.length - 1
 
                                                             return (
                                                                 <th
                                                                     key={col.id}
-                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isLast ? "rounded-r-lg" : ""}`}
+                                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body bg-brand-gray dark:bg-dark-border/50 ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors" : ""} ${isFirst ? "rounded-l-lg pl-6" : ""} ${isLast ? "rounded-r-lg" : ""}`}
                                                                     style={{ width: col.width }}
                                                                     onClick={() => {
                                                                         if (!isSortable) return
@@ -2447,6 +2543,7 @@ export default function TransactionsPage({
                                                             transaction={transaction}
                                                             columns={COLUMNS}
                                                             selected={selection.ids.has(transaction.id)}
+                                                            selectable={!isSettledTab(activeTab)}
                                                             onSelect={handleSelectRow}
                                                             onOpenDetail={handleOpenTransactionDetail}
                                                             onEdit={handleEditTransaction}
@@ -2514,14 +2611,41 @@ export default function TransactionsPage({
                 onClose={closeSelectionModal}
             />
 
-            <FloatingActionBar
-                selectedCount={selection.ids.size}
-                onClearSelection={() => setSelection({ ids: new Set() })}
-            >
-                <Button variant="ghost" onClick={() => { }} leftIcon={<EditIcon size={18} />} className="h-10 px-3">
-                    Ações em massa
-                </Button>
-            </FloatingActionBar>
+            {!isSettledTab(activeTab) && (
+                <FloatingActionBar
+                    selectedCount={selection.ids.size}
+                    onClearSelection={() => setSelection({ ids: new Set() })}
+                >
+                    <Button variant="ghost" onClick={() => setBulkModalOpen(true)} leftIcon={<EditIcon size={18} />} className="h-10 px-3">
+                        Ações em massa
+                    </Button>
+                </FloatingActionBar>
+            )}
+
+            {!isSettledTab(activeTab) && (
+                <BulkEditActionsModal
+                    isOpen={bulkModalOpen}
+                    onClose={() => setBulkModalOpen(false)}
+                    selectedCount={selection.ids.size}
+                    targetType="financial_transaction"
+                    financialSelectionGuards={financialSelectionGuards}
+                    financialCategories={categories}
+                    financeAccounts={financeAccounts}
+                    paymentMethods={fallbackPaymentMethods.length > 0 ? fallbackPaymentMethods : paymentMethods}
+                    onApply={handleBulkApply}
+                />
+            )}
+
+            <UndoGracePeriodToast
+                isOpen={Boolean(undoManager.pendingAction)}
+                title={undoManager.pendingAction?.title || ""}
+                description={undoManager.pendingAction?.description}
+                remainingSeconds={undoManager.remainingSeconds}
+                progressPct={undoManager.progressPct}
+                isExecuting={undoManager.isExecuting}
+                onUndo={undoManager.undo}
+                onConfirmNow={undoManager.flush}
+            />
 
             {renderSharedModals()}
         </FadeIn>

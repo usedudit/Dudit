@@ -164,6 +164,28 @@ export async function recordDemandEventTelemetry(input: DemandEventInput): Promi
             }
         }
 
+        if (input.type === "explicit_demand") {
+            p.incr(`ddt:demand:${dateStr}:explicit`)
+            p.expire(`ddt:demand:${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
+
+            if (input.citySlug) {
+                p.incr(`ddt:demand:${cityPrefix}${dateStr}:explicit`)
+                p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
+            }
+
+            const term = (input.metadata?.term as string) || ""
+            const demandType = (input.metadata?.demandType as string) || ""
+            if (term) {
+                p.zincrby(`ddt:demand:${dateStr}:explicit_terms`, 1, `${demandType}: ${term}`)
+                p.expire(`ddt:demand:${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
+
+                if (input.citySlug) {
+                    p.zincrby(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, 1, `${demandType}: ${term}`)
+                    p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
+                }
+            }
+        }
+
         await p.exec().catch((err) => {
             console.warn("[ANALYTICS_DEMAND] Redis pipeline failed gracefully:", err?.message)
         })

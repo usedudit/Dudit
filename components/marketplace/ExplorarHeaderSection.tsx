@@ -22,7 +22,7 @@ export function ExplorarHeaderSection({
         <div className="mb-6">
             <div className="flex items-start gap-3">
                 {showBackButton && (
-                    <div className="hidden md:flex pt-1">
+                    <div className="flex pt-1">
                         <Button
                             variant="filled"
                             onClick={onBack}

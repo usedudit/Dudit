@@ -2,10 +2,10 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
-import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon } from "@/lib/icons"
+import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
 import {
     disconnectMercadoPagoAction,
     getMercadoPagoStatusAction,
@@ -15,10 +15,14 @@ import {
 import {
     getWhatsappIntegrationAction,
     disconnectWhatsappAction,
+    connectEvolutionAction,
+    disconnectEvolutionAction,
+    getEvolutionStatusAction,
+    isEvolutionConfiguredAction,
+    resetEvolutionPairingStatusAction,
     type WhatsappConnectionView,
 } from "@/app/actions/whatsapp"
 import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
-import Link from "next/link"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { motion, AnimatePresence } from "framer-motion"
 import { getSubscriptionStatusAction } from "@/app/actions/erp/subscriptions"
@@ -90,20 +94,163 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
 
     // Accepted payment methods state
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
     const [isLoadingMethods, setIsLoadingMethods] = useState(false)
     const [isSavingMethods, setIsSavingMethods] = useState<string | null>(null)
-    const [showMpConfig, setShowMpConfig] = useState(false)
 
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
     const [waIsLoading, setWaIsLoading] = useState(false)
     const [waActiveModal, setWaActiveModal] = useState<"info" | "knowMore" | null>(null)
     const [waKnowMoreStep, setWaKnowMoreStep] = useState(0)
+
+    // WhatsApp Evolution modal state
+    const [evoModalOpen, setEvoModalOpen] = useState(false)
+    const [evoStatus, setEvoStatus] = useState<string>("disconnected")
+    const [evoQrCode, setEvoQrCode] = useState<string | null>(null)
+    const [evoPhoneNumber, setEvoPhoneNumber] = useState<string | null>(null)
+    const [evoIsLoading, setEvoIsLoading] = useState(false)
+    const [evoConfigured, setEvoConfigured] = useState<boolean | null>(null)
+    const [evoConnection, setEvoConnection] = useState<WhatsappConnectionView | null>(null)
+    const evoStatusRef = useRef(evoStatus)
+    const evoPairingInitiated = useRef(false)
+
+    useEffect(() => { evoStatusRef.current = evoStatus }, [evoStatus])
+
+    useEffect(() => {
+        return () => {
+            if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
+                resetEvolutionPairingStatusAction().catch(() => {})
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!evoModalOpen) return
+        isEvolutionConfiguredAction().then((res) => {
+            if (res.success && res.data) setEvoConfigured(res.data.configured)
+        })
+        const fetchStatus = async () => {
+            const res = await getWhatsappIntegrationAction()
+            if (res.success && res.data) {
+                const evo = res.data.allConnections?.find((c) => c.provider === "evolution") || null
+                setEvoConnection(evo)
+                if (evo) {
+                    setEvoStatus(evo.status)
+                    setEvoPhoneNumber(evo.phoneNumber)
+                } else {
+                    setEvoStatus("disconnected")
+                    setEvoPhoneNumber(null)
+                }
+            }
+        }
+        fetchStatus()
+    }, [evoModalOpen])
+
+    useEffect(() => {
+        if (evoConnection?.phoneNumber) setEvoPhoneNumber(evoConnection.phoneNumber)
+    }, [evoConnection])
+
+    useEffect(() => {
+        if (evoConnection) {
+            const isPairingActive = evoPairingInitiated.current &&
+                (evoStatus === "connected" || evoStatus === "qr_pending" || evoStatus === "connecting")
+            if (!isPairingActive) setEvoStatus(evoConnection.status)
+        }
+    }, [evoConnection, evoStatus])
+
+    useEffect(() => {
+        if (!evoModalOpen || (evoStatus !== "qr_pending" && evoStatus !== "connecting")) return
+        const startTime = Date.now()
+        const interval = setInterval(async () => {
+            if (Date.now() - startTime > 5 * 60 * 1000) {
+                clearInterval(interval)
+                setEvoStatus("disconnected")
+                setEvoQrCode(null)
+                toast.error("Tempo limite de pareamento atingido.")
+                return
+            }
+            const res = await getEvolutionStatusAction()
+            if (res.success && res.data) {
+                setEvoStatus(res.data.status)
+                if (res.data.status === "connected") {
+                    setEvoQrCode(null)
+                    if (res.data.phoneNumber) setEvoPhoneNumber(res.data.phoneNumber)
+                    toast.success("WhatsApp conectado com sucesso!")
+                    const refresh = await getWhatsappIntegrationAction()
+                    if (refresh.success && refresh.data) {
+                        setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                    }
+                    setTimeout(async () => {
+                        const r2 = await getWhatsappIntegrationAction()
+                        if (r2.success && r2.data) setEvoConnection(r2.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                    }, 3000)
+                } else if (res.data.qrCode) {
+                    setEvoQrCode(res.data.qrCode)
+                }
+                if (res.data.phoneNumber) setEvoPhoneNumber(res.data.phoneNumber)
+            }
+        }, 5000)
+        return () => clearInterval(interval)
+    }, [evoStatus, evoModalOpen])
+
+    const handleEvoConnect = async () => {
+        setEvoIsLoading(true)
+        evoPairingInitiated.current = true
+        try {
+            const res = await connectEvolutionAction()
+            if (!res.success) { toast.error(res.error); return }
+            setEvoStatus(res.data.status)
+            setEvoQrCode(res.data.qrCode)
+            if (res.data.status === "connected") toast.success("WhatsApp conectado com sucesso!")
+            const refresh = await getWhatsappIntegrationAction()
+            if (refresh.success && refresh.data) {
+                setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+            }
+        } finally { setEvoIsLoading(false) }
+    }
+
+    const handleEvoCancel = async () => {
+        setEvoIsLoading(true)
+        try {
+            const res = await resetEvolutionPairingStatusAction()
+            if (res.success) {
+                setEvoStatus("disconnected")
+                setEvoQrCode(null)
+                const refresh = await getWhatsappIntegrationAction()
+                if (refresh.success && refresh.data) {
+                    setEvoConnection(refresh.data.allConnections?.find((c) => c.provider === "evolution") || null)
+                }
+            }
+        } finally { setEvoIsLoading(false) }
+    }
+
+    const handleEvoDisconnect = async () => {
+        if (!confirm("Desconectar WhatsApp (Evolution)?")) return
+        setEvoIsLoading(true)
+        try {
+            const res = await disconnectEvolutionAction()
+            if (!res.success) { toast.error(res.error); return }
+            toast.success("WhatsApp desconectado")
+            setEvoStatus("disconnected")
+            setEvoQrCode(null)
+            setEvoPhoneNumber(null)
+            setEvoConnection(null)
+        } finally { setEvoIsLoading(false) }
+    }
+
+    const handleEvoModalClose = () => {
+        if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
+            resetEvolutionPairingStatusAction().catch(() => {})
+        }
+        setEvoStatus("disconnected")
+        setEvoQrCode(null)
+        setEvoModalOpen(false)
+    }
 
     const [provider] = useState<"meta">("meta")
 
@@ -250,7 +397,8 @@ export const IntegrationsSubPage = ({
         if (result.error) {
             toast.error(`Erro: ${result.error}`)
         } else {
-            setShowMpConfig(false)
+            toast.success("Mercado Pago desconectado com sucesso.")
+            window.location.reload()
         }
         setIsLoading(false)
     }
@@ -388,7 +536,7 @@ export const IntegrationsSubPage = ({
                                             {mpConnected && (
                                                 <Button
                                                     variant="link"
-                                                    onClick={() => setShowMpConfig(!showMpConfig)}
+                                                    onClick={() => setActiveModal("mpConfig")}
                                                 >
                                                     Configurar
                                                 </Button>
@@ -411,46 +559,47 @@ export const IntegrationsSubPage = ({
                             </div>
                         </div>
 
-                        {/* Accepted Payment Methods Section */}
-                        {mpConnected && showMpConfig && (
-                            <div className="mt-6 max-w-xl">
-                                <h4 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-1">Meios de pagamento aceitos</h4>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                    Escolha quais meios de pagamento online seus clientes podem usar no checkout.
-                                </p>
-                                <div className="space-y-4">
-                                    {([
-                                        { key: "credit_card" as const, label: "Cartão de Crédito", icon: "https://img.dudit.com.br/static/icons/payments/CreditCard.png", description: "Visa, Mastercard, Elo e mais" },
-                                        { key: "debit_card" as const, label: "Cartão de Débito", icon: "https://img.dudit.com.br/static/icons/payments/DebitCard.png", description: "Débito online" },
-                                        { key: "pix" as const, label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png", description: "Transferência instantânea" },
-                                        { key: "boleto" as const, label: "Boleto Bancário", icon: "https://img.dudit.com.br/static/icons/payments/Boleto.png", description: "Pagamento em até 3 dias úteis" },
-                                        { key: "mercado_pago_wallet" as const, label: "Saldo Mercado Pago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png", description: "Saldo MP e parcelamento sem cartão" },
-                                    ]).map((method, index, arr) => (
-                                        <React.Fragment key={method.key}>
-                                            <div
-                                                className="flex items-center gap-3 py-2 transition-colors"
-                                            >
-                                                <img
-                                                    src={method.icon}
-                                                    alt={method.label}
-                                                    className="w-8 h-8 object-contain shrink-0 rounded-md"
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">{method.label}</span>
-                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">{method.description}</span>
-                                                </div>
-                                                <Switch
-                                                    checked={acceptedMethods[method.key]}
-                                                    onCheckedChange={() => handleToggleMethod(method.key)}
-                                                    className={isSavingMethods === method.key ? "opacity-50 pointer-events-none" : ""}
-                                                />
+                        <DefaultModal
+                            isOpen={activeModal === "mpConfig"}
+                            onClose={() => setActiveModal(null)}
+                            title="Meios de pagamento aceitos"
+                            maxWidth="md"
+                        >
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                Escolha quais meios de pagamento online seus clientes podem usar no checkout.
+                            </p>
+                            <div className="space-y-4">
+                                {([
+                                    { key: "credit_card" as const, label: "Cartão de Crédito", icon: "https://img.dudit.com.br/static/icons/payments/CreditCard.png", description: "Visa, Mastercard, Elo e mais" },
+                                    { key: "debit_card" as const, label: "Cartão de Débito", icon: "https://img.dudit.com.br/static/icons/payments/DebitCard.png", description: "Débito online" },
+                                    { key: "pix" as const, label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png", description: "Transferência instantânea" },
+                                    { key: "boleto" as const, label: "Boleto Bancário", icon: "https://img.dudit.com.br/static/icons/payments/Boleto.png", description: "Pagamento em até 3 dias úteis" },
+                                    { key: "mercado_pago_wallet" as const, label: "Saldo Mercado Pago", icon: "https://img.dudit.com.br/static/icons/payments/MercadoPago.png", description: "Saldo MP e parcelamento sem cartão" },
+                                ]).map((method, index, arr) => (
+                                    <React.Fragment key={method.key}>
+                                        <div
+                                            className="flex items-center gap-3 py-2 transition-colors"
+                                        >
+                                            <img
+                                                src={method.icon}
+                                                alt={method.label}
+                                                className="w-8 h-8 object-contain shrink-0 rounded-md"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block">{method.label}</span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">{method.description}</span>
                                             </div>
-                                            {index < arr.length - 1 && <hr className="border-brand-border dark:border-dark-border" />}
-                                        </React.Fragment>
-                                    ))}
-                                </div>
+                                            <Switch
+                                                checked={acceptedMethods[method.key]}
+                                                onCheckedChange={() => handleToggleMethod(method.key)}
+                                                className={isSavingMethods === method.key ? "opacity-50 pointer-events-none" : ""}
+                                            />
+                                        </div>
+                                        {index < arr.length - 1 && <hr className="border-brand-border dark:border-dark-border" />}
+                                    </React.Fragment>
+                                ))}
                             </div>
-                        )}
+                        </DefaultModal>
 
                         <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Mensagens</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -467,7 +616,7 @@ export const IntegrationsSubPage = ({
                                                 <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
                                                     WhatsApp Business
                                                 </span>
-                                                {waConnection?.hasToken && waConnection?.status === "connected" ? (
+                                                {evoStatus === "connected" ? (
                                                     <Badge variant="green"></Badge>
                                                 ) : !hasMinimumPlan(planSlug, "escalar") ? (
                                                     <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("escalar")}>
@@ -478,9 +627,9 @@ export const IntegrationsSubPage = ({
                                                     <Badge variant="gray"></Badge>
                                                 )}
                                             </div>
-                                            {waConnection?.phoneNumber || waConnection?.wabaName ? (
+                                            {evoPhoneNumber ? (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
-                                                    {formatBrazilPhone(waConnection.phoneNumber || "") || waConnection.wabaName}
+                                                    {formatBrazilPhone(evoPhoneNumber)}
                                                 </span>
                                             ) : (
                                                 <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 block font-medium">
@@ -506,23 +655,34 @@ export const IntegrationsSubPage = ({
                                             >
                                                 Saber mais
                                             </Button>
-                                            <Link href="/erp/integracoes/whatsapp">
-                                                <Button variant="link">
-                                                    Configurar
-                                                </Button>
-                                            </Link>
+                                            <Button
+                                                variant="link"
+                                                onClick={() => {
+                                                    if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                        openPlanUpgrade("escalar")
+                                                        return
+                                                    }
+                                                    setEvoModalOpen(true)
+                                                }}
+                                            >
+                                                Configurar
+                                            </Button>
                                         </div>
                                         <Switch
-                                            checked={!!(waConnection?.hasToken && waConnection?.status === "connected")}
+                                            checked={evoStatus === "connected"}
                                             onCheckedChange={(checked) => {
-                                                if (waIsLoading || isCheckingPlan) return
+                                                if (evoIsLoading || isCheckingPlan) return
                                                 if (checked) {
-                                                    handleWaConnectClick()
+                                                    if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                        openPlanUpgrade("escalar")
+                                                        return
+                                                    }
+                                                    setEvoModalOpen(true)
                                                 } else {
-                                                    handleDisconnectWa()
+                                                    handleEvoDisconnect()
                                                 }
                                             }}
-                                            className={waIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
+                                            className={evoIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
                                         />
                                     </div>
                                 </div>
@@ -705,6 +865,94 @@ export const IntegrationsSubPage = ({
                             </div>
                         </div>
                     </div>
+                </DefaultModal>
+
+                {/* WhatsApp Evolution Modal */}
+                <DefaultModal
+                    isOpen={evoModalOpen}
+                    onClose={handleEvoModalClose}
+                    title={evoStatus === "connected" ? "Integração WhatsApp" : "Conectar WhatsApp"}
+                    maxWidth="md"
+                >
+                    {evoConfigured === false && (
+                        <div className="text-center py-8">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Integração Evolution API não disponível. As variáveis de ambiente não estão configuradas no servidor.
+                            </p>
+                        </div>
+                    )}
+                    {evoConfigured === null && (
+                        <div className="flex items-center justify-center py-8">
+                            <div className="w-6 h-6 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                        </div>
+                    )}
+                    {evoConfigured === true && (
+                        <>
+                            {evoStatus === "connected" && (
+                                <div className="flex flex-col gap-4">
+                                    <ListItem
+                                        className="border-none bg-transparent hover:border-none p-0 cursor-default pointer-events-none"
+                                        icon={<img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="object-contain" />}
+                                        title={formatBrazilPhone(evoPhoneNumber || "") || "WhatsApp Conectado"}
+                                        description={
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <Badge variant="green">Conectado</Badge>
+                                            </div>
+                                        }
+                                    />
+                                    <Button variant="destructive" onClick={handleEvoDisconnect} disabled={evoIsLoading} className="w-full h-[42px]">
+                                        Desconectar WhatsApp
+                                    </Button>
+                                </div>
+                            )}
+                            {(evoStatus === "disconnected" || evoStatus === "error" || evoStatus === "pending") && !evoQrCode && (
+                                <div className="flex flex-col items-center text-center">
+                                    <IconPlaceholder
+                                        icon={QRCodeIcon}
+                                        title="WhatsApp Desconectado"
+                                        subtitle="Conecte seu WhatsApp para habilitar o envio de notificações e lembretes."
+                                        buttons={[{
+                                            text: evoIsLoading ? "Conectando..." : "Conectar WhatsApp",
+                                            action: handleEvoConnect,
+                                            disabled: evoIsLoading,
+                                            className: "w-full max-w-xs"
+                                        }]}
+                                    />
+                                </div>
+                            )}
+                            {((evoStatus === "qr_pending" || evoStatus === "connecting") || evoQrCode) && evoStatus !== "connected" && (
+                                <div className="flex flex-col items-center text-center">
+                                    <IconPlaceholder
+                                        icon={QRCodeIcon}
+                                        title="Escaneie o QR Code"
+                                        subtitle="Abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho"
+                                    />
+                                    {evoQrCode ? (
+                                        <div className="mt-6 bg-white p-4 rounded-2xl">
+                                            <img
+                                                src={evoQrCode.startsWith("data:") ? evoQrCode : `data:image/png;base64,${evoQrCode}`}
+                                                alt="QR Code"
+                                                className="w-56 h-56 object-contain mx-auto"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="mt-8 flex flex-col items-center justify-center gap-3 py-8">
+                                            <div className="w-8 h-8 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerando QR Code...</p>
+                                        </div>
+                                    )}
+                                    <div className="flex gap-3 mt-6 w-full max-w-xs justify-center">
+                                        <Button variant="outline" onClick={handleEvoCancel} disabled={evoIsLoading} className="flex-1 h-12">
+                                            Cancelar
+                                        </Button>
+                                        <Button onClick={handleEvoConnect} disabled={evoIsLoading} className="flex-1 h-12">
+                                            Regerar QR
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </DefaultModal>
 
                 {/* 1. Connection Info Modal */}

@@ -634,7 +634,7 @@ export async function onOrderStatusChanged(
     const mixType = await getOrderMixType(orderId)
 
     if (buyerId) {
-      const skipForCustomer = mixType === "service" && (situation === "paid" || situation === "cancelled")
+      const skipForCustomer = mixType === "service" && situation === "paid"
       if (!skipForCustomer) {
         const userId = await resolveCustomerUserId({ buyerId })
         if (userId) {
@@ -770,6 +770,7 @@ export async function notifyCustomerBatchOrders(params: {
   storeName?: string
   phone?: string
   origin?: "manual" | "automation" | "system"
+  cancellationReason?: string
 }) {
   if (!params.orders || params.orders.length === 0) return
   if (params.orders.length === 1) {
@@ -783,19 +784,43 @@ export async function notifyCustomerBatchOrders(params: {
         buyer_phone: params.phone,
         customer_name: params.customerName,
       },
-      params.type === "order_paid" ? "paid" : undefined,
+      params.type === "order_paid"
+        ? "paid"
+        : params.type === "order_cancelled"
+          ? "cancelled"
+          : undefined,
       undefined,
       params.origin,
+      params.cancellationReason,
     )
   }
 
   const count = params.orders.length
   const batchId = params.orders.map((o) => o.id).sort().join("-")
+  const orderNumbers = params.orders.map((o) => o.orderNumber).filter(Boolean) as string[]
+
+  let storeName = params.storeName
+  if (!storeName) {
+    const admin = getAdminClient()
+    const { data: hqStore } = await admin
+      .from("stores")
+      .select("name")
+      .eq("partner_id", params.partnerId)
+      .order("is_headquarters", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (hqStore?.name) {
+      storeName = hqStore.name
+    }
+  }
+
   const content = buildNotificationContent(params.type, "customer", {
     isBatch: true,
     batchCount: count,
-    storeName: params.storeName,
+    orderNumbers,
+    storeName,
     customerName: params.customerName,
+    cancellationNote: params.cancellationReason,
   })
 
   await createNotification({
@@ -806,14 +831,17 @@ export async function notifyCustomerBatchOrders(params: {
     entityType: "order",
     entityId: params.orders[0].id,
     data: {
+      href: `/marketplace/me/orders`,
       isBatch: true,
       batchCount: count,
       orderIds: params.orders.map((o) => o.id),
+      orderNumbers,
       partner_id: params.partnerId,
       customer_id: params.userId,
       phone: params.phone,
-      storeName: params.storeName,
+      storeName,
       customerName: params.customerName,
+      cancellationReason: params.cancellationReason,
     },
     idempotencyKey: buildIdempotencyKey(
       params.type,

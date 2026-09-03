@@ -7,6 +7,7 @@ import { revalidateCustomers } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
 import { formatDate, formatTime } from "@/lib/utils"
 import { decryptCPF, encryptCPF } from "@/lib/crypto"
+import { generateCpfLookupHash } from "@/lib/services/cpf-hash"
 import { getDeliveryStatusMeta, getDeliveryStatusLabelForType } from "@/lib/orders/status"
 import { requireUser, requireCustomerOwnership } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
@@ -29,35 +30,57 @@ async function prepareEncryptedCpf(
   partnerId: string,
   cpf?: string | null,
   currentCustomerId?: string,
-) {
+): Promise<{ cpf?: string | null; cpfLookupHash?: string | null; error?: string }> {
   if (!cpf) {
-    return { cpf: null }
+    return { cpf: null, cpfLookupHash: null }
   }
 
   if (!validateCPF(cpf)) {
-    return { error: "CPF invÃ¡lido" }
+    return { error: "CPF inválido" }
   }
 
   const cleanCpf = cpf.replace(/\D/g, "")
+  const lookupHash = generateCpfLookupHash(cleanCpf)
 
-  const cpfQuery = supabase
+  // 1. Verificação instantânea O(1) via índice parcial cpf_lookup_hash
+  if (lookupHash) {
+    let hashQuery = supabase
+      .from("customers")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("cpf_lookup_hash", lookupHash)
+      .is("deleted_at", null)
+
+    if (currentCustomerId) {
+      hashQuery = hashQuery.neq("id", currentCustomerId)
+    }
+
+    const { data: duplicateByHash } = await hashQuery.limit(1)
+    if (duplicateByHash && duplicateByHash.length > 0) {
+      return { error: "Já existe um cliente com este CPF." }
+    }
+  }
+
+  // 2. Fallback de transição segura apenas para clientes legados sem hash preenchido
+  let legacyQuery = supabase
     .from("customers")
     .select("id, cpf")
     .eq("partner_id", partnerId)
+    .is("cpf_lookup_hash", null)
     .not("cpf", "is", null)
+    .is("deleted_at", null)
 
-  const { data: existingCpfs, error: fetchError } = currentCustomerId
-    ? await cpfQuery.neq("id", currentCustomerId)
-    : await cpfQuery
+  if (currentCustomerId) {
+    legacyQuery = legacyQuery.neq("id", currentCustomerId)
+  }
 
-  if (fetchError) {
-    console.error("Erro ao buscar CPFs de clientes para verificar unicidade:", fetchError)
-  } else if (existingCpfs && existingCpfs.length > 0) {
-    for (const row of existingCpfs) {
+  const { data: legacyRows } = await legacyQuery.limit(50)
+  if (legacyRows && legacyRows.length > 0) {
+    for (const row of legacyRows) {
       try {
         const decrypted = await decryptCPF(row.cpf)
         if (decrypted === cleanCpf) {
-          return { error: "JÃ¡ existe um cliente com este CPF." }
+          return { error: "Já existe um cliente com este CPF." }
         }
       } catch {
         continue
@@ -66,7 +89,10 @@ async function prepareEncryptedCpf(
   }
 
   try {
-    return { cpf: await encryptCPF(cleanCpf) }
+    return {
+      cpf: await encryptCPF(cleanCpf),
+      cpfLookupHash: lookupHash,
+    }
   } catch (err) {
     console.error("Error encrypting CPF:", err)
     return { error: "Erro ao criptografar o CPF" }
@@ -202,6 +228,7 @@ export async function createComprehensiveCustomerAction(data: {
     website: data.website || null,
     person_type: data.personType,
     cpf: cpfResult.cpf,
+    cpf_lookup_hash: cpfResult.cpfLookupHash,
     contribuinte: data.contribuinte || null,
     cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
     nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,
@@ -403,8 +430,8 @@ export async function updateComprehensiveCustomerAction(data: {
   if (data.hasDifferentBillingAddress && data.billingZipCode && !validateCEP(data.billingZipCode)) {
     return { error: "CEP de cobrança inválido" }
   }
-  const cpfResult: { cpf?: string | null; error?: string } = !can(customerAccess as RbacUserLike, "customers.view_fiscal_data")
-    ? { cpf: null as string | null }
+  const cpfResult: { cpf?: string | null; cpfLookupHash?: string | null; error?: string } = !can(customerAccess as RbacUserLike, "customers.view_fiscal_data")
+    ? { cpf: null as string | null, cpfLookupHash: null as string | null }
     : await prepareEncryptedCpf(supabase, partnerId, data.cpf, data.customerId)
   if (cpfResult.error) {
     return { error: cpfResult.error }
@@ -428,6 +455,7 @@ export async function updateComprehensiveCustomerAction(data: {
   if (customerAccess.roleId !== "operator") {
     Object.assign(customerUpdatePayload, {
       cpf: cpfResult.cpf,
+      cpf_lookup_hash: cpfResult.cpfLookupHash,
       contribuinte: data.contribuinte || null,
       cnpj: data.cnpj ? data.cnpj.replace(/\D/g, "") : null,
       nome_fantasia: data.nomeFantasia ? sanitizeInput(data.nomeFantasia, 150) : null,

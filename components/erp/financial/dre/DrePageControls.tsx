@@ -1,14 +1,28 @@
 "use client"
 
-import React from "react"
-import { Button, FormDropdown, Checkbox } from "@/components/reusable"
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react"
+import { AnimatePresence } from "framer-motion"
+import { Button } from "@/components/reusable"
+import FilterChip from "@/components/reusable/FilterChip"
+import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import {
   FileIcon,
   AnalyticsIcon,
+  FilterIcon,
   ArrowUpDownIcon,
+  CalendarIcon,
+  StoreIcon,
+  MoneyIcon,
+  ArrowLeftRightIcon,
 } from "@/lib/icons"
 import type { DreRegime } from "@/lib/services/dre.service"
+import {
+  EMPTY_DATE_PERIOD,
+  isDatePeriodFilterActive,
+  summarizeDatePeriodFilter,
+} from "@/lib/utils/filter-date-period"
+import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 
 export type PeriodPreset =
   | "current_month"
@@ -25,58 +39,169 @@ interface StoreOption {
   name: string
 }
 
+export interface DreFilterState {
+  datePeriod: DatePeriodFilterValue
+  stores: string[]
+  regime: DreRegime[]
+  comparePrevious: boolean
+}
+
 interface DrePageControlsProps {
   activeTab: DreViewTab
   setActiveTab: (tab: DreViewTab) => void
-  preset: PeriodPreset
-  setPreset: (preset: PeriodPreset) => void
-  customStartDate: string
-  setCustomStartDate: (date: string) => void
-  customEndDate: string
-  setCustomEndDate: (date: string) => void
   stores: StoreOption[]
-  selectedStoreId: string
-  setSelectedStoreId: (id: string) => void
-  regime: DreRegime
-  setRegime: (regime: DreRegime) => void
-  comparePrevious: boolean
-  setComparePrevious: (compare: boolean) => void
+  filters: DreFilterState
+  setFilters: React.Dispatch<React.SetStateAction<DreFilterState>>
   isAllExpanded: boolean
   onToggleExpandAll: () => void
 }
 
-const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
-  { value: "current_month", label: "Mês Atual" },
-  { value: "last_month", label: "Mês Anterior" },
-  { value: "last_30_days", label: "Últimos 30 Dias" },
-  { value: "current_quarter", label: "Trimestre Atual" },
-  { value: "current_year", label: "Ano Completo" },
-  { value: "custom", label: "Personalizado..." },
-]
+const PERIOD_PRESET_LABELS: Record<string, string> = {
+  current_month: "Mês Atual",
+  last_month: "Mês Anterior",
+  last_30_days: "Últimos 30 Dias",
+  current_quarter: "Trimestre Atual",
+  current_year: "Ano Completo",
+  custom: "Personalizado",
+}
 
 export function DrePageControls({
   activeTab,
   setActiveTab,
-  preset,
-  setPreset,
-  customStartDate,
-  setCustomStartDate,
-  customEndDate,
-  setCustomEndDate,
   stores,
-  selectedStoreId,
-  setSelectedStoreId,
-  regime,
-  setRegime,
-  comparePrevious,
-  setComparePrevious,
+  filters,
+  setFilters,
   isAllExpanded,
   onToggleExpandAll,
 }: DrePageControlsProps) {
-  const storeOptions = [
-    { value: "all", label: "Todas as Lojas (Consolidado)" },
-    ...stores.map((s) => ({ value: s.id, label: s.name })),
-  ]
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false)
+  const filtersContainerRef = useRef<HTMLDivElement>(null)
+  const [filterScrollState, setFilterScrollState] = useState({ left: false, right: false })
+
+  const checkFilterScroll = useCallback(() => {
+    if (!filtersContainerRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = filtersContainerRef.current
+    setFilterScrollState({
+      left: scrollLeft > 0,
+      right: scrollLeft < scrollWidth - clientWidth - 2,
+    })
+  }, [])
+
+  useEffect(() => {
+    checkFilterScroll()
+    window.addEventListener("resize", checkFilterScroll)
+    return () => window.removeEventListener("resize", checkFilterScroll)
+  }, [checkFilterScroll, filters])
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      isDatePeriodFilterActive(filters.datePeriod) ||
+      filters.stores.length > 0 ||
+      filters.regime.length > 0 ||
+      filters.comparePrevious !== true
+    )
+  }, [filters])
+
+  const filterSections: FilterSectionConfig[] = useMemo(
+    () => [
+      {
+        id: "datePeriod",
+        title: "Período",
+        type: "date-period",
+        datePresetOptions: ["current_month", "last_month", "last_30_days", "current_quarter", "current_year", "custom"],
+      },
+      {
+        id: "stores",
+        title: "Loja",
+        type: "checkbox-list",
+        options: stores.map((s) => s.id),
+        optionLabels: Object.fromEntries(stores.map((s) => [s.id, s.name])),
+      },
+      {
+        id: "regime",
+        title: "Regime Contábil",
+        type: "checkbox-list",
+        options: ["competencia", "caixa"],
+        optionLabels: {
+          competencia: "Competência",
+          caixa: "Caixa",
+        },
+      },
+      {
+        id: "comparePrevious",
+        title: "Comparativo",
+        type: "switch",
+        switchLabel: "Comparar com período anterior",
+      },
+    ],
+    [stores],
+  )
+
+  const clearAllFilters = useCallback(() => {
+    setFilters({
+      datePeriod: { ...EMPTY_DATE_PERIOD },
+      stores: [],
+      regime: [],
+      comparePrevious: true,
+    })
+  }, [setFilters])
+
+  const removeFilter = useCallback(
+    (key: string) => {
+      setFilters((prev) => {
+        switch (key) {
+          case "datePeriod":
+            return { ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }
+          case "stores":
+            return { ...prev, stores: [] }
+          case "regime":
+            return { ...prev, regime: [] }
+          case "comparePrevious":
+            return { ...prev, comparePrevious: true }
+          default:
+            return prev
+        }
+      })
+    },
+    [setFilters],
+  )
+
+  const BadgeList = () => (
+    <AnimatePresence>
+      {isDatePeriodFilterActive(filters.datePeriod) && (
+        <FilterChip
+          label="Período"
+          value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+          icon={<CalendarIcon size={12} />}
+          onRemove={() => removeFilter("datePeriod")}
+        />
+      )}
+      {filters.stores.length > 0 && (
+        <FilterChip
+          label="Loja"
+          value={filters.stores.length === 1 ? stores.find((s) => s.id === filters.stores[0])?.name || filters.stores[0] : `${filters.stores.length} lojas`}
+          icon={<StoreIcon size={12} />}
+          onRemove={() => removeFilter("stores")}
+        />
+      )}
+      {filters.regime.length > 0 && (
+        <FilterChip
+          label="Regime"
+          value={filters.regime.map((r) => (r === "competencia" ? "Competência" : "Caixa")).join(", ")}
+          icon={<MoneyIcon size={12} />}
+          onRemove={() => removeFilter("regime")}
+        />
+      )}
+      {filters.comparePrevious !== true && (
+        <FilterChip
+          label="Comparativo"
+          value="Desativado"
+          icon={<ArrowLeftRightIcon size={12} />}
+          onRemove={() => removeFilter("comparePrevious")}
+        />
+      )}
+    </AnimatePresence>
+  )
 
   return (
     <>
@@ -95,101 +220,86 @@ export function DrePageControls({
       </div>
 
       {/* ── Barra de Controles e Filtros ─────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 flex-none px-4 md:px-8 print:hidden">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Seletor de Período */}
-          <div className="w-48">
-            <FormDropdown
-              options={PERIOD_OPTIONS}
-              value={preset}
-              setValue={(val) => setPreset(val as PeriodPreset)}
-            />
-          </div>
-
-          {/* Inputs de Data Personalizada */}
-          {preset === "custom" && (
-            <div className="flex items-center gap-2 bg-brand-gray dark:bg-dark-border/30 p-1.5 rounded-xl border border-brand-border dark:border-dark-border">
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="text-xs px-2 py-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden"
-              />
-              <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">até</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="text-xs px-2 py-1 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-lg text-brand-dark dark:text-dark-heading focus:outline-hidden"
-              />
-            </div>
-          )}
-
-          {/* Seletor de Loja (se houver mais de uma) */}
-          {stores.length > 1 && (
-            <div className="w-56">
-              <FormDropdown
-                options={storeOptions}
-                value={selectedStoreId}
-                setValue={(val) => setSelectedStoreId(val)}
-              />
-            </div>
-          )}
-
-          {/* Regime Contábil: Competência vs Caixa */}
-          <div className="flex items-center bg-brand-gray dark:bg-dark-border/40 p-1 rounded-xl border border-brand-border dark:border-dark-border">
-            <button
-              type="button"
-              onClick={() => setRegime("competencia")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                regime === "competencia"
-                  ? "bg-brand-green text-white"
-                  : "text-brand-dark dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-              }`}
-            >
-              Competência
-            </button>
-            <button
-              type="button"
-              onClick={() => setRegime("caixa")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                regime === "caixa"
-                  ? "bg-brand-green text-white"
-                  : "text-brand-dark dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading"
-              }`}
-            >
-              Caixa
-            </button>
-          </div>
-
-          {/* Comparativo Anterior */}
-          <div className="flex items-center gap-2 pl-1">
-            <Checkbox
-              checked={comparePrevious}
-              onCheckedChange={(checked) => setComparePrevious(Boolean(checked))}
-            />
-            <span
-              className="text-xs text-brand-dark dark:text-dark-body font-medium select-none cursor-pointer"
-              onClick={() => setComparePrevious(!comparePrevious)}
-            >
-              Comparar anterior
-            </span>
-          </div>
-        </div>
-
-        {/* Direita: Ações */}
-        <div className="flex items-center gap-2 self-end md:self-center">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 flex-none px-4 md:px-8 print:hidden">
+        {/* MOBILE CONTROLS */}
+        <div className="md:hidden flex items-center gap-2 w-full">
+          <Button variant="outline" onClick={() => setIsFilterSheetOpen(true)} className="flex-1 h-[42px]">
+            <FilterIcon className="w-4 h-4 mr-2" />
+            Filtros
+          </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={onToggleExpandAll}
-            className="text-xs h-[42px]"
+            className="h-[42px] px-3"
           >
-            <ArrowUpDownIcon size={16} className="mr-1.5" />
-            {isAllExpanded ? "Recolher tudo" : "Expandir tudo"}
+            <ArrowUpDownIcon size={16} />
           </Button>
         </div>
+
+        {/* DESKTOP CONTROLS */}
+        <div className="hidden md:flex items-center w-full gap-4">
+          <div className="flex items-center gap-3 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsFilterSheetOpen(true)}
+              leftIcon={<FilterIcon size={18} />}
+            >
+              Filtros
+            </Button>
+            {hasActiveFilters && (
+              <div className="h-8 w-px bg-brand-border dark:bg-dark-border mx-1" />
+            )}
+          </div>
+
+          {/* Scrollable Badges Area */}
+          <div className="flex-1 min-w-0 relative h-[42px] flex items-center">
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.left ? "opacity-100" : "opacity-0"}`}
+            />
+            <div
+              ref={filtersContainerRef}
+              onScroll={checkFilterScroll}
+              className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full"
+            >
+              <BadgeList />
+            </div>
+            <div
+              className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.right ? "opacity-100" : "opacity-0"}`}
+            />
+          </div>
+
+          {/* Expand/Collapse Button */}
+          <div className="shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleExpandAll}
+              className="text-xs h-[42px]"
+            >
+              <ArrowUpDownIcon size={16} className="mr-1.5" />
+              {isAllExpanded ? "Recolher tudo" : "Expandir tudo"}
+            </Button>
+          </div>
+        </div>
       </div>
+
+      {/* MOBILE CHIPS */}
+      <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
+        <div className="flex items-center gap-2">
+          <BadgeList />
+        </div>
+      </div>
+
+      {/* ── FilterSheet ──────────────────────────────────────────────────── */}
+      <FilterSheet
+        isOpen={isFilterSheetOpen}
+        onClose={() => setIsFilterSheetOpen(false)}
+        sections={filterSections}
+        filters={filters}
+        setFilters={setFilters as any}
+        onClear={clearAllFilters}
+      />
     </>
   )
 }

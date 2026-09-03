@@ -20,6 +20,7 @@ interface TransactionListItemProps {
     transaction: ERPTransaction
     columns: ColumnDef[]
     selected: boolean
+    selectable?: boolean
     onSelect: (id: string) => void
     onOpenDetail?: (transaction: ERPTransaction) => void
     onEdit?: (transaction: ERPTransaction) => void
@@ -40,7 +41,7 @@ const getPaymentIcon = (paymentType: string) => {
 }
 
 const TransactionListItem = React.memo(
-    ({ transaction, columns, selected, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
+    ({ transaction, columns, selected, selectable = true, onSelect, onOpenDetail, onEdit, onMarkAsPaid, onCancelPending, onSettleInstallmentGroup, onPrefetchMouseEnter, onPrefetchMouseLeave, onPrefetchTouchStart }: TransactionListItemProps) => {
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "transaction":
@@ -212,12 +213,14 @@ const TransactionListItem = React.memo(
                 onMouseLeave={() => onPrefetchMouseLeave?.(transaction.id)}
                 onTouchStart={() => onPrefetchTouchStart?.(transaction.id)}
             >
-                <td
-                    className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <Checkbox checked={selected} onChange={() => onSelect(transaction.id)} />
-                </td>
+                {selectable && (
+                    <td
+                        className="p-2 pl-6 border-b border-brand-border dark:border-dark-border w-12"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <Checkbox checked={selected} onChange={() => onSelect(transaction.id)} />
+                    </td>
+                )}
 
                 {columns.map((col) => (
                     <td
@@ -235,6 +238,7 @@ const TransactionListItem = React.memo(
     (prev, next) =>
         prev.transaction === next.transaction &&
         prev.selected === next.selected &&
+        prev.selectable === next.selectable &&
         prev.columns === next.columns &&
         prev.onOpenDetail === next.onOpenDetail
 )

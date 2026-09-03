@@ -251,7 +251,7 @@ export function getIntegrations(ctx: DashboardContext): DashboardIntegration[] {
       name: "WhatsApp",
       description: "Receba pedidos e envie atualizações automáticas direto no WhatsApp dos clientes.",
       status: ctx.isWhatsAppConnected ? "connected" : "disconnected",
-      actionHref: "/erp/integracoes/whatsapp"
+      actionHref: "/erp/configuracoes?tab=integracoes"
     },
     {
       id: "mercadopago",
@@ -302,7 +302,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       title: "Venda mais com o WhatsApp",
       description: "Conecte seu WhatsApp para responder clientes em 1 clique e enviar status dos pedidos automaticamente.",
       actionLabel: "Conectar Agora",
-      actionHref: "/erp/integracoes/whatsapp",
+      actionHref: "/erp/configuracoes?tab=integracoes",
       variant: "tip"
     });
   }

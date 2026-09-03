@@ -21,7 +21,11 @@ import {
 import { getDreReportAction } from "@/app/actions/erp/dre"
 import type { DreReportData, DreRegime, DreNode } from "@/lib/services/dre.service"
 import { useNotification } from "@/hooks/use-notification"
-import { DrePageControls, type PeriodPreset, type DreViewTab } from "./DrePageControls"
+import { DrePageControls, type DreViewTab, type DreFilterState } from "./DrePageControls"
+import {
+  resolveDatePeriodBounds,
+  EMPTY_DATE_PERIOD,
+} from "@/lib/utils/filter-date-period"
 
 import { exportDreToXLSX } from "@/lib/utils/export-dre-excel"
 import { DrePrintModal } from "./receipt/DrePrintModal"
@@ -37,58 +41,21 @@ interface DreViewProps {
   activeStoreId?: string | null
 }
 
-function getPresetDates(preset: PeriodPreset): { startDate: string; endDate: string } {
+function resolvePresetDates(datePeriod: DreFilterState["datePeriod"]): { startDate: string; endDate: string } {
+  const bounds = resolveDatePeriodBounds(datePeriod)
+  if (bounds.startYmd && bounds.endYmd) {
+    return { startDate: bounds.startYmd, endDate: bounds.endYmd }
+  }
+  if (bounds.startYmd && !bounds.endYmd) {
+    return { startDate: bounds.startYmd, endDate: bounds.startYmd }
+  }
+  if (!bounds.startYmd && bounds.endYmd) {
+    return { startDate: bounds.endYmd, endDate: bounds.endYmd }
+  }
+  // Fallback: mês atual
   const now = new Date()
   const year = now.getFullYear()
-  const month = now.getMonth() // 0-indexed
-
-  if (preset === "current_month") {
-    const start = new Date(Date.UTC(year, month, 1))
-    const end = new Date(Date.UTC(year, month + 1, 0))
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    }
-  }
-
-  if (preset === "last_month") {
-    const start = new Date(Date.UTC(year, month - 1, 1))
-    const end = new Date(Date.UTC(year, month, 0))
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    }
-  }
-
-  if (preset === "last_30_days") {
-    const end = new Date()
-    const start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000)
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    }
-  }
-
-  if (preset === "current_quarter") {
-    const quarter = Math.floor(month / 3)
-    const start = new Date(Date.UTC(year, quarter * 3, 1))
-    const end = new Date(Date.UTC(year, (quarter + 1) * 3, 0))
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    }
-  }
-
-  if (preset === "current_year") {
-    const start = new Date(Date.UTC(year, 0, 1))
-    const end = new Date(Date.UTC(year, 11, 31))
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    }
-  }
-
-  // fallback para custom
+  const month = now.getMonth()
   const start = new Date(Date.UTC(year, month, 1))
   const end = new Date(Date.UTC(year, month + 1, 0))
   return {
@@ -101,17 +68,26 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
   const { error: notifyError, success: notifySuccess } = useNotification()
 
   const [activeTab, setActiveTab] = useState<DreViewTab>("structure")
-  const [preset, setPreset] = useState<PeriodPreset>("current_month")
-  const [customStartDate, setCustomStartDate] = useState<string>(() => getPresetDates("current_month").startDate)
-  const [customEndDate, setCustomEndDate] = useState<string>(() => getPresetDates("current_month").endDate)
+  const [filters, setFilters] = useState<DreFilterState>({
+    datePeriod: { presets: ["Mês atual"], from: "", to: "" },
+    stores: [],
+    regime: [],
+    comparePrevious: true,
+  })
 
-  const [selectedStoreId, setSelectedStoreId] = useState<string>(() => {
+  const selectedStoreId = useMemo(() => {
+    if (filters.stores.length === 1) return filters.stores[0]
     if (stores.length === 1) return stores[0].id
     if (activeStoreId && stores.some((s) => s.id === activeStoreId)) return activeStoreId
     return "all"
-  })
-  const [regime, setRegime] = useState<DreRegime>("competencia")
-  const [comparePrevious, setComparePrevious] = useState<boolean>(true)
+  }, [filters.stores, stores, activeStoreId])
+
+  const regime: DreRegime = useMemo(() => {
+    if (filters.regime.length === 1) return filters.regime[0]
+    return "competencia"
+  }, [filters.regime])
+
+  const comparePrevious = filters.comparePrevious
 
   const [loading, setLoading] = useState<boolean>(true)
   const [report, setReport] = useState<DreReportData | null>(null)
@@ -126,15 +102,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
     "8_resultado_financeiro": true,
   })
 
-  const dates = useMemo(() => {
-    if (preset === "custom") {
-      return {
-        startDate: customStartDate || getPresetDates("current_month").startDate,
-        endDate: customEndDate || getPresetDates("current_month").endDate,
-      }
-    }
-    return getPresetDates(preset)
-  }, [preset, customStartDate, customEndDate])
+  const dates = useMemo(() => resolvePresetDates(filters.datePeriod), [filters.datePeriod])
 
   const selectedStoreName = useMemo(() => {
     if (selectedStoreId === "all") return "Todas as Lojas (Consolidado)"
@@ -313,19 +281,9 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
       <DrePageControls
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        preset={preset}
-        setPreset={setPreset}
-        customStartDate={customStartDate}
-        setCustomStartDate={setCustomStartDate}
-        customEndDate={customEndDate}
-        setCustomEndDate={setCustomEndDate}
         stores={stores}
-        selectedStoreId={selectedStoreId}
-        setSelectedStoreId={setSelectedStoreId}
-        regime={regime}
-        setRegime={setRegime}
-        comparePrevious={comparePrevious}
-        setComparePrevious={setComparePrevious}
+        filters={filters}
+        setFilters={setFilters}
         isAllExpanded={isAllExpanded}
         onToggleExpandAll={toggleExpandAll}
       />

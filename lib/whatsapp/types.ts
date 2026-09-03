@@ -128,6 +128,8 @@ export interface PartnerWhatsappConnection {
   api_url: string | null
   api_key_encrypted: string | null
   evolution_webhook_secret: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export interface WhatsappTemplateView {

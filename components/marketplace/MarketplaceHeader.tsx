@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition 
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon } from "@/lib/icons"
+import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon, PlusIcon } from "@/lib/icons"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable/Button"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -184,6 +184,59 @@ const Header: React.FC<HeaderProps> = ({
     const [isIpLoading, setIsIpLoading] = useState(false)
     const [citiesList, setCitiesList] = useState<string[]>([])
     const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
+    const [citySlug, setCitySlug] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (typeof window === "undefined") return
+
+        if (profile?.citySlug && profile.citySlug !== "brasil" && !profile.citySlug.startsWith("estado-")) {
+            setCitySlug(profile.citySlug)
+            return
+        }
+
+        if (profile?.address && profile.address.includes(" - ") && profile.address !== "Brasil" && profile.address !== "Estado de São Paulo") {
+            const [cityName, stateUf] = profile.address.split(" - ")
+            if (cityName && stateUf && stateUf.trim().length === 2) {
+                const normCity = cityName.trim()
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/(^-|-$)/g, "")
+                setCitySlug(`${normCity}-${stateUf.trim().toLowerCase()}`)
+                return
+            }
+        }
+
+        let stored = localStorage.getItem("dudit_city")
+        if (stored === "brasil" || stored?.startsWith("estado-")) {
+            stored = null
+        }
+
+        if (!stored) {
+            const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
+            if (match && match[1] !== "brasil" && !match[1].startsWith("estado-")) {
+                stored = match[1]
+            }
+        }
+
+        if (!stored && pathname) {
+            const parts = pathname.split('/').filter(Boolean)
+            if (parts[0] === 'explorar' && parts[1] && parts[1] !== "brasil" && !parts[1].startsWith("estado-")) {
+                stored = parts[1]
+            } else if (
+                parts.length >= 1 &&
+                !['auth', 'erp', 'ddt-admin', 'pedidos', 'perfil', 'checkout', 'quote', 'print', 'entregadores', 'sacola', 'favoritos', 'colecoes', 'assinaturas', 'mapa', 'invite', 'institucional', 'ajuda', 'banned', 'brasil'].includes(parts[0]) &&
+                /^[a-z0-9-]+-[a-z]{2}$/.test(parts[0])
+            ) {
+                stored = parts[0]
+            }
+        }
+
+        if (stored) {
+            setCitySlug(stored)
+        }
+    }, [pathname, profile])
 
     const handleOpenAnnounceModal = useCallback((e?: React.MouseEvent) => {
         if (e) e.preventDefault()
@@ -559,24 +612,20 @@ const Header: React.FC<HeaderProps> = ({
 
     // Get navigation links with city included
     const navigationLinks = useMemo(() => {
-        // Escopo resolvido pelo servidor (cidade do usuário/cookie/Brasil) mantém a URL limpa
-        const basePath = "/explorar"
+        const exploreBase = citySlug ? `/explorar/${citySlug}` : "/explorar"
         return [
-            { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
-            { label: "Produtos", href: `${basePath}?type=produtos` },
-            { label: "Serviços", href: `/services` },
+            { label: "Produtos", href: `${exploreBase}?type=produtos` },
+            { label: "Serviços", href: `${exploreBase}?type=servicos` },
         ]
-    }, [])
+    }, [citySlug])
 
     const desktopNavigationLinks = useMemo(() => {
-        // Escopo resolvido pelo servidor (cidade do usuário/cookie/Brasil) mantém a URL limpa
-        const basePath = "/explorar"
+        const exploreBase = citySlug ? `/explorar/${citySlug}` : "/explorar"
         return [
-            { label: "Ofertas do Dia", href: `${basePath}?q=oferta` },
-            { label: "Produtos", href: `${basePath}?type=produtos` },
-            { label: "Serviços", href: `${basePath}?type=servicos` },
+            { label: "Produtos", href: `${exploreBase}?type=produtos` },
+            { label: "Serviços", href: `${exploreBase}?type=servicos` },
         ]
-    }, [])
+    }, [citySlug])
 
     const handleSignOut = useCallback(async () => {
         document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
@@ -628,7 +677,7 @@ const Header: React.FC<HeaderProps> = ({
                         {(!isHome || isProductDetail) ? (
                             <Button
                                 variant={isTransparentHeader ? "filled" : "ghost"}
-                                className="h-8 w-8"
+                                size="icon"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (vendorCategoryTitle && onVendorCategoryBack) {
@@ -651,7 +700,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <UserProfileImage
                                     fullName={fullName}
                                     imageUrl={avatarUrl}
-                                    className="w-9 h-9 border-2 border-white/20"
+                                    className="w-9 h-9 border border-white/10"
                                 />
                             </button>
                         ) : (
@@ -662,7 +711,7 @@ const Header: React.FC<HeaderProps> = ({
                                 }}
                                 className="shrink-0 focus:outline-none"
                             >
-                                <div className="w-9 h-9 rounded-full border-2 border-white/20 bg-white/10 flex items-center justify-center">
+                                <div className="w-9 h-9 rounded-full border border-white/20 bg-white/10 flex items-center justify-center">
                                     <span className="text-xs text-white/60">?</span>
                                 </div>
                             </button>
@@ -731,7 +780,8 @@ const Header: React.FC<HeaderProps> = ({
                                     <Button
                                         variant="filled"
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                        className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
+                                        size="icon"
+                                        className={`${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                     >
                                         <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                     </Button>
@@ -742,7 +792,8 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant="filled"
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
-                                            className={`h-8 w-8 ${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
+                                            size="icon"
+                                            className={`${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                         >
                                             <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                         </Button>
@@ -753,7 +804,7 @@ const Header: React.FC<HeaderProps> = ({
                                         <Button
                                             variant={isTransparentHeader ? "filled" : "ghost"}
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
-                                            className="h-8 w-8"
+                                            size="icon"
                                         >
                                             <HeartIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"} ${isFavorite ? "fill-current" : ""}`} />
                                         </Button>
@@ -761,6 +812,14 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenAnnounceModal}
+                                        className="shrink-0 text-brand-orange font-bold text-[12px] flex items-center gap-0.5 px-2 py-1.5 cursor-pointer"
+                                    >
+                                        <PlusIcon size={14} />
+                                        <span className="hidden min-[380px]:inline">Anunciar</span>
+                                    </button>
                                     <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={20} strokeWidth={2} />
                                         {cartCount > 0 && (

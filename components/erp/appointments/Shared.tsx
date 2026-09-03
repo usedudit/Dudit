@@ -12,7 +12,7 @@ export const TopSelectionBar = ({ onClose, onViewSheet }: { onClose: () => void,
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -50, opacity: 0 }}
-            className="absolute top-0 left-0 w-full h-[60px] bg-brand-dark z-50 flex items-center justify-between px-6 shadow-md"
+            className="top-0 left-0 w-full fixed h-[60px] bg-brand-dark z-50 flex items-center justify-between px-6 shadow-md"
         >
             <div className="flex gap-3">
                 <button onClick={onViewSheet} className="px-4 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors">

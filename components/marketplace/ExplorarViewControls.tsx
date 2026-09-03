@@ -71,7 +71,7 @@ export function ExplorarViewControls({
                                     transition={{ duration: 0.15 }}
                                     className="shrink-0"
                                 >
-                                    <Badge variant="gray" className="flex items-center gap-1 pr-1 py-1">
+                                    <Badge variant="gray" icon={null} className="flex items-center gap-1 pr-1 py-1">
                                         <span className="opacity-70 font-normal whitespace-nowrap">{chip.label}:</span>
                                         <span className="font-bold truncate max-w-[120px]">{chip.value}</span>
                                         <button

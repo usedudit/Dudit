@@ -115,7 +115,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
     const [data, setData] = useState<PurchaseWithRelations[]>([])
     const [total, setTotal] = useState(0)
     const [page, setPage] = useState(1)
-    const [pageSize] = useState(20)
+    const [pageSize] = useState(8)
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [viewMode, setViewMode] = useState<"grid" | "list">("list")

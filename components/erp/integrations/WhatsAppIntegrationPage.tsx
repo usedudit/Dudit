@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
-import { Button, Badge, Input, InfoCard, FormSection, ListItem, IconPlaceholder } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormSection, ListItem, IconPlaceholder, Input } from "@/components/reusable"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, CheckCircleIcon, QRCodeIcon } from "@/lib/icons"
+import { ChevronLeftIcon, QRCodeIcon, CheckCircleIcon } from "@/lib/icons"
 import { toast } from "@/hooks/use-notification"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { WhatsappConnectButton } from "@/components/erp/integrations/WhatsappConnectButton"
@@ -100,7 +100,6 @@ export function WhatsAppIntegrationPage({
     const [evoStatus, setEvoStatus] = useState<string>("disconnected")
     const [evoQrCode, setEvoQrCode] = useState<string | null>(null)
     const [evoPhoneNumber, setEvoPhoneNumber] = useState<string | null>(null)
-    const [evoTestPhone, setEvoTestPhone] = useState("")
     const [evoIsLoading, setEvoIsLoading] = useState(false)
     const [evoConfigured, setEvoConfigured] = useState<boolean | null>(null)
 
@@ -109,6 +108,9 @@ export function WhatsAppIntegrationPage({
     useEffect(() => {
         evoStatusRef.current = evoStatus
     }, [evoStatus])
+
+    // Track if pairing was initiated by this component session (to avoid DB race overwriting local state)
+    const evoPairingInitiated = useRef(false)
 
     // Cleanup pairing status when component unmounts if it is still pairing
     useEffect(() => {
@@ -176,10 +178,6 @@ export function WhatsAppIntegrationPage({
         return getEvolutionStatusAction(storeId)
     }, [storeId])
 
-    const scopedTestEvolution = useCallback(async (phone: string) => {
-        return testEvolutionConnectionAction(phone, storeId)
-    }, [storeId])
-
     // Check if Evolution is configured on mount
     useEffect(() => {
         isEvolutionConfiguredAction().then((res) => {
@@ -192,12 +190,18 @@ export function WhatsAppIntegrationPage({
     // Initialize Evolution state from existing connection
     useEffect(() => {
         if (evoConnection) {
-            // Prevent database status from overriding the local "connected" state
-            // unless the database connection is actually disconnected or error.
-            if (evoStatus !== "connected" || evoConnection.status === "disconnected" || evoConnection.status === "error") {
+            // If pairing was initiated in this session and local status is already
+            // connected/qr_pending/connecting, don't let a stale DB value overwrite it.
+            const isPairingActive = evoPairingInitiated.current &&
+                (evoStatus === "connected" || evoStatus === "qr_pending" || evoStatus === "connecting")
+
+            if (!isPairingActive) {
                 setEvoStatus(evoConnection.status)
             }
-            setEvoPhoneNumber(evoConnection.phoneNumber)
+            // Always sync phone number from DB (it may have been populated by webhook)
+            if (evoConnection.phoneNumber) {
+                setEvoPhoneNumber(evoConnection.phoneNumber)
+            }
         }
     }, [evoConnection, evoStatus])
 
@@ -220,14 +224,15 @@ export function WhatsAppIntegrationPage({
                 setEvoStatus(res.data.status)
                 if (res.data.status === "connected") {
                     setEvoQrCode(null)
+                    if (res.data.phoneNumber) setEvoPhoneNumber(res.data.phoneNumber)
+                    toast.success("WhatsApp conectado com sucesso!")
+                    // Refresh twice: immediate + delayed to ensure webhook has updated the DB
+                    await refresh()
+                    setTimeout(() => { refresh() }, 3000)
                 } else if (res.data.qrCode) {
                     setEvoQrCode(res.data.qrCode)
                 }
-                setEvoPhoneNumber(res.data.phoneNumber)
-                if (res.data.status === "connected") {
-                    toast.success("WhatsApp conectado com sucesso!")
-                    await refresh()
-                }
+                if (res.data.phoneNumber) setEvoPhoneNumber(res.data.phoneNumber)
             }
         }, 5000)
 
@@ -279,6 +284,7 @@ export function WhatsAppIntegrationPage({
 
     const handleEvoConnect = async () => {
         setEvoIsLoading(true)
+        evoPairingInitiated.current = true
         try {
             const res = await scopedConnectEvolution()
             if (!res.success) { toast.error(res.error); return }
@@ -338,17 +344,6 @@ export function WhatsAppIntegrationPage({
                 toast.success("WhatsApp conectado!")
                 await refresh()
             }
-        } finally { setEvoIsLoading(false) }
-    }
-
-    const handleEvoTest = async () => {
-        if (!evoTestPhone.trim()) { toast.error("Informe um telefone para teste"); return }
-        setEvoIsLoading(true)
-        try {
-            const res = await scopedTestEvolution(evoTestPhone.trim())
-            if (!res.success) { toast.error(res.error); return }
-            toast.success("Mensagem de teste enviada via Evolution")
-            await refresh()
         } finally { setEvoIsLoading(false) }
     }
 
@@ -431,112 +426,124 @@ export function WhatsAppIntegrationPage({
                                         )}
 
                                         {evoConfigured === true && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-
-                                                {/* Left Column - FormSection with borderless ListItem */}
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all">
-                                                    <FormSection title="Integração WhatsApp">
+                                            <>
+                                                {/* Connected state - full-width FormSection */}
+                                                {evoStatus === "connected" && (
+                                                    <FormSection
+                                                        title="Integração WhatsApp"
+                                                        titleRight={
+                                                            <Button
+                                                                variant="destructive"
+                                                                onClick={handleEvoDisconnect}
+                                                                disabled={evoIsLoading}
+                                                                className="hidden md:flex h-[42px]"
+                                                            >
+                                                                Desconectar WhatsApp
+                                                            </Button>
+                                                        }
+                                                    >
                                                         <ListItem
                                                             className="border-none bg-transparent hover:border-none p-0 cursor-default pointer-events-none"
                                                             icon={<img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="object-contain" />}
                                                             title={
-                                                                evoStatus === "connected"
-                                                                    ? (formatBrazilPhone(evoPhoneNumber || evoConnection?.phoneNumber || "") || "WhatsApp Conectado")
-                                                                    : "Sem conexão ativa"
+                                                                formatBrazilPhone(evoPhoneNumber || evoConnection?.phoneNumber || "") || "WhatsApp Conectado"
                                                             }
                                                             description={
                                                                 <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Status: {STATUS_LABELS[evoStatus] || evoStatus}</span>
+                                                                    <Badge variant="green">Conectado</Badge>
                                                                 </div>
                                                             }
                                                         />
-                                                    </FormSection>
-                                                </div>
-
-                                                {/* Right Column - Dynamic IconPlaceholder, QR code, and buttons */}
-                                                <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all flex flex-col items-center justify-center min-h-[300px]">
-
-                                                    {/* 1. Connected State */}
-                                                    {evoStatus === "connected" && (
-                                                        <div className="flex flex-col items-center gap-6 w-full">
-                                                            <IconPlaceholder
-                                                                icon={CheckCircleIcon}
-                                                                title="WhatsApp Conectado"
-                                                                subtitle={`Seu WhatsApp (${formatBrazilPhone(evoPhoneNumber || evoConnection?.phoneNumber || "")}) está pareado e pronto para o envio de mensagens.`}
-                                                            />
-
-                                                            <div className="w-full max-w-sm border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-brand-gray/30 dark:bg-dark-surface/50">
-                                                                <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Testar envio de mensagem</h3>
-                                                                <div className="flex gap-2 mb-4">
-                                                                    <Input
-                                                                        placeholder="Telefone para teste (com DDD)"
-                                                                        value={evoTestPhone}
-                                                                        onChange={(e) => setEvoTestPhone(e.target.value)}
-                                                                        disabled={evoIsLoading}
-                                                                    />
-                                                                    <Button variant="outline" onClick={handleEvoTest} disabled={evoIsLoading || !evoTestPhone.trim()}>
-                                                                        Testar
-                                                                    </Button>
-                                                                </div>
-                                                                <Button variant="destructive" onClick={handleEvoDisconnect} disabled={evoIsLoading} className="w-full h-[42px]">
-                                                                    Desconectar WhatsApp
-                                                                </Button>
-                                                            </div>
+                                                        <div className="md:hidden">
+                                                            <Button
+                                                                variant="destructive"
+                                                                onClick={handleEvoDisconnect}
+                                                                disabled={evoIsLoading}
+                                                                className="w-full h-[42px]"
+                                                            >
+                                                                Desconectar WhatsApp
+                                                            </Button>
                                                         </div>
-                                                    )}
+                                                    </FormSection>
+                                                )}
 
-                                                    {/* 2. Disconnected / Error / Pending State */}
-                                                    {(evoStatus === "disconnected" || evoStatus === "error" || evoStatus === "pending") && !evoQrCode && (
-                                                        <IconPlaceholder
-                                                            icon={QRCodeIcon}
-                                                            title="WhatsApp Desconectado"
-                                                            subtitle="Conecte seu WhatsApp para habilitar o envio de notificações e lembretes."
-                                                            buttons={[
-                                                                {
-                                                                    text: evoIsLoading ? "Conectando..." : "Conectar WhatsApp",
-                                                                    action: handleEvoConnect,
-                                                                    disabled: evoIsLoading,
-                                                                    className: "w-full max-w-xs"
-                                                                }
-                                                            ]}
-                                                        />
-                                                    )}
+                                                {/* Disconnected / QR state - two-column grid */}
+                                                {evoStatus !== "connected" && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
 
-                                                    {/* 3. Connecting / QR Pending / Pairing State */}
-                                                    {((evoStatus === "qr_pending" || evoStatus === "connecting") || evoQrCode) && evoStatus !== "connected" && (
-                                                        <div className="flex flex-col items-center justify-center text-center w-full">
-                                                            <IconPlaceholder
-                                                                icon={QRCodeIcon}
-                                                                title="Escaneie o QR Code"
-                                                                subtitle="Abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho"
-                                                            />
-                                                            {evoQrCode ? (
-                                                                <div className="mt-6 bg-white p-4 rounded-2xl">
-                                                                    <img
-                                                                        src={evoQrCode.startsWith("data:") ? evoQrCode : `data:image/png;base64,${evoQrCode}`}
-                                                                        alt="QR Code"
-                                                                        className="w-64 h-64 object-contain mx-auto"
+                                                        {/* Left Column - FormSection with borderless ListItem */}
+                                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all">
+                                                            <FormSection title="Integração WhatsApp">
+                                                                <ListItem
+                                                                    className="border-none bg-transparent hover:border-none p-0 cursor-default pointer-events-none"
+                                                                    icon={<img src="https://img.dudit.com.br/static/icons/WhatsApp.png" alt="WhatsApp" className="object-contain" />}
+                                                                    title="Sem conexão ativa"
+                                                                    description={
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">Status: {STATUS_LABELS[evoStatus] || evoStatus}</span>
+                                                                        </div>
+                                                                    }
+                                                                />
+                                                            </FormSection>
+                                                        </div>
+
+                                                        {/* Right Column - QR code, and buttons */}
+                                                        <div className="border border-brand-border dark:border-dark-border rounded-2xl p-6 bg-white dark:bg-dark-surface transition-all flex flex-col items-center justify-center min-h-[300px]">
+
+                                                            {/* Disconnected / Error / Pending State */}
+                                                            {(evoStatus === "disconnected" || evoStatus === "error" || evoStatus === "pending") && !evoQrCode && (
+                                                                <IconPlaceholder
+                                                                    icon={QRCodeIcon}
+                                                                    title="WhatsApp Desconectado"
+                                                                    subtitle="Conecte seu WhatsApp para habilitar o envio de notificações e lembretes."
+                                                                    buttons={[
+                                                                        {
+                                                                            text: evoIsLoading ? "Conectando..." : "Conectar WhatsApp",
+                                                                            action: handleEvoConnect,
+                                                                            disabled: evoIsLoading,
+                                                                            className: "w-full max-w-xs"
+                                                                        }
+                                                                    ]}
+                                                                />
+                                                            )}
+
+                                                            {/* Connecting / QR Pending / Pairing State */}
+                                                            {((evoStatus === "qr_pending" || evoStatus === "connecting") || evoQrCode) && evoStatus !== "connected" && (
+                                                                <div className="flex flex-col items-center justify-center text-center w-full">
+                                                                    <IconPlaceholder
+                                                                        icon={QRCodeIcon}
+                                                                        title="Escaneie o QR Code"
+                                                                        subtitle="Abra o WhatsApp > Aparelhos Conectados > Conectar um Aparelho"
                                                                     />
-                                                                </div>
-                                                            ) : (
-                                                                <div className="mt-8 flex flex-col items-center justify-center gap-3 py-10">
-                                                                    <div className="w-8 h-8 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
-                                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerando QR Code...</p>
+                                                                    {evoQrCode ? (
+                                                                        <div className="mt-6 bg-white p-4 rounded-2xl">
+                                                                            <img
+                                                                                src={evoQrCode.startsWith("data:") ? evoQrCode : `data:image/png;base64,${evoQrCode}`}
+                                                                                alt="QR Code"
+                                                                                className="w-64 h-64 object-contain mx-auto"
+                                                                            />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="mt-8 flex flex-col items-center justify-center gap-3 py-10">
+                                                                            <div className="w-8 h-8 border-2 border-brand-border border-t-brand-dark rounded-full animate-spin" />
+                                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Gerando QR Code...</p>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex gap-3 mt-6 w-full max-w-xs justify-center">
+                                                                        <Button variant="outline" onClick={handleCancelEvoConnect} disabled={evoIsLoading} className="flex-1 h-12">
+                                                                            Cancelar
+                                                                        </Button>
+                                                                        <Button onClick={handleEvoConnect} disabled={evoIsLoading} className="flex-1 h-12">
+                                                                            Regerar QR
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
                                                             )}
-                                                            <div className="flex gap-3 mt-6 w-full max-w-xs justify-center">
-                                                                <Button variant="outline" onClick={handleCancelEvoConnect} disabled={evoIsLoading} className="flex-1 h-12">
-                                                                    Cancelar
-                                                                </Button>
-                                                                <Button onClick={handleEvoConnect} disabled={evoIsLoading} className="flex-1 h-12">
-                                                                    Regerar QR
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    )}
 
-                                                </div>
-                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </motion.div>
                                 </TabsContent>
@@ -613,7 +620,7 @@ export function WhatsAppIntegrationPage({
                                                                     <Input
                                                                         placeholder="Telefone para teste (com DDD)"
                                                                         value={testPhone}
-                                                                        onChange={(e) => setTestPhone(e.target.value)}
+                                                                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setTestPhone(e.target.value)}
                                                                         disabled={isLoading}
                                                                     />
                                                                     <Button variant="outline" onClick={handleTest} disabled={isLoading || !testPhone.trim()}>

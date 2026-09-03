@@ -9,6 +9,8 @@ export interface DashboardContext {
   planSlug: "free" | "crescer" | "escalar";
   
   // Dados de Onboarding / Configurações Faltantes
+  needsOnboarding?: boolean;
+  onboardingCompleted?: boolean;
   hasPhone: boolean;
   hasCategory: boolean;
   hasAddress: boolean;
@@ -102,6 +104,8 @@ export interface DashboardLayout {
   planSlug: "free" | "crescer" | "escalar";
   sellsProducts: boolean;
   sellsServices: boolean;
+  needsOnboarding?: boolean;
+  businessInfo?: any;
   greeting: {
     title: string;
     subtitle: string;

@@ -26,35 +26,31 @@ export const SelectionBanner: React.FC<SelectionBannerProps> = ({
     <AnimatePresence>
       {selectedCount > 0 && (
         <motion.div
-          initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-          animate={{ height: "auto", opacity: 1, marginBottom: 16 }}
-          exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -50, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="overflow-hidden w-full"
+          className="sticky top-14 z-20 w-full bg-brand-dark dark:bg-dark-surface shadow-md"
         >
-          <div className="bg-brand-green-light dark:bg-brand-green/10 border border-brand-green/20 dark:border-brand-green/30 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm font-medium text-brand-dark dark:text-dark-heading transition-all">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span>
+          <div className="px-4 sm:px-6 lg:px-8 h-11 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-white text-xs font-bold">
                 {selectedCount === 1 ? (
-                  <>
-                    <strong className="text-brand-green">{selectedCount}</strong> {singularItemName} selecionado
-                  </>
+                  <>{selectedCount} {singularItemName} selecionado</>
                 ) : (
-                  <>
-                    <strong className="text-brand-green">{selectedCount}</strong> {itemName} selecionados
-                  </>
+                  <>{selectedCount} {itemName} selecionados</>
                 )}
                 {" de "}
-                <strong className="text-brand-inactive-text dark:text-dark-body">{totalCount}</strong> no total.
+                <span className="text-white/60">{totalCount}</span>
               </span>
 
               {!isAllSelected && (
                 <button
                   type="button"
                   onClick={onSelectAll}
-                  className="text-brand-green hover:underline hover:text-brand-green/90 focus:outline-none focus:ring-2 focus:ring-brand-green/25 rounded-md px-1.5 py-0.5 transition-colors font-bold cursor-pointer"
+                  className="px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors cursor-pointer"
                 >
-                  Selecionar todos os {totalCount} {itemName}
+                  Selecionar todos
                 </button>
               )}
             </div>
@@ -62,9 +58,9 @@ export const SelectionBanner: React.FC<SelectionBannerProps> = ({
             <button
               type="button"
               onClick={onClearSelection}
-              className="text-brand-inactive-text hover:text-brand-dark dark:text-dark-body dark:hover:text-dark-heading hover:underline focus:outline-none focus:ring-2 focus:ring-brand-inactive-text/25 rounded-md px-1.5 py-0.5 transition-colors font-bold cursor-pointer"
+              className="px-3 py-1 rounded-full bg-white text-brand-dark dark:text-dark-heading text-xs font-bold hover:bg-gray-100 transition-colors cursor-pointer"
             >
-              Limpar seleção
+              Limpar
             </button>
           </div>
         </motion.div>

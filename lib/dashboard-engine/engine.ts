@@ -243,10 +243,13 @@ export async function getDashboardLayout(
 
   const recentOrders = recentOrdersRes.data || [];
 
-  // 3. Monta o objeto de Contexto
   const businessMode = businessInfo.mode || "erp";
   const isDesapego = businessMode === "desapego";
   const isQuickMode = businessMode === "quick" || businessMode === "showcase";
+
+  const rawBusinessInfo: any = partner.business_info || {};
+  const onboardingCompleted = typeof rawBusinessInfo === "object" && Boolean(rawBusinessInfo?.onboardingCompleted);
+  const needsOnboarding = !onboardingCompleted && !isDesapego && !hasItems;
 
   const context: DashboardContext = {
     partnerId,
@@ -257,6 +260,8 @@ export async function getDashboardLayout(
     sellsProducts,
     sellsServices,
     planSlug,
+    needsOnboarding,
+    onboardingCompleted,
     hasPhone,
     hasCategory,
     hasAddress,
@@ -345,6 +350,8 @@ export async function getDashboardLayout(
     planSlug: context.planSlug,
     sellsProducts: context.sellsProducts,
     sellsServices: context.sellsServices,
+    needsOnboarding,
+    businessInfo: partner.business_info,
     greeting,
     checklist,
     cards,

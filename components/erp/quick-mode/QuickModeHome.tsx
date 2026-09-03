@@ -29,6 +29,7 @@ import { ERPPageHeader } from "@/components/erp/page-header-state";
 import { DashboardLayout } from "@/lib/dashboard-engine/types";
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal";
 import { ERPOnboardingFeedbackModal } from "@/components/erp/ERPOnboardingFeedbackModal";
+import { ERPOnboardingWizard } from "@/components/erp/onboarding/ERPOnboardingWizard";
 import { StorePlaqueModal } from "@/components/erp/shared/StorePlaqueModal";
 import { usePermissions } from "@/lib/permission-context";
 import { MessageSquare } from "lucide-react";
@@ -334,10 +335,10 @@ function ProgressCard({
             <div className="flex-1 min-w-0 bg-brand-gray dark:bg-dark-border/50 p-6 flex flex-col justify-between">
                 <div>
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-2">
-                        Configurações iniciais
+                        Próximos passos para o seu negócio 🚀
                     </h3>
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                        Conclua as configurações para deixar sua vitrine pronta para receber pedidos e clientes.
+                        Dicas rápidas para deixar sua vitrine ainda mais atrativa e pronta para receber pedidos.
                     </p>
 
                     {/* Barra de progresso geral */}
@@ -858,6 +859,7 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     const [showDeleteModal, setShowDeleteModal] = useState<{ id: string; itemType: 'product' | 'service'; name: string } | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [showOnboardingWizard, setShowOnboardingWizard] = useState<boolean>(() => Boolean(data.needsOnboarding));
     const [currentImportOptions, setCurrentImportOptions] = useState<DashboardChecklistItem["importOptions"] | null>(null);
 
     const handleDelete = async () => {
@@ -915,6 +917,17 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                         <p className="text-brand-inactive-text dark:text-dark-body text-sm font-medium mt-1">
                             {data.greeting.subtitle}
                         </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowOnboardingWizard(true)}
+                            className="gap-2 border-brand-green/30 text-brand-green hover:bg-brand-green/10"
+                        >
+                            <SparklesIcon size={14} />
+                            Guia de Configuração
+                        </Button>
                     </div>
                 </header>
 
@@ -1026,6 +1039,18 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     partnerId={permPartnerId}
                     partnerPlan={permPlanSlug}
                     userRole={permRole}
+                />
+
+                <ERPOnboardingWizard
+                    isOpen={showOnboardingWizard}
+                    onClose={() => setShowOnboardingWizard(false)}
+                    partnerId={partnerId}
+                    storeName={data.storeName || "Sua Loja"}
+                    partnerUrl={data.partnerUrl || "/"}
+                    onSuccess={() => {
+                        setShowOnboardingWizard(false);
+                        router.refresh();
+                    }}
                 />
             </div>
         </>

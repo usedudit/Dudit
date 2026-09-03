@@ -12,7 +12,12 @@ import {
     ArrowRightIcon,
     ShieldIcon,
     EnergyIcon,
+    ThreeDotsIcon,
+    CancelIcon,
+    EyeIcon,
+    EditIcon,
 } from "@/lib/icons"
+import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { PixQrDisplayModal } from "@/components/erp/payments/shared"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -32,7 +37,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
 import { BillingPage } from "@/components/billing/BillingPage"
 import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
-import Link from "next/link"
+
 
 // ─── Plan Card ─────────────────────────────────────────────────────────────
 
@@ -757,26 +762,30 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
                                             Plano atual
                                         </span>
-                                        {isScheduledToCancel ? (
-                                            <span className="bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 text-xs font-bold px-3 py-1 rounded-full">
-                                                Cancelamento agendado
-                                            </span>
-                                        ) : hasActivePaidSub && subData?.subscription?.status === "active" ? (
-                                            <span className="bg-brand-green/10 text-brand-green text-xs font-bold px-3 py-1 rounded-full">
-                                                Ativo
-                                            </span>
-                                        ) : hasActivePaidSub && subData?.subscription?.status === "past_due" ? (
-                                            <span className="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-xs font-bold px-3 py-1 rounded-full">
-                                                Atrasado
-                                            </span>
-                                        ) : hasActivePaidSub && subData?.subscription?.status === "trialing" ? (
-                                            <span className="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 text-xs font-bold px-3 py-1 rounded-full">
-                                                Trial
-                                            </span>
-                                        ) : (
-                                            <span className="bg-gray-100 dark:bg-dark-border text-brand-inactive-text dark:text-dark-body text-xs font-bold px-3 py-1 rounded-full">
-                                                Gratuito
-                                            </span>
+                                        {(hasActivePaidSub || activeRefund) && (
+                                            <Dropdown
+                                                trigger={
+                                                    <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+                                                        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                                    </Button>
+                                                }
+                                                align="right"
+                                                showChevron={false}
+                                            >
+                                                {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status !== "past_due" && (
+                                                    <DropdownItem onClick={() => setCancelModal(true)}>
+                                                        <CancelIcon size={18} /> Cancelar Plano
+                                                    </DropdownItem>
+                                                )}
+                                                {activeRefund && (
+                                                    <DropdownItem onClick={() => window.open(`/reembolso/${activeRefund.token}`, "_blank")}>
+                                                        <EyeIcon size={18} /> Acompanhar Reembolso
+                                                    </DropdownItem>
+                                                )}
+                                                <DropdownItem onClick={() => setPlansOpen(true)}>
+                                                    <EditIcon size={18} /> Alterar Plano
+                                                </DropdownItem>
+                                            </Dropdown>
                                         )}
                                     </div>
 
@@ -800,41 +809,19 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     </div>
 
                                     <div className="flex flex-wrap items-center gap-2">
-                                        {hasActivePaidSub && !isScheduledToCancel && (
-                                            <>
-                                                {subData?.subscription?.status === "past_due" && (
-                                                    <Button
-                                                        variant="destructive"
-                                                        className="h-11"
-                                                        onClick={handleGenerateManualPayment}
-                                                        disabled={manualPaymentModal.loading}
-                                                        isLoading={manualPaymentModal.loading}
-                                                    >
-                                                        Pagar fatura atrasada
-                                                    </Button>
-                                                )}
-                                                {subData?.subscription?.status !== "past_due" && (
-                                                    <Button
-                                                        variant="outlinered"
-                                                        className="h-11"
-                                                        onClick={() => setCancelModal(true)}
-                                                    >
-                                                        Cancelar Plano
-                                                    </Button>
-                                                )}
-                                            </>
+                                        {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status === "past_due" && (
+                                            <Button
+                                                variant="destructive"
+                                                className="h-11"
+                                                onClick={handleGenerateManualPayment}
+                                                disabled={manualPaymentModal.loading}
+                                                isLoading={manualPaymentModal.loading}
+                                            >
+                                                Pagar fatura atrasada
+                                            </Button>
                                         )}
 
-                                        {activeRefund ? (
-                                            <Link href={`/reembolso/${activeRefund.token}`} target="_blank">
-                                                <Button
-                                                    variant="outline"
-                                                    className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
-                                                >
-                                                    Acompanhar Reembolso
-                                                </Button>
-                                            </Link>
-                                        ) : hasActivePaidSub && displayPlanPrice > 0 && displayPlanSlug !== "free" ? (
+                                        {hasActivePaidSub && !activeRefund && displayPlanPrice > 0 && displayPlanSlug !== "free" && (
                                             <Button
                                                 variant="outline"
                                                 className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
@@ -844,15 +831,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             >
                                                 Solicitar Reembolso
                                             </Button>
-                                        ) : null}
-
-                                        <Button
-                                            variant="default"
-                                            className="bg-brand-green text-white hover:bg-brand-green/90 text-xs md:text-sm font-bold h-11 px-6"
-                                            onClick={() => setPlansOpen(true)}
-                                        >
-                                            {displayPlanPrice === 0 ? "Fazer Upgrade" : "Alterar Plano"}
-                                        </Button>
+                                        )}
                                     </div>
                                 </div>
 

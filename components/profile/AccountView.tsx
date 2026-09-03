@@ -59,7 +59,7 @@ export const AccountView = ({
   <motion.div key="account" {...fade} className="w-full">
     <PageHeader title="Informações da conta" subtitle="Gerencie seus dados pessoais e de contato." onBack={() => navigate("main")} />
 
-    <SectionCard title="Dados da conta">
+    <SectionCard title="Dados da conta" className="mb-8">
       <div className="space-y-4">
         <EmailChangeBlock
           idPrefix="acc"

@@ -687,11 +687,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                         const storeUrl = getStoreUrl({ id: store.id, short_id: store.short_id, slug: store.slug, store_name: store.store_name, city: store.city, state: store.state })
 
                         const storeImage = store.store_avatar || store.store_image_url
-                        const imgUrl = storeImage
-                            ? (storeImage.includes("Placeholder.png") || storeImage.includes("dudit.com.br/static")
-                                ? getR2ImageUrl(storeImage)
-                                : storeImage)
-                            : "https://img.dudit.com.br/static/Placeholder.png"
+                        const imgUrl = storeImage ? getR2ImageUrl(storeImage, "thumb") : "https://img.dudit.com.br/static/Placeholder.png"
 
                         return (
                             <Link

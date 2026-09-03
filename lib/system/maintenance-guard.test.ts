@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
-import { evaluateMaintenanceMode } from "./maintenance-guard"
+import { evaluateMaintenanceMode, clearMaintenanceMemoryCache } from "./maintenance-guard"
 
 const mockFetch = vi.fn()
 global.fetch = mockFetch
@@ -10,6 +10,7 @@ describe("evaluateMaintenanceMode (Edge Guard)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    clearMaintenanceMemoryCache()
     process.env = {
       ...originalEnv,
       KV_REST_API_URL: "https://mock-redis.upstash.io",

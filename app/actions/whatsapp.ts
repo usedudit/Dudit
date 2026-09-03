@@ -129,15 +129,22 @@ export async function getWhatsappIntegrationAction(): Promise<
 
         const rows = (connections || []) as PartnerWhatsappConnection[]
 
-        // Auto-reset stale pairing statuses on page load
+        // Auto-reset stale pairing statuses on page load.
+        // Only reset if the connection was last updated more than 5 minutes ago
+        // (to avoid resetting an active pairing in progress).
+        const STALE_PAIRING_MS = 5 * 60 * 1000
+        const now = Date.now()
         for (const conn of rows) {
             if (conn.provider === "evolution" && (conn.status === "connecting" || conn.status === "qr_pending")) {
-                conn.status = "disconnected"
-                conn.is_active = false
-                await admin
-                    .from("partner_whatsapp_connections")
-                    .update({ status: "disconnected", is_active: false, updated_at: new Date().toISOString() })
-                    .eq("id", conn.id)
+                const updatedAt = conn.updated_at ? new Date(conn.updated_at).getTime() : 0
+                if (now - updatedAt > STALE_PAIRING_MS) {
+                    conn.status = "disconnected"
+                    conn.is_active = false
+                    await admin
+                        .from("partner_whatsapp_connections")
+                        .update({ status: "disconnected", is_active: false, updated_at: new Date().toISOString() })
+                        .eq("id", conn.id)
+                }
             }
         }
 
@@ -256,7 +263,7 @@ export async function connectWhatsappAction(input: {
             connectionSource: "manual",
         })
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
 
         return {
             success: true,
@@ -403,7 +410,7 @@ export async function completeWhatsappEmbeddedSignupAction(input: {
             wabaId,
         })
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         revalidatePath("/erp/configuracoes")
 
         return { success: true, data: { connectionId: connection.id } }
@@ -434,7 +441,7 @@ export async function syncWhatsappTemplatesAction(storeId?: string | null): Prom
             wabaId: connection.business_account_id,
         })
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: result }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -452,7 +459,7 @@ export async function disconnectWhatsappAction(
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
         await requireIntegrationsAccess(context.partnerId)
         await deactivateWhatsappConnection(context.partnerId, provider, storeId)
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -471,7 +478,7 @@ export async function toggleWhatsappActiveAction(
         if (!context) return { success: false, error: "Contexto ERP não encontrado" }
         await requireIntegrationsAccess(context.partnerId)
         await setWhatsappConnectionActive(context.partnerId, isActive, provider, storeId)
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -515,16 +522,16 @@ export async function sendWhatsappTestMessageAction(phone: string, storeId?: str
                 .single()
 
             if (updatedMsg && updatedMsg.status === "failed") {
-                revalidatePath("/erp/integracoes/whatsapp")
+                revalidatePath("/erp/configuracoes")
                 return { success: false, error: updatedMsg.error_message || "Falha ao enviar mensagem de teste" }
             }
             if (updatedMsg && updatedMsg.status === "pending" && updatedMsg.error_message) {
-                revalidatePath("/erp/integracoes/whatsapp")
+                revalidatePath("/erp/configuracoes")
                 return { success: false, error: updatedMsg.error_message }
             }
         }
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: { messageId: result.messageId } }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -562,7 +569,7 @@ export async function resendWhatsappMessageAction(messageId: string): Promise<Ac
             .eq("id", messageId)
 
         await processWhatsappMessageById(messageId)
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -743,7 +750,7 @@ export async function connectEvolutionAction(storeId?: string | null): Promise<
             .update(updateData)
             .eq("id", connection.id)
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
 
         return {
             success: true,
@@ -780,7 +787,7 @@ export async function disconnectEvolutionAction(storeId?: string | null): Promis
         }
 
         await deactivateWhatsappConnection(context.partnerId, "evolution", storeId)
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -883,12 +890,12 @@ export async function testEvolutionConnectionAction(phone: string, storeId?: str
                 .single()
 
             if (updatedMsg && updatedMsg.status === "failed") {
-                revalidatePath("/erp/integracoes/whatsapp")
+                revalidatePath("/erp/configuracoes")
                 return { success: false, error: updatedMsg.error_message || "Falha ao enviar mensagem de teste" }
             }
         }
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: { messageId: result.messageId } }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)
@@ -923,7 +930,7 @@ export async function resetEvolutionPairingStatusAction(storeId?: string | null)
 
         await query
 
-        revalidatePath("/erp/integracoes/whatsapp")
+        revalidatePath("/erp/configuracoes")
         return { success: true, data: undefined }
     } catch (error: unknown) {
         const msg = extractErrorMessage(error)

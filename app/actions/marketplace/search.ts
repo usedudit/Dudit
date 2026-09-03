@@ -255,17 +255,8 @@ export const searchMarketplaceDirectFull = cache(async (
         }
     }
 
-    if (query && query.trim().length > 0 && !limits.cursor && !limits.lastId) {
-        const hasResults = (finalResults && finalResults.length > 0) || (moreDistantItems && moreDistantItems.length > 0)
-        // Fire-and-forget non-blocking telemetry logging
-        void recordMarketplaceSearchTelemetry({
-            query,
-            hasResults: Boolean(hasResults),
-            resultsCount: (finalResults?.length || 0) + (moreDistantItems?.length || 0),
-            citySlug: limits.cidade || null,
-            itemType: type,
-        })
-    }
+    // Telemetria automática a cada busca desativada para poupar comandos no Redis
+    // e evitar poluição por robôs/erros de digitação. Demanda agora é captada via modal de feedback.
 
     return {
         results: finalResults,
@@ -697,8 +688,8 @@ async function _searchMarketplaceInternal(
                     slug: rawStore?.slug,
                     store_avatar: storeImage || "https://img.dudit.com.br/static/Placeholder.png",
                     store_image_url: storeImage,
-            latitude: rawStore?.addresses?.[0]?.latitude ?? null,
-            longitude: rawStore?.addresses?.[0]?.longitude ?? null,
+                    latitude: rawStore?.addresses?.[0]?.latitude ?? null,
+                    longitude: rawStore?.addresses?.[0]?.longitude ?? null,
                     city: rawStore?.addresses?.[0]?.city || null,
                     state: rawStore?.addresses?.[0]?.state || null,
                     neighborhood: rawStore?.addresses?.[0]?.neighborhood || null

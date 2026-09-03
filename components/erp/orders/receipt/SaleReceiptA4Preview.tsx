@@ -169,13 +169,13 @@ const SaleReceiptA4Preview = ({
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">
-                                                    {data.isOnlineOrder ? "Canal / Origem" : "Vendedor"}
+                                                    Canal / Origem
                                                 </span>
                                                 <span className="font-bold text-sm text-brand-dark">
                                                     {data.isOnlineOrder ? (
                                                         data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"
                                                     ) : (
-                                                        data.sellerName
+                                                        data.orderSource || data.sellerName || "Não informado"
                                                     )}
                                                 </span>
                                             </div>

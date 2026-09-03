@@ -20,13 +20,13 @@ function formatCalendarCompact(value: number): string {
     const sign = value > 0 ? "+" : "-"
     if (abs >= 1_000_000) {
         const formatted = (abs / 1_000_000).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 })
-        return `${sign}${formatted}M`
+        return `R$ ${sign}${formatted}M`
     }
     if (abs >= 1_000) {
         const formatted = (abs / 1_000).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 1 })
-        return `${sign}${formatted}k`
+        return `R$ ${sign}${formatted}k`
     }
-    return `${sign}${Math.round(abs)}`
+    return `R$ ${sign}${Math.round(abs)}`
 }
 
 function capitalizeFirst(str: string) {
@@ -207,7 +207,7 @@ export function FinancialCalendarCard({ dailyMovements = {}, className = "" }: F
 
                             {hasMovement ? (
                                 <span
-                                    className={`text-[10.5px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full inline-flex items-center justify-center leading-none mt-1 shadow-sm whitespace-nowrap transition-transform hover:scale-105 ${isPositive
+                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap mt-1 ${isPositive
                                         ? "bg-[#d1fae5] dark:bg-emerald-950/60 text-[#059669] dark:text-emerald-300"
                                         : "bg-[#ffe4e6] dark:bg-rose-950/60 text-[#e11d48] dark:text-rose-300"
                                         }`}

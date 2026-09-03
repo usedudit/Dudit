@@ -10,21 +10,25 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 export async function syncCancelledOrderAppointmentsAndTransactions(
   supabase: SupabaseClient,
   orderId: string,
-  options?: { refundMode?: 'store_credit' | 'financial' | 'none' }
+  options?: { refundMode?: 'store_credit' | 'financial' | 'none'; orderData?: any }
 ): Promise<void> {
   let orderPartnerId: string | null = null
 
   // Refund subscription credits or exchange credits if any were consumed
   try {
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .select("id, partner_id, buyer_id, customer_id, store_id, paid_amount, exchange_return_request_id, payment_breakdown")
-      .eq("id", orderId)
-      .single()
+    let order = options?.orderData
+    if (!order) {
+      const { data: fetchedOrder, error: orderError } = await supabase
+        .from("orders")
+        .select("id, partner_id, buyer_id, customer_id, store_id, paid_amount, exchange_return_request_id, payment_breakdown")
+        .eq("id", orderId)
+        .single()
 
-    if (orderError || !order?.partner_id) {
-      console.error("[syncCancelledOrder] Order not found or missing partner scope:", orderId)
-      return
+      if (orderError || !fetchedOrder?.partner_id) {
+        console.error("[syncCancelledOrder] Order not found or missing partner scope:", orderId)
+        return
+      }
+      order = fetchedOrder
     }
 
     orderPartnerId = order.partner_id

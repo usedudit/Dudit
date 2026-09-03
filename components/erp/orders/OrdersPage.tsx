@@ -9,9 +9,10 @@ import { useStore } from "@/lib/store-context"
 import { useUserProfile } from "@/hooks/use-user-profile"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
+import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge, UndoGracePeriodToast } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -241,6 +242,8 @@ export default function OrdersPage({
         reasonDropdownValue: string
         customReasonText: string
     } | null>(null)
+
+    const undoManager = useUndoGracePeriod(10000)
 
 
 
@@ -691,80 +694,144 @@ export default function OrdersPage({
         const ids = Array.from(selection.ids)
         if (ids.length === 0) return
 
-        setActionModal({ open: true, text: "Aplicando alterações..." })
-
-        try {
-            if (payload.type === 'order_payment' || payload.type === 'order_delivery') {
-                const actionType = payload.type === 'order_payment' ? 'payment_status' : 'delivery_status'
-                const result = await updateOrdersStatusInBatchAction({
-                    orderIds: ids,
-                    partnerId,
-                    actionType,
-                    statusValue: payload.orderStatus
-                })
-                if (result.success) {
-                    afterMutation()
-                    setSelection({ ids: new Set() })
-                    toast({ title: "Sucesso", description: "Status alterado com sucesso" })
-                    if ((result as any).warning) {
-                        toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
-                    }
-                    setBulkEditModal({ isOpen: false })
-                } else {
-                    toast({ title: "Erro", description: result.error, variant: "destructive" })
-                }
-            } else {
-                toast({ title: "Ação inválida", description: "Essa ação em massa não é suportada para pedidos.", variant: "destructive" })
-            }
-        } catch (error) {
-            console.error(error)
-            toast({ title: "Erro", description: "Falha ao aplicar ação em massa", variant: "destructive" })
-        } finally {
-            setActionModal({ open: false, text: "" })
+        if (payload.type !== 'order_payment' && payload.type !== 'order_delivery') {
+            toast({ title: "Ação inválida", description: "Essa ação em massa não é suportada para pedidos.", variant: "destructive" })
+            return
         }
+
+        const actionType = payload.type === 'order_payment' ? 'payment_status' : 'delivery_status'
+        const actionTitle = payload.type === 'order_payment' ? 'Alterando status de pagamento' : 'Alterando status de envio'
+
+        setBulkEditModal({ isOpen: false })
+        setSelection({ ids: new Set() })
+
+        undoManager.schedule({
+            id: `orders-status-${Date.now()}`,
+            title: `${actionTitle} (${ids.length} pedidos)...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: ids.length,
+            payload: { ids, actionType, statusValue: payload.orderStatus },
+            onExecute: async (p) => {
+                const result = await updateOrdersStatusInBatchAction({
+                    orderIds: p.ids,
+                    partnerId,
+                    actionType: p.actionType,
+                    statusValue: p.statusValue
+                })
+                if (!result.success) {
+                    throw new Error(result.error || "Erro ao aplicar ação em massa")
+                }
+                return result
+            },
+            onUndo: () => {
+                toast({ title: "Ação desfeita", description: "Nenhuma alteração foi realizada nos pedidos." })
+                afterMutation()
+            },
+            onSuccess: (result: any) => {
+                afterMutation()
+                toast({ title: "Sucesso", description: "Status alterado com sucesso" })
+                if (result?.warning) {
+                    toast({ title: "Atenção", description: result.warning, variant: "destructive" })
+                }
+            },
+            onError: (err: any) => {
+                toast({ title: "Erro", description: err?.message || "Falha ao aplicar ação em massa", variant: "destructive" })
+                afterMutation()
+            }
+        })
     }
 
     const confirmBulk = async (action: 'cancel', explicitIds?: string[]) => {
         const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
         if (ids.length === 0) return
 
-        setActionModal({ open: true, text: "Cancelando pedidos..." })
+        // Cancelamento individual direto
+        if (singleCancelId) {
+            setActionModal({ open: true, text: "Cancelando pedido..." })
+            try {
+                const result = await updateOrdersStatusInBatchAction({
+                    orderIds: ids,
+                    partnerId,
+                    actionType: 'cancel',
+                    cancelReason: cancelReason.trim() || undefined,
+                    restoreStock: shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false,
+                    generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
+                    userName: currentUserName
+                })
+                if (result.success) {
+                    afterMutation()
+                    toast({ title: "Sucesso", description: "Pedido cancelado" })
+                    if ((result as any).warning) {
+                        toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
+                    }
+                } else {
+                    toast({ title: "Erro", description: result.error, variant: "destructive" })
+                }
+            } catch (error) {
+                console.error(error)
+                toast({ title: "Erro", description: "Ocorreu um erro.", variant: "destructive" })
+            } finally {
+                setConfirmations(p => ({ ...p, bulkCancel: false }))
+                setSingleCancelId(null)
+                setCancelReason("")
+                setRestoreStockOnCancel(true)
+                setGenerateAutomaticRefundOnCancel(true)
+                setActionModal({ open: false, text: "" })
+            }
+            return
+        }
 
-        try {
-            const result = await updateOrdersStatusInBatchAction({
-                orderIds: ids,
-                partnerId,
-                actionType: 'cancel',
-                cancelReason: cancelReason.trim() || undefined,
-                restoreStock: shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false,
-                generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
-                userName: currentUserName
-            })
+        // Cancelamento em massa com janela de 10s para desfazer
+        const savedReason = cancelReason.trim() || undefined
+        const savedRestoreStock = shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false
+        const savedRefund = shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false
 
-            if (result.success) {
+        setConfirmations(p => ({ ...p, bulkCancel: false }))
+        setCancelReason("")
+        setRestoreStockOnCancel(true)
+        setGenerateAutomaticRefundOnCancel(true)
+        setSelection({ ids: new Set() })
+
+        undoManager.schedule({
+            id: `orders-cancel-${Date.now()}`,
+            title: `Cancelando ${ids.length} pedidos...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: ids.length,
+            payload: { ids, savedReason, savedRestoreStock, savedRefund },
+            onExecute: async (p) => {
+                const result = await updateOrdersStatusInBatchAction({
+                    orderIds: p.ids,
+                    partnerId,
+                    actionType: 'cancel',
+                    cancelReason: p.savedReason,
+                    restoreStock: p.savedRestoreStock,
+                    generateAutomaticRefund: p.savedRefund,
+                    userName: currentUserName
+                })
+                if (!result.success) {
+                    throw new Error(result.error || "Erro ao cancelar pedidos")
+                }
+                return result
+            },
+            onUndo: () => {
+                toast({ title: "Cancelamento desfeito", description: "Nenhuma alteração foi realizada nos pedidos." })
                 afterMutation()
-                if (!singleCancelId) setSelection({ ids: new Set() })
+            },
+            onSuccess: (result: any) => {
+                afterMutation()
                 toast({
                     title: "Sucesso",
-                    description: "Pedidos cancelados"
+                    description: `${result.processedCount || ids.length} pedidos cancelados.`
                 })
-                if ((result as any).warning) {
-                    toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
+                if (result.warning) {
+                    toast({ title: "Atenção", description: result.warning, variant: "destructive" })
                 }
-            } else {
-                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            },
+            onError: (err: any) => {
+                toast({ title: "Erro", description: err?.message || "Ocorreu um erro ao cancelar pedidos.", variant: "destructive" })
+                afterMutation()
             }
-        } catch (error) {
-            console.error(error)
-            toast({ title: "Erro", description: "Ocorreu um erro.", variant: "destructive" })
-        } finally {
-            setConfirmations(p => ({ ...p, bulkCancel: false }))
-            setSingleCancelId(null)
-            setCancelReason("")
-            setRestoreStockOnCancel(true)
-            setGenerateAutomaticRefundOnCancel(true)
-            setActionModal({ open: false, text: "" })
-        }
+        })
     }
 
     const handleClearFilters = () => {
@@ -1342,6 +1409,17 @@ export default function OrdersPage({
                 canExportAllColumns={columnSelectionModal.canExportAllColumns}
                 onConfirm={handleColumnConfirm}
                 onClose={closeColumnSelectionModal}
+            />
+
+            <UndoGracePeriodToast
+                isOpen={Boolean(undoManager.pendingAction)}
+                title={undoManager.pendingAction?.title || ""}
+                description={undoManager.pendingAction?.description}
+                remainingSeconds={undoManager.remainingSeconds}
+                progressPct={undoManager.progressPct}
+                isExecuting={undoManager.isExecuting}
+                onUndo={undoManager.undo}
+                onConfirmNow={undoManager.flush}
             />
         </>
     )

@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { generateSKUBase, generateSKUWithSuffix } from "@/lib/utils/code-generators"
 import { encryptCPF } from "@/lib/crypto"
+import { generateCpfLookupHash } from "@/lib/services/cpf-hash"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { parseNumber, parseDate, parseTime } from "./validators"
 import { canUseFeature, checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
@@ -1085,9 +1086,27 @@ async function importCustomerBatch(
       .select("id, email, name")
       .eq("partner_id", partnerId)
       .in("email", emails)
+      .is("deleted_at", null)
 
     for (const c of existing || []) {
       if (c.email) existingCustomersByEmail.set(c.email.toLowerCase(), c)
+    }
+  }
+
+  const cpfs = [...new Set(batch.map((r) => r["cpf"]?.replace(/\D/g, "")).filter((c) => c && c.length === 11))] as string[]
+  const cpfHashes = cpfs.map((c) => generateCpfLookupHash(c)).filter(Boolean) as string[]
+  const existingCustomersByCpfHash = new Map<string, any>()
+
+  if (cpfHashes.length > 0) {
+    const { data: existingByHash } = await supabase
+      .from("customers")
+      .select("id, email, name, cpf_lookup_hash")
+      .eq("partner_id", partnerId)
+      .in("cpf_lookup_hash", cpfHashes)
+      .is("deleted_at", null)
+
+    for (const c of existingByHash || []) {
+      if (c.cpf_lookup_hash) existingCustomersByCpfHash.set(c.cpf_lookup_hash, c)
     }
   }
 
@@ -1132,7 +1151,9 @@ async function importCustomerBatch(
 
     const rawCpf = row["cpf"]?.replace(/\D/g, "") || null
     let cpfEncrypted = null
+    let cpfLookupHash: string | null = null
     if (rawCpf && rawCpf.length === 11) {
+      cpfLookupHash = generateCpfLookupHash(rawCpf)
       try {
         cpfEncrypted = await encryptCPF(rawCpf)
       } catch {
@@ -1159,6 +1180,7 @@ async function importCustomerBatch(
       phone_fixed: row["phone_fixed"]?.trim() || null,
       person_type: personType,
       cpf: cpfEncrypted,
+      cpf_lookup_hash: cpfLookupHash,
       cnpj,
       birth_date: parseDate(row["birth_date"]),
       notes: row["notes"] || null,
@@ -1166,7 +1188,9 @@ async function importCustomerBatch(
       status,
     }
 
-    const existing = email ? existingCustomersByEmail.get(email) : null
+    const existing = email
+      ? existingCustomersByEmail.get(email)
+      : (cpfLookupHash ? existingCustomersByCpfHash.get(cpfLookupHash) : null)
     if (existing) {
       if (duplicateStrategy === "update") {
         toUpdate.push({ id: existing.id, data: customerData })

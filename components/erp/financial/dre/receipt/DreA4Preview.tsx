@@ -66,19 +66,19 @@ export function DreA4Preview({
         className={
           printMode
             ? "w-full p-0"
-            : "absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden flex flex-col shadow-xs"
+            : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
         }
       >
         <div
           className={
             printMode
               ? "w-full flex flex-col items-center p-0"
-              : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8"
+              : "w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col justify-between shadow-md rounded-sm min-h-[297mm]"
           }
         >
           {/* Folha A4 Padronizada */}
           <div
-            className={`w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-xs"
+            className={`w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"
               }`}
           >
             <div>
@@ -127,14 +127,14 @@ export function DreA4Preview({
                       className="w-8 h-8 shrink-0 text-[13px] font-bold"
                       style={{ backgroundColor: secondaryColor }}
                     />
-                    <span className="text-white font-bold text-md">{partnerName}</span>
+                    <span className="text-white font-bold text-sm">{partnerName}</span>
                   </div>
 
                   <div>
-                    <h1 className="text-2xl font-medium text-white tracking-tight">
+                    <h1 className="text-2xl font-medium text-white">
                       Demonstração do Resultado
                     </h1>
-                    <p className="text-white/80 text-xs tracking-widest font-light mt-1 uppercase">
+                    <p className="text-white/80 text-xs tracking-widest font-light mt-1">
                       Período: {formatDate(startDate)} até {formatDate(endDate)} • Regime de {regime === "competencia" ? "Competência" : "Caixa"}
                     </p>
                   </div>
@@ -142,51 +142,51 @@ export function DreA4Preview({
               </div>
 
               {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
-              <div className="px-8 py-5 border-b border-gray-100">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <span className="text-[11px] text-gray-500 font-medium block">Empresa</span>
-                    <span className="font-bold text-xs text-brand-dark block truncate">{partnerName}</span>
+              <div className="px-8 py-6">
+                <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Empresa</span>
+                    <span className="font-bold text-sm text-brand-dark">{partnerName}</span>
                     {report.companyInfo?.documentNumber && (
                       <span className="text-[10px] text-gray-500">CNPJ: {report.companyInfo.documentNumber}</span>
                     )}
                   </div>
-                  <div>
-                    <span className="text-[11px] text-gray-500 font-medium block">Unidade / Loja</span>
-                    <span className="font-bold text-xs text-brand-dark block truncate">{storeName}</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Unidade / Loja</span>
+                    <span className="font-bold text-sm text-brand-dark">{storeName}</span>
                     <span className="text-[10px] text-gray-500">{report.companyInfo?.taxRegimeLabel}</span>
                   </div>
-                  <div>
-                    <span className="text-[11px] text-gray-500 font-medium block">Emissão / Gerado em</span>
-                    <span className="font-bold text-xs text-brand-dark block">{report.companyInfo?.generatedAt}</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Emissão / Gerado em</span>
+                    <span className="font-bold text-sm text-brand-dark">{report.companyInfo?.generatedAt}</span>
                     <span className="text-[10px] text-gray-500">Base 100%: {formatCurrency(kpis?.grossRevenue || 0)}</span>
                   </div>
                 </div>
               </div>
 
               {/* ── 3. Tabela Principal da DRE ─────────────────────────────────── */}
-              <div className="px-8 pt-4 pb-2">
+              <div className="px-8 pb-4">
                 <table className="w-full text-left border-separate border-spacing-0">
                   <thead>
                     <tr className="bg-brand-gray/40">
-                      <th className="py-2.5 pl-4 pr-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider rounded-tl-lg border-b border-gray-200">
+                      <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                         Estrutura / Conta Contábil
                       </th>
-                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-center w-24 border-b border-gray-200">
+                      <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center w-24 border-b border-gray-100">
                         Tipo
                       </th>
-                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-28 border-b border-gray-200">
+                      <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-28 border-b border-gray-100">
                         Atual (R$)
                       </th>
-                      <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 border-b border-gray-200">
+                      <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-16 border-b border-gray-100">
                         AV (%)
                       </th>
                       {showComparison && (
                         <>
-                          <th className="py-2.5 px-2 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-24 border-b border-gray-200">
+                          <th className="py-2.5 px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-24 border-b border-gray-100">
                             Anterior (R$)
                           </th>
-                          <th className="py-2.5 pl-2 pr-4 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider text-right w-16 rounded-tr-lg border-b border-gray-200">
+                          <th className="py-2.5 pl-4 pr-6 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right w-16 rounded-tr-xl border-b border-gray-100">
                             AH (%)
                           </th>
                         </>
@@ -208,8 +208,8 @@ export function DreA4Preview({
 
               {/* ── 4. Resumo de Indicadores e Margens Contábeis ────────────────── */}
               {showKpiSummary && kpis && (
-                <div className="px-8 py-3">
-                  <div className="bg-brand-gray/40 p-4 rounded-lg text-black">
+                <div className="px-8 pb-4">
+                  <div className="bg-brand-gray/40 p-6 rounded-2xl text-black">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-2">
                       Resumo de Margens e Indicadores Operacionais
                     </h4>
@@ -237,7 +237,7 @@ export function DreA4Preview({
 
               {/* ── 5. Bloco de Assinaturas Formais Contábeis ─────────────────────── */}
               {showSignatures && (
-                <div className="px-8 pt-8 pb-4">
+                <div className="px-8 pt-8 pb-16">
                   <div className="grid grid-cols-2 gap-12 text-center text-xs text-gray-800">
                     <div className="border-t border-gray-400 pt-2">
                       <p className="font-bold text-brand-dark text-xs">{partnerName}</p>
@@ -254,11 +254,10 @@ export function DreA4Preview({
 
             {/* ── 6. Rodapé Oficial Dudit ───────────────────────────────────────── */}
             <div
-              className="text-white/80 px-8 py-2 text-[10px] flex justify-between items-center absolute bottom-0 w-full h-[36px]"
+              className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
               style={{ backgroundColor: primaryColor }}
             >
-              <span>Demonstração Contábil Gerencial</span>
-              <span>Criado via Dudit • dudit.com.br</span>
+              <span>Criado via Dudit - dudit.com.br</span>
             </div>
           </div>
         </div>
@@ -296,30 +295,30 @@ function DreA4TableRow({
   return (
     <>
       <tr className={getRowBg()}>
-        <td className="py-1.5 pl-4 pr-2 text-xs">
+        <td className="py-2 pl-6 pr-4 text-[13px]">
           <span className={isResult || isSubtotal ? "font-bold text-brand-dark" : "font-medium text-brand-dark"}>
             {node.title}
           </span>
         </td>
 
-        <td className="py-1.5 px-2 text-center text-[10.5px] text-gray-500 font-medium">
+        <td className="py-2 px-4 text-center text-[11px] text-gray-400 font-medium">
           {translateType(node.type)}
         </td>
 
-        <td className={`py-1.5 px-2 text-right text-xs ${getAmountColor()}`}>
+        <td className={`py-2 px-4 text-right text-[13px] ${getAmountColor()}`}>
           {formatCurrency(node.amount)}
         </td>
 
-        <td className="py-1.5 px-2 text-right text-[10.5px] font-semibold text-gray-700">
+        <td className="py-2 px-4 text-right text-[11px] font-semibold text-gray-700">
           {node.verticalPercent > 0 ? `${node.verticalPercent}%` : "—"}
         </td>
 
         {showComparison && (
           <>
-            <td className="py-1.5 px-2 text-right text-[10.5px] text-gray-500">
+            <td className="py-2 px-4 text-right text-[11px] text-gray-400">
               {node.previousAmount !== undefined ? formatCurrency(node.previousAmount) : "—"}
             </td>
-            <td className="py-1.5 pl-2 pr-4 text-right text-[10.5px]">
+            <td className="py-2 pl-4 pr-6 text-right text-[11px]">
               <VariationBadgeA4 value={node.horizontalVariation} type={node.type} />
             </td>
           </>
@@ -330,24 +329,24 @@ function DreA4TableRow({
       {showSubItems &&
         hasItems &&
         node.items.map((item) => (
-          <tr key={item.id} className="bg-gray-50/40 text-[10.5px] border-b border-gray-100/60">
-            <td className="py-1 pl-8 pr-2 text-gray-700">
+          <tr key={item.id} className="bg-gray-50/40 text-[11px] border-b border-gray-50">
+            <td className="py-1.5 pl-10 pr-4 text-gray-700">
               <span className="mr-1 text-brand-green">•</span>
               {item.name}
             </td>
-            <td className="py-1 px-2 text-center text-gray-400">Item</td>
-            <td className="py-1 px-2 text-right font-medium text-gray-800">
+            <td className="py-1.5 px-4 text-center text-gray-400">Item</td>
+            <td className="py-1.5 px-4 text-right font-medium text-gray-800">
               {formatCurrency(item.amount)}
             </td>
-            <td className="py-1 px-2 text-right text-gray-500">
+            <td className="py-1.5 px-4 text-right text-gray-500">
               {item.verticalPercent > 0 ? `${item.verticalPercent}%` : "—"}
             </td>
             {showComparison && (
               <>
-                <td className="py-1 px-2 text-right text-gray-400">
+                <td className="py-1.5 px-4 text-right text-gray-400">
                   {item.previousAmount !== undefined ? formatCurrency(item.previousAmount) : "—"}
                 </td>
-                <td className="py-1 pl-2 pr-4 text-right">
+                <td className="py-1.5 pl-4 pr-6 text-right">
                   <VariationBadgeA4 value={item.horizontalVariation} type={node.type} />
                 </td>
               </>

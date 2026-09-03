@@ -635,98 +635,16 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             />
                         </div>
 
-                        {/* SUA CONTA HOJE */}
-                        {dryRunReport && (
-                            <div className="space-y-3">
-                                <h4 className="text-brand-inactive-text dark:text-dark-body font-medium">
-                                    Sua conta hoje
-                                </h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    {dryRunReport.customersCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.customersCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Clientes cadastrados
-                                            </span>
-                                        </div>
-                                    )}
-                                    {dryRunReport.productsCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.productsCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Produtos
-                                            </span>
-                                        </div>
-                                    )}
-                                    {dryRunReport.servicesCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.servicesCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Serviços
-                                            </span>
-                                        </div>
-                                    )}
-                                    {dryRunReport.ordersCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.ordersCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Pedidos realizados
-                                            </span>
-                                        </div>
-                                    )}
-                                    {dryRunReport.serviceOrdersCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.serviceOrdersCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Ordens de Serviço
-                                            </span>
-                                        </div>
-                                    )}
-                                    {dryRunReport.appointmentsCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.appointmentsCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Compromissos agendados
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {dryRunReport.whatsappCount > 0 && (
-                                        <div className="p-3 rounded-2xl border border-brand-border dark:border-dark-border bg-brand-gray/20 dark:bg-dark-surface/50 text-center">
-                                            <span className="block text-lg font-extrabold text-brand-dark dark:text-dark-heading">
-                                                {dryRunReport.whatsappCount}
-                                            </span>
-                                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
-                                                Integrações WhatsApp
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
                         {/* O QUE SERÁ PERDIDO */}
                         {dryRunReport && (
                             <div className="space-y-3 pt-2">
-                                <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                                <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                     Ao encerrar sua conta, você perderá permanentemente:
                                 </h4>
                                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-brand-dark/80 dark:text-dark-body">
                                     {dryRunReport.customersCount > 0 && (
                                         <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span className="text-brand-red mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Cadastro de clientes</strong>
                                                 <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.customersCount} registros)</span>
@@ -735,7 +653,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     )}
                                     {(dryRunReport.productsCount > 0 || dryRunReport.servicesCount > 0) && (
                                         <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span className="text-brand-red mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Produtos e serviços</strong>
                                                 <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.productsCount + dryRunReport.servicesCount} itens)</span>
@@ -744,7 +662,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     )}
                                     {dryRunReport.appointmentsCount > 0 && (
                                         <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span className="text-brand-red mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Agenda</strong>
                                                 <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.appointmentsCount} compromissos)</span>
@@ -753,7 +671,25 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     )}
                                     {dryRunReport.ordersCount > 0 && (
                                         <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span className="text-brand-red mt-0.5">•</span>
+                                            <div>
+                                                <strong className="text-brand-dark dark:text-dark-heading">Pedidos realizados</strong>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.ordersCount} pedidos)</span>
+                                            </div>
+                                        </li>
+                                    )}
+                                    {dryRunReport.serviceOrdersCount > 0 && (
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-brand-red mt-0.5">•</span>
+                                            <div>
+                                                <strong className="text-brand-dark dark:text-dark-heading">Ordens de serviço</strong>
+                                                <span className="block text-xs text-brand-inactive-text dark:text-dark-body">({dryRunReport.serviceOrdersCount} ordens de serviço)</span>
+                                            </div>
+                                        </li>
+                                    )}
+                                    {dryRunReport.ordersCount > 0 && (
+                                        <li className="flex items-start gap-2">
+                                            <span className="text-brand-red mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Financeiro</strong>
                                                 <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(histórico completo de faturamento)</span>
@@ -762,7 +698,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     )}
                                     {dryRunReport.whatsappCount > 0 && (
                                         <li className="flex items-start gap-2">
-                                            <span className="text-red-500 mt-0.5">•</span>
+                                            <span className="text-brand-red mt-0.5">•</span>
                                             <div>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Integrações</strong>
                                                 <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(conexões ativas de WhatsApp)</span>
@@ -771,7 +707,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                                     )}
 
                                     <li className="flex items-start gap-2">
-                                        <span className="text-red-500 mt-0.5">•</span>
+                                        <span className="text-brand-red mt-0.5">•</span>
                                         <div>
                                             <strong className="text-brand-dark dark:text-dark-heading">Configurações e Equipe</strong>
                                             <span className="block text-xs text-brand-inactive-text dark:text-dark-body">(dados da empresa e permissões de acesso)</span>
@@ -783,7 +719,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
                         {/* O QUE SERÁ PRESERVADO */}
                         <div className="space-y-3 pt-2">
-                            <h4 className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
+                            <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
                                 O que será preservado
                             </h4>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">
@@ -791,13 +727,13 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                             </p>
                             <ul className="space-y-1.5 text-xs font-semibold text-brand-dark/90 dark:text-dark-heading">
                                 <li className="flex items-center gap-2">
-                                    <span className="text-emerald-500 font-bold">✓</span> Nenhum dado pessoal permanecerá acessível.
+                                    • Nenhum dado pessoal permanecerá acessível.
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <span className="text-emerald-500 font-bold">✓</span> Nenhuma cobrança continuará sendo realizada.
+                                    • Nenhuma cobrança continuará sendo realizada.
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <span className="text-emerald-500 font-bold">✓</span> Nenhum usuário conseguirá acessar sua conta.
+                                    • Nenhum usuário conseguirá acessar sua conta.
                                 </li>
                             </ul>
                         </div>
@@ -869,22 +805,23 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
                 isOpen={activeSubModalOpen}
                 onClose={() => setActiveSubModalOpen(false)}
                 title="Assinatura Ativa Detectada"
+                maxWidth="md"
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setActiveSubModalOpen(false)}>
+                            Fechar
+                        </Button>
+                        <Button onClick={() => window.location.href = "/erp/configuracoes?tab=assinatura"}>
+                            Ir para Assinaturas
+                        </Button>
+                    </>
+                }
             >
                 <div>
                     <IconPlaceholder
                         icon={AlertCircleIcon}
                         title="Assinatura Ativa Detectada"
                         subtitle="Você possui uma assinatura ativa da plataforma. Cancele sua assinatura antes de excluir sua conta."
-                        buttons={[
-                            { text: "Fechar", type: "button", action: () => setActiveSubModalOpen(false) },
-                            {
-                                text: "Ir para Assinaturas", type: "button", action: () => {
-                                    setActiveSubModalOpen(false)
-                                    window.location.href = "/erp/configuracoes/assinatura"
-                                }
-                            }
-                        ]}
-
                     />
                 </div>
             </DefaultModal>

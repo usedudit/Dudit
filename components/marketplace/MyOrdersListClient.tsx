@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
-import { OrderStatusSyncOnLoad, BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
+import { BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger } from "@/components/reusable";
 import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
-
 
 const getStatusConfig = (status: string) => {
     switch (status) {
@@ -190,19 +189,19 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="mb-6">
                                     <TabsTrigger value="todos">
-                                        Todos <span className={`ml-1.5 text-xs font-normal ${activeTab === "todos" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.todos})</span>
+                                        Todos <span className="ml-1.5 text-xs font-normal">({tabCounts.todos})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="pending">
-                                        Aguardando pagamento <span className={`ml-1.5 text-xs font-normal ${activeTab === "pending" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.pending})</span>
+                                        Aguardando pagamento <span className="ml-1.5 text-xs font-normal">({tabCounts.pending})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="preparing">
-                                        Preparando <span className={`ml-1.5 text-xs font-normal ${activeTab === "preparing" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.preparing})</span>
+                                        Preparando <span className="ml-1.5 text-xs font-normal">({tabCounts.preparing})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="sent">
-                                        Enviado <span className={`ml-1.5 text-xs font-normal ${activeTab === "sent" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.sent})</span>
+                                        Enviado <span className="ml-1.5 text-xs font-normal">({tabCounts.sent})</span>
                                     </TabsTrigger>
                                     <TabsTrigger value="delivered">
-                                        Entregue <span className={`ml-1.5 text-xs font-normal ${activeTab === "delivered" ? "text-white/70" : "text-brand-inactive-text dark:text-dark-body"}`}>({tabCounts.delivered})</span>
+                                        Entregue <span className="ml-1.5 text-xs font-normal">({tabCounts.delivered})</span>
                                     </TabsTrigger>
                                 </TabsList>
                             </Tabs>

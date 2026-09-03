@@ -56,7 +56,7 @@ interface ProductDetailsPageClientProps {
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
 
-const getProductImageUrl = (path: string | null | undefined) => getR2ImageUrl(path)
+const getProductImageUrl = (path: string | null | undefined, size: "thumb" | "thumbnail" | "medium" | "large" = "large") => getR2ImageUrl(path, size)
 
 const parseVariantAttributes = (variant: any): Record<string, string> => {
     if (variant.variant_options && typeof variant.variant_options === "object") {
@@ -878,7 +878,7 @@ export function ProductDetailsPageClient({
     const MAX_STOCK = selectedVariant ? (selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0) : (product.stock_available ?? product.stock_quantity ?? 0)
     const isOutOfStock = MAX_STOCK === 0
 
-    const partnerProfileImageUrl = getR2ImageUrl(partner.store_avatar)
+    const partnerProfileImageUrl = getR2ImageUrl(partner.store_avatar, "thumb")
     // NOTE: delivery config fetch is now merged into the combined useEffect above (line ~239)
 
     const preparationEstimate = useMemo(() => computeOrderPreparationEstimate({
@@ -1363,7 +1363,7 @@ export function ProductDetailsPageClient({
                         <div className="w-10 h-10 relative rounded-lg overflow-hidden border border-brand-green/20 shrink-0 bg-white flex items-center justify-center">
                             {giftDetails.image_url ? (
                                 <img
-                                    src={getProductImageUrl(giftDetails.image_url)}
+                                    src={getProductImageUrl(giftDetails.image_url, "thumbnail")}
                                     alt={giftDetails.name}
                                     className="w-full h-full object-cover"
                                 />

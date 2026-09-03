@@ -12,8 +12,9 @@
     "lint": "next lint",
     "test": "vitest run",
     "seed:legal": "npx tsx scripts/seed-legal-documents.ts",
+    "seed:explore": "npx tsx scripts/seed-explore-redis.ts",
     "trigger:dev": "npx trigger.dev@latest dev",
-    "trigger:deploy": "npx trigger.dev@latest deploy"
+    "trigger:deploy": "npx trigger.deploy@latest deploy"
   },
   "dependencies": {
     "@ai-sdk/google": "3.0.21",

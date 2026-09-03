@@ -3926,4 +3926,276 @@ export async function updateInstallmentGroupNotesAction(input: {
     }
 }
 
+export interface BatchFinancialTransactionsPayload {
+    partnerId: string
+    transactionIds: string[]
+    actionType: "cancel" | "settle" | "reschedule" | "category"
+    cancelReason?: string
+    settleAccountId?: string
+    settlePaymentMethodId?: string
+    settlePaymentDate?: string
+    rescheduleMode?: "add_days" | "fixed_date"
+    rescheduleDays?: number
+    rescheduleDate?: string
+    categoryId?: string
+    categoryName?: string
+}
+
+export async function updateFinancialTransactionsInBatchAction(input: BatchFinancialTransactionsPayload) {
+    try {
+        const rl = await requireRateLimit(RateLimitCategory.ERP_GENERAL)
+        if (!rl.success) return { success: false as const, error: rl.error || "Muitas tentativas." }
+
+        await requireFinancialCapability(input.partnerId)
+        const requiredPerm = input.actionType === "cancel" ? "cancel" : input.actionType === "settle" ? "create" : "edit"
+        const { userId } = await requirePermission(input.partnerId, "financial", requiredPerm)
+        const user = await getCurrentUser()
+        const actorName = user?.user_metadata?.full_name?.trim() || user?.email?.trim() || "Usuário"
+        const supabase = createAdminClient()
+
+        if (!input.transactionIds || input.transactionIds.length === 0) {
+            return { success: false as const, error: "Nenhuma transação selecionada." }
+        }
+
+        // 1. Fetch current selected transactions
+        const { data: currentRows, error: fetchErr } = await supabase
+            .from("transactions")
+            .select("id, partner_id, status, installment_group_id, amount, original_amount, paid_amount, description, account_id, payment_type, payment_method_id, transaction_type, refund_kind, due_date, notes, store_id, category_id, category")
+            .in("id", input.transactionIds)
+            .eq("partner_id", input.partnerId)
+
+        if (fetchErr || !currentRows || currentRows.length === 0) {
+            return { success: false as const, error: "Transações não encontradas." }
+        }
+
+        let eligibleRows: typeof currentRows = []
+
+        // 2. Filter eligible rows based on actionType (early rule filtering)
+        if (input.actionType === "cancel") {
+            eligibleRows = currentRows.filter((tx: any) => {
+                const isPending = String(tx.status || "").toLowerCase() === "pending"
+                const hasNoGroup = !tx.installment_group_id
+                return isPending && hasNoGroup
+            })
+        } else if (input.actionType === "settle") {
+            eligibleRows = currentRows.filter((tx: any) => {
+                return String(tx.status || "").toLowerCase() === "pending"
+            })
+        } else if (input.actionType === "reschedule") {
+            eligibleRows = currentRows.filter((tx: any) => {
+                return String(tx.status || "").toLowerCase() === "pending"
+            })
+        } else if (input.actionType === "category") {
+            eligibleRows = currentRows.filter((tx: any) => {
+                return String(tx.status || "").toLowerCase() !== "cancelled"
+            })
+        }
+
+        const skippedCount = currentRows.length - eligibleRows.length
+
+        if (eligibleRows.length === 0) {
+            return {
+                success: false as const,
+                error: "Nenhuma das transações selecionadas é elegível para esta ação.",
+                skippedCount,
+                totalCount: currentRows.length,
+            }
+        }
+
+        // Concurrency pool (concurrency: 6)
+        const CONCURRENCY = 6
+        const now = new Date()
+        const nowIso = now.toISOString()
+        const formattedDateNow = formatDateTime(nowIso) || now.toLocaleString("pt-BR")
+        let queueIndex = 0
+        const processingWarnings: string[] = []
+        let processedCount = 0
+
+        const processSingleTransaction = async (tx: typeof currentRows[0]) => {
+            try {
+                if (input.actionType === "cancel") {
+                    const reason = String(input.cancelReason || "").trim()
+                    const cancellationLine = `Cancelado por ${actorName} em ${formattedDateNow}${reason ? ` - Motivo: ${reason}` : ""}`
+                    const prevNotes = String(tx.notes || "").trim()
+                    const nextNotes = prevNotes ? `${prevNotes}\n${cancellationLine}` : cancellationLine
+
+                    const { error: updErr } = await supabase
+                        .from("transactions")
+                        .update({
+                            status: "cancelled",
+                            notes: nextNotes,
+                            updated_at: nowIso,
+                        })
+                        .eq("id", tx.id)
+                        .eq("partner_id", input.partnerId)
+
+                    if (updErr) throw updErr
+
+                    await logAuditEvent({
+                        partnerId: input.partnerId,
+                        actorUserId: userId,
+                        entityType: "transaction",
+                        entityId: tx.id,
+                        actionType: "updated",
+                        changeLines: [cancellationLine, "alterou o status para cancelado."],
+                        source: "manual",
+                        storeId: tx.store_id || null,
+                    })
+
+                } else if (input.actionType === "settle") {
+                    const resolvedAccountId = sanitizeUUID(input.settleAccountId) || tx.account_id
+                    if (!resolvedAccountId) {
+                        throw new Error(`Transação ${tx.description || tx.id}: conta bancária não informada.`)
+                    }
+                    const paymentAmount = Math.max(0, Number(tx.amount || 0) - Number(tx.paid_amount || 0)) || Number(tx.amount || 0)
+                    if (paymentAmount <= 0) return
+
+                    const validPmId = sanitizeUUID(input.settlePaymentMethodId)
+                    const rawPm = typeof input.settlePaymentMethodId === "string" && !validPmId ? input.settlePaymentMethodId : tx.payment_type
+
+                    const paymentDate = input.settlePaymentDate || nowIso.slice(0, 10)
+
+                    // Insert transaction_payment
+                    const { error: insPaymentErr } = await supabase
+                        .from("transaction_payments")
+                        .insert({
+                            partner_id: input.partnerId,
+                            transaction_id: tx.id,
+                            amount: paymentAmount,
+                            base_amount: paymentAmount,
+                            interest_amount: 0,
+                            discount_amount: 0,
+                            account_id: resolvedAccountId,
+                            payment_method_id: validPmId || null,
+                            payment_date: paymentDate,
+                            payment_type: rawPm || null,
+                            created_by: userId,
+                        })
+
+                    if (insPaymentErr) throw insPaymentErr
+
+                    // Update transaction
+                    const { error: updTxErr } = await supabase
+                        .from("transactions")
+                        .update({
+                            status: "paid",
+                            paid_amount: tx.amount,
+                            payment_date: paymentDate,
+                            account_id: resolvedAccountId,
+                            payment_method_id: validPmId || null,
+                            payment_type: rawPm || tx.payment_type,
+                            updated_at: nowIso,
+                        })
+                        .eq("id", tx.id)
+                        .eq("partner_id", input.partnerId)
+
+                    if (updTxErr) throw updTxErr
+
+                    // Update balance
+                    await applyFinanceAccountBalanceDelta(supabase, input.partnerId, resolvedAccountId, {
+                        transaction_type: tx.transaction_type,
+                        amount: paymentAmount,
+                        refund_kind: tx.refund_kind,
+                    })
+
+                    await logAuditEvent({
+                        partnerId: input.partnerId,
+                        actorUserId: userId,
+                        entityType: "transaction",
+                        entityId: tx.id,
+                        actionType: "updated",
+                        changeLines: [`Quitado em massa no valor de R$ ${paymentAmount.toFixed(2)} por ${actorName}`],
+                        source: "manual",
+                        storeId: tx.store_id || null,
+                    })
+
+                } else if (input.actionType === "reschedule") {
+                    let nextDueDate: string = nowIso.slice(0, 10)
+                    if (input.rescheduleMode === "fixed_date" && input.rescheduleDate) {
+                        nextDueDate = input.rescheduleDate
+                    } else if (input.rescheduleMode === "add_days" && input.rescheduleDays) {
+                        const baseDate = tx.due_date ? new Date(tx.due_date) : new Date()
+                        baseDate.setDate(baseDate.getDate() + Number(input.rescheduleDays))
+                        nextDueDate = baseDate.toISOString().slice(0, 10)
+                    }
+
+                    const { error: updErr } = await supabase
+                        .from("transactions")
+                        .update({
+                            due_date: nextDueDate,
+                            updated_at: nowIso,
+                        })
+                        .eq("id", tx.id)
+                        .eq("partner_id", input.partnerId)
+
+                    if (updErr) throw updErr
+
+                    await logAuditEvent({
+                        partnerId: input.partnerId,
+                        actorUserId: userId,
+                        entityType: "transaction",
+                        entityId: tx.id,
+                        actionType: "updated",
+                        changeLines: [`Vencimento prorrogado para ${nextDueDate} por ${actorName}`],
+                        source: "manual",
+                        storeId: tx.store_id || null,
+                    })
+
+                } else if (input.actionType === "category") {
+                    const validCatId = sanitizeUUID(input.categoryId)
+                    const catName = input.categoryName?.trim() || "Geral"
+
+                    const { error: updErr } = await supabase
+                        .from("transactions")
+                        .update({
+                            category_id: validCatId || null,
+                            category: catName,
+                            updated_at: nowIso,
+                        })
+                        .eq("id", tx.id)
+                        .eq("partner_id", input.partnerId)
+
+                    if (updErr) throw updErr
+
+                    await logAuditEvent({
+                        partnerId: input.partnerId,
+                        actorUserId: userId,
+                        entityType: "transaction",
+                        entityId: tx.id,
+                        actionType: "updated",
+                        changeLines: [`Categoria alterada para "${catName}" por ${actorName}`],
+                        source: "manual",
+                        storeId: tx.store_id || null,
+                    })
+                }
+
+                processedCount++
+            } catch (err: any) {
+                console.error(`[batch_financial_tx] Error processing ${tx.id}:`, err)
+                processingWarnings.push(`Transação "${tx.description || tx.id}": ${err.message}`)
+            }
+        }
+
+        const workers = new Array(Math.min(CONCURRENCY, eligibleRows.length)).fill(0).map(async () => {
+            while (queueIndex < eligibleRows.length) {
+                const idx = queueIndex++
+                await processSingleTransaction(eligibleRows[idx])
+            }
+        })
+        await Promise.all(workers)
+
+        await revalidateTransactions(input.partnerId)
+
+        return {
+            success: true as const,
+            processedCount,
+            skippedCount,
+            totalCount: currentRows.length,
+            warning: processingWarnings.length > 0 ? processingWarnings.join(" | ") : undefined,
+        }
+    } catch (e: any) {
+        return { success: false as const, error: e.message || "Erro ao processar transações em massa" }
+    }
+}
+
 

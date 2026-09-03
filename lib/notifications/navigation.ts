@@ -40,7 +40,7 @@ export function getNotificationHref(params: {
   }
 
   if (entityType === "message" && entityId) {
-    return `/erp/integracoes/whatsapp`
+    return `/erp/configuracoes?tab=integracoes`
   }
 
   if (entityType === "product") {

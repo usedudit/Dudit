@@ -748,3 +748,19 @@ export async function trackMarketplaceContactClickAction(partnerId: string, stor
         return { success: true } // Non-blocking
     }
 }
+
+/**
+ * Track explicit demand submissions from users looking for products/services.
+ */
+export async function trackExplicitDemandAction(demandType: string, term: string, citySlug?: string) {
+    try {
+        await recordDemandEventTelemetry({
+            type: "explicit_demand",
+            citySlug,
+            metadata: { demandType, term },
+        })
+        return { success: true }
+    } catch {
+        return { success: true } // Non-blocking
+    }
+}

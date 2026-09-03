@@ -7,7 +7,7 @@ import { r2PublicConfig } from "@/lib/r2/r2-public"
 
 export function getR2ImageUrl(
   imageInput: any,
-  size?: "thumb" | "thumbnail" | "medium" | "large",
+  size?: "thumb" | "thumbnail" | "medium" | "large" | "raw" | "original",
 ): string {
   let imagePath = imageInput;
 
@@ -85,6 +85,12 @@ export function getR2ImageUrl(
     return `${finalBaseUrl}/${cleanPath}`
   }
 
+  // Documentos, vetores e chamadas explicitamente raw não passam por image resizing
+  const isVectorOrDoc = /\.(svg|pdf|doc|docx|xls|xlsx|csv|zip|rar)$/i.test(cleanPath)
+  if (isVectorOrDoc || size === "raw" || size === "original") {
+    return `${finalBaseUrl}/${cleanPath}`
+  }
+
   // Se a otimização da Cloudflare estiver explicitamente desativada por env
   const isOptimizationDisabled = process.env.NEXT_PUBLIC_ENABLE_IMAGE_OPTIMIZATION === "false"
   if (isOptimizationDisabled) {
@@ -98,6 +104,9 @@ export function getR2ImageUrl(
     options = "width=400,height=400,fit=cover,format=auto,quality=85"
   } else if (size === "large") {
     options = "width=900,fit=contain,format=auto,quality=85"
+  } else {
+    // Default seguro para imagens sem tamanho explícito: limita a 1200px e converte para WebP/AVIF
+    options = "width=1200,fit=contain,format=auto,quality=85"
   }
 
   if (options) {

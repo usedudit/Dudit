@@ -215,11 +215,10 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // Keep source-map upload bounded for the MVP build while preserving stack traces.
   widenClientFileUpload: false,
 
-  // Uncomment to route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers and CORS issues.
   // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  // tunnelRoute: "/monitoring",
+  // Note: The configured route is excluded from Next.js middleware to avoid interfering with client-side error reporting.
+  tunnelRoute: "/monitoring",
 
   webpack: {
     // Keep automatic capture enabled for App Router pages, route handlers and server actions.

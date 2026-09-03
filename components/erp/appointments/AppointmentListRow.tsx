@@ -177,7 +177,7 @@ export const AppointmentListRow = React.memo(
                 case "staff":
                     return (
                         <div className="flex items-center gap-2 min-w-0">
-                            <UserProfileImage fullName={appointment.staff} className="w-5 h-5 shrink-0" />
+                            <UserProfileImage fullName={appointment.staff} className="w-8 h-8 shrink-0" />
                             <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate">
                                 {appointment.staff}
                             </span>

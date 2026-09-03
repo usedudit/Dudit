@@ -21,6 +21,7 @@ interface TemplateContext {
     cancellationNote?: string
     isBatch?: boolean
     batchCount?: number
+    orderNumbers?: string[]
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -565,9 +566,14 @@ export function buildNotificationContent(
                         message: `${batchCount} pedidos de ${customer} foram cancelados.`,
                     }
                 }
+                const orderRefs = ctx.orderNumbers && ctx.orderNumbers.length > 0 && ctx.orderNumbers.length <= 3
+                    ? ` (${ctx.orderNumbers.map((n) => `#${n}`).join(", ")})`
+                    : ""
                 return {
                     title: "💔 Pedidos cancelados",
-                    message: `Seus ${batchCount} pedidos em ${store} foram cancelados. Se tiver dúvidas, fale conosco. 🥺`,
+                    message: ctx.cancellationNote
+                        ? `Seus ${batchCount} pedidos${orderRefs} em ${store} foram cancelados. Motivo: ${ctx.cancellationNote}.`
+                        : `Seus ${batchCount} pedidos${orderRefs} em ${store} foram cancelados. Se tiver dúvidas, fale conosco. 🥺`,
                 }
             }
             if (audience === "seller") {

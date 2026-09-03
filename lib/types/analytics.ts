@@ -7,7 +7,7 @@ export interface SearchTelemetryInput {
 }
 
 export interface DemandEventInput {
-    type: "whatsapp_click" | "phone_click" | "quote_request" | "appointment_request" | "order_created"
+    type: "whatsapp_click" | "phone_click" | "quote_request" | "appointment_request" | "order_created" | "explicit_demand"
     partnerId?: string | null
     storeId?: string | null
     citySlug?: string | null

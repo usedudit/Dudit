@@ -253,7 +253,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         )
     }
 
-    const getImageUrl = (path: string) => getR2ImageUrl(path)
+    const getImageUrl = (path: string) => getR2ImageUrl(path, "thumbnail")
     const isExpanded = (partnerId: string) => isVendorExpanded[partnerId] !== false
     const toggleVendor = (partnerId: string) =>
         setIsVendorExpanded(prev => ({ ...prev, [partnerId]: !prev[partnerId] }))

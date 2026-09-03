@@ -656,7 +656,7 @@ export function ServiceDetailsPageClient({
     const serviceImages = useMemo(() => {
         const images = (service.images || [])
             .filter((img: string) => typeof img === "string" && img.trim())
-            .map((img: string) => getR2ImageUrl(img))
+            .map((img: string) => getR2ImageUrl(img, "large"))
         return images.length > 0 ? images : [PLACEHOLDER]
     }, [service.images])
 
@@ -749,7 +749,7 @@ export function ServiceDetailsPageClient({
     }, [partner])
 
     const partnerProfileImageUrl = useMemo(() => {
-        return getR2ImageUrl(partner.store_avatar)
+        return getR2ImageUrl(partner.store_avatar, "thumb")
     }, [partner.store_avatar])
 
     const selectedStaff = useMemo(() => staff.find((s) => s.id === selectedStaffId), [staff, selectedStaffId])
@@ -1175,7 +1175,7 @@ export function ServiceDetailsPageClient({
                         <div className="w-10 h-10 relative rounded-lg overflow-hidden border border-brand-green/20 shrink-0 bg-white flex items-center justify-center">
                             {giftDetails.image_url ? (
                                 <img
-                                    src={getR2ImageUrl(giftDetails.image_url)}
+                                    src={getR2ImageUrl(giftDetails.image_url, "thumbnail")}
                                     alt={giftDetails.name}
                                     className="w-full h-full object-cover"
                                 />

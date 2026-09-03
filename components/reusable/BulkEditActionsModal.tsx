@@ -2,12 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem, InfoCard } from "@/components/reusable"
+import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem, InfoCard, FormDropdown } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import {
     MoneyIcon, Package, EyeIcon, TrashIcon, RemoveImageIcon, AlertTriangleIcon,
     UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon,
-    WrenchIcon
+    WrenchIcon, ClockIcon
 } from "@/lib/icons"
 
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
@@ -16,7 +16,21 @@ import { isGifFile } from "@/lib/security/file-validator"
 import { useToast } from "@/hooks/use-toast"
 
 // --- Tipagens ---
-export type BulkActionType = 'price' | 'stock' | 'visibility' | 'image' | 'remove_image' | 'delete' | 'status' | 'order_payment' | 'order_delivery' | 'service_order_status'
+export type BulkActionType =
+    | 'price'
+    | 'stock'
+    | 'visibility'
+    | 'image'
+    | 'remove_image'
+    | 'delete'
+    | 'status'
+    | 'order_payment'
+    | 'order_delivery'
+    | 'service_order_status'
+    | 'financial_cancel'
+    | 'financial_settle'
+    | 'financial_reschedule'
+    | 'financial_category'
 
 export interface BulkActionPayload {
     type: BulkActionType
@@ -32,13 +46,22 @@ export interface BulkActionPayload {
     status?: 'draft' | 'sent' | 'approved' | 'rejected' | 'expired' | 'cancelled'
     orderStatus?: string
     serviceOrderStatus?: string
+    cancelReason?: string
+    settleAccountId?: string
+    settlePaymentMethodId?: string
+    settlePaymentDate?: string
+    rescheduleMode?: 'add_days' | 'fixed_date'
+    rescheduleDays?: number
+    rescheduleDate?: string
+    categoryId?: string
+    categoryName?: string
 }
 
 interface BulkEditActionsModalProps {
     isOpen: boolean
     onClose: () => void
     selectedCount: number
-    targetType: 'product' | 'variation' | 'service' | 'quote' | 'order' | 'service_order'
+    targetType: 'product' | 'variation' | 'service' | 'quote' | 'order' | 'service_order' | 'financial_transaction'
     orderSelectionGuards?: {
         paidCount: number
         deliveredCount: number
@@ -51,6 +74,16 @@ interface BulkEditActionsModalProps {
         cancelledCount: number
         totalCount: number
     }
+    financialSelectionGuards?: {
+        totalCount: number
+        pendingCount: number
+        paidCount: number
+        cancelledCount: number
+        installmentCount: number
+    }
+    financialCategories?: Array<{ id: string; name: string }>
+    financeAccounts?: Array<{ id: string; name: string }>
+    paymentMethods?: Array<{ id: string; name: string }>
     onApply: (payload: BulkActionPayload) => Promise<void>
 }
 
@@ -110,6 +143,10 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     targetType,
     orderSelectionGuards,
     serviceOrderSelectionGuards,
+    financialSelectionGuards,
+    financialCategories,
+    financeAccounts,
+    paymentMethods,
     onApply
 }) => {
     const { toast } = useToast()
@@ -125,6 +162,16 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     const [serviceOrderStatusConfig, setServiceOrderStatusConfig] = useState<string>('')
     const [imageState, setImageState] = useState<{ file: File | null, preview: string | null }>({ file: null, preview: null })
 
+    // Financial Bulk Action states
+    const [cancelReason, setCancelReason] = useState("")
+    const [settleAccountId, setSettleAccountId] = useState("")
+    const [settlePaymentMethodId, setSettlePaymentMethodId] = useState("")
+    const [settlePaymentDate, setSettlePaymentDate] = useState(new Date().toISOString().slice(0, 10))
+    const [rescheduleMode, setRescheduleMode] = useState<"add_days" | "fixed_date">("add_days")
+    const [rescheduleDays, setRescheduleDays] = useState<number>(30)
+    const [rescheduleDate, setRescheduleDate] = useState(new Date().toISOString().slice(0, 10))
+    const [financialCategoryId, setFinancialCategoryId] = useState("")
+
     // UI Helpers
     const [showImageCropper, setShowImageCropper] = useState(false)
     const [selectedImageForCrop, setSelectedImageForCrop] = useState<File | null>(null)
@@ -139,15 +186,26 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     }, [isOpen])
 
     const cancelledCount = orderSelectionGuards?.cancelledCount || 0
+    const financialIgnoredCount = view === "financial_cancel"
+        ? (financialSelectionGuards?.paidCount || 0) + (financialSelectionGuards?.cancelledCount || 0) + (financialSelectionGuards?.installmentCount || 0)
+        : view === "financial_settle" || view === "financial_reschedule"
+            ? (financialSelectionGuards?.paidCount || 0) + (financialSelectionGuards?.cancelledCount || 0)
+            : view === "financial_category"
+                ? (financialSelectionGuards?.cancelledCount || 0)
+                : 0
+
     const ignoredByRuleCount = view === "order_payment"
         ? (orderSelectionGuards?.paidCount || 0) + cancelledCount
         : view === "order_delivery"
             ? (orderSelectionGuards?.deliveredCount || 0) + cancelledCount
             : view === "service_order_status"
                 ? (serviceOrderSelectionGuards?.deliveredCount || 0) + (serviceOrderSelectionGuards?.cancelledCount || 0)
-                : 0
+                : financialIgnoredCount
+
     const selectableCount = Math.max(0, (orderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
     const serviceOrderSelectableCount = Math.max(0, (serviceOrderSelectionGuards?.totalCount || 0) - ignoredByRuleCount)
+    const financialSelectableCount = Math.max(0, (financialSelectionGuards?.totalCount || 0) - financialIgnoredCount)
+
     const isOrderPaymentFullyBlocked = targetType === "order"
         && (orderSelectionGuards?.totalCount || 0) > 0
         && selectableCount === 0
@@ -157,10 +215,15 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     const isServiceOrderStatusFullyBlocked = targetType === "service_order"
         && (serviceOrderSelectionGuards?.totalCount || 0) > 0
         && serviceOrderSelectableCount === 0
+    const isFinancialViewFullyBlocked = targetType === "financial_transaction"
+        && (financialSelectionGuards?.totalCount || 0) > 0
+        && financialSelectableCount === 0
+
     const isCurrentViewBlocked =
         (view === "order_payment" && isOrderPaymentFullyBlocked)
         || (view === "order_delivery" && isOrderDeliveryFullyBlocked)
         || (view === "service_order_status" && isServiceOrderStatusFullyBlocked)
+        || (targetType === "financial_transaction" && isFinancialViewFullyBlocked)
 
     const handleApply = async () => {
         if (isCurrentViewBlocked) return
@@ -186,6 +249,20 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                 payload.serviceOrderStatus = serviceOrderStatusConfig
             } else if (view === 'image') {
                 payload.imageFile = imageState.file
+            } else if (view === 'financial_cancel') {
+                payload.cancelReason = cancelReason.trim() || undefined
+            } else if (view === 'financial_settle') {
+                payload.settleAccountId = settleAccountId || undefined
+                payload.settlePaymentMethodId = settlePaymentMethodId || undefined
+                payload.settlePaymentDate = settlePaymentDate || undefined
+            } else if (view === 'financial_reschedule') {
+                payload.rescheduleMode = rescheduleMode
+                payload.rescheduleDays = rescheduleDays
+                payload.rescheduleDate = rescheduleDate
+            } else if (view === 'financial_category') {
+                payload.categoryId = financialCategoryId
+                const found = financialCategories?.find(c => c.id === financialCategoryId)
+                payload.categoryName = found?.name
             }
 
             await onApply(payload)
@@ -224,14 +301,18 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
         } catch (error) { console.error("Erro ao processar imagem", error) }
     }
 
-    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'service' ? 'serviços' : targetType === 'order' ? 'pedidos' : targetType === 'service_order' ? 'ordens de serviço' : 'orçamentos'
-    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'service' ? 'serviço' : targetType === 'order' ? 'pedido' : targetType === 'service_order' ? 'ordem de serviço' : 'orçamento'
+    const targetLabel = targetType === 'product' ? 'produtos' : targetType === 'variation' ? 'variantes' : targetType === 'service' ? 'serviços' : targetType === 'order' ? 'pedidos' : targetType === 'service_order' ? 'ordens de serviço' : targetType === 'financial_transaction' ? 'transações' : 'orçamentos'
+    const singularTargetLabel = targetType === 'product' ? 'produto' : targetType === 'variation' ? 'variante' : targetType === 'service' ? 'serviço' : targetType === 'order' ? 'pedido' : targetType === 'service_order' ? 'ordem de serviço' : targetType === 'financial_transaction' ? 'transação' : 'orçamento'
 
     const viewTitles: Record<string, string> = {
         menu: '', price: 'Alterar Preço', stock: 'Ajustar Estoque',
         visibility: 'Visibilidade', image: 'Aplicar Imagem', remove_image: 'Remover Imagem',
         status: 'Alterar Status', order_payment: 'Status de Pagamento', order_delivery: 'Status de Envio',
         service_order_status: 'Alterar Status',
+        financial_cancel: 'Cancelar Transações',
+        financial_settle: 'Dar Baixa / Quitar',
+        financial_reschedule: 'Prorrogar Vencimento',
+        financial_category: 'Alterar Categoria',
         delete: `Excluir ${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)}`
     }
 
@@ -269,7 +350,22 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 <BulkActionCard icon={WrenchIcon} label="Alterar Status" onClick={() => { setView('service_order_status'); setServiceOrderStatusConfig('aprovada') }} />
                             </div>
                         )}
-                        {targetType !== 'order' && targetType !== 'service_order' && (
+                        {targetType === 'financial_transaction' && (
+                            <>
+                                <BulkActionCard icon={TrashIcon} label="Cancelar" onClick={() => setView('financial_cancel')} danger />
+                                <BulkActionCard icon={CheckIcon} label="Dar Baixa" onClick={() => {
+                                    setView('financial_settle')
+                                    if (financeAccounts?.[0] && !settleAccountId) setSettleAccountId(financeAccounts[0].id)
+                                    if (paymentMethods?.[0] && !settlePaymentMethodId) setSettlePaymentMethodId(paymentMethods[0].id)
+                                }} />
+                                <BulkActionCard icon={ClockIcon} label="Prorrogar Vencimento" onClick={() => setView('financial_reschedule')} />
+                                <BulkActionCard icon={EditIcon} label="Alterar Categoria" onClick={() => {
+                                    setView('financial_category')
+                                    if (financialCategories?.[0] && !financialCategoryId) setFinancialCategoryId(financialCategories[0].id)
+                                }} />
+                            </>
+                        )}
+                        {targetType !== 'order' && targetType !== 'service_order' && targetType !== 'financial_transaction' && (
                             <BulkActionCard icon={TrashIcon} label="Excluir" onClick={() => setView('delete')} danger />
                         )}
                     </div>
@@ -591,6 +687,201 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                     )}
                                 </>
                             ) : <IconPlaceholder icon={UploadIcon} title="Upload de Imagem" subtitle="Clique para adicionar" />}
+                        </div>
+                    </div>
+                )
+            case 'financial_cancel':
+                return (
+                    <div className="space-y-4 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(financialSelectionGuards?.totalCount || 0)} transação(ões) serão ignoradas por regra (já quitadas, canceladas ou parcelas vinculadas).`}
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        {isCurrentViewBlocked && (
+                            <InfoCard
+                                title="Atenção"
+                                message="Todas as transações selecionadas já estão quitadas, canceladas ou são parceladas. Nenhuma ação pode ser aplicada."
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
+                                Motivo do cancelamento (opcional)
+                            </label>
+                            <Input
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                placeholder="Ex: Cobrança duplicada, despesa cancelada..."
+                                disabled={isCurrentViewBlocked}
+                            />
+                        </div>
+                    </div>
+                )
+            case 'financial_settle':
+                return (
+                    <div className="space-y-4 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(financialSelectionGuards?.totalCount || 0)} transação(ões) serão ignoradas por regra (já quitadas ou canceladas).`}
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        {isCurrentViewBlocked && (
+                            <InfoCard
+                                title="Atenção"
+                                message="Todas as transações selecionadas já estão quitadas ou canceladas."
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        <div className="space-y-3">
+                            <FormDropdown
+                                label="Conta Bancária / Caixa de Destino"
+                                value={settleAccountId}
+                                setValue={setSettleAccountId}
+                                options={(financeAccounts || []).map((a) => ({ value: a.id, label: a.name }))}
+                                placeholder="Selecione a conta..."
+                                disabled={isCurrentViewBlocked}
+                            />
+                            <FormDropdown
+                                label="Método de Pagamento"
+                                value={settlePaymentMethodId}
+                                setValue={setSettlePaymentMethodId}
+                                options={(paymentMethods || []).map((p) => ({ value: p.id, label: p.name }))}
+                                placeholder="Selecione a forma de pagamento..."
+                                disabled={isCurrentViewBlocked}
+                            />
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
+                                    Data da Baixa
+                                </label>
+                                <Input
+                                    type="date"
+                                    value={settlePaymentDate}
+                                    onChange={(e) => setSettlePaymentDate(e.target.value)}
+                                    disabled={isCurrentViewBlocked}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )
+            case 'financial_reschedule':
+                return (
+                    <div className="space-y-4 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(financialSelectionGuards?.totalCount || 0)} transação(ões) serão ignoradas por regra (já quitadas ou canceladas).`}
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        {isCurrentViewBlocked && (
+                            <InfoCard
+                                title="Atenção"
+                                message="Todas as transações selecionadas já estão quitadas ou canceladas."
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        <div className="space-y-3">
+                            <div className={`space-y-2 ${isCurrentViewBlocked ? "pointer-events-none opacity-50" : ""}`}>
+                                <RadioButton
+                                    checked={rescheduleMode === "add_days"}
+                                    onChange={() => setRescheduleMode("add_days")}
+                                    label="Adicionar dias ao vencimento atual"
+                                    name="rescheduleMode"
+                                    value="add_days"
+                                />
+                                <RadioButton
+                                    checked={rescheduleMode === "fixed_date"}
+                                    onChange={() => setRescheduleMode("fixed_date")}
+                                    label="Definir nova data de vencimento fixa"
+                                    name="rescheduleMode"
+                                    value="fixed_date"
+                                />
+                            </div>
+
+                            {rescheduleMode === "add_days" ? (
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
+                                        Quantidade de dias adicionais
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        {[15, 30, 45, 60].map((d) => (
+                                            <Button
+                                                key={d}
+                                                type="button"
+                                                variant={rescheduleDays === d ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setRescheduleDays(d)}
+                                                disabled={isCurrentViewBlocked}
+                                            >
+                                                +{d} dias
+                                            </Button>
+                                        ))}
+                                    </div>
+                                    <div className="pt-2">
+                                        <Input
+                                            type="number"
+                                            value={String(rescheduleDays)}
+                                            onChange={(e) => setRescheduleDays(Math.max(1, Number(e.target.value) || 1))}
+                                            placeholder="Ex: 30"
+                                            disabled={isCurrentViewBlocked}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
+                                        Nova data de vencimento
+                                    </label>
+                                    <Input
+                                        type="date"
+                                        value={rescheduleDate}
+                                        onChange={(e) => setRescheduleDate(e.target.value)}
+                                        disabled={isCurrentViewBlocked}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            case 'financial_category':
+                return (
+                    <div className="space-y-4 pt-2">
+                        {ignoredByRuleCount > 0 && (
+                            <InfoCard
+                                title="Atenção"
+                                message={`${ignoredByRuleCount} de ${(financialSelectionGuards?.totalCount || 0)} transação(ões) serão ignoradas por regra (canceladas).`}
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        {isCurrentViewBlocked && (
+                            <InfoCard
+                                title="Atenção"
+                                message="Todas as transações selecionadas estão canceladas."
+                                color="orange"
+                                className="px-4"
+                            />
+                        )}
+                        <div className="space-y-3">
+                            <FormDropdown
+                                label="Nova Categoria Financeira"
+                                value={financialCategoryId}
+                                setValue={setFinancialCategoryId}
+                                options={(financialCategories || []).map((c) => ({ value: c.id, label: c.name }))}
+                                placeholder="Selecione a categoria..."
+                                disabled={isCurrentViewBlocked}
+                            />
                         </div>
                     </div>
                 )

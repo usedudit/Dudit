@@ -55,4 +55,5 @@ export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } fro
 export { Barcode } from "./Barcode"
 export { QuantitySelector } from "./QuantitySelector"
 export { BarcodeScannerInput } from "./BarcodeScannerInput"
+export { UndoGracePeriodToast } from "./UndoGracePeriodToast"
 

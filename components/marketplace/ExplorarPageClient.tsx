@@ -39,6 +39,7 @@ import { ExploreContentSkeleton } from "./explorar-skeleton"
 import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP } from "./explorar-constants"
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
+import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -227,6 +228,12 @@ export function ExplorarPageClient({
     const [isFiltersBottomSheetOpen, setIsFiltersBottomSheetOpen] = useState(false)
     const [isSortBottomSheetOpen, setIsSortBottomSheetOpen] = useState(false)
     const [isMobileScrolled, setIsMobileScrolled] = useState(false)
+
+    // Demand modal states
+    const [isDemandModalOpen, setIsDemandModalOpen] = useState(false)
+    const [isDemandThankYouOpen, setIsDemandThankYouOpen] = useState(false)
+    const [selectedDemandType, setSelectedDemandType] = useState<string>("comprar")
+    const [demandTerm, setDemandTerm] = useState("")
 
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
@@ -1132,6 +1139,29 @@ export function ExplorarPageClient({
         window.open(url, "_blank")
     }, [selectedCitySlug, query, selectedCategories])
 
+    const handleOpenDemandModal = useCallback(() => {
+        const defaultTerm = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
+        setDemandTerm(defaultTerm)
+        setSelectedDemandType("comprar")
+        setIsDemandModalOpen(true)
+    }, [query, selectedCategories])
+
+    const handleSubmitDemand = useCallback(async () => {
+        if (!demandTerm.trim()) return
+        const demandTypeLabels: Record<string, string> = {
+            comprar: "Quero comprar",
+            contratar: "Quero contratar",
+            encontrar: "Quero encontrar empresa",
+        }
+        await trackExplicitDemandAction(
+            demandTypeLabels[selectedDemandType] || selectedDemandType,
+            demandTerm.trim(),
+            selectedCitySlug || undefined
+        )
+        setIsDemandModalOpen(false)
+        setIsDemandThankYouOpen(true)
+    }, [demandTerm, selectedDemandType, selectedCitySlug])
+
     const clearFilters = () => {
         triggerFilterLoading()
         setSelectedCategories([])
@@ -1270,7 +1300,7 @@ export function ExplorarPageClient({
         const showPrice = !isStore && item.show_price_in_store !== false
         const sellerName = partner?.store_name || item.name || ""
         const sellerLogoRaw = partner?.store_avatar || partner?.store_image_url || item.logo_url || null
-        const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw) : null
+        const sellerLogoUrl = sellerLogoRaw && !String(sellerLogoRaw).includes("Placeholder.png") ? getR2ImageUrl(sellerLogoRaw, "thumb") : null
         const locationLabel = getLocationLabel(partner, locationContext)
 
         // Resolve distance & delivery estimates
@@ -1626,7 +1656,7 @@ export function ExplorarPageClient({
                 {/* MAIN CONTENT */}
                 <div className="container mx-auto max-w-[1400px] flex-grow pb-24 lg:pb-12 mt-4 px-4">
                     {/* CATEGORIAS EM CÍRCULOS (type-aware) */}
-                    {!query && activeCategoriesList.length > 0 && !isLandingPage && (
+                    {!query && activeCategoriesList.length > 0 && !isLandingPage && !isCategoryMode && (
                         <div className="mb-6 lg:mb-8">
                             <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-4">Categorias</h2>
                             <div className="flex gap-4 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -1705,12 +1735,16 @@ export function ExplorarPageClient({
                                 title={pageTitle}
                                 resultsCount={filteredResults.length}
                                 isLoading={isContentLoading}
-                                showBackButton={!!query || !!selectedSection}
+                                showBackButton={!!query || !!selectedSection || isCategoryMode}
                                 onBack={() => {
                                     if (selectedSection) {
                                         triggerFilterLoading()
                                         setSelectedSection(null)
                                         updateUrl(selectedCitySlug, selectedCategories, query, currentType, selectedRadius, null)
+                                    } else if (isCategoryMode) {
+                                        triggerFilterLoading()
+                                        setSelectedCategories([])
+                                        updateUrl(selectedCitySlug, [], query, currentType)
                                     } else {
                                         router.back()
                                     }
@@ -1760,6 +1794,11 @@ export function ExplorarPageClient({
                                             {
                                                 text: "Conheço quem vende",
                                                 action: handleInvite,
+                                                variant: "outline"
+                                            },
+                                            {
+                                                text: "Estou procurando isso",
+                                                action: handleOpenDemandModal,
                                                 variant: "outline"
                                             }
                                         ]}
@@ -1839,6 +1878,11 @@ export function ExplorarPageClient({
                                                     {
                                                         text: "Conheço quem vende",
                                                         action: handleInvite,
+                                                        variant: "outline"
+                                                    },
+                                                    {
+                                                        text: "Estou procurando isso",
+                                                        action: handleOpenDemandModal,
                                                         variant: "outline"
                                                     }
                                                 ]}
@@ -2046,6 +2090,98 @@ export function ExplorarPageClient({
                         )
                     })}
                 </div>
+            </DefaultModal>
+
+            {/* 3. DEMAND MODAL - "Estou procurando isso" */}
+            <DefaultModal
+                isOpen={isDemandModalOpen}
+                onClose={() => setIsDemandModalOpen(false)}
+                title="O que você está procurando?"
+                maxWidth="md"
+            >
+                <div className="flex flex-col gap-4 py-2">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Selecione o tipo de demanda e digite o que precisa. Vamos tentar encontrar alguém que possa ajudar!
+                    </p>
+
+                    <div className="flex flex-col gap-3">
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
+                            <input
+                                type="radio"
+                                name="demandType"
+                                value="comprar"
+                                checked={selectedDemandType === "comprar"}
+                                onChange={(e) => setSelectedDemandType(e.target.value)}
+                                className="w-4 h-4 text-brand-green accent-brand-green"
+                            />
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero comprar</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
+                            <input
+                                type="radio"
+                                name="demandType"
+                                value="contratar"
+                                checked={selectedDemandType === "contratar"}
+                                onChange={(e) => setSelectedDemandType(e.target.value)}
+                                className="w-4 h-4 text-brand-green accent-brand-green"
+                            />
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero contratar</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
+                            <input
+                                type="radio"
+                                name="demandType"
+                                value="encontrar"
+                                checked={selectedDemandType === "encontrar"}
+                                onChange={(e) => setSelectedDemandType(e.target.value)}
+                                className="w-4 h-4 text-brand-green accent-brand-green"
+                            />
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero encontrar uma empresa que faça</span>
+                        </label>
+                    </div>
+
+                    <div className="mt-2">
+                        <input
+                            type="text"
+                            placeholder={selectedDemandType === "comprar" ? "Ex: pneu goodyear" : selectedDemandType === "contratar" ? "Ex: encanador" : "Ex: conserto de ar condicionado"}
+                            value={demandTerm}
+                            onChange={(e) => setDemandTerm(e.target.value)}
+                            className="w-full px-4 py-3 border border-brand-border dark:border-dark-border rounded-xl text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green transition-colors"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleSubmitDemand}
+                        disabled={!demandTerm.trim()}
+                        className="w-full py-3 px-4 bg-brand-green text-white rounded-xl text-sm font-bold hover:bg-brand-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Enviar
+                    </button>
+                </div>
+            </DefaultModal>
+
+            {/* 4. DEMAND THANK YOU MODAL */}
+            <DefaultModal
+                isOpen={isDemandThankYouOpen}
+                onClose={() => setIsDemandThankYouOpen(false)}
+                title=""
+                maxWidth="sm"
+                hideHeader
+            >
+                <IconPlaceholder
+                    placeholderType="image"
+                    imageSrc="https://img.dudit.com.br/static/mascots/Feedback.png"
+                    imageAlt="Obrigado pelo seu feedback!"
+                    title="Obrigado!"
+                    subtitle="Recebemos sua demanda! Vamos tentar encontrar alguém que possa te ajudar com isso. Fique de olho nas novidades da Dudit!"
+                    itemButton={{
+                        text: "Entendido",
+                        action: () => setIsDemandThankYouOpen(false),
+                        variant: "default"
+                    }}
+                />
             </DefaultModal>
         </>
     )
