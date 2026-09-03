@@ -14,9 +14,9 @@ export type PermissionTemplate = {
     list: boolean
   }
   appointments: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  customers: { view: boolean; create: boolean; edit: boolean; delete: boolean; list: boolean; view_fiscal_data: boolean; view_personal_data: boolean }
+  customers: { view: boolean; create: boolean; edit: boolean; delete: boolean; list: boolean; view_fiscal_data: boolean; view_personal_data: boolean; export: boolean }
   suppliers: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  products: { view: boolean; create: boolean; edit: boolean; delete: boolean }
+  products: { view: boolean; create: boolean; edit: boolean; delete: boolean; view_cost_price: boolean }
   stock_movements: { view: boolean; create: boolean; undo: boolean }
   pdv: {
     view: boolean
@@ -29,9 +29,9 @@ export type PermissionTemplate = {
     can_add_delivery: boolean
   }
   services: { view: boolean; create: boolean; edit: boolean; delete: boolean }
-  service_orders: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_assign_technician: boolean; can_change_status: boolean }
+  service_orders: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_assign_technician: boolean; can_change_status: boolean; can_generate_invoice: boolean }
   quotes: { view: boolean; create: boolean; edit: boolean; delete: boolean; can_apply_discount: boolean }
-  financial: { view: boolean; create: boolean; edit: boolean; cancel: boolean }
+  financial: { view: boolean; create: boolean; edit: boolean; cancel: boolean; can_settle: boolean }
   categories: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   coupons: { view: boolean; create: boolean; edit: boolean; delete: boolean }
   goals: { view: boolean; create: boolean; edit: boolean; delete: boolean }

@@ -19,24 +19,8 @@ export default async function InicioPage() {
 
     const { partnerId, roleId } = context
 
-    if (!can(context as RbacUserLike, "dashboard.view")) {
-        return (
-            <div className="flex items-center justify-center min-h-[calc(100vh-140px)] p-4 text-center">
-                <FadeIn>
-                    <IconPlaceholder
-                        placeholderType="image"
-                        imageSrc="https://img.dudit.com.br/static/mascots/QRDino.png"
-                        imageAlt="Área do Entregador"
-                        title="Área do Entregador"
-                        subtitle="Acesse a seção de entregas para acompanhar suas rotas e entregas em tempo real."
-                        itemButton={{
-                            text: "Acessar Entregas",
-                            action: "/erp/entregas"
-                        }}
-                    />
-                </FadeIn>
-            </div>
-        )
+    if (roleId?.toLowerCase() === "delivery" || !can(context as RbacUserLike, "dashboard.view")) {
+        redirect("/erp/entregas")
     }
 
     const result = await getUnifiedDashboardAction(partnerId)

@@ -8,6 +8,7 @@ import { Menu, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, ShieldIcon, S
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 import { useSidebarState } from "@/lib/hooks/use-sidebar-state"
 import { motion, AnimatePresence } from "framer-motion"
+import { Drawer } from "vaul"
 
 interface SubMenuItem {
     label: string
@@ -191,32 +192,15 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
 
     return (
         <TooltipPrimitive.Provider delayDuration={0}>
-            <div
-                className={cn(
-                    "fixed inset-0 bg-slate-900/50 z-40 xl:hidden transition-opacity duration-200",
-                    isMobileOpen ? "opacity-100" : "opacity-0 pointer-events-none",
-                )}
-                aria-hidden="true"
-                onClick={() => setIsMobileOpen(false)}
-            />
-
-            <button
-                ref={triggerRef}
-                onClick={() => setIsMobileOpen(!isMobileOpen)}
-                className="xl:hidden fixed top-4 left-4 z-30 p-2 bg-dark-background rounded-xl border border-dark-border shadow-sm"
-            >
-                <Menu className="w-6 h-6 text-white" />
-            </button>
-
+            {/* DESKTOP SIDEBAR */}
             <div
                 ref={sidebarRef}
                 className={cn(
-                    "flex flex-col fixed z-40 left-0 top-0 h-screen border-r",
+                    "hidden xl:flex flex-col fixed z-40 left-0 top-0 h-screen border-r",
                     "bg-brand-dark dark:bg-dark-background border-dark-border",
                     "transition-[width] duration-300 ease-in-out",
                     "xl:static xl:translate-x-0",
                     isCollapsed ? "xl:w-[68px]" : "xl:w-64",
-                    isMobileOpen ? "translate-x-0 w-64" : "-translate-x-full w-64",
                 )}
             >
                 <div className="h-[65px] flex items-center px-3 overflow-hidden shrink-0 relative transition-all duration-300">
@@ -241,10 +225,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                             />
                         </div>
                     </Link>
-
-                    <button className="xl:hidden absolute right-2" onClick={() => setIsMobileOpen(false)}>
-                        <XIcon className="w-6 h-6 text-gray-400" />
-                    </button>
                 </div>
 
                 <div className="px-3 mb-2">
@@ -303,7 +283,7 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                             )}
                                         >
                                             {item.href && !hasSubmenu ? (
-                                                <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" onClick={() => setIsMobileOpen(false)} />
+                                                <Link href={item.href} prefetch={false} className="absolute inset-0 z-10" />
                                             ) : null}
 
                                             <div className="w-[44px] h-[44px] flex items-center justify-center shrink-0">
@@ -373,7 +353,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                                                     <Link
                                                                         href={subItem.href}
                                                                         prefetch={false}
-                                                                        onClick={() => setIsMobileOpen(false)}
                                                                         className={cn(
                                                                             "flex items-center px-3 py-2 rounded-lg text-sm transition-colors duration-200 relative z-10",
                                                                             isActive ? activeClasses : inactiveClasses
@@ -397,15 +376,12 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                                     animate={{ opacity: 1, x: 0, scale: 1 }}
                                                     exit={{ opacity: 0, x: 5, scale: 0.95 }}
                                                     transition={{ duration: 0.15, ease: "easeOut" }}
-                                                    // Ajustado o left para calc(100% + 16px) para dar mais espaço
                                                     className="absolute left-[calc(100%+16px)] top-0 z-50 bg-dark-surface border border-dark-border rounded-xl shadow-xl min-w-[200px] overflow-hidden"
                                                 >
-                                                    {/* Header do Card com cor diferente para destaque */}
                                                     <div className="px-4 py-3 border-b border-dark-border bg-dark-surface/50">
                                                         <span className="text-sm font-bold text-white block">{item.label}</span>
                                                     </div>
 
-                                                    {/* Corpo do Card */}
                                                     <div className="py-1 bg-dark-background">
                                                         {hasSubmenu ? (
                                                             item.submenu!.map((subItem) => {
@@ -424,7 +400,6 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                                                                 )
                                                             })
                                                         ) : (
-                                                            // Item sem submenu
                                                             <div className="p-2">
                                                                 <div className="text-xs text-brand-inactive-text px-2 pb-1">Navegar para {item.label}</div>
                                                             </div>
@@ -441,6 +416,123 @@ export function AdminSidebar({ initialExpanded = true }: AdminSidebarProps) {
                     </ul>
                 </nav>
             </div>
+
+            {/* MOBILE TRIGGER BUTTON */}
+            <button
+                ref={triggerRef}
+                onClick={() => setIsMobileOpen(true)}
+                className="xl:hidden fixed top-4 left-4 z-30 p-2 bg-dark-background rounded-xl border border-dark-border shadow-sm"
+            >
+                <Menu className="w-6 h-6 text-white" />
+            </button>
+
+            {/* MOBILE BOTTOM SHEET (VAUL) */}
+            <Drawer.Root open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+                <Drawer.Portal>
+                    <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
+                    <Drawer.Content className="bg-brand-dark dark:bg-dark-background border-t border-dark-border flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-[60] outline-none">
+                        <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-dark-border mt-3 mb-2" />
+
+                        <div className="px-4 py-2 flex items-center justify-between shrink-0">
+                            <Link
+                                href="/ddt-admin"
+                                prefetch={false}
+                                onClick={() => setIsMobileOpen(false)}
+                                className="flex items-center gap-3 group"
+                            >
+                                <div className="flex items-center justify-center shrink-0 w-[36px]">
+                                    <img
+                                        src="https://img.dudit.com.br/static/Icon.png"
+                                        alt="Dudit"
+                                        className="h-7 w-auto object-contain transition-transform group-hover:scale-105"
+                                    />
+                                </div>
+                                <img
+                                    src="https://img.dudit.com.br/static/Logo.png"
+                                    alt="Dudit Logo"
+                                    className="h-6 w-auto object-contain"
+                                />
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileOpen(false)}
+                                className="p-1.5 rounded-lg text-brand-inactive-text hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="px-4 my-1 shrink-0">
+                            <div className="h-px w-full bg-dark-border" />
+                        </div>
+
+                        <div className="p-4 pt-1 flex-1 overflow-y-auto no-scrollbar">
+                            <nav className="flex flex-col gap-1">
+                                {filteredNavItems.map((item) => {
+                                    const Icon = item.icon
+                                    const hasSubmenu = item.submenu && item.submenu.length > 0
+                                    const isMenuExpanded = openSubmenu === item.label
+                                    const isActive = item.href ? isActivePath(item.href) : (hasSubmenu && item.submenu?.some((sub) => isActivePath(sub.href)))
+
+                                    return (
+                                        <div key={item.label} className="flex flex-col">
+                                            {item.href && !hasSubmenu ? (
+                                                <Link
+                                                    href={item.href}
+                                                    prefetch={false}
+                                                    className={cn(
+                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                        isActive ? activeClasses : inactiveClasses
+                                                    )}
+                                                    onClick={() => setIsMobileOpen(false)}
+                                                >
+                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                </Link>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => hasSubmenu ? toggleSubmenu(item.label) : null}
+                                                    className={cn(
+                                                        "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
+                                                        isActive ? activeClasses : inactiveClasses
+                                                    )}
+                                                >
+                                                    <Icon size={20} className={isActive ? "text-brand-green" : ""} />
+                                                    <span className="text-[15px] font-medium flex-1 text-left">{item.label}</span>
+                                                    {hasSubmenu && (
+                                                        <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
+                                                    )}
+                                                </button>
+                                            )}
+
+                                            {hasSubmenu && isMenuExpanded && (
+                                                <div className="flex flex-col gap-1 pl-11 pr-3 pb-2">
+                                                    {item.submenu!.map((sub) => (
+                                                        <Link
+                                                            key={sub.href}
+                                                            href={sub.href}
+                                                            prefetch={false}
+                                                            className={cn(
+                                                                "py-2 px-3 rounded-lg text-sm transition-colors",
+                                                                isActivePath(sub.href) ? activeClasses : inactiveClasses
+                                                            )}
+                                                            onClick={() => setIsMobileOpen(false)}
+                                                        >
+                                                            {sub.label}
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </nav>
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
         </TooltipPrimitive.Provider>
     )
 }

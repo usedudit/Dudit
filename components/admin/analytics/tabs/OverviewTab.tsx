@@ -222,15 +222,28 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                                             className="p-3 rounded-[24px] bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 flex items-center justify-between"
                                         >
                                             <div>
-                                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
-                                                    {item.term}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading capitalize">
+                                                        {item.term}
+                                                    </div>
+                                                    {item.demandType && (
+                                                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                                            item.demandType === 'contratar'
+                                                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300'
+                                                                : item.demandType === 'loja'
+                                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                                                        }`}>
+                                                            {item.demandType === 'contratar' ? 'Contratar' : item.demandType === 'loja' ? 'Loja' : 'Comprar'}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                     Categoria sugerida: <span className="font-medium text-brand-dark dark:text-dark-heading">{item.suggestedCategory || "Geral"}</span>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <Badge variant="red">{item.count} buscas</Badge>
+                                                <Badge variant="red">{item.count} {item.demandType ? 'demanda(s)' : 'buscas'}</Badge>
                                             </div>
                                         </div>
                                     ))}

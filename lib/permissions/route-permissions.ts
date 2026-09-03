@@ -61,7 +61,7 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     // ── Produtos
     products: {
         key: "products", path: "/erp/produtos", label: "Catálogo de Produtos", category: "Produtos", legacyCategory: "products",
-        specificPermissions: ["can_adjust_stock", "can_import_products"],
+        specificPermissions: ["can_adjust_stock", "can_import_products", "view_cost_price"],
     },
     stock_movements: { key: "stock_movements", path: "/erp/movimentacao-estoque", label: "Movimentação de estoque", category: "Produtos", legacyCategory: "products" },
     import_notes: {
@@ -99,20 +99,23 @@ export const ROUTE_MAP: Record<RouteKey, RouteInfo> = {
     cadastros_services: { key: "cadastros_services", path: "/erp/servicos/cadastros", label: "Cadastros", category: "Serviços", legacyCategory: "services" },
 
     // ── Clientes
-    customers: { key: "customers", path: "/erp/clientes", label: "Clientes", category: "Clientes", legacyCategory: "customers" },
+    customers: {
+        key: "customers", path: "/erp/clientes", label: "Clientes", category: "Clientes", legacyCategory: "customers",
+        specificPermissions: ["export"],
+    },
 
     // ── Financeiro
     financial_transactions: {
         key: "financial_transactions", path: "/erp/transacoes", label: "Transações (Pagar/Receber)", category: "Financeiro", legacyCategory: "financial",
-        specificPermissions: ["can_approve_payment", "can_view_reports"],
+        specificPermissions: ["can_approve_payment", "can_view_reports", "can_settle"],
     },
     contas_a_pagar: {
         key: "contas_a_pagar", path: "/erp/contas-a-pagar", label: "Contas a Pagar", category: "Financeiro", legacyCategory: "financial",
-        specificPermissions: ["can_approve_payment"],
+        specificPermissions: ["can_approve_payment", "can_settle"],
     },
     contas_a_receber: {
         key: "contas_a_receber", path: "/erp/contas-a-receber", label: "Contas a Receber", category: "Financeiro", legacyCategory: "financial",
-        specificPermissions: ["can_approve_payment"],
+        specificPermissions: ["can_approve_payment", "can_settle"],
     },
     cash_register: {
         key: "cash_register", path: "/erp/caixa", label: "Caixa (PDV)", category: "Financeiro", legacyCategory: "financial",
@@ -248,7 +251,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     quotes: withSpecific(full, { can_apply_discount: true }),
     goals: full,
     // Produtos
-    products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
+    products: withSpecific(full, { can_adjust_stock: true, can_import_products: true, view_cost_price: true }),
     stock_movements: full,
     import_notes: withSpecific(full, { can_import_products: true }),
     xml_import: withSpecific(full, { can_import_products: true }),
@@ -266,11 +269,11 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
     }),
     cadastros_services: full,
     // Clientes
-    customers: full,
+    customers: withSpecific(full, { export: true }),
     // Financeiro
-    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
-    contas_a_pagar: withSpecific(full, { can_approve_payment: true }),
-    contas_a_receber: withSpecific(full, { can_approve_payment: true }),
+    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true, can_settle: true }),
+    contas_a_pagar: withSpecific(full, { can_approve_payment: true, can_settle: true }),
+    contas_a_receber: withSpecific(full, { can_approve_payment: true, can_settle: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
     financial_dre: withSpecific(full, { can_view_dre: true }),
     cadastros_financeiro: full,
@@ -302,6 +305,7 @@ const OWNER_PERMISSIONS: PartnerRoutePermissions = {
 
 const ADMIN_PERMISSIONS: PartnerRoutePermissions = {
     ...OWNER_PERMISSIONS,
+    stores: withSpecific(crud, { manage_members: true }),
     // Admin: tudo operacional, exceto assinatura e integrações
     settings: full,
     settings_business: full,
@@ -318,9 +322,9 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     stores: storeViewOnly,
     stores_members: viewOnly,
     stores_settings: viewOnly,
-    // Vendas - full ops, can cancel but CANNOT refund
-    orders: withSpecific(full, {
-        can_cancel_order: true, can_refund: false, can_update_status: true,
+    // Vendas - full ops, can cancel and refund, but CANNOT hard delete orders
+    orders: withSpecific(crud, {
+        can_cancel_order: true, can_refund: true, can_update_status: true,
         can_assign_delivery: true, can_view_values: true, can_apply_discount: true,
     }),
     returns: full,
@@ -333,7 +337,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     quotes: withSpecific(full, { can_apply_discount: true }),
     goals: full,
     // Produtos - full
-    products: withSpecific(full, { can_adjust_stock: true, can_import_products: true }),
+    products: withSpecific(full, { can_adjust_stock: true, can_import_products: true, view_cost_price: true }),
     stock_movements: full,
     import_notes: withSpecific(full, { can_import_products: true }),
     xml_import: withSpecific(full, { can_import_products: true }),
@@ -347,15 +351,15 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     services: withSpecific(full, { can_change_service_price: true }),
     service_orders: withSpecific(full, {
         can_assign_technician: true, can_change_status: true,
-        can_request_signature: true, can_generate_invoice: false,
+        can_request_signature: true, can_generate_invoice: true,
     }),
     cadastros_services: full,
-    // Clientes
-    customers: full,
+    // Clientes - CRUD sem exclusão
+    customers: withSpecific(crud, { export: true }),
     // Financeiro - pode visualizar e gerenciar pagamentos
-    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true }),
-    contas_a_pagar: withSpecific(full, { can_approve_payment: true }),
-    contas_a_receber: withSpecific(full, { can_approve_payment: true }),
+    financial_transactions: withSpecific(full, { can_approve_payment: true, can_view_reports: true, can_settle: true }),
+    contas_a_pagar: withSpecific(full, { can_approve_payment: true, can_settle: true }),
+    contas_a_receber: withSpecific(full, { can_approve_payment: true, can_settle: true }),
     cash_register: withSpecific(full, { can_open_cash: true, can_close_cash: true, can_manage_cash: true }),
     financial_dre: withSpecific(viewOnly, { can_view_dre: true }),
     cadastros_financeiro: full,
@@ -375,7 +379,7 @@ const MANAGER_PERMISSIONS: PartnerRoutePermissions = {
     settings: viewOnly,
     settings_business: viewOnly,
     settings_integrations: noAccess,
-    settings_team: withSpecific(viewOnly, { can_invite: false, can_remove_member: false, can_revoke_invite: false, can_manage_team: true }),
+    settings_team: withSpecific(viewOnly, { can_invite: true, can_remove_member: false, can_revoke_invite: true, can_manage_team: true }),
     settings_subscription: noAccess,
     // Produtividade - full
     productivity_overview: full,
@@ -403,11 +407,11 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     quotes: withSpecific(crud, { can_apply_discount: false }),
     goals: viewOnly,
     // Produtos - view only
-    products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false }),
+    products: withSpecific(viewOnly, { can_adjust_stock: false, can_import_products: false, view_cost_price: false }),
     stock_movements: viewOnly,
     import_notes: noAccess,
     xml_import: withSpecific(viewOnly, { can_import_products: false }),
-    suppliers: crud,
+    suppliers: noAccess,
     cadastros_produtos: viewOnly,
     // Serviços - view only (cannot create/edit services)
     // Agendamentos - create/edit, update status, no cancel
@@ -422,7 +426,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
     }),
     cadastros_services: viewOnly,
     // Clientes - CRUD sem exclusão
-    customers: crud,
+    customers: withSpecific(crud, { export: false }),
     // Financeiro - no financial access for operator
     financial_transactions: noAccess,
     contas_a_pagar: noAccess,
@@ -457,7 +461,7 @@ const OPERATOR_PERMISSIONS: PartnerRoutePermissions = {
 // ─── DELIVERY: Entregador ───────────────────────────────────────────────────
 
 const DELIVERY_PERMISSIONS: PartnerRoutePermissions = {
-    dashboard: viewOnly,
+    dashboard: noAccess,
     // Lojas e Filiais
     stores: noAccess,
     stores_members: noAccess,
@@ -624,6 +628,8 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             can_apply_discount: hasSpecificPermission(routePerms, "orders", "can_apply_discount"),
             can_add_delivery: hasSpecificPermission(routePerms, "pos", "can_add_delivery") || hasSpecificPermission(routePerms, "orders", "can_assign_delivery"),
             delete_cancel: orders.delete,
+            can_refund: hasSpecificPermission(routePerms, "orders", "can_refund") || routePerms.returns?.access || false,
+            list: orders.view,
         },
         appointments: {
             view: routePerms.appointments?.access ?? false,
@@ -631,8 +637,14 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             edit: routePerms.appointments?.edit ?? false,
             delete: routePerms.appointments?.delete ?? false,
         },
-        customers: mapRoute("customers"),
-        products: mapRoute("products"),
+        customers: {
+            ...mapRoute("customers"),
+            export: hasSpecificPermission(routePerms, "customers", "export"),
+        },
+        products: {
+            ...mapRoute("products"),
+            view_cost_price: hasSpecificPermission(routePerms, "products", "view_cost_price"),
+        },
         pdv: {
             view: pos.view,
             sell: hasSpecificPermission(routePerms, "pos", "can_sell") || pos.create || pos.edit,
@@ -649,6 +661,10 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             manage: cashRegister.edit,
         },
         services: mapRoute("services"),
+        service_orders: {
+            ...mapRoute("service_orders"),
+            can_generate_invoice: hasSpecificPermission(routePerms, "service_orders", "can_generate_invoice"),
+        },
         quotes: {
             ...mapRoute("quotes"),
             can_apply_discount: hasSpecificPermission(routePerms, "quotes", "can_apply_discount"),
@@ -658,7 +674,13 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
             create: mapRoute("stock_movements").create,
             undo: mapRoute("stock_movements").delete,
         },
-        financial: { view: financial.view, create: financial.create, edit: financial.edit, cancel: hasSpecificPermission(routePerms, "financial_transactions", "can_cancel") },
+        financial: {
+            view: financial.view,
+            create: financial.create,
+            edit: financial.edit,
+            cancel: hasSpecificPermission(routePerms, "financial_transactions", "can_cancel"),
+            can_settle: hasSpecificPermission(routePerms, "financial_transactions", "can_settle"),
+        },
         categories: mapRoute("cadastros_produtos"),
         coupons: mapRoute("marketing_coupons"), // both coupons and promotions map to legacy coupons for compatibility
         goals: mapRoute("goals"),
@@ -756,6 +778,12 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             ;["products", "stock_movements", "import_notes", "xml_import", "cadastros_produtos", "suppliers"].forEach((routeKey) =>
                 apply(routeKey as RouteKey, mapped)
             )
+        if (legacy.products.view_cost_price !== undefined) {
+            base.products.specific = {
+                ...(base.products?.specific || {}),
+                view_cost_price: legacy.products.view_cost_price,
+            }
+        }
     }
 
     if (legacy.services) {
@@ -763,6 +791,16 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             ;["appointments", "services", "service_orders", "cadastros_services"].forEach((routeKey) =>
                 apply(routeKey as RouteKey, mapped)
             )
+    }
+
+    if (legacy.service_orders) {
+        apply("service_orders", {
+            ...mapLegacy(legacy.service_orders),
+            specific: {
+                ...(base.service_orders?.specific || {}),
+                can_generate_invoice: legacy.service_orders.can_generate_invoice ?? false,
+            },
+        })
     }
 
     if (legacy.orders) {
@@ -863,6 +901,10 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
         apply("customers", {
             ...mapLegacy(legacy.customers),
             access: role === "DELIVERY" ? false : legacy.customers.view,
+            specific: {
+                ...(base.customers?.specific || {}),
+                export: legacy.customers.export ?? false,
+            },
         })
     }
 
@@ -872,7 +914,10 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             create: legacy.financial.create,
             edit: legacy.financial.edit,
             delete: false,
-            specific: { can_cancel: legacy.financial.cancel ?? false },
+            specific: {
+                can_cancel: legacy.financial.cancel ?? false,
+                can_settle: legacy.financial.can_settle ?? false,
+            },
         }
             ;["financial_transactions", "contas_a_pagar", "contas_a_receber", "cadastros_financeiro"].forEach((routeKey) => apply(routeKey as RouteKey, mapped))
     }

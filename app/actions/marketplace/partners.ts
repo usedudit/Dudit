@@ -620,15 +620,24 @@ export async function updatePartnerAction(partnerId: string, data: any) {
 
   const supabase = await getSupabaseServerClient()
 
-  // Verify this partner belongs to the current user
+  // Verify this partner exists and user has permission
   const { data: partnerCheck } = await supabase
     .from("partners")
     .select("user_id, business_info")
     .eq("id", partnerId)
     .single()
 
-  if (!partnerCheck || partnerCheck.user_id !== currentUser.id) {
-    return { error: "Não autorizado" }
+  if (!partnerCheck) {
+    return { error: "Parceiro não encontrado" }
+  }
+
+  const isOwner = partnerCheck.user_id === currentUser.id
+  if (!isOwner) {
+    const { checkPartnerPermission } = await import("@/lib/auth/authorization")
+    const permission = await checkPartnerPermission(partnerId, "settings" as any, "settings_negocio")
+    if (!permission.allowed) {
+      return { error: "Não autorizado" }
+    }
   }
 
   const updateData: any = {}

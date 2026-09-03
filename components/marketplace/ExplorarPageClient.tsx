@@ -7,7 +7,7 @@ import { ItemCard, VitrineCard, HorizontalCarousel } from "./shared-components"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import type { LocationContext } from "@/lib/utils/location-label"
 import { getLocationLabel } from "@/lib/utils/location-label"
-import { IconPlaceholder, DefaultModal, SkeletonLoader } from "@/components/reusable"
+import { IconPlaceholder, DefaultModal, SkeletonLoader, ListItem, Input, RadioButton, Button } from "@/components/reusable"
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation"
 import { CommunityVideosCarousel } from "./CommunityVideosCarousel"
 import {
@@ -234,6 +234,7 @@ export function ExplorarPageClient({
     const [isDemandThankYouOpen, setIsDemandThankYouOpen] = useState(false)
     const [selectedDemandType, setSelectedDemandType] = useState<string>("comprar")
     const [demandTerm, setDemandTerm] = useState("")
+    const [isSubmittingDemand, setIsSubmittingDemand] = useState(false)
 
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
@@ -1142,25 +1143,43 @@ export function ExplorarPageClient({
     const handleOpenDemandModal = useCallback(() => {
         const defaultTerm = query || (selectedCategories.length > 0 ? selectedCategories[0] : "")
         setDemandTerm(defaultTerm)
-        setSelectedDemandType("comprar")
+        if (currentType === "servicos") {
+            setSelectedDemandType("contratar")
+        } else if (currentType === "vitrines" || currentType === "negocios") {
+            setSelectedDemandType("loja")
+        } else {
+            setSelectedDemandType("comprar")
+        }
         setIsDemandModalOpen(true)
-    }, [query, selectedCategories])
+    }, [query, selectedCategories, currentType])
 
     const handleSubmitDemand = useCallback(async () => {
-        if (!demandTerm.trim()) return
+        const term = demandTerm.trim()
+        if (!term || isSubmittingDemand) return
+
+        setIsSubmittingDemand(true)
         const demandTypeLabels: Record<string, string> = {
             comprar: "Quero comprar",
             contratar: "Quero contratar",
-            encontrar: "Quero encontrar empresa",
+            loja: "Quero encontrar loja",
+            encontrar: "Quero encontrar loja",
         }
-        await trackExplicitDemandAction(
-            demandTypeLabels[selectedDemandType] || selectedDemandType,
-            demandTerm.trim(),
-            selectedCitySlug || undefined
-        )
-        setIsDemandModalOpen(false)
-        setIsDemandThankYouOpen(true)
-    }, [demandTerm, selectedDemandType, selectedCitySlug])
+
+        try {
+            await trackExplicitDemandAction(
+                demandTypeLabels[selectedDemandType] || "Quero comprar",
+                term,
+                selectedCitySlug || undefined
+            )
+            setDemandTerm("")
+            setIsDemandModalOpen(false)
+            setIsDemandThankYouOpen(true)
+        } catch (err) {
+            console.error("[DEMAND_SUBMIT] Erro ao enviar demanda:", err)
+        } finally {
+            setIsSubmittingDemand(false)
+        }
+    }, [demandTerm, selectedDemandType, selectedCitySlug, isSubmittingDemand])
 
     const clearFilters = () => {
         triggerFilterLoading()
@@ -2104,61 +2123,89 @@ export function ExplorarPageClient({
                         Selecione o tipo de demanda e digite o que precisa. Vamos tentar encontrar alguém que possa ajudar!
                     </p>
 
-                    <div className="flex flex-col gap-3">
-                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
-                            <input
-                                type="radio"
-                                name="demandType"
-                                value="comprar"
-                                checked={selectedDemandType === "comprar"}
-                                onChange={(e) => setSelectedDemandType(e.target.value)}
-                                className="w-4 h-4 text-brand-green accent-brand-green"
-                            />
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero comprar</span>
-                        </label>
+                    <div className="flex flex-col gap-2.5">
+                        <ListItem
+                            title="Quero comprar"
+                            description="Produtos, peças, eletrônicos, roupas ou itens físicos"
+                            className={`p-3.5 transition-all cursor-pointer ${
+                                selectedDemandType === "comprar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                            }`}
+                            onClick={() => setSelectedDemandType("comprar")}
+                            right={
+                                <RadioButton
+                                    name="demandType"
+                                    value="comprar"
+                                    checked={selectedDemandType === "comprar"}
+                                    onChange={() => setSelectedDemandType("comprar")}
+                                />
+                            }
+                        />
 
-                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
-                            <input
-                                type="radio"
-                                name="demandType"
-                                value="contratar"
-                                checked={selectedDemandType === "contratar"}
-                                onChange={(e) => setSelectedDemandType(e.target.value)}
-                                className="w-4 h-4 text-brand-green accent-brand-green"
-                            />
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero contratar</span>
-                        </label>
+                        <ListItem
+                            title="Quero contratar"
+                            description="Serviços, profissionais, reformas, assistências ou diárias"
+                            className={`p-3.5 transition-all cursor-pointer ${
+                                selectedDemandType === "contratar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                            }`}
+                            onClick={() => setSelectedDemandType("contratar")}
+                            right={
+                                <RadioButton
+                                    name="demandType"
+                                    value="contratar"
+                                    checked={selectedDemandType === "contratar"}
+                                    onChange={() => setSelectedDemandType("contratar")}
+                                />
+                            }
+                        />
 
-                        <label className="flex items-center gap-3 p-3 rounded-xl border border-brand-border dark:border-dark-border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-border/20 transition-colors">
-                            <input
-                                type="radio"
-                                name="demandType"
-                                value="encontrar"
-                                checked={selectedDemandType === "encontrar"}
-                                onChange={(e) => setSelectedDemandType(e.target.value)}
-                                className="w-4 h-4 text-brand-green accent-brand-green"
-                            />
-                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">Quero encontrar uma empresa que faça</span>
-                        </label>
-                    </div>
-
-                    <div className="mt-2">
-                        <input
-                            type="text"
-                            placeholder={selectedDemandType === "comprar" ? "Ex: pneu goodyear" : selectedDemandType === "contratar" ? "Ex: encanador" : "Ex: conserto de ar condicionado"}
-                            value={demandTerm}
-                            onChange={(e) => setDemandTerm(e.target.value)}
-                            className="w-full px-4 py-3 border border-brand-border dark:border-dark-border rounded-xl text-sm text-brand-dark dark:text-dark-heading focus:outline-none focus:border-brand-green transition-colors"
+                        <ListItem
+                            title="Quero encontrar loja ou empresa"
+                            description="Estabelecimentos comerciais, empresas locais ou pontos de atendimento"
+                            className={`p-3.5 transition-all cursor-pointer ${
+                                selectedDemandType === "loja" || selectedDemandType === "encontrar"
+                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                    : ""
+                            }`}
+                            onClick={() => setSelectedDemandType("loja")}
+                            right={
+                                <RadioButton
+                                    name="demandType"
+                                    value="loja"
+                                    checked={selectedDemandType === "loja" || selectedDemandType === "encontrar"}
+                                    onChange={() => setSelectedDemandType("loja")}
+                                />
+                            }
                         />
                     </div>
 
-                    <button
+                    <div className="pt-1">
+                        <Input
+                            label="O que você precisa?"
+                            placeholder={
+                                selectedDemandType === "comprar"
+                                    ? "Ex: pneu goodyear, notebook dell, camiseta..."
+                                    : selectedDemandType === "contratar"
+                                        ? "Ex: encanador, eletricista, fotógrafo..."
+                                        : "Ex: conserto de ar condicionado, autopeças, pet shop..."
+                            }
+                            value={demandTerm}
+                            onChange={(e) => setDemandTerm(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+
+                    <Button
+                        variant="default"
+                        className="w-full font-bold"
                         onClick={handleSubmitDemand}
-                        disabled={!demandTerm.trim()}
-                        className="w-full py-3 px-4 bg-brand-green text-white rounded-xl text-sm font-bold hover:bg-brand-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!demandTerm.trim() || isSubmittingDemand}
                     >
-                        Enviar
-                    </button>
+                        {isSubmittingDemand ? "Enviando..." : "Enviar"}
+                    </Button>
                 </div>
             </DefaultModal>
 

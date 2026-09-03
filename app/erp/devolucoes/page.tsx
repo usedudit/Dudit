@@ -16,7 +16,7 @@ export default async function ReturnsPageServer() {
 
   const { partnerId, roleId, activeStoreId } = context
 
-  if (!can(context as RbacUserLike, "orders.can_refund")) {
+  if (!can(context as RbacUserLike, "orders.view") && !can(context as RbacUserLike, "orders.can_refund")) {
     return <AccessDenied />
   }
 

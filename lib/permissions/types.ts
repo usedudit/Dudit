@@ -18,6 +18,23 @@ export interface ResourcePermissions {
     delete: boolean
 }
 
+export interface ProductsPermissions extends ResourcePermissions {
+    view_cost_price?: boolean
+}
+
+export interface CustomersPermissions extends ResourcePermissions {
+    list?: boolean
+    view_fiscal_data?: boolean
+    view_personal_data?: boolean
+    export?: boolean
+}
+
+export interface ServiceOrdersPermissions extends ResourcePermissions {
+    can_assign_technician: boolean
+    can_change_status: boolean
+    can_generate_invoice: boolean
+}
+
 export interface QuotesPermissions extends ResourcePermissions {
     can_apply_discount: boolean
 }
@@ -32,6 +49,8 @@ export interface OrdersPermissions {
     cancel: boolean
     can_apply_discount: boolean
     can_add_delivery: boolean
+    can_refund?: boolean
+    list?: boolean
     // Backward compatibility alias
     delete_cancel?: boolean
 }
@@ -52,11 +71,13 @@ export interface FinancialPermissions {
     create: boolean
     edit: boolean
     cancel: boolean
+    can_settle?: boolean
 }
 
 export interface ReportsPermissions {
     view_basic: boolean
     view_advanced: boolean
+    export_dre?: boolean
 }
 
 export interface DeliveryPermissions {
@@ -122,11 +143,12 @@ export interface PartnerPermissions {
     stores: StorePermissions
     orders: OrdersPermissions
     appointments: AppointmentsPermissions
-    customers: ResourcePermissions
-    products: ResourcePermissions
+    customers: CustomersPermissions
+    products: ProductsPermissions
     stock_movements: StockMovementsPermissions
     pdv: PdvPermissions
     services: ResourcePermissions
+    service_orders?: ServiceOrdersPermissions
     quotes: QuotesPermissions
     financial: FinancialPermissions
     categories: ResourcePermissions
@@ -143,6 +165,10 @@ export interface PartnerPermissions {
     settings_plans: SettingsPlansPermissions
     payment_methods: PaymentMethodsPermissions
     settings_comissions: SettingsComissionsPermissions
+    suppliers?: ResourcePermissions
+    commissions?: { view: boolean; edit: boolean }
+    community_videos?: ResourcePermissions
+    colecoes?: ResourcePermissions
     // Backward compatibility aliases still used by old mappings/actions
     cash_register?: { view: boolean; open_close: boolean; manage: boolean }
     cadastros_categories?: ResourcePermissions
@@ -154,7 +180,6 @@ export interface PartnerPermissions {
         can_apply_discount: boolean
         can_add_delivery?: boolean
     }
-    suppliers?: ResourcePermissions
     productivity?: {
         view: boolean
         goals_view: boolean

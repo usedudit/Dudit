@@ -40,35 +40,53 @@ function getDayKeys(startDate: Date, endDate: Date): string[] {
     return keys
 }
 
+function cleanCitySlug(slug?: string | null): string | null {
+    if (!slug) return null
+    const s = slug.toLowerCase().trim()
+    if (s === "brasil" || s.startsWith("estado-")) return null
+    return s
+}
+
 /**
- * Intelligent categorization suggestion based on search keyword
+ * Intelligent categorization suggestion based on search keyword and demand type
  */
-function inferCategoryFromQuery(term: string): string {
+function inferCategoryFromQuery(term: string, demandType?: string): string {
     const t = term.toLowerCase()
-    if (t.includes("marmita") || t.includes("comida") || t.includes("lanche") || t.includes("pizza") || t.includes("hamburg") || t.includes("sushi") || t.includes("acai") || t.includes("restaurante") || t.includes("doce") || t.includes("bolo") || t.includes("cafe")) {
+    if (t.includes("marmita") || t.includes("comida") || t.includes("lanche") || t.includes("pizza") || t.includes("hamburg") || t.includes("sushi") || t.includes("acai") || t.includes("restaurante") || t.includes("doce") || t.includes("bolo") || t.includes("cafe") || t.includes("bebida")) {
         return "Alimentação & Gastronomia"
     }
-    if (t.includes("iphone") || t.includes("celular") || t.includes("computador") || t.includes("notebook") || t.includes("tela") || t.includes("bateria") || t.includes("conserto") || t.includes("assistencia") || t.includes("fone") || t.includes("carregador")) {
+    if (t.includes("iphone") || t.includes("celular") || t.includes("computador") || t.includes("notebook") || t.includes("tela") || t.includes("bateria") || t.includes("conserto") || t.includes("assistencia") || t.includes("fone") || t.includes("carregador") || t.includes("tablet")) {
         return "Assistência Técnica & Informática"
     }
-    if (t.includes("roupa") || t.includes("vestido") || t.includes("camisa") || t.includes("tenis") || t.includes("sapato") || t.includes("calca") || t.includes("biquini") || t.includes("moda") || t.includes("lingerie")) {
+    if (t.includes("roupa") || t.includes("vestido") || t.includes("camisa") || t.includes("tenis") || t.includes("sapato") || t.includes("calca") || t.includes("biquini") || t.includes("moda") || t.includes("lingerie") || t.includes("bolsa") || t.includes("acessorio")) {
         return "Moda & Vestuário"
     }
-    if (t.includes("corte") || t.includes("cabelo") || t.includes("barba") || t.includes("unha") || t.includes("sobrancelha") || t.includes("manicure") || t.includes("pedicure") || t.includes("depilacao") || t.includes("estetica") || t.includes("massagem")) {
+    if (t.includes("corte") || t.includes("cabelo") || t.includes("barba") || t.includes("unha") || t.includes("sobrancelha") || t.includes("manicure") || t.includes("pedicure") || t.includes("depilacao") || t.includes("estetica") || t.includes("massagem") || t.includes("barbearia") || t.includes("salao")) {
         return "Beleza, Barbearia & Estética"
     }
-    if (t.includes("eletricista") || t.includes("encanador") || t.includes("pedreiro") || t.includes("pintor") || t.includes("marceneiro") || t.includes("ar condicionado") || t.includes("limpeza") || t.includes("diarista") || t.includes("frete") || t.includes("guincho")) {
+    if (t.includes("eletricista") || t.includes("encanador") || t.includes("pedreiro") || t.includes("pintor") || t.includes("marceneiro") || t.includes("ar condicionado") || t.includes("limpeza") || t.includes("diarista") || t.includes("frete") || t.includes("guincho") || t.includes("reforma")) {
         return "Serviços Gerais & Reformas"
     }
-    if (t.includes("pet") || t.includes("racao") || t.includes("banho e tosa") || t.includes("veterinario") || t.includes("cachorro") || t.includes("gato")) {
+    if (t.includes("pet") || t.includes("racao") || t.includes("banho e tosa") || t.includes("veterinario") || t.includes("cachorro") || t.includes("gato") || t.includes("animal")) {
         return "Pet Shop & Veterinária"
     }
-    if (t.includes("mecanic") || t.includes("pneu") || t.includes("oleo") || t.includes("oficina") || t.includes("funilaria") || t.includes("lava rapido") || t.includes("moto") || t.includes("carro")) {
+    if (t.includes("mecanic") || t.includes("pneu") || t.includes("oleo") || t.includes("oficina") || t.includes("funilaria") || t.includes("lava rapido") || t.includes("moto") || t.includes("carro") || t.includes("autopeca")) {
         return "Automotivo & Mecânica"
     }
-    if (t.includes("farmacia") || t.includes("remedio") || t.includes("dentista") || t.includes("psicolog") || t.includes("nutricion") || t.includes("fisioterap") || t.includes("academia") || t.includes("personal")) {
+    if (t.includes("farmacia") || t.includes("remedio") || t.includes("dentista") || t.includes("psicolog") || t.includes("nutricion") || t.includes("fisioterap") || t.includes("academia") || t.includes("personal") || t.includes("pilates")) {
         return "Saúde, Bem-estar & Fitness"
     }
+
+    if (demandType?.includes("contratar")) {
+        return "Serviços & Contratações"
+    }
+    if (demandType?.includes("loja") || demandType?.includes("empresa")) {
+        return "Lojas & Negócios Locais"
+    }
+    if (demandType?.includes("comprar")) {
+        return "Comércio & Produtos"
+    }
+
     return "Comércio Local & Geral"
 }
 
@@ -86,7 +104,8 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
         if (!normalizedTerm) return
 
         const dateStr = formatDateKey()
-        const cityPrefix = input.citySlug ? `city:${input.citySlug}:` : ""
+        const cleanCity = cleanCitySlug(input.citySlug)
+        const cityPrefix = cleanCity ? `city:${cleanCity}:` : ""
 
         // Multi / Pipeline operations in Redis
         const p = redis.pipeline()
@@ -95,7 +114,7 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
         p.incr(`ddt:search:${dateStr}:total`)
         p.expire(`ddt:search:${dateStr}:total`, TELEMETRY_TTL_SECONDS)
 
-        if (input.citySlug) {
+        if (cleanCity) {
             p.incr(`ddt:search:${cityPrefix}${dateStr}:total`)
             p.expire(`ddt:search:${cityPrefix}${dateStr}:total`, TELEMETRY_TTL_SECONDS)
         }
@@ -104,7 +123,7 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
             p.incr(`ddt:search:${dateStr}:with_results`)
             p.expire(`ddt:search:${dateStr}:with_results`, TELEMETRY_TTL_SECONDS)
 
-            if (input.citySlug) {
+            if (cleanCity) {
                 p.incr(`ddt:search:${cityPrefix}${dateStr}:with_results`)
                 p.expire(`ddt:search:${cityPrefix}${dateStr}:with_results`, TELEMETRY_TTL_SECONDS)
             }
@@ -121,7 +140,7 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
             p.zincrby(`ddt:search:${monthStr}:zero_terms`, 1, normalizedTerm)
             p.expire(`ddt:search:${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
 
-            if (input.citySlug) {
+            if (cleanCity) {
                 p.incr(`ddt:search:${cityPrefix}${dateStr}:zero_results`)
                 p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
 
@@ -145,7 +164,8 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
 export async function recordDemandEventTelemetry(input: DemandEventInput): Promise<void> {
     try {
         const dateStr = formatDateKey()
-        const cityPrefix = input.citySlug ? `city:${input.citySlug}:` : ""
+        const cleanCity = cleanCitySlug(input.citySlug)
+        const cityPrefix = cleanCity ? `city:${cleanCity}:` : ""
 
         const p = redis.pipeline()
 
@@ -153,7 +173,7 @@ export async function recordDemandEventTelemetry(input: DemandEventInput): Promi
             p.incr(`ddt:demand:${dateStr}:contacts`)
             p.expire(`ddt:demand:${dateStr}:contacts`, TELEMETRY_TTL_SECONDS)
 
-            if (input.citySlug) {
+            if (cleanCity) {
                 p.incr(`ddt:demand:${cityPrefix}${dateStr}:contacts`)
                 p.expire(`ddt:demand:${cityPrefix}${dateStr}:contacts`, TELEMETRY_TTL_SECONDS)
             }
@@ -165,23 +185,52 @@ export async function recordDemandEventTelemetry(input: DemandEventInput): Promi
         }
 
         if (input.type === "explicit_demand") {
-            p.incr(`ddt:demand:${dateStr}:explicit`)
-            p.expire(`ddt:demand:${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
+            const rawTerm = ((input.metadata?.term as string) || "").trim().slice(0, 100)
+            const rawDemandType = ((input.metadata?.demandType as string) || "").trim()
 
-            if (input.citySlug) {
-                p.incr(`ddt:demand:${cityPrefix}${dateStr}:explicit`)
-                p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
-            }
+            if (rawTerm) {
+                const displayEntry = rawDemandType ? `${rawDemandType}: ${rawTerm}` : rawTerm
+                const monthStr = dateStr.slice(0, 7)
 
-            const term = (input.metadata?.term as string) || ""
-            const demandType = (input.metadata?.demandType as string) || ""
-            if (term) {
-                p.zincrby(`ddt:demand:${dateStr}:explicit_terms`, 1, `${demandType}: ${term}`)
+                // 1. Contador e lista de demandas explícitas
+                p.incr(`ddt:demand:${dateStr}:explicit`)
+                p.expire(`ddt:demand:${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
+
+                p.zincrby(`ddt:demand:${dateStr}:explicit_terms`, 1, displayEntry)
                 p.expire(`ddt:demand:${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
 
-                if (input.citySlug) {
-                    p.zincrby(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, 1, `${demandType}: ${term}`)
+                // 2. Unificação com as buscas e demandas gerais da plataforma (resultado zero atendido)
+                p.incr(`ddt:search:${dateStr}:total`)
+                p.expire(`ddt:search:${dateStr}:total`, TELEMETRY_TTL_SECONDS)
+
+                p.incr(`ddt:search:${dateStr}:zero_results`)
+                p.expire(`ddt:search:${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
+
+                p.zincrby(`ddt:search:${dateStr}:zero_terms`, 1, displayEntry)
+                p.expire(`ddt:search:${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
+
+                p.zincrby(`ddt:search:${monthStr}:zero_terms`, 1, displayEntry)
+                p.expire(`ddt:search:${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
+
+                // 3. Granularidade por cidade (se houver cidade selecionada)
+                if (cleanCity) {
+                    p.incr(`ddt:demand:${cityPrefix}${dateStr}:explicit`)
+                    p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
+
+                    p.zincrby(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, 1, displayEntry)
                     p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
+
+                    p.incr(`ddt:search:${cityPrefix}${dateStr}:total`)
+                    p.expire(`ddt:search:${cityPrefix}${dateStr}:total`, TELEMETRY_TTL_SECONDS)
+
+                    p.incr(`ddt:search:${cityPrefix}${dateStr}:zero_results`)
+                    p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
+
+                    p.zincrby(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, 1, displayEntry)
+                    p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
+
+                    p.zincrby(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, 1, displayEntry)
+                    p.expire(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
                 }
             }
         }
@@ -216,16 +265,18 @@ export async function getMarketplaceSearchStats(
 }> {
     try {
         const dayKeys = getDayKeys(startDate, endDate)
-        const cityPrefix = citySlug ? `city:${citySlug}:` : ""
+        const cleanCity = cleanCitySlug(citySlug)
+        const cityPrefix = cleanCity ? `city:${cleanCity}:` : ""
 
         const p = redis.pipeline()
 
-        // Batch fetch all daily metrics
+        // Batch fetch all daily metrics (searches, results, contacts, explicit demands)
         for (const d of dayKeys) {
             p.get(`ddt:search:${cityPrefix}${d}:total`)
             p.get(`ddt:search:${cityPrefix}${d}:with_results`)
             p.get(`ddt:search:${cityPrefix}${d}:zero_results`)
             p.get(`ddt:demand:${cityPrefix}${d}:contacts`)
+            p.get(`ddt:demand:${cityPrefix}${d}:explicit`)
         }
 
         const results = await p.exec()
@@ -245,12 +296,18 @@ export async function getMarketplaceSearchStats(
 
         for (let i = 0; i < dayKeys.length; i++) {
             const dateStr = dayKeys[i]
-            const baseIdx = i * 4
+            const baseIdx = i * 5
 
-            const t = Number(results[baseIdx] || 0)
-            const w = Number(results[baseIdx + 1] || 0)
-            const z = Number(results[baseIdx + 2] || 0)
-            const c = Number(results[baseIdx + 3] || 0)
+            const rawT = Number(results[baseIdx] || 0)
+            const rawW = Number(results[baseIdx + 1] || 0)
+            const rawZ = Number(results[baseIdx + 2] || 0)
+            const rawC = Number(results[baseIdx + 3] || 0)
+            const rawE = Number(results[baseIdx + 4] || 0)
+
+            const w = rawW
+            const z = Math.max(rawZ, rawE)
+            const t = Math.max(rawT, w + z)
+            const c = rawC
 
             totalSearches += t
             searchesWithResults += w
@@ -266,14 +323,18 @@ export async function getMarketplaceSearchStats(
             })
         }
 
-        // Fetch top zero-result keywords across the period
-        // To combine sorted sets across days efficiently, fetch from daily keys or monthly keys
-        const termsMap = new Map<string, number>()
+        // Fetch top zero-result keywords AND explicit demands across the period
+        const termsMap = new Map<string, { count: number; demandType?: string; cleanTerm: string }>()
 
         const termPipeline = redis.pipeline()
         for (const d of dayKeys) {
-            // Get top 20 zero terms per day with scores (REV = highest first)
-            termPipeline.zrange(`ddt:search:${cityPrefix}${d}:zero_terms`, 0, 20, {
+            // Get zero terms
+            termPipeline.zrange(`ddt:search:${cityPrefix}${d}:zero_terms`, 0, 30, {
+                rev: true,
+                withScores: true,
+            })
+            // Also get explicit demand terms
+            termPipeline.zrange(`ddt:demand:${cityPrefix}${d}:explicit_terms`, 0, 30, {
                 rev: true,
                 withScores: true,
             })
@@ -283,24 +344,60 @@ export async function getMarketplaceSearchStats(
 
         for (const res of termResults) {
             if (Array.isArray(res)) {
-                // Upstash returns [member, score, member, score, ...] or [{ member, score }] depending on driver version
                 for (let j = 0; j < res.length; j += 2) {
-                    const term = typeof res[j] === "string" ? res[j] : (res[j] as any)?.member
+                    const rawMember = typeof res[j] === "string" ? res[j] : (res[j] as any)?.member
                     const score = typeof res[j + 1] === "number" ? res[j + 1] : Number((res[j] as any)?.score || 0)
 
-                    if (term && score > 0) {
-                        const cur = termsMap.get(term) || 0
-                        termsMap.set(term, cur + score)
+                    if (rawMember && score > 0) {
+                        let cleanTerm = String(rawMember).trim()
+                        let demandType: string | undefined = undefined
+
+                        const knownPrefixes = [
+                            { prefix: "Quero comprar: ", type: "Quero comprar" },
+                            { prefix: "Quero contratar: ", type: "Quero contratar" },
+                            { prefix: "Quero encontrar loja/empresa: ", type: "Quero encontrar loja" },
+                            { prefix: "Quero encontrar loja: ", type: "Quero encontrar loja" },
+                            { prefix: "Quero encontrar empresa: ", type: "Quero encontrar loja" },
+                            { prefix: "Quero encontrar: ", type: "Quero encontrar loja" },
+                            { prefix: "comprar: ", type: "Quero comprar" },
+                            { prefix: "contratar: ", type: "Quero contratar" },
+                            { prefix: "loja: ", type: "Quero encontrar loja" },
+                            { prefix: "encontrar: ", type: "Quero encontrar loja" },
+                        ]
+
+                        for (const p of knownPrefixes) {
+                            if (cleanTerm.toLowerCase().startsWith(p.prefix.toLowerCase())) {
+                                demandType = p.type
+                                cleanTerm = cleanTerm.slice(p.prefix.length).trim()
+                                break
+                            }
+                        }
+
+                        const mapKey = cleanTerm.toLowerCase()
+                        const existing = termsMap.get(mapKey)
+                        if (existing) {
+                            existing.count += score
+                            if (!existing.demandType && demandType) {
+                                existing.demandType = demandType
+                            }
+                        } else {
+                            termsMap.set(mapKey, {
+                                cleanTerm,
+                                demandType,
+                                count: score,
+                            })
+                        }
                     }
                 }
             }
         }
 
-        const sortedTerms: ZeroResultTerm[] = Array.from(termsMap.entries())
-            .map(([term, count]) => ({
-                term,
+        const sortedTerms: ZeroResultTerm[] = Array.from(termsMap.values())
+            .map(({ cleanTerm, demandType, count }) => ({
+                term: cleanTerm,
                 count,
-                suggestedCategory: inferCategoryFromQuery(term),
+                demandType,
+                suggestedCategory: inferCategoryFromQuery(cleanTerm, demandType),
             }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 30)

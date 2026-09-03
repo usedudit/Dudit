@@ -18,6 +18,7 @@ export interface ZeroResultTerm {
     term: string
     count: number
     suggestedCategory?: string
+    demandType?: string
 }
 
 export interface MarketplaceDemandMetrics {

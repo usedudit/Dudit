@@ -80,6 +80,7 @@ const SPECIFIC_PERMISSION_MESSAGES: Record<string, string> = {
   "financial.create": "Você não possui permissão para criar lançamentos financeiros.",
   "financial.edit": "Você não possui permissão para editar lançamentos financeiros.",
   "financial.cancel": "Você não possui permissão para cancelar transações financeiras.",
+  "financial.can_settle": "Você não possui permissão para liquidar ou baixar contas a pagar/receber.",
   "financial.view": "Você não possui permissão para acessar o módulo financeiro.",
 
   // Produtos & Estoque
@@ -87,6 +88,7 @@ const SPECIFIC_PERMISSION_MESSAGES: Record<string, string> = {
   "products.edit": "Você não possui permissão para editar produtos.",
   "products.delete": "Você não possui permissão para excluir produtos.",
   "products.view": "Você não possui permissão para visualizar produtos.",
+  "products.view_cost_price": "Você não possui permissão para visualizar o preço de custo dos produtos.",
   "stock_movements.create": "Você não possui permissão para realizar movimentações de estoque.",
   "stock_movements.undo": "Você não possui permissão para estornar movimentações de estoque.",
   "stock_movements.view": "Você não possui permissão para visualizar o histórico de estoque.",
@@ -96,6 +98,7 @@ const SPECIFIC_PERMISSION_MESSAGES: Record<string, string> = {
   "customers.edit": "Você não possui permissão para editar dados de clientes.",
   "customers.delete": "Você não possui permissão para excluir clientes.",
   "customers.view": "Você não possui permissão para visualizar clientes.",
+  "customers.export": "Você não possui permissão para exportar a base de clientes.",
   "customers.view_fiscal_data": "Você não possui permissão para visualizar dados fiscais de clientes.",
   "customers.view_personal_data": "Você não possui permissão para visualizar dados pessoais de clientes.",
   "suppliers.create": "Você não possui permissão para cadastrar fornecedores.",
@@ -114,6 +117,7 @@ const SPECIFIC_PERMISSION_MESSAGES: Record<string, string> = {
   "service_orders.view": "Você não possui permissão para visualizar ordens de serviço.",
   "service_orders.can_assign_technician": "Você não possui permissão para atribuir técnicos em ordens de serviço.",
   "service_orders.can_change_status": "Você não possui permissão para alterar o status de ordens de serviço.",
+  "service_orders.can_generate_invoice": "Você não possui permissão para faturar ou emitir nota fiscal para ordens de serviço.",
 
   // Agendamentos
   "appointments.create": "Você não possui permissão para criar agendamentos.",

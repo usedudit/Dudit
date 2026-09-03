@@ -217,11 +217,29 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-2 mb-2">
-                                            <div className="font-bold text-brand-dark dark:text-dark-heading text-sm capitalize">
-                                                &quot;{item.term}&quot;
+                                            <div className="flex flex-col gap-1 min-w-0">
+                                                <div className="font-bold text-brand-dark dark:text-dark-heading text-sm capitalize truncate">
+                                                    &quot;{item.term}&quot;
+                                                </div>
+                                                {item.demandType && (
+                                                    <div className="flex items-center gap-1 mt-0.5">
+                                                        <Badge
+                                                            variant={
+                                                                item.demandType.includes("comprar")
+                                                                    ? "orange"
+                                                                    : item.demandType.includes("contratar")
+                                                                        ? "purple"
+                                                                        : "blue"
+                                                            }
+                                                            className="text-[11px] py-0.5 px-2"
+                                                        >
+                                                            {item.demandType}
+                                                        </Badge>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <Badge variant={isTopDemand ? "red" : "gray"}>
-                                                {item.count} buscas
+                                            <Badge variant={isTopDemand ? "red" : "gray"} className="shrink-0">
+                                                {item.count} {item.demandType ? "demanda(s)" : "busca(s)"}
                                             </Badge>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body">

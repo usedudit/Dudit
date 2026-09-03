@@ -1,615 +1,35 @@
 "use client"
 
-import React, { useState, useTransition, useCallback, useRef, useEffect } from "react"
+import React, { useState, useTransition, useRef, useEffect } from "react"
 import {
-    CheckCircleIcon, CancelCircleIcon, ClockIcon, TrashIcon, RemoveImageIcon,
-    StoreIcon, UserIcon, InfoIcon, XIcon, EditIcon
+    RemoveImageIcon
 } from "@/lib/icons"
-import { Button, Badge, Input, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
-import Portal from "@/components/Portal"
-import AlertModal from "@/components/reusable/AlertModal"
-import DefaultModal from "@/components/reusable/DefaultModal"
+import { Badge, Pagination, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import ModerationListRow from "./ModerationListRow"
 import ModerationPageControls from "./ModerationPageControls"
+import AdminModerationDetailView from "./AdminModerationDetailView"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AnimatePresence } from "framer-motion"
 import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
 import {
     getModerationQueue,
     approveModeration,
-    rejectFlaggedImages,
-    rejectModeration,
 } from "@/app/actions/admin/moderation"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import BottomSheet from "@/components/BottomSheet"
-import { useMediaQuery } from "@/components/erp/hooks"
 import { toast } from "@/hooks/use-notification"
+import { useEntityState } from "@/hooks/use-entity-state"
 import { useEntityPage } from "@/hooks/use-entity-page"
 import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
-
-// ─── Image thumbnail ────────────────────────────────────────────────────────
-
-function ImageThumbnail({ url, selected, onToggle }: { url: string; selected: boolean; onToggle: () => void }) {
-    const imageUrl = url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`
-    return (
-        <div
-            className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${selected ? "border-red-500 ring-2 ring-red-300" : "border-brand-border dark:border-dark-border"}`}
-            onClick={onToggle}
-        >
-            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-            {selected && (
-                <div className="absolute inset-0 bg-red-500/30 flex items-center justify-center">
-                    <CancelCircleIcon className="w-6 h-6 text-white" />
-                </div>
-            )}
-        </div>
-    )
-}
-
-// ─── Product Moderation Sheet ───────────────────────────────────────────────────
-
-interface ProductModerationSheetProps {
-    item: ModerationItem | null
-    isOpen: boolean
-    onClose: () => void
-    onApprove: (id: string, type: ModerationItem["type"]) => void
-    onRejectImages: (id: string, urls: string[], reason: string) => void
-    onFullReject: (id: string, reason: string, type: ModerationItem["type"]) => void
-    onEditItem?: (type: string, id: string) => void
-    isPending: boolean
-}
-
-function ProductModerationSheet({
-    item, isOpen, onClose, onApprove, onRejectImages, onFullReject, onEditItem, isPending,
-}: ProductModerationSheetProps) {
-    const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
-    const [showRejectImagesModal, setShowRejectImagesModal] = useState(false)
-    const [showFullRejectModal, setShowFullRejectModal] = useState(false)
-    const [showApproveModal, setShowApproveModal] = useState(false)
-    const [rejectReason, setRejectReason] = useState("")
-    const [showLightbox, setShowLightbox] = useState(false)
-    const [lightboxIndex, setLightboxIndex] = useState(0)
-    const isMobile = useMediaQuery("(max-width: 768px)")
-
-    // Reset local state when item changes
-    useEffect(() => {
-        setSelectedImages(new Set())
-        setRejectReason("")
-        setShowLightbox(false)
-    }, [item])
-
-    const toggleImage = (url: string) => {
-        setSelectedImages(prev => {
-            const next = new Set(prev)
-            if (next.has(url)) next.delete(url)
-            else next.add(url)
-            return next
-        })
-    }
-
-    const allImages = (item?.images || []).map(url => url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`)
-
-    const openLightbox = (index: number = 0) => {
-        setLightboxIndex(index)
-        setShowLightbox(true)
-    }
-
-    const content = item ? (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            {/* Header */}
-            <header className="z-10 shrink-0 flex items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Revisar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}</h2>
-                <Button variant="filled" onClick={onClose} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar pb-32 md:pb-6">
-                {/* Product/Partner Info */}
-                <div>
-                    <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight truncate">{item.title}</h3>
-                    <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        <Badge variant={
-                            item.moderation_status === "pending_moderation" ? "orange" :
-                                item.moderation_status === "flagged" ? "red" :
-                                    item.moderation_status === "approved" ? "green" :
-                                        item.moderation_status === "rejected" ? "red" :
-                                            item.moderation_status === "needs_images" ? "blue" : "gray"
-                        }>
-                            {item.moderation_status === "pending_moderation" ? "Pendente" :
-                                item.moderation_status === "flagged" ? "Flagged" :
-                                    item.moderation_status === "approved" ? "Aprovado" :
-                                        item.moderation_status === "rejected" ? "Rejeitado" :
-                                            item.moderation_status === "needs_images" ? "Sem imagens" : item.moderation_status}
-                        </Badge>
-                        {item.price > 0 && (
-                            <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                                {formatCurrency(item.price)}
-                            </span>
-                        )}
-                        {/* Category */}
-                        {item.category_name && (
-                            <span className="px-3 py-1 bg-brand-gray dark:bg-dark-border rounded-lg text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                {item.category_name}
-                            </span>
-                        )}
-                        {/* Brand */}
-                        {item.brand_name && (
-                            <span className="px-3 py-1 bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-brand-green/80 rounded-lg text-sm font-medium">
-                                {item.brand_name}
-                            </span>
-                        )}
-                        {/* Video indicator */}
-                        {item.video_url && (
-                            <span className="px-3 py-1 bg-brand-blue/10 dark:bg-brand-blue/20 text-brand-blue dark:text-brand-blue/80 rounded-lg text-sm font-medium flex items-center gap-1">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <polygon points="23 7 16 12 23 17 23 7" />
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                                </svg>
-                                Vídeo
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* Video Player */}
-                {item.video_url && item.video_type && (
-                    <div className="space-y-2">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Vídeo</h4>
-                        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black/10 dark:bg-black/30 border border-brand-border dark:border-dark-border">
-                            {item.video_type === "youtube" && (
-                                <iframe
-                                    src={`https://www.youtube.com/embed/${item.video_url.split("v=")[1]?.split("&")[0]}`}
-                                    title="Vídeo do produto"
-                                    className="w-full h-full"
-                                    frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                />
-                            )}
-                            {item.video_type === "vimeo" && (
-                                <iframe
-                                    src={`https://player.vimeo.com/video/${item.video_url.split("/").pop()}`}
-                                    title="Vídeo do produto"
-                                    className="w-full h-full"
-                                    frameBorder="0"
-                                    allow="autoplay; fullscreen; picture-in-picture"
-                                    allowFullScreen
-                                />
-                            )}
-                            {item.video_type === "upload" && item.video_url && (
-                                <video
-                                    src={item.video_url.startsWith("http") ? item.video_url : `https://img.dudit.com.br/${item.video_url}`}
-                                    controls
-                                    className="w-full h-full"
-                                    poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : `https://img.dudit.com.br/${item.video_thumbnail}`) : undefined}
-                                />
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* description */}
-                <div>
-                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body mb-2">Descrição</h4>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
-                        {item.description || "Sem descrição disponível."}
-                    </p>
-                </div>
-
-                {/* Store Info Card */}
-                <div className="p-4 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-brand-border dark:border-dark-border">
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <StoreIcon size={16} className="text-brand-inactive-text" />
-                                <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">{item.store_name || item.owner_store_name}</span>
-                            </div>
-                            {item.risk_score > 0 && (
-                                <Badge variant={item.risk_score >= 50 ? "red" : item.risk_score >= 20 ? "orange" : "blue"}>
-                                    Risk: {item.risk_score}
-                                </Badge>
-                            )}
-                        </div>
-                        {item.store_phone && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">{formatBrazilPhone(item.store_phone || "")}</span>
-                            </div>
-                        )}
-                        {item.store_description && (
-                            <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
-                                {item.store_description}
-                            </p>
-                        )}
-                        <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                            <div className="flex items-center gap-2">
-                                <UserIcon size={14} className="text-brand-inactive-text" />
-                                <span className="text-xs text-brand-inactive-text truncate">
-                                    Proprietário: <strong>{item.owner_user_name || "N/A"}</strong>
-                                </span>
-                            </div>
-                        </div>
-                        {item.owner_user_id && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono text-brand-inactive-text opacity-70 break-all">{item.owner_user_id}</span>
-                            </div>
-                        )}
-                        <div className="flex items-center gap-2 pt-2 border-t border-brand-border dark:border-dark-border">
-                            <ClockIcon size={14} className="text-brand-inactive-text" />
-                            <span className="text-xs text-brand-inactive-text truncate">Enviado em {formatDate(item.created_at)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Banner */}
-                {(item.store_banner_url || item.store_logo_url) && (
-                    <div className="space-y-2">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Banner da Vitrine</h4>
-                        <div className="relative w-full h-32 rounded-xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
-                            {item.store_banner_url ? (
-                                <img
-                                    src={item.store_banner_url.startsWith("http") ? item.store_banner_url : `https://img.dudit.com.br/${item.store_banner_url}`}
-                                    alt="Banner"
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-brand-inactive-text text-xs">Sem banner</div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Gallery */}
-                {item.store_gallery && item.store_gallery.length > 0 && (
-                    <div className="space-y-2">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Galeria ({item.store_gallery.length})</h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            {item.store_gallery.map((url: string, idx: number) => (
-                                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
-                                    <img
-                                        src={url.startsWith("http") ? url : `https://img.dudit.com.br/${url}`}
-                                        alt={`Galeria ${idx + 1}`}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Images */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body">Imagens do {item.type === "product" ? "Produto" : item.type === "service" ? "Serviço" : "Item"} ({item.images?.length || 0})</h4>
-                        {selectedImages.size > 0 && (
-                            <span className="text-xs font-bold text-brand-red">{selectedImages.size} selecionada(s)</span>
-                        )}
-                    </div>
-                    {item.images && item.images.length > 0 ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {item.images.map((url: string, idx: number) => {
-                                const fullUrl = url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`
-                                const isSelected = selectedImages.has(url)
-                                return (
-                                    <div
-                                        key={idx}
-                                        className={`relative group aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
-                                            isSelected ? "border-red-500 ring-2 ring-red-300" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"
-                                        }`}
-                                        onClick={() => {
-                                            if (isSelected) {
-                                                toggleImage(url)
-                                            } else {
-                                                openLightbox(idx)
-                                            }
-                                        }}
-                                    >
-                                        <img src={fullUrl} alt={`Imagem ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                                        {isSelected && (
-                                            <div className="absolute inset-0 bg-red-500/30 flex items-center justify-center">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                                </svg>
-                                            </div>
-                                        )}
-                                        {!isSelected && (
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <path d="M12 8v4M12 16h.01" />
-                                                </svg>
-                                            </div>
-                                        )}
-                                        <div className="absolute bottom-2 right-2">
-                                            <span className="text-xs bg-black/70 text-white px-2 py-1 rounded">
-                                                {idx + 1} / {item.images.length}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center p-8 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-30">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                            </svg>
-                            <span className="text-sm font-medium">Nenhuma imagem enviada</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Actions Section */}
-                {item.moderation_status !== "approved" && (
-                    <div className="pt-4 border-t border-brand-border dark:border-dark-border space-y-3">
-                        <Button
-                            variant="filled"
-                            className="w-full rounded-full h-12 text-[15px] font-bold"
-                            onClick={() => setShowApproveModal(true)}
-                            disabled={isPending}
-                        >
-                            <CheckCircleIcon size={20} className="mr-2" /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
-                        </Button>
-
-                        {(item.type === "product" || item.type === "service") && onEditItem && (
-                            <Button
-                                variant="outline"
-                                className="w-full rounded-full h-11 text-[14px] font-medium"
-                                onClick={() => {
-                                    onClose()
-                                    onEditItem(item.type, item.id)
-                                }}
-                            >
-                                <EditIcon size={18} className="mr-2" /> Editar {item.type === "product" ? "Produto" : "Serviço"} no Painel
-                            </Button>
-                        )}
-
-                        <div className="flex gap-3">
-                            {selectedImages.size > 0 && (item.type === "product" || item.type === "service") && (
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 rounded-full h-12 text-amber-600 border-amber-200 hover:bg-amber-50"
-                                    onClick={() => setShowRejectImagesModal(true)}
-                                    disabled={isPending}
-                                >
-                                    <CancelCircleIcon size={20} className="mr-2" /> Remover Imagens
-                                </Button>
-                            )}
-                            <Button
-                                variant="outline"
-                                className="flex-1 rounded-full h-12 text-brand-red border-red-200 hover:bg-red-50"
-                                onClick={() => setShowFullRejectModal(true)}
-                                disabled={isPending}
-                            >
-                                <TrashIcon size={20} className="mr-2" /> Rejeitar Tudo
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Modals */}
-            <DefaultModal
-                isOpen={showApproveModal}
-                onClose={() => setShowApproveModal(false)}
-                title={`Aprovar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}`}
-                maxWidth="sm"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => setShowApproveModal(false)} disabled={isPending}>Cancelar</Button>
-                        <Button onClick={() => { onApprove(item.id, item.type); setShowApproveModal(false) }} isLoading={isPending}>Confirmar Aprovação</Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col items-center text-center gap-4 py-4">
-                    <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
-                        <CheckCircleIcon size={32} />
-                    </div>
-                    <div>
-                        <p className="text-brand-dark dark:text-dark-heading font-bold text-lg">Confirmar aprovação?</p>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
-                            {item.type === "product"
-                                ? `O produto "${item.title}" ficará visível imediatamente.`
-                                : `O perfil de "${item.owner_store_name}" terá suas imagens aprovadas.`}
-                        </p>
-                    </div>
-                </div>
-            </DefaultModal>
-
-            <DefaultModal
-                isOpen={showRejectImagesModal}
-                onClose={() => { setShowRejectImagesModal(false); setRejectReason("") }}
-                title="Remover Imagens"
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setShowRejectImagesModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
-                        <Button
-                            variant="destructive"
-                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                            onClick={() => {
-                                onRejectImages(item.id, [...selectedImages], rejectReason)
-                                setShowRejectImagesModal(false)
-                            }}
-                            isLoading={isPending}
-                        >
-                            Confirmar Remoção
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-700 dark:text-amber-400">
-                        <InfoIcon size={20} className="shrink-0 mt-0.5" />
-                        <p className="text-sm font-medium">{selectedImages.size} imagem(ns) serão removidas. O parceiro será notificado para substituí-las.</p>
-                    </div>
-                    <Input
-                        name="reject-images-reason"
-                        label="Motivo da remoção"
-                        placeholder="Explique ao parceiro por que as imagens foram removidas..."
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                        multiline
-                        rows={3}
-                        required
-                    />
-                </div>
-            </DefaultModal>
-
-            <DefaultModal
-                isOpen={showFullRejectModal}
-                onClose={() => { setShowFullRejectModal(false); setRejectReason("") }}
-                title={`Rejeitar ${item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}`}
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setShowFullRejectModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
-                        <Button
-                            variant="destructive"
-                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                            onClick={() => {
-                                onFullReject(item.id, rejectReason, item.type)
-                                setShowFullRejectModal(false)
-                            }}
-                            isLoading={isPending}
-                        >
-                            Confirmar Rejeição
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">O item será removido da fila e o parceiro receberá o motivo da rejeição.</p>
-                    <Input
-                        name="full-reject-reason"
-                        label="Motivo da rejeição"
-                        placeholder="Explique detalhadamente o motivo da rejeição..."
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                        multiline
-                        rows={3}
-                        required
-                    />
-                </div>
-</DefaultModal>
-
-        {/* Image Lightbox */}
-        <ImageLightbox
-            isOpen={showLightbox}
-            onClose={() => setShowLightbox(false)}
-            images={allImages}
-            currentIndex={lightboxIndex}
-            onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
-        />
-        </div>
-) : null
-
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose}>
-                {content}
-            </BottomSheet>
-        )
-    }
-
-    return (
-        <Portal>
-            <div
-                className={`fixed inset-0 z-50 bg-black/50 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 md:w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-transform duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {content}
-                </div>
-            </div>
-        </Portal>
-    )
-}
-
-// Lightbox component for ProductModerationSheet
-function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
-    isOpen: boolean
-    onClose: () => void
-    images: string[]
-    currentIndex: number
-    onNavigate: (dir: 1 | -1) => void
-}) {
-    if (!isOpen || images.length === 0) return null
-
-    const currentImage = images[currentIndex]
-
-    return (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center" onClick={onClose}>
-            <div className="relative w-full h-full max-w-[90vw] max-h-[90vh] flex items-center justify-center">
-                <img
-                    src={currentImage}
-                    alt={`Imagem ${currentIndex + 1} de ${images.length}`}
-                    className="max-w-full max-h-full object-contain"
-                />
-                {images.length > 1 && (
-                    <>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onNavigate(-1) }}
-                            className="absolute left-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
-                            aria-label="Anterior"
-                        >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="15 18 9 12 15 6" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onNavigate(1) }}
-                            className="absolute right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
-                            aria-label="Próxima"
-                        >
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="9 18 15 12 9 6" />
-                            </svg>
-                        </button>
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
-                            {currentIndex + 1} / {images.length}
-                        </div>
-                    </>
-                )}
-                <button
-                    onClick={(e) => { e.stopPropagation(); onClose() }}
-                    className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors p-2 rounded-full bg-black/50"
-                    aria-label="Fechar"
-                >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    )
-}
-
-// ─── Main Component ─────────────────────────────────────────────────────────
-
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 interface ModerationListProps {
     initialData?: CursorPaginatedResult<ModerationItem>
-    onEditItem?: (type: string, id: string) => void
 }
 
-const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
-    const isMobile = useMediaQuery("(max-width: 768px)")
+const ModerationList = ({ initialData }: ModerationListProps) => {
+    const { state: entityState, open: openEntity, close: closeEntity } = useEntityState()
     const observerTarget = useRef<HTMLDivElement>(null)
     const [statusFilter, setStatusFilter] = useState("all")
-    const [detailItem, setDetailItem] = useState<ModerationItem | null>(null)
-    const [noImagesAlert, setNoImagesAlert] = useState(false)
     const [isPending, startTransition] = useTransition()
 
     // ─── Entity Page ──────────────────────────────────────────────────────────
@@ -652,38 +72,12 @@ const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
         startTransition(async () => {
             const result = await approveModeration(id, type as any)
             if (result.success) {
-                toast.success(`${type === "product" ? "Produto" : "Perfil"} aprovado com sucesso!`)
-                setDetailItem(null)
+                const label = type === "product" ? "Produto" : type === "service" ? "Serviço" : "Perfil"
+                toast.success(`${label} aprovado com sucesso!`)
                 afterMutation()
             } else {
-                toast.error(result.error || `Erro ao aprovar ${type === "product" ? "produto" : "perfil"}`)
-            }
-        })
-    }
-
-    const handleRejectImages = (id: string, urls: string[], reason: string) => {
-        startTransition(async () => {
-            const result = await rejectFlaggedImages(id, reason, urls)
-            if (result.success) {
-                toast.success("Imagens removidas com sucesso!")
-                if (result.noImagesLeft) setNoImagesAlert(true)
-                setDetailItem(null)
-                afterMutation()
-            } else {
-                toast.error(result.error || "Erro ao remover imagens")
-            }
-        })
-    }
-
-    const handleFullReject = (id: string, reason: string, type: ModerationItem["type"]) => {
-        startTransition(async () => {
-            const result = await rejectModeration(id, reason, type as any)
-            if (result.success) {
-                toast.success(`${type === "product" ? "Produto" : "Perfil"} rejeitado com sucesso!`)
-                setDetailItem(null)
-                afterMutation()
-            } else {
-                toast.error(result.error || `Erro ao rejeitar ${type === "product" ? "produto" : "perfil"}`)
+                const label = type === "product" ? "produto" : type === "service" ? "serviço" : "perfil"
+                toast.error(result.error || `Erro ao aprovar ${label}`)
             }
         })
     }
@@ -702,6 +96,19 @@ const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
 
     // Reset page when search/filter changes
     useEffect(() => { setPage(1) }, [debouncedSearch, statusFilter])
+
+    // If viewing detail of a specific item via URL (?view=id)
+    if (entityState.isOpen && entityState.action === "view" && entityState.entityId) {
+        const currentItem = allItems.find(i => i.id === entityState.entityId)
+        if (currentItem) {
+            return (
+                <AdminModerationDetailView
+                    item={currentItem}
+                    onBack={closeEntity}
+                />
+            )
+        }
+    }
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
@@ -747,8 +154,8 @@ const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
                                     {paginated.map((item) => (
                                         <div
                                             key={item.id}
-                                            className="py-5 flex items-start gap-3"
-                                            onClick={() => setDetailItem(item)}
+                                            className="py-5 flex items-start gap-3 cursor-pointer"
+                                            onClick={() => openEntity("view", item.id)}
                                         >
                                             <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border">
                                                 {item.images?.[0] ? (
@@ -811,7 +218,7 @@ const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
                                                         key={item.id}
                                                         item={item}
                                                         isPending={isPending}
-                                                        onDetail={setDetailItem}
+                                                        onDetail={() => openEntity("view", item.id)}
                                                         onApprove={handleApprove}
                                                     />
                                                 ))}
@@ -842,26 +249,6 @@ const ModerationList = ({ initialData, onEditItem }: ModerationListProps) => {
                 </div>
             </div>
 
-            {/* Detail Sheet */}
-            <ProductModerationSheet
-                item={detailItem}
-                isOpen={!!detailItem}
-                onClose={() => setDetailItem(null)}
-                onApprove={handleApprove}
-                onRejectImages={handleRejectImages}
-                onFullReject={handleFullReject}
-                onEditItem={onEditItem}
-                isPending={isPending}
-            />
-
-            {/* No images left alert */}
-            <AlertModal
-                isOpen={noImagesAlert}
-                onClose={() => setNoImagesAlert(false)}
-                title="Produto sem imagens"
-                message="Todas as imagens foram removidas. O produto ficará com status pendente até que o parceiro adicione novas imagens."
-                variant="warning"
-            />
         </FadeIn>
     )
 }

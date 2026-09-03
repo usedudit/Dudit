@@ -64,7 +64,7 @@ async function deactivatePartnerProducts(partnerId: string): Promise<void> {
         const adminClient: any = getAdminClient()
         await adminClient
             .from("products")
-            .update({ is_active: false } as any)
+            .update({ status: "inativo" } as any)
             .eq("partner_id", partnerId)
             .is("deleted_at", null)
     } catch (e) {

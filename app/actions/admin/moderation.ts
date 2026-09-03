@@ -24,6 +24,7 @@ import type { ModerationItem, CursorPaginatedResult } from "@/lib/admin/types"
 import { formatDateTime } from "@/lib/utils/formatters";
 import { syncCancelledOrderAppointmentsAndTransactions } from "@/lib/services/sync-cancellation"
 import { logAuditEvent } from "@/lib/services/timeline.service"
+import { createNotification, buildIdempotencyKey, getPartnerTeamUserIds } from "@/lib/services/notification.service"
 
 // ─── Helper: delete image from R2 ──────────────────────────────────────────
 
@@ -376,7 +377,7 @@ export async function approveModeration(
             .eq("id", entityId)
             .eq("status", "ESCALATED")
             .single()
-        if (rrError || !rr) return { success: false, error: "Disputa nao encontrada" }
+        if (rrError || !rr) return { success: false, error: "Disputa não encontrada" }
 
         const { error } = await supabase.rpc("process_return_request", {
             p_request_id: entityId,
@@ -448,7 +449,7 @@ export async function approveModeration(
                 moderation_status: "approved",
                 moderation_reviewed_by: admin.userId,
                 moderation_reviewed_at: new Date().toISOString(),
-                is_active: true,
+                status: "ativo",
             })
             .eq("id", entityId)
 
@@ -545,7 +546,7 @@ export async function rejectFlaggedImages(
         await adminAuditLog({
             adminUserId: admin.userId,
             actionType: AdminActionType.MODERATION_REJECT,
-            targetType: "product",
+            targetType: type,
             targetId: entityId,
             metadata: {
                 reason: detailedReason,
@@ -557,22 +558,43 @@ export async function rejectFlaggedImages(
             },
         })
 
+        // Send notification to partner
+        if (entity.partner_id) {
+            const userIds = await getPartnerTeamUserIds(entity.partner_id)
+            const typeLabel = type === "service" ? "serviço" : "produto"
+            const notificationMessage = `Todas as imagens do ${typeLabel} "${entity.name}" foram removidas. Motivo: ${reason.trim()}. Adicione novas imagens para que o item possa ser aprovado.`
+
+            for (const uid of userIds) {
+                await createNotification({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: "Imagens removidas",
+                    message: notificationMessage,
+                    entityType: "product",
+                    entityId: entityId,
+                    data: { audience: "seller", partner_id: entity.partner_id, removed_count: removedCount, remaining: 0 },
+                    idempotencyKey: buildIdempotencyKey("admin_announcement", type, entityId, uid, "images_removed"),
+                    origin: "system",
+                })
+            }
+        }
+
         return {
             success: true,
             noImagesLeft: true,
         }
     }
 
-    // Images still remain - remove flagged, approve product
+    // Images still remain - remove flagged, approve item
     const { error: updateError } = await supabase
-        .from("products")
+        .from(targetTable)
         .update({
             images: remainingImages,
             moderation_status: "approved",
             moderation_reason: detailedReason,
             moderation_reviewed_by: admin.userId,
             moderation_reviewed_at: new Date().toISOString(),
-            is_active: true,
+            status: "ativo",
         })
         .eq("id", entityId)
 
@@ -592,7 +614,7 @@ export async function rejectFlaggedImages(
     await adminAuditLog({
         adminUserId: admin.userId,
         actionType: AdminActionType.MODERATION_REJECT,
-        targetType: "product",
+        targetType: type,
         targetId: entityId,
         metadata: {
             reason: detailedReason,
@@ -603,6 +625,27 @@ export async function rejectFlaggedImages(
             riskScoreAdded: 2,
         },
     })
+
+    // Send notification to partner
+    if (entity.partner_id) {
+        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const typeLabel = type === "service" ? "serviço" : "produto"
+        const notificationMessage = `${removedCount} ${removedWord} do ${typeLabel} "${entity.name}" foi removida. Motivo: ${reason.trim()}. O item foi aprovado com as imagens restantes.`
+
+        for (const uid of userIds) {
+            await createNotification({
+                userId: uid,
+                type: "admin_announcement",
+                title: "Imagens removidas",
+                message: notificationMessage,
+                entityType: "product",
+                entityId: entityId,
+                data: { audience: "seller", partner_id: entity.partner_id, removed_count: removedCount, remaining: remainingImages.length },
+                idempotencyKey: buildIdempotencyKey("admin_announcement", type, entityId, uid, "images_removed"),
+                origin: "system",
+            })
+        }
+    }
 
     return { success: true, noImagesLeft: false }
 }
@@ -626,7 +669,7 @@ export async function rejectModeration(
     if (type === "community_video") {
         const { data: video } = await supabase
             .from("community_videos")
-            .select("id, moderation_status")
+            .select("id, partner_id, moderation_status")
             .eq("id", entityId)
             .single()
 
@@ -650,6 +693,28 @@ export async function rejectModeration(
             metadata: { reason: reason.trim(), previousStatus: video.moderation_status },
         })
 
+        // Send notification to partner
+        if (video.partner_id) {
+            const userIds = await getPartnerTeamUserIds(video.partner_id)
+            const notificationMessage = reason.trim().length > 0
+                ? reason.trim()
+                : "Seu vídeo da comunidade não atendeu aos critérios de moderação e não foi aprovado."
+
+            for (const uid of userIds) {
+                await createNotification({
+                    userId: uid,
+                    type: "admin_announcement",
+                    title: "Vídeo da comunidade rejeitado",
+                    message: notificationMessage,
+                    entityType: "product",
+                    entityId: entityId,
+                    data: { audience: "seller", partner_id: video.partner_id, entity_type: "community_video" },
+                    idempotencyKey: buildIdempotencyKey("admin_announcement", "community_video", entityId, uid, "rejected"),
+                    origin: "system",
+                })
+            }
+        }
+
         return { success: true }
     }
 
@@ -659,7 +724,7 @@ export async function rejectModeration(
             .select("id, partner_id, status")
             .eq("id", entityId)
             .single()
-        if (rrError || !rr) return { success: false, error: "Disputa nao encontrada" }
+        if (rrError || !rr) return { success: false, error: "Disputa não encontrada" }
 
         const { error } = await supabase.rpc("process_return_request", {
             p_request_id: entityId,
@@ -708,7 +773,7 @@ export async function rejectModeration(
                 moderation_reason: reason.trim(),
                 moderation_reviewed_by: admin.userId,
                 moderation_reviewed_at: new Date().toISOString(),
-                is_active: false,
+                status: "inativo",
             })
             .eq("id", entityId)
 
@@ -732,6 +797,30 @@ export async function rejectModeration(
             riskScoreAdded: isItem ? 3 : 0
         },
     })
+
+    // Send notification to partner
+    if (entity.partner_id) {
+        const userIds = await getPartnerTeamUserIds(entity.partner_id)
+        const itemName = isItem ? entity.name : "seu perfil"
+        const typeLabel = type === "product" ? "produto" : type === "service" ? "serviço" : "perfil"
+        const notificationMessage = reason.trim().length > 0
+            ? `Seu ${typeLabel} "${itemName}" foi rejeitado. Motivo: ${reason.trim()}`
+            : `Seu ${typeLabel} "${itemName}" foi rejeitado e não está visível no marketplace.`
+
+        for (const uid of userIds) {
+            await createNotification({
+                userId: uid,
+                type: "admin_announcement",
+                title: `${type === "product" ? "Produto" : type === "service" ? "Serviço" : "Perfil"} rejeitado`,
+                message: notificationMessage,
+                entityType: "product",
+                entityId: entityId,
+                data: { audience: "seller", partner_id: entity.partner_id, moderation_type: type },
+                idempotencyKey: buildIdempotencyKey("admin_announcement", type, entityId, uid, "rejected"),
+                origin: "system",
+            })
+        }
+    }
 
     return { success: true }
 }
@@ -857,4 +946,133 @@ export async function reprocessModeration(
     })
 
     return { success: true }
+}
+
+// ─── Fetch single moderation item detail ─────────────────────────────────────
+
+export async function getModerationItemDetail(
+    id: string
+): Promise<{ success: boolean; data?: ModerationItem; error?: string }> {
+    await requireAdminScope("moderation")
+    await requireRateLimit(RateLimitCategory.ADMIN_READ)
+
+    const supabase = getAdminClient()
+
+    // Try product first
+    const { data: product } = await supabase
+        .from("products")
+        .select(`
+            id, name, description, price, images, moderation_status, created_at, store_id,
+            category_id, category:product_categories!category_id(name),
+            brand, brand_id, brand_rel:brands!brand_id(name),
+            video_url, video_type, video_thumbnail,
+            partner:partners!inner(id, user_id),
+            store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
+        `)
+        .eq("id", id)
+        .is("deleted_at", null)
+        .single()
+
+    if (product) {
+        const st = product.store
+        let ownerName = ""
+        if (product.partner?.user_id) {
+            const { data: owner } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", product.partner.user_id)
+                .single()
+            ownerName = owner?.full_name || ""
+        }
+
+        return {
+            success: true,
+            data: {
+                id: product.id,
+                type: "product",
+                title: product.name,
+                description: product.description,
+                price: product.price || 0,
+                images: product.images || [],
+                owner_store_name: st?.name || "Desconhecido",
+                owner_user_name: ownerName,
+                partner_id: product.partner?.id || "",
+                store_id: product.store_id || undefined,
+                store_name: st?.name || undefined,
+                store_phone: st?.phone || undefined,
+                store_description: st?.description || undefined,
+                store_banner_url: st?.banner_url || undefined,
+                store_gallery: st?.gallery || undefined,
+                store_logo_url: st?.logo_url || undefined,
+                owner_user_id: product.partner?.user_id || undefined,
+                moderation_status: product.moderation_status,
+                risk_score: st?.risk_score ?? 0,
+                created_at: product.created_at,
+                category_name: product.category?.name || null,
+                brand_name: product.brand?.name || null,
+                video_url: product.video_url || null,
+                video_type: product.video_type || null,
+                video_thumbnail: product.video_thumbnail || null,
+            },
+        }
+    }
+
+    // Try service
+    const { data: service } = await supabase
+        .from("services")
+        .select(`
+            id, name, description, price, images, moderation_status, created_at, store_id,
+            video_url, video_type, video_thumbnail,
+            partner:partners!inner(id, user_id),
+            store:stores!store_id!left(id, name, phone, description, banner_url, gallery, logo_url, risk_score)
+        `)
+        .eq("id", id)
+        .is("deleted_at", null)
+        .single()
+
+    if (service) {
+        const st = service.store
+        let ownerName = ""
+        if (service.partner?.user_id) {
+            const { data: owner } = await supabase
+                .from("user_profiles")
+                .select("full_name")
+                .eq("user_id", service.partner.user_id)
+                .single()
+            ownerName = owner?.full_name || ""
+        }
+
+        return {
+            success: true,
+            data: {
+                id: service.id,
+                type: "service",
+                title: service.name,
+                description: service.description,
+                price: service.price || 0,
+                images: service.images || [],
+                owner_store_name: st?.name || "Desconhecido",
+                owner_user_name: ownerName,
+                partner_id: service.partner?.id || "",
+                store_id: service.store_id || undefined,
+                store_name: st?.name || undefined,
+                store_phone: st?.phone || undefined,
+                store_description: st?.description || undefined,
+                store_banner_url: st?.banner_url || undefined,
+                store_gallery: st?.gallery || undefined,
+                store_logo_url: st?.logo_url || undefined,
+                owner_user_id: service.partner?.user_id || undefined,
+                moderation_status: service.moderation_status,
+                risk_score: st?.risk_score ?? 0,
+                created_at: service.created_at,
+                category_name: null,
+                brand_name: null,
+                video_url: service.video_url || null,
+                video_type: service.video_type || null,
+                video_thumbnail: service.video_thumbnail || null,
+            },
+        }
+    }
+
+    return { success: false, error: "Item não encontrado" }
 }

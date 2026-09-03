@@ -27,6 +27,26 @@ describe("permission-descriptions", () => {
     expect(msg).toBe("Você não possui permissão para excluir produtos.")
   })
 
+  it("returns specific clean user-facing error message for products view_cost_price", () => {
+    const msg = getPermissionErrorMessage("products", "view_cost_price")
+    expect(msg).toBe("Você não possui permissão para visualizar o preço de custo dos produtos.")
+  })
+
+  it("returns specific clean user-facing error message for customers export", () => {
+    const msg = getPermissionErrorMessage("customers", "export")
+    expect(msg).toBe("Você não possui permissão para exportar a base de clientes.")
+  })
+
+  it("returns specific clean user-facing error message for service_orders can_generate_invoice", () => {
+    const msg = getPermissionErrorMessage("service_orders", "can_generate_invoice")
+    expect(msg).toBe("Você não possui permissão para faturar ou emitir nota fiscal para ordens de serviço.")
+  })
+
+  it("returns specific clean user-facing error message for financial can_settle", () => {
+    const msg = getPermissionErrorMessage("financial", "can_settle")
+    expect(msg).toBe("Você não possui permissão para liquidar ou baixar contas a pagar/receber.")
+  })
+
   it("returns fallback message with resource name when specific mapping is not defined", () => {
     const msg = getPermissionErrorMessage("categories", "edit")
     expect(msg).toBe("Você não possui permissão para editar Categorias.")

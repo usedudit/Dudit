@@ -255,8 +255,17 @@ export const searchMarketplaceDirectFull = cache(async (
         }
     }
 
-    // Telemetria automática a cada busca desativada para poupar comandos no Redis
-    // e evitar poluição por robôs/erros de digitação. Demanda agora é captada via modal de feedback.
+    // Registra telemetria de busca apenas na 1ª página (sem cursor/lastId) para termos reais
+    if (query && query.trim().length >= 2 && !limits.cursor && !limits.lastId) {
+        const hasResults = Boolean(finalResults && finalResults.length > 0)
+        recordMarketplaceSearchTelemetry({
+            query: query.trim(),
+            hasResults,
+            resultsCount: finalResults.length,
+            citySlug: limits.cidade || null,
+            itemType: type,
+        }).catch(() => {})
+    }
 
     return {
         results: finalResults,

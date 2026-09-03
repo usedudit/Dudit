@@ -64,26 +64,6 @@ export function AdminModerationPanel() {
     const [rejectReason, setRejectReason] = useState("")
     const [videoSearch, setVideoSearch] = useState("")
 
-    const handleEditFromQueue = (type: string, id: string) => {
-        const mappedType = type === "product" ? "product" : type === "service" ? "service" : (type as SearchType)
-        setSearchType(mappedType)
-        setSearchId(id)
-        setError("")
-        setActiveModerationTab("manual")
-        startTransition(async () => {
-            const res = await fetchModerationTarget(mappedType, id)
-            if (res.success) {
-                setResult({ type: mappedType, data: res.data })
-                setActiveTab("general")
-                setError("")
-                scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
-            } else {
-                setResult(null)
-                setError(res.error || "Não encontrado")
-            }
-        })
-    }
-
     const handleSearch = () => {
         if (!searchId.trim()) { setError("Digite um ID"); return }
         setError("")
@@ -254,7 +234,7 @@ export function AdminModerationPanel() {
                     {/* Content Area */}
                     {activeModerationTab === "queue" ? (
                         <div className="w-full">
-                            <ModerationList onEditItem={handleEditFromQueue} />
+                            <ModerationList />
                         </div>
                     ) : activeModerationTab === "manual" ? (
                         <div className="px-4 md:px-8 pb-8">

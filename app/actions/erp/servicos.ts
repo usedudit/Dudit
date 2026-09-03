@@ -706,7 +706,16 @@ export async function batchUpdateServicesAction(updates: any[]): Promise<ActionR
 
         const results = await Promise.all(updates.map(update => {
             const { id, ...data } = update
-            return supabase.from("services").update(data).eq("id", id)
+            const updateData: any = { ...data }
+            if (updateData.is_active !== undefined) {
+                updateData.status = updateData.is_active ? "ativo" : "inativo"
+                delete updateData.is_active
+            }
+            if (updateData.isActive !== undefined) {
+                updateData.status = updateData.isActive ? "ativo" : "inativo"
+                delete updateData.isActive
+            }
+            return supabase.from("services").update(updateData).eq("id", id)
         }))
 
         const firstError = results.find(r => r.error)
