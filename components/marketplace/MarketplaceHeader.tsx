@@ -812,14 +812,6 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenAnnounceModal}
-                                        className="shrink-0 text-brand-orange font-bold text-[12px] flex items-center gap-0.5 px-2 py-1.5 cursor-pointer"
-                                    >
-                                        <PlusIcon size={14} />
-                                        <span className="hidden min-[380px]:inline">Anunciar</span>
-                                    </button>
                                     <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={20} strokeWidth={2} />
                                         {cartCount > 0 && (
@@ -835,23 +827,33 @@ const Header: React.FC<HeaderProps> = ({
 
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
-                        <Link
-                            href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
-                            prefetch={false}
-                            onClick={(e) => {
-                                if (!user || !userLocation) {
-                                    e.preventDefault()
-                                    setIsVisitorModalOpen(true)
-                                }
-                            }}
-                            className="flex items-center gap-1.5 px-1 mt-2.5 text-brand-inactive-text cursor-pointer w-full overflow-hidden hover:opacity-80 transition-opacity"
-                        >
-                            <MapPinIcon size={14} className="shrink-0 text-white" />
-                            <span className="text-[12px] font-normal truncate ml-0.5 text-white">
-                                {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
-                            </span>
-                            <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
-                        </Link>
+                        <div className="flex items-center justify-between mt-2.5 px-1">
+                            <Link
+                                href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
+                                prefetch={false}
+                                onClick={(e) => {
+                                    if (!user || !userLocation) {
+                                        e.preventDefault()
+                                        setIsVisitorModalOpen(true)
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
+                            >
+                                <MapPinIcon size={14} className="shrink-0 text-white" />
+                                <span className="text-[12px] font-normal truncate ml-0.5 text-white">
+                                    {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
+                                </span>
+                                <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={handleOpenAnnounceModal}
+                                className="shrink-0 text-brand-orange font-bold text-[12px] flex items-center gap-0.5 pl-3 cursor-pointer"
+                            >
+                                <PlusIcon size={14} />
+                                <span>Anunciar grátis</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </header >

@@ -1047,6 +1047,9 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     partnerId={partnerId}
                     storeName={data.storeName || "Sua Loja"}
                     partnerUrl={data.partnerUrl || "/"}
+                    businessMode={data.businessMode || (data.isDesapego ? "desapego" : data.isQuickMode ? "quick" : "erp")}
+                    sellsProducts={data.sellsProducts}
+                    sellsServices={data.sellsServices}
                     onSuccess={() => {
                         setShowOnboardingWizard(false);
                         router.refresh();

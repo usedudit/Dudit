@@ -42,32 +42,22 @@ export interface StepVisualData {
 const STEP_VISUALS: Record<number, StepVisualData> = {
   1: {
     title: "Seu negócio do seu jeito",
-    subtitle: "A Dudit se molda ao que você faz, sem complicação ou botões que você não vai usar.",
+    subtitle: "A Dudit organiza seu dia a dia sem complicação ou telas que você não vai usar.",
     image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
   },
   2: {
-    title: "Menos tempo no sistema",
-    subtitle: "Mais tempo atendendo seus clientes e fazendo o que você faz de melhor.",
-    image: "/images/dino-cavalete.png",
-  },
-  3: {
     title: "Seu catálogo em 30 segundos",
-    subtitle: "Cadastre com nome e preço direto ao ponto. Sem formulários longos ou termos técnicos.",
+    subtitle: "Cadastre com nome e preço direto ao ponto para começar a divulgar para seus clientes.",
     image: "https://img.dudit.com.br/static/mascots/Servicos.png",
   },
-  4: {
-    title: "Direto no seu Pix",
-    subtitle: "Seus clientes pagam você na hora. Sem taxas escondidas e sem esperar dias para receber.",
-    image: "https://img.dudit.com.br/static/mascots/Transacoes.png",
-  },
-  5: {
+  3: {
     title: "Parabéns, está tudo pronto!",
     subtitle: "Seu link exclusivo já pode ser compartilhado com seus clientes pelo WhatsApp.",
     image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
   },
 }
 
-export const ERPOnboardingVisuals = React.memo(({ currentStep }: { currentStep: number }) => {
+export const ERPOnboardingVisuals = React.memo(({ currentStep, totalSteps = 3 }: { currentStep: number; totalSteps?: number }) => {
   const visual = STEP_VISUALS[currentStep] || STEP_VISUALS[1]
 
   const variants = {
@@ -79,14 +69,14 @@ export const ERPOnboardingVisuals = React.memo(({ currentStep }: { currentStep: 
   return (
     <div className="flex-1 relative hidden lg:flex flex-col justify-center items-center p-8 overflow-hidden bg-[#022C2B] rounded-2xl">
       {/* Blobs decorativas */}
-      <BlobTeal className="absolute -top-16 -right-16 w-[360px] h-[360px] opacity-80 pointer-events-none" />
-      <BlobGreenAccent className="absolute top-1/3 -left-20 w-[240px] h-[240px] opacity-50 pointer-events-none" />
-      <BlobGreenLight className="absolute -bottom-14 left-1/4 w-[180px] h-[180px] opacity-40 pointer-events-none" />
+      <BlobTeal className="absolute -top-16 -right-16 w-[380px] h-[380px] opacity-80 pointer-events-none" />
+      <BlobGreenAccent className="absolute top-1/3 -left-20 w-[260px] h-[260px] opacity-50 pointer-events-none" />
+      <BlobGreenLight className="absolute -bottom-14 left-1/4 w-[200px] h-[200px] opacity-40 pointer-events-none" />
 
       {/* Conteúdo Principal */}
-      <div className="relative z-10 w-full max-w-[380px] flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-[420px] flex flex-col items-center">
         {/* Imagem do mascote Dino */}
-        <div className="relative w-full h-[220px] mb-6">
+        <div className="relative w-full h-[240px] mb-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep + "-visual"}
@@ -128,18 +118,21 @@ export const ERPOnboardingVisuals = React.memo(({ currentStep }: { currentStep: 
 
         {/* Indicador de passos */}
         <div className="flex items-center gap-2 mt-6">
-          {[1, 2, 3, 4, 5].map((s) => (
-            <div
-              key={s}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                s === currentStep
-                  ? "w-8 bg-green-400"
-                  : s < currentStep
-                  ? "w-2 bg-green-600"
-                  : "w-2 bg-white/20"
-              }`}
-            />
-          ))}
+          {Array.from({ length: totalSteps }).map((_, idx) => {
+            const s = idx + 1
+            return (
+              <div
+                key={s}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  s === currentStep
+                    ? "w-8 bg-green-400"
+                    : s < currentStep
+                    ? "w-2 bg-green-600"
+                    : "w-2 bg-white/20"
+                }`}
+              />
+            )
+          })}
         </div>
       </div>
     </div>

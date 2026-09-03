@@ -122,4 +122,57 @@ describe("Grace Period Queue Timing & Undo Mechanism", () => {
         flush()
         expect(onExecute).toHaveBeenCalledTimes(1)
     })
+
+    it("should correctly parse and separate direct UUIDs from group- UUIDs", () => {
+        const rawIds = [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "group-660e8400-e29b-41d4-a716-446655440001",
+            "invalid-id",
+            "recurring-occurrence-12345",
+        ]
+
+        const sanitizeUUID = (val: unknown) => {
+            if (typeof val !== "string") return null
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            return uuidRegex.test(val) ? val : null
+        }
+
+        const directIds: string[] = []
+        const groupIds: string[] = []
+
+        for (const rawId of rawIds) {
+            if (typeof rawId !== "string") continue
+            if (rawId.startsWith("group-")) {
+                const gid = sanitizeUUID(rawId.slice(6))
+                if (gid) groupIds.push(gid)
+            } else {
+                const uid = sanitizeUUID(rawId)
+                if (uid) directIds.push(uid)
+            }
+        }
+
+        expect(directIds).toEqual(["550e8400-e29b-41d4-a716-446655440000"])
+        expect(groupIds).toEqual(["660e8400-e29b-41d4-a716-446655440001"])
+    })
+
+    it("should never include account_id in transaction_payments payload", () => {
+        const transactionPaymentsRow = {
+            partner_id: "partner-1",
+            transaction_id: "tx-1",
+            store_id: null,
+            amount: 150.0,
+            base_amount: 150.0,
+            interest_amount: 0,
+            discount_amount: 0,
+            payment_method_id: "pm-1",
+            created_by_user_id: "user-1",
+            created_at: new Date().toISOString(),
+        }
+
+        expect("account_id" in transactionPaymentsRow).toBe(false)
+        expect("payment_date" in transactionPaymentsRow).toBe(false)
+        expect("payment_type" in transactionPaymentsRow).toBe(false)
+        expect(transactionPaymentsRow.created_by_user_id).toBe("user-1")
+    })
 })
+

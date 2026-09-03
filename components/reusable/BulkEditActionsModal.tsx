@@ -178,12 +178,22 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     const [hoveredImage, setHoveredImage] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // Reset view when modal closes
+    // Reset view when modal closes and pre-populate options when opening
     useEffect(() => {
         if (!isOpen) {
             setTimeout(() => setView('menu'), 300)
+        } else {
+            if (financeAccounts && financeAccounts.length > 0 && !settleAccountId) {
+                setSettleAccountId(financeAccounts[0].id)
+            }
+            if (paymentMethods && paymentMethods.length > 0 && !settlePaymentMethodId) {
+                setSettlePaymentMethodId(paymentMethods[0].id)
+            }
+            if (financialCategories && financialCategories.length > 0 && !financialCategoryId) {
+                setFinancialCategoryId(financialCategories[0].id)
+            }
         }
-    }, [isOpen])
+    }, [isOpen, financeAccounts, paymentMethods, financialCategories, settleAccountId, settlePaymentMethodId, financialCategoryId])
 
     const cancelledCount = orderSelectionGuards?.cancelledCount || 0
     const financialIgnoredCount = view === "financial_cancel"

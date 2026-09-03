@@ -5,33 +5,18 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { createServiceAction } from "@/app/actions/erp/servicos"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
-import { createPaymentMethodAction } from "@/app/actions/erp/payment-methods"
 import { safeRevalidateTag, safeRevalidatePath } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
-import { normalizeBusinessInfo } from "@/lib/business-info"
 
 export type ERPOnboardingWizardInput = {
     partnerId: string
-    businessType: "services" | "products" | "hybrid"
-    goal: "appointments" | "whatsapp_catalog" | "cash_control"
+    goals?: string[]
     firstItem?: {
         name: string
         price: number
+        itemType?: "service" | "product"
         durationMinutes?: number
     } | null
-    paymentPreference?: "pix" | "card_machine" | "cash" | "online"
-    pixKey?: string | null
-    pixKeyType?: "cpf" | "cnpj" | "email" | "phone" | "random" | null
-}
-
-function detectPixKeyType(key: string): "cpf" | "cnpj" | "email" | "phone" | "random" {
-    const clean = key.trim()
-    if (clean.includes("@")) return "email"
-    const digits = clean.replace(/\D/g, "")
-    if (digits.length === 11 && !clean.startsWith("+")) return "cpf"
-    if (digits.length === 14) return "cnpj"
-    if (digits.length >= 10 && digits.length <= 13) return "phone"
-    return "random"
 }
 
 export async function completeERPOnboardingWizardAction(input: ERPOnboardingWizardInput) {
@@ -41,7 +26,7 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             return { success: false, error: "Não autenticado" }
         }
 
-        const { partnerId, businessType, goal, firstItem, pixKey, pixKeyType } = input
+        const { partnerId, goals, firstItem } = input
         if (!partnerId) {
             return { success: false, error: "Parceiro não informado" }
         }
@@ -60,62 +45,18 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             return { success: false, error: "Parceiro não encontrado" }
         }
 
-        const currentBusinessInfo = normalizeBusinessInfo(partnerRes.data.business_info)
         const rawBusinessInfo = (partnerRes.data.business_info && typeof partnerRes.data.business_info === "object")
             ? partnerRes.data.business_info
             : {}
 
-        // 2. Define os recursos ativos ideais para o perfil do autônomo
-        let activeResources: string[] = []
-        if (businessType === "services") {
-            activeResources = [
-                "services",
-                "appointments",
-                "orders",
-                "customers",
-                "financial",
-                "showcase",
-                "quotes",
-            ]
-        } else if (businessType === "products") {
-            activeResources = [
-                "products",
-                "orders",
-                "pos",
-                "deliveries",
-                "customers",
-                "financial",
-                "showcase",
-                "stockMovements",
-            ]
-        } else {
-            // hybrid
-            activeResources = [
-                "products",
-                "services",
-                "appointments",
-                "orders",
-                "pos",
-                "deliveries",
-                "customers",
-                "financial",
-                "showcase",
-                "stockMovements",
-                "quotes",
-            ]
-        }
-
         const updatedBusinessInfo = {
             ...rawBusinessInfo,
-            mode: currentBusinessInfo.mode === "desapego" ? "desapego" : "quick",
-            activeResources,
             onboardingCompleted: true,
-            onboardingGoal: goal,
-            businessType,
+            onboardingGoals: goals || [],
             onboardingCompletedAt: new Date().toISOString(),
         }
 
-        // 3. Atualiza partners table
+        // 2. Atualiza partners table
         const { error: updatePartnerError } = await admin
             .from("partners")
             .update({ business_info: updatedBusinessInfo })
@@ -128,13 +69,14 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
 
         const storeId = storeRes.data?.id || null
 
-        // 4. Cadastra o primeiro item se fornecido
+        // 3. Cadastra o primeiro item se fornecido
         let createdItemId: string | null = null
         if (firstItem && firstItem.name?.trim() && Number(firstItem.price) > 0) {
             const trimmedName = firstItem.name.trim()
             const numPrice = Number(firstItem.price)
+            const itemType = firstItem.itemType || "service"
 
-            if (businessType === "services" || businessType === "hybrid") {
+            if (itemType === "service") {
                 try {
                     const res = await createServiceAction({
                         partnerId,
@@ -171,28 +113,7 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             }
         }
 
-        // 5. Cadastra método Pix simples se chave foi fornecida
-        if (pixKey && pixKey.trim()) {
-            const cleanKey = pixKey.trim()
-            const keyType = pixKeyType || detectPixKeyType(cleanKey)
-            try {
-                await createPaymentMethodAction({
-                    partnerId,
-                    storeId,
-                    name: "Pix",
-                    paymentType: "pix",
-                    pixKey: cleanKey,
-                    pixKeyType: keyType,
-                    isDefault: true,
-                    isOnlineDefault: true,
-                    isActive: true,
-                })
-            } catch (err) {
-                console.warn("[ONBOARDING] Falha ao cadastrar método Pix inicial:", err)
-            }
-        }
-
-        // 6. Invalidação de cache
+        // 4. Invalidação de cache
         try {
             await safeRevalidateTag(TAGS.partner(partnerId))
             await safeRevalidateTag(TAGS.products(partnerId))

@@ -3957,15 +3957,43 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
             return { success: false as const, error: "Nenhuma transação selecionada." }
         }
 
+        // Parse IDs: separate direct UUIDs and group- UUIDs
+        const directIds: string[] = []
+        const groupIds: string[] = []
+
+        for (const rawId of input.transactionIds) {
+            if (typeof rawId !== "string") continue
+            if (rawId.startsWith("group-")) {
+                const gid = sanitizeUUID(rawId.slice(6))
+                if (gid) groupIds.push(gid)
+            } else {
+                const uid = sanitizeUUID(rawId)
+                if (uid) directIds.push(uid)
+            }
+        }
+
+        if (directIds.length === 0 && groupIds.length === 0) {
+            return { success: false as const, error: "Nenhuma transação válida selecionada." }
+        }
+
         // 1. Fetch current selected transactions
-        const { data: currentRows, error: fetchErr } = await supabase
+        let query = supabase
             .from("transactions")
             .select("id, partner_id, status, installment_group_id, amount, original_amount, paid_amount, description, account_id, payment_type, payment_method_id, transaction_type, refund_kind, due_date, notes, store_id, category_id, category")
-            .in("id", input.transactionIds)
             .eq("partner_id", input.partnerId)
 
+        if (directIds.length > 0 && groupIds.length > 0) {
+            query = query.or(`id.in.(${directIds.join(",")}),installment_group_id.in.(${groupIds.join(",")})`)
+        } else if (directIds.length > 0) {
+            query = query.in("id", directIds)
+        } else {
+            query = query.in("installment_group_id", groupIds)
+        }
+
+        const { data: currentRows, error: fetchErr } = await query
+
         if (fetchErr || !currentRows || currentRows.length === 0) {
-            return { success: false as const, error: "Transações não encontradas." }
+            return { success: false as const, error: fetchErr?.message || "Transações não encontradas." }
         }
 
         let eligibleRows: typeof currentRows = []
@@ -4043,33 +4071,57 @@ export async function updateFinancialTransactionsInBatchAction(input: BatchFinan
                     })
 
                 } else if (input.actionType === "settle") {
-                    const resolvedAccountId = sanitizeUUID(input.settleAccountId) || tx.account_id
+                    const validPmId = sanitizeUUID(input.settlePaymentMethodId)
+                    const rawPm = typeof input.settlePaymentMethodId === "string" && !validPmId ? input.settlePaymentMethodId : tx.payment_type
+
+                    let resolvedAccountId = sanitizeUUID(input.settleAccountId) || tx.account_id
+                    if (!resolvedAccountId && validPmId) {
+                        const { data: pm } = await supabase
+                            .from("payment_methods")
+                            .select("default_finance_account_id")
+                            .eq("id", validPmId)
+                            .eq("partner_id", input.partnerId)
+                            .maybeSingle()
+                        if (pm?.default_finance_account_id) {
+                            resolvedAccountId = pm.default_finance_account_id
+                        }
+                    }
                     if (!resolvedAccountId) {
-                        throw new Error(`Transação ${tx.description || tx.id}: conta bancária não informada.`)
+                        const { data: defaultAcc } = await supabase
+                            .from("finance_accounts")
+                            .select("id")
+                            .eq("partner_id", input.partnerId)
+                            .eq("is_active", true)
+                            .order("is_default", { ascending: false })
+                            .limit(1)
+                            .maybeSingle()
+                        if (defaultAcc?.id) {
+                            resolvedAccountId = defaultAcc.id
+                        }
+                    }
+
+                    if (!resolvedAccountId) {
+                        throw new Error(`Transação "${tx.description || tx.id}": conta bancária não informada.`)
                     }
                     const paymentAmount = Math.max(0, Number(tx.amount || 0) - Number(tx.paid_amount || 0)) || Number(tx.amount || 0)
                     if (paymentAmount <= 0) return
 
-                    const validPmId = sanitizeUUID(input.settlePaymentMethodId)
-                    const rawPm = typeof input.settlePaymentMethodId === "string" && !validPmId ? input.settlePaymentMethodId : tx.payment_type
-
                     const paymentDate = input.settlePaymentDate || nowIso.slice(0, 10)
 
-                    // Insert transaction_payment
+                    // Insert transaction_payment (without non-existent columns)
                     const { error: insPaymentErr } = await supabase
                         .from("transaction_payments")
                         .insert({
                             partner_id: input.partnerId,
                             transaction_id: tx.id,
+                            store_id: tx.store_id || null,
                             amount: paymentAmount,
                             base_amount: paymentAmount,
                             interest_amount: 0,
                             discount_amount: 0,
-                            account_id: resolvedAccountId,
                             payment_method_id: validPmId || null,
-                            payment_date: paymentDate,
-                            payment_type: rawPm || null,
-                            created_by: userId,
+                            created_by_user_id: userId,
+                            created_at: nowIso,
                         })
 
                     if (insPaymentErr) throw insPaymentErr
