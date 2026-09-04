@@ -38,7 +38,7 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
         // 1. Busca dados do parceiro e loja
         const [partnerRes, storeRes] = await Promise.all([
             admin.from("partners").select("id, business_info").eq("id", partnerId).single(),
-            admin.from("stores").select("id, name").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+            admin.from("stores").select("id, name, business_info").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
         ])
 
         if (partnerRes.error || !partnerRes.data) {
@@ -56,14 +56,31 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             onboardingCompletedAt: new Date().toISOString(),
         }
 
-        // 2. Atualiza partners table
-        const { error: updatePartnerError } = await admin
-            .from("partners")
-            .update({ business_info: updatedBusinessInfo })
-            .eq("id", partnerId)
+        // 2. Atualiza partners table (e stores table se houver)
+        const updatePromises: Promise<any>[] = [
+            admin.from("partners").update({ business_info: updatedBusinessInfo }).eq("id", partnerId),
+        ]
 
-        if (updatePartnerError) {
-            console.error("[ONBOARDING] Erro ao atualizar business_info do parceiro:", updatePartnerError)
+        if (storeRes.data?.id) {
+            const rawStoreBusinessInfo = (storeRes.data.business_info && typeof storeRes.data.business_info === "object")
+                ? storeRes.data.business_info
+                : {}
+            updatePromises.push(
+                admin.from("stores").update({
+                    business_info: {
+                        ...rawStoreBusinessInfo,
+                        onboardingCompleted: true,
+                        onboardingGoals: goals || [],
+                        onboardingCompletedAt: new Date().toISOString(),
+                    },
+                }).eq("id", storeRes.data.id)
+            )
+        }
+
+        const [partnerUpdateRes] = await Promise.all(updatePromises)
+
+        if (partnerUpdateRes?.error) {
+            console.error("[ONBOARDING] Erro ao atualizar business_info do parceiro:", partnerUpdateRes.error)
             return { success: false, error: "Erro ao salvar configurações do negócio" }
         }
 

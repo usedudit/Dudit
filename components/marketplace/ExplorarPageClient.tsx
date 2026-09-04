@@ -235,6 +235,7 @@ export function ExplorarPageClient({
     const [selectedDemandType, setSelectedDemandType] = useState<string>("comprar")
     const [demandTerm, setDemandTerm] = useState("")
     const [isSubmittingDemand, setIsSubmittingDemand] = useState(false)
+    const isSubmittingDemandRef = useRef(false)
 
     // City search input
     const [citySearchText, setCitySearchText] = useState("")
@@ -1155,8 +1156,9 @@ export function ExplorarPageClient({
 
     const handleSubmitDemand = useCallback(async () => {
         const term = demandTerm.trim()
-        if (!term || isSubmittingDemand) return
+        if (!term || isSubmittingDemandRef.current) return
 
+        isSubmittingDemandRef.current = true
         setIsSubmittingDemand(true)
         const demandTypeLabels: Record<string, string> = {
             comprar: "Quero comprar",
@@ -1178,8 +1180,11 @@ export function ExplorarPageClient({
             console.error("[DEMAND_SUBMIT] Erro ao enviar demanda:", err)
         } finally {
             setIsSubmittingDemand(false)
+            setTimeout(() => {
+                isSubmittingDemandRef.current = false
+            }, 800)
         }
-    }, [demandTerm, selectedDemandType, selectedCitySlug, isSubmittingDemand])
+    }, [demandTerm, selectedDemandType, selectedCitySlug])
 
     const clearFilters = () => {
         triggerFilterLoading()
@@ -2194,6 +2199,13 @@ export function ExplorarPageClient({
                             }
                             value={demandTerm}
                             onChange={(e) => setDemandTerm(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !isSubmittingDemand && demandTerm.trim()) {
+                                    e.preventDefault()
+                                    handleSubmitDemand()
+                                }
+                            }}
+                            disabled={isSubmittingDemand}
                             autoFocus
                         />
                     </div>
@@ -2203,6 +2215,7 @@ export function ExplorarPageClient({
                         className="w-full font-bold"
                         onClick={handleSubmitDemand}
                         disabled={!demandTerm.trim() || isSubmittingDemand}
+                        isLoading={isSubmittingDemand}
                     >
                         {isSubmittingDemand ? "Enviando..." : "Enviar"}
                     </Button>

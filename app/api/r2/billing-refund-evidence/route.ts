@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/authorization"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { DANGEROUS_EXTENSIONS, MAX_FILE_SIZE } from "@/lib/r2/config"
 import { validateR2Config } from "@/lib/r2/r2-server-config"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export const runtime = "nodejs"
 
@@ -23,6 +25,14 @@ const REFUND_EVIDENCE_MIME_TO_EXT: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
     try {
+        const rateLimit = await checkRateLimitForAPI(RateLimitCategory.UPLOAD)
+        if (rateLimit.limited) {
+            return NextResponse.json(
+                rateLimit.body || { error: "Muitas requisições. Tente novamente mais tarde." },
+                { status: rateLimit.status || 429 }
+            )
+        }
+
         const user = await requireUser()
         const configValidation = validateR2Config()
         if (!configValidation.valid) {

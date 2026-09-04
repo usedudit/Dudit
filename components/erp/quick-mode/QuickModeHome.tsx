@@ -12,7 +12,6 @@ import {
     InfoIcon,
     LinkIcon,
     CopyIcon,
-    DownloadIcon,
     SparklesIcon,
     WhatsappIcon,
     EyeIcon,
@@ -859,7 +858,13 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
     const [showDeleteModal, setShowDeleteModal] = useState<{ id: string; itemType: 'product' | 'service'; name: string } | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-    const [showOnboardingWizard, setShowOnboardingWizard] = useState<boolean>(() => Boolean(data.needsOnboarding));
+    const [onboardingCompleted, setOnboardingCompleted] = useState<boolean>(() => {
+        return Boolean(data.onboardingCompleted || data.businessInfo?.onboardingCompleted);
+    });
+    const [showOnboardingWizard, setShowOnboardingWizard] = useState<boolean>(() => {
+        const isDone = Boolean(data.onboardingCompleted || data.businessInfo?.onboardingCompleted);
+        return !isDone && Boolean(data.needsOnboarding);
+    });
     const [currentImportOptions, setCurrentImportOptions] = useState<DashboardChecklistItem["importOptions"] | null>(null);
 
     const handleDelete = async () => {
@@ -918,17 +923,19 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                             {data.greeting.subtitle}
                         </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowOnboardingWizard(true)}
-                            className="gap-2 border-brand-green/30 text-brand-green hover:bg-brand-green/10"
-                        >
-                            <SparklesIcon size={14} />
-                            Guia de Configuração
-                        </Button>
-                    </div>
+                    {!onboardingCompleted && (
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowOnboardingWizard(true)}
+                                className="gap-2 border-brand-green/30 text-brand-green hover:bg-brand-green/10"
+                            >
+                                <SparklesIcon size={14} />
+                                Guia de Configuração
+                            </Button>
+                        </div>
+                    )}
                 </header>
 
                 {/* Alertas Críticos */}
@@ -1051,6 +1058,7 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                     sellsProducts={data.sellsProducts}
                     sellsServices={data.sellsServices}
                     onSuccess={() => {
+                        setOnboardingCompleted(true);
                         setShowOnboardingWizard(false);
                         router.refresh();
                     }}

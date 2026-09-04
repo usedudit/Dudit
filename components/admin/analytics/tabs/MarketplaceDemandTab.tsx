@@ -176,15 +176,15 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                         </div>
                         <div>
                             <h3 className="font-bold text-red-900 dark:text-red-300 text-base">
-                                O que as {searchesWithoutResults.toLocaleString("pt-BR")} pessoas estavam procurando?
+                                Demandas Cadastradas pelos Clientes
                             </h3>
                             <p className="text-xs text-red-700 dark:text-red-400">
-                                Diagnóstico exato do que a cidade quer da Dudit. Use esses dados para prospecção de novos parceiros comerciais.
+                                Diagnóstico das demandas que os clientes informaram na plataforma através do &quot;Estou procurando isso&quot;.
                             </p>
                         </div>
                     </div>
                     <Badge variant="red" className="self-start sm:self-auto py-1 px-3">
-                        {topZeroResultTerms.length} Oportunidades Identificadas
+                        {topZeroResultTerms.length} {topZeroResultTerms.length === 1 ? "Demanda Registrada" : "Demandas Registradas"}
                     </Badge>
                 </div>
 
@@ -192,14 +192,14 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
                         <div className="w-full sm:max-w-md">
                             <Input
-                                placeholder="Filtrar termos ou categorias..."
+                                placeholder="Filtrar demandas ou categorias..."
                                 value={searchTermFilter}
                                 onChange={(e) => setSearchTermFilter(e.target.value)}
                                 className="w-full"
                             />
                         </div>
                         <div className="text-xs text-brand-inactive-text dark:text-dark-body">
-                            Ordenado por maior volume de buscas não atendidas
+                            Ordenado por maior volume de solicitações
                         </div>
                     </div>
 
@@ -239,7 +239,7 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                                                 )}
                                             </div>
                                             <Badge variant={isTopDemand ? "red" : "gray"} className="shrink-0">
-                                                {item.count} {item.demandType ? "demanda(s)" : "busca(s)"}
+                                                {item.count} {item.count === 1 ? "demanda" : "demandas"}
                                             </Badge>
                                         </div>
                                         <div className="flex items-center gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body">
@@ -258,10 +258,10 @@ export function MarketplaceDemandTab({ data, selectedCity, onSelectCity }: Marke
                     ) : (
                         <div className="p-8 text-center bg-gray-50 dark:bg-gray-900/30 rounded-[24px] border border-dashed border-brand-border dark:border-dark-border">
                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                Nenhuma busca sem resultado encontrada para o filtro atual
+                                Nenhuma demanda registrada para o filtro atual
                             </p>
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                Isso significa que quase todas as buscas dos clientes estão encontrando produtos ou serviços parceiros!
+                                Quando os clientes procurarem algo e preencherem o formulário &quot;Estou procurando isso&quot;, as solicitações aparecerão aqui.
                             </p>
                         </div>
                     )}

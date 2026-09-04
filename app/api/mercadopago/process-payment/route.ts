@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
-import { createHash } from "crypto"
+import { createHash, randomUUID } from "crypto"
 import { revalidateProducts, revalidateMarketplace, revalidateCart } from "@/lib/utils/revalidation"
 import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
@@ -661,11 +661,69 @@ async function handler(request: NextRequest) {
     const payerFirstName = customerNameParts[0] || "Cliente"
     const payerLastName = customerNameParts.slice(1).join(" ") || "Comprador"
 
+    const targetOrderId = existingOrderId || randomUUID()
+
+    // Telefone seguro do pagador (DDD 2 dígitos + número)
+    const rawPhone = String(userProfile?.phone || "").replace(/\D/g, "")
+    const cleanPhone = rawPhone.startsWith("55") && rawPhone.length > 11 ? rawPhone.slice(2) : rawPhone
+    const payerPhone = cleanPhone.length >= 10 ? {
+      area_code: cleanPhone.slice(0, 2),
+      number: cleanPhone.slice(2),
+    } : undefined
+
+    // Endereço estruturado do pagador
+    const rawPayerAddr = paymentFormData.payer?.address
+    const payerZipCode = String(rawPayerAddr?.zipCode || rawPayerAddr?.zip_code || "").replace(/\D/g, "")
+    const payerStreetName = String(rawPayerAddr?.streetName || rawPayerAddr?.street_name || "").trim()
+    const payerStreetNumber = String(rawPayerAddr?.streetNumber || rawPayerAddr?.street_number || "").trim()
+    const payerNeighborhood = String(rawPayerAddr?.neighborhood || "").trim()
+    const payerCity = String(rawPayerAddr?.city || "").trim()
+    const payerFederalUnit = String(rawPayerAddr?.federalUnit || rawPayerAddr?.federal_unit || "").trim()
+
+    // Itens formatados para o motor antifraude do Mercado Pago (+12 pontos)
+    const additionalItems = (validatedItems.length > 0 ? validatedItems : (items || [])).map(item => ({
+      id: String((item as any).product_id || (item as any).id || "item"),
+      title: String((item as any).product_name || (item as any).name || "Item").slice(0, 256),
+      description: String((item as any).product_name || (item as any).name || "Produto").slice(0, 256),
+      category_id: "others",
+      quantity: Math.max(1, Math.round(Number((item as any).quantity) || 1)),
+      unit_price: roundMoney(Number((item as any).product_price || (item as any).price) || 0),
+    }))
+
+    // Dados do pagador no additional_info
+    const additionalPayer: Record<string, any> = {
+      first_name: payerFirstName,
+      last_name: payerLastName,
+      registration_date: user.created_at || new Date().toISOString(),
+      ...(payerPhone ? { phone: payerPhone } : {}),
+      ...(payerStreetName ? {
+        address: {
+          zip_code: payerZipCode || undefined,
+          street_name: payerStreetName,
+          street_number: payerStreetNumber ? (Number(payerStreetNumber.replace(/\D/g, "")) || payerStreetNumber) : undefined,
+        },
+      } : {}),
+    }
+
+    // Dados de envio (shipments) se entrega ativa (+5 a +7 pontos)
+    const shipmentReceiver = (normalizedDeliveryType === "delivery" && payerStreetName) ? {
+      receiver_address: {
+        zip_code: payerZipCode || undefined,
+        street_name: payerStreetName,
+        street_number: payerStreetNumber ? (Number(payerStreetNumber.replace(/\D/g, "")) || payerStreetNumber) : undefined,
+        city_name: payerCity || undefined,
+        state_name: payerFederalUnit || undefined,
+      },
+    } : undefined
+
     // SEGURANÇA: Montar requisição para API do MP usando chargeAmount do SERVIDOR
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: chargeAmount,
       payment_method_id: paymentFormData.payment_method_id,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
+      external_reference: targetOrderId,
+      statement_descriptor: "DUDIT",
+      description: `Pedido de ${customerName}`.slice(0, 250),
       payer: {
         email: paymentFormData.payer?.email || user.email,
         first_name: payerFirstName,
@@ -674,18 +732,22 @@ async function handler(request: NextRequest) {
           type: paymentFormData.payer?.identification?.type || "CPF",
           number: paymentFormData.payer?.identification?.number,
         },
-        ...(paymentFormData.payer?.address ? {
+        ...(payerStreetName ? {
           address: {
-            zip_code: paymentFormData.payer.address.zipCode || paymentFormData.payer.address.zip_code || "",
-            street_name: paymentFormData.payer.address.streetName || paymentFormData.payer.address.street_name || "",
-            street_number: paymentFormData.payer.address.streetNumber || paymentFormData.payer.address.street_number || "",
-            neighborhood: paymentFormData.payer.address.neighborhood || "",
-            city: paymentFormData.payer.address.city || "",
-            federal_unit: paymentFormData.payer.address.federalUnit || paymentFormData.payer.address.federal_unit || "",
+            zip_code: payerZipCode || "",
+            street_name: payerStreetName,
+            street_number: payerStreetNumber || "",
+            neighborhood: payerNeighborhood || "",
+            city: payerCity || "",
+            federal_unit: payerFederalUnit || "",
           },
         } : {}),
       },
-      description: `Pedido de ${customerName}`,
+      additional_info: {
+        ...(additionalItems.length > 0 ? { items: additionalItems } : {}),
+        payer: additionalPayer,
+        ...(shipmentReceiver ? { shipments: shipmentReceiver } : {}),
+      },
     }
 
     // Adicionar token se for cartão de crédito
@@ -725,15 +787,14 @@ async function handler(request: NextRequest) {
       }
 
       // additional_info.payer.address é OBRIGATÓRIO para boleto desde BACEN Set/2024
-      mpPaymentRequest.additional_info = {
-        payer: {
-          first_name: mpPaymentRequest.payer.first_name,
-          last_name: mpPaymentRequest.payer.last_name,
-          address: {
-            zip_code: mpPaymentRequest.payer?.address?.zip_code || "",
-            street_name: mpPaymentRequest.payer?.address?.street_name || "",
-            street_number: mpPaymentRequest.payer?.address?.street_number || "",
-          },
+      mpPaymentRequest.additional_info.payer = {
+        ...(mpPaymentRequest.additional_info.payer || {}),
+        first_name: mpPaymentRequest.payer.first_name,
+        last_name: mpPaymentRequest.payer.last_name,
+        address: {
+          zip_code: mpPaymentRequest.payer?.address?.zip_code || "",
+          street_name: mpPaymentRequest.payer?.address?.street_name || "",
+          street_number: mpPaymentRequest.payer?.address?.street_number || "",
         },
       }
     }
@@ -981,6 +1042,7 @@ async function handler(request: NextRequest) {
       const { data: insertedOrder, error: insertError } = await adminClient
         .from("orders")
         .insert({
+          id: targetOrderId,
           partner_id: partnerId,
           buyer_id: buyerId,
           customer_id: resolvedCustomerId,

@@ -6,11 +6,12 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { captureError } from "@/lib/monitoring/sentry"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const MAX_WEBHOOK_AGE_MS = 5 * 60 * 1000  // 5 minutes
-const AMOUNT_TOLERANCE = 0.01
 const MAX_RETRIES = 3
 const RETRY_DELAYS = [3000, 5000, 8000]
 
@@ -78,6 +79,15 @@ function validateWebhookSignature(
 export async function POST(request: NextRequest) {
   console.log("[WEBHOOK] ========== PAYMENT WEBHOOK RECEIVED ==========")
   console.log("[WEBHOOK] Timestamp:", new Date().toISOString())
+
+  // Rate limit
+  const rateLimitResult = await checkRateLimitForAPI(
+    RateLimitCategory.WEBHOOK,
+    "mercadopago-webhook",
+  )
+  if (rateLimitResult.limited) {
+    return NextResponse.json(rateLimitResult.body, { status: rateLimitResult.status })
+  }
 
   try {
     // ── Step 1: Validate required headers (FAIL CLOSED) ──
@@ -360,7 +370,7 @@ async function processWebhookWithRetry(
     const preapprovalId = paymentInfo.preapproval_id || paymentInfo.metadata?.preapproval_id
     if (preapprovalId) {
       console.log(`[WEBHOOK] Detected subscription preapproval payment (${preapprovalId}) for payment ${paymentId}`)
-      
+
       const { data: sub } = await supabase
         .from("recurring_subscriptions")
         .select("id")
@@ -371,7 +381,7 @@ async function processWebhookWithRetry(
         const { processPreapprovalPaymentWebhook, processPreapprovalPaymentFailed } = await import(
           "@/lib/services/recurring-execution.service"
         )
-        
+
         if (paymentInfo.status === "approved") {
           const res = await processPreapprovalPaymentWebhook({
             subscriptionId: sub.id,
@@ -398,9 +408,9 @@ async function processWebhookWithRetry(
     const saasExternalRef = paymentInfo.external_reference
     if (saasPreapprovalId || saasExternalRef) {
       console.log(`[WEBHOOK] Checking for SaaS subscription payment (preapproval: ${saasPreapprovalId}, ext_ref: ${saasExternalRef})`)
-      
+
       let saasSubscription = null
-      
+
       if (saasPreapprovalId) {
         const { data: sub } = await supabase
           .from("subscriptions")
@@ -419,11 +429,11 @@ async function processWebhookWithRetry(
 
       if (saasSubscription) {
         console.log(`[WEBHOOK] Found SaaS subscription ${saasSubscription.id} for payment ${paymentId}`)
-        
+
         if (paymentInfo.status === "approved" && ["past_due", "failed", "unpaid", "pending"].includes(saasSubscription.status)) {
           // Reactivate subscription
           console.log(`[WEBHOOK] Reactivating SaaS subscription ${saasSubscription.id} from ${saasSubscription.status} to active`)
-          
+
           const now = new Date()
           const currentEnd = saasSubscription.current_period_end ? new Date(saasSubscription.current_period_end) : null
           const nextEnd = currentEnd && currentEnd.getTime() > now.getTime()
@@ -445,10 +455,10 @@ async function processWebhookWithRetry(
             // Invalidate cache and sync billing
             const { invalidatePartnerPlanCache } = await import("@/lib/services/subscription.service")
             invalidatePartnerPlanCache(saasSubscription.partner_id)
-            
+
             const { syncSubscriptionToBilling } = await import("@/lib/billing/sync-subscription")
             await syncSubscriptionToBilling(saasSubscription.id, "webhook", "active", now, nextEnd).catch(console.error)
-            
+
             // Log billing event
             try {
               await supabase.from("billing_events").insert({
@@ -473,7 +483,7 @@ async function processWebhookWithRetry(
               .select("user_id")
               .eq("id", saasSubscription.partner_id)
               .single()
-            
+
             if (partner?.user_id) {
               const { sendBillingNotification } = await import("@/lib/billing/notifications")
               await sendBillingNotification(
@@ -488,7 +498,7 @@ async function processWebhookWithRetry(
                 }
               )
             }
-            
+
             console.log(`[WEBHOOK] SaaS subscription ${saasSubscription.id} reactivated successfully`)
           }
         }
@@ -512,14 +522,29 @@ async function processWebhookWithRetry(
     // ── Find order in DB ──
     let orderData = existingOrderData
     if (!orderData) {
-      const { data: order, error: orderError } = await supabase
+      let { data: order, error: orderError } = await supabase
         .from("orders")
         .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment")
         .eq("mp_payment_id", paymentId.toString())
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (orderError || !order) {
+      // Fallback seguro: se não encontrou por mp_payment_id, busca por external_reference (ID do pedido)
+      if (!order && paymentInfo?.external_reference) {
+        const { data: orderExt } = await supabase
+          .from("orders")
+          .select("id, situation, total_amount, paid_amount, partner_id, store_id, payment_breakdown, finance_account_id, checkout_fulfillment")
+          .eq("id", paymentInfo.external_reference)
+          .limit(1)
+          .maybeSingle()
+
+        if (orderExt) {
+          order = orderExt
+          console.log(`[WEBHOOK] Order ${order.id} found via external_reference fallback`)
+        }
+      }
+
+      if (!order) {
         console.error("[WEBHOOK] Order not found in database:", orderError?.message)
         if (attempt < MAX_RETRIES - 1) {
           await new Promise((resolve) => setTimeout(resolve, 2000))

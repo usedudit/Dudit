@@ -128,27 +128,14 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
                 p.expire(`ddt:search:${cityPrefix}${dateStr}:with_results`, TELEMETRY_TTL_SECONDS)
             }
         } else {
+            // Apenas contabiliza a métrica quantitativa de buscas sem resultado para a taxa de sucesso.
+            // NÃO salva o termo como demanda (demanda só é registrada se o usuário clicar em 'Estou procurando isso' e enviar).
             p.incr(`ddt:search:${dateStr}:zero_results`)
             p.expire(`ddt:search:${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
-
-            // Track zero result terms in Sorted Set (auto-increment score)
-            p.zincrby(`ddt:search:${dateStr}:zero_terms`, 1, normalizedTerm)
-            p.expire(`ddt:search:${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
-
-            // Monthly consolidated zero result terms for trend analysis
-            const monthStr = dateStr.slice(0, 7) // YYYY-MM
-            p.zincrby(`ddt:search:${monthStr}:zero_terms`, 1, normalizedTerm)
-            p.expire(`ddt:search:${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
 
             if (cleanCity) {
                 p.incr(`ddt:search:${cityPrefix}${dateStr}:zero_results`)
                 p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
-
-                p.zincrby(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, 1, normalizedTerm)
-                p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
-
-                p.zincrby(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, 1, normalizedTerm)
-                p.expire(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
             }
         }
 
@@ -189,8 +176,17 @@ export async function recordDemandEventTelemetry(input: DemandEventInput): Promi
             const rawDemandType = ((input.metadata?.demandType as string) || "").trim()
 
             if (rawTerm) {
+                const normalizedTerm = normalizeSearchQuery(rawTerm).slice(0, 100)
+                if (!normalizedTerm) return
+
+                // Anti-duplicação: impede que duplo clique ou requisições repetidas em < 10s incrementem a mesma demanda
+                const dedupKey = `ddt:demand:dedup:${cleanCity || "global"}:${rawDemandType}:${normalizedTerm}`
+                const isNew = await redis.set(dedupKey, "1", { nx: true, ex: 10 })
+                if (!isNew) {
+                    return // Já foi registrada nos últimos 10 segundos
+                }
+
                 const displayEntry = rawDemandType ? `${rawDemandType}: ${rawTerm}` : rawTerm
-                const monthStr = dateStr.slice(0, 7)
 
                 // 1. Contador e lista de demandas explícitas
                 p.incr(`ddt:demand:${dateStr}:explicit`)
@@ -199,38 +195,13 @@ export async function recordDemandEventTelemetry(input: DemandEventInput): Promi
                 p.zincrby(`ddt:demand:${dateStr}:explicit_terms`, 1, displayEntry)
                 p.expire(`ddt:demand:${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
 
-                // 2. Unificação com as buscas e demandas gerais da plataforma (resultado zero atendido)
-                p.incr(`ddt:search:${dateStr}:total`)
-                p.expire(`ddt:search:${dateStr}:total`, TELEMETRY_TTL_SECONDS)
-
-                p.incr(`ddt:search:${dateStr}:zero_results`)
-                p.expire(`ddt:search:${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
-
-                p.zincrby(`ddt:search:${dateStr}:zero_terms`, 1, displayEntry)
-                p.expire(`ddt:search:${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
-
-                p.zincrby(`ddt:search:${monthStr}:zero_terms`, 1, displayEntry)
-                p.expire(`ddt:search:${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
-
-                // 3. Granularidade por cidade (se houver cidade selecionada)
+                // 2. Granularidade por cidade (se houver cidade selecionada)
                 if (cleanCity) {
                     p.incr(`ddt:demand:${cityPrefix}${dateStr}:explicit`)
                     p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit`, TELEMETRY_TTL_SECONDS)
 
                     p.zincrby(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, 1, displayEntry)
                     p.expire(`ddt:demand:${cityPrefix}${dateStr}:explicit_terms`, TELEMETRY_TTL_SECONDS)
-
-                    p.incr(`ddt:search:${cityPrefix}${dateStr}:total`)
-                    p.expire(`ddt:search:${cityPrefix}${dateStr}:total`, TELEMETRY_TTL_SECONDS)
-
-                    p.incr(`ddt:search:${cityPrefix}${dateStr}:zero_results`)
-                    p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
-
-                    p.zincrby(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, 1, displayEntry)
-                    p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_terms`, TELEMETRY_TTL_SECONDS)
-
-                    p.zincrby(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, 1, displayEntry)
-                    p.expire(`ddt:search:${cityPrefix}${monthStr}:zero_terms`, TELEMETRY_TTL_SECONDS * 2)
                 }
             }
         }
@@ -302,10 +273,9 @@ export async function getMarketplaceSearchStats(
             const rawW = Number(results[baseIdx + 1] || 0)
             const rawZ = Number(results[baseIdx + 2] || 0)
             const rawC = Number(results[baseIdx + 3] || 0)
-            const rawE = Number(results[baseIdx + 4] || 0)
 
             const w = rawW
-            const z = Math.max(rawZ, rawE)
+            const z = rawZ
             const t = Math.max(rawT, w + z)
             const c = rawC
 
@@ -323,18 +293,13 @@ export async function getMarketplaceSearchStats(
             })
         }
 
-        // Fetch top zero-result keywords AND explicit demands across the period
+        // Fetch explicit demands across the period (ONLY explicit user submissions)
         const termsMap = new Map<string, { count: number; demandType?: string; cleanTerm: string }>()
 
         const termPipeline = redis.pipeline()
         for (const d of dayKeys) {
-            // Get zero terms
-            termPipeline.zrange(`ddt:search:${cityPrefix}${d}:zero_terms`, 0, 30, {
-                rev: true,
-                withScores: true,
-            })
-            // Also get explicit demand terms
-            termPipeline.zrange(`ddt:demand:${cityPrefix}${d}:explicit_terms`, 0, 30, {
+            // Consulta exclusivamente as demandas explícitas cadastradas pelos usuários
+            termPipeline.zrange(`ddt:demand:${cityPrefix}${d}:explicit_terms`, 0, 50, {
                 rev: true,
                 withScores: true,
             })
@@ -373,13 +338,10 @@ export async function getMarketplaceSearchStats(
                             }
                         }
 
-                        const mapKey = cleanTerm.toLowerCase()
+                        const mapKey = `${demandType || ""}:${cleanTerm.toLowerCase()}`
                         const existing = termsMap.get(mapKey)
                         if (existing) {
                             existing.count += score
-                            if (!existing.demandType && demandType) {
-                                existing.demandType = demandType
-                            }
                         } else {
                             termsMap.set(mapKey, {
                                 cleanTerm,

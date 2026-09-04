@@ -105,6 +105,7 @@ export interface DashboardLayout {
   sellsProducts: boolean;
   sellsServices: boolean;
   needsOnboarding?: boolean;
+  onboardingCompleted?: boolean;
   businessInfo?: any;
   greeting: {
     title: string;

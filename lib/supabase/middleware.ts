@@ -38,16 +38,20 @@ type SecureRuntimeStatus = {
 // Rotas que são puramente estáticas e não precisam de contexto de usuário no RootLayout.
 // Note: /institucional and /ajuda are now excluded from the middleware matcher entirely,
 // but we keep the header for any edge cases where dynamic routing might reach here.
-// Rotas da API que possuem seu próprio rate limit interno e devem ser isentas do rate limit global no middleware
+// Rotas da API que possuem seu próprio rate limit interno ou são probes de saúde e devem ser isentas do rate limit global no middleware
 const RATE_LIMIT_EXEMPT_PATHS = [
+  "/api/health",
   "/api/assets/qr-dino",
   "/api/upload-image",
   "/api/r2/video-upload",
+  "/api/r2/presigned-url",
   "/api/r2/returns-evidence",
   "/api/r2/billing-refund-evidence",
+  "/api/mercadopago/webhook",
   "/api/mercadopago/webhook/subscription",
   "/api/mercadopago/process-payment",
   "/api/mercadopago/process-erp-payment",
+  "/api/orders/retry-payment",
   "/api/emails/send",
   "/api/ai/suggest-ncm",
   "/api/ai/suggest-cest",

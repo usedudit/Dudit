@@ -168,10 +168,23 @@ async function handler(request: NextRequest) {
     const customerEmail = (paymentFormData.payer?.email || "").trim();
     const hasCustomerEmail = customerEmail.length > 0;
 
+    const targetReference = `ERP-${partnerId.slice(0, 8)}-${Date.now()}`
+
+    const rawPayerAddr = paymentFormData.payer?.address
+    const payerZipCode = String(rawPayerAddr?.zipCode || rawPayerAddr?.zip_code || "").replace(/\D/g, "")
+    const payerStreetName = String(rawPayerAddr?.streetName || rawPayerAddr?.street_name || "").trim()
+    const payerStreetNumber = String(rawPayerAddr?.streetNumber || rawPayerAddr?.street_number || "").trim()
+    const payerNeighborhood = String(rawPayerAddr?.neighborhood || "").trim()
+    const payerCity = String(rawPayerAddr?.city || "").trim()
+    const payerFederalUnit = String(rawPayerAddr?.federalUnit || rawPayerAddr?.federal_unit || "").trim()
+
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: amount,
       payment_method_id: paymentFormData.payment_method_id,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
+      external_reference: targetReference,
+      statement_descriptor: "DUDIT",
+      description: (description || `Venda ERP - ${partnerStoreName}`).slice(0, 250),
       payer: {
         email: hasCustomerEmail ? customerEmail : user.email,
         first_name: firstName,
@@ -182,18 +195,41 @@ async function handler(request: NextRequest) {
             number: identificationNumber,
           },
         } : {}),
-        ...(paymentFormData.payer?.address ? {
+        ...(payerStreetName ? {
           address: {
-            zip_code: paymentFormData.payer.address.zipCode || paymentFormData.payer.address.zip_code || "",
-            street_name: paymentFormData.payer.address.streetName || paymentFormData.payer.address.street_name || "",
-            street_number: paymentFormData.payer.address.streetNumber || paymentFormData.payer.address.street_number || "",
-            neighborhood: paymentFormData.payer.address.neighborhood || "",
-            city: paymentFormData.payer.address.city || "",
-            federal_unit: paymentFormData.payer.address.federalUnit || paymentFormData.payer.address.federal_unit || "",
+            zip_code: payerZipCode || "",
+            street_name: payerStreetName,
+            street_number: payerStreetNumber || "",
+            neighborhood: payerNeighborhood || "",
+            city: payerCity || "",
+            federal_unit: payerFederalUnit || "",
           },
         } : {}),
       },
-      description: description || `Venda ERP - ${partnerStoreName}`,
+      additional_info: {
+        items: [
+          {
+            id: "venda_erp",
+            title: (description || `Venda ERP - ${partnerStoreName}`).slice(0, 256),
+            description: "Venda ERP",
+            category_id: "others",
+            quantity: 1,
+            unit_price: amount,
+          },
+        ],
+        payer: {
+          first_name: firstName,
+          last_name: lastName || firstName,
+          registration_date: user.created_at || new Date().toISOString(),
+          ...(payerStreetName ? {
+            address: {
+              zip_code: payerZipCode || undefined,
+              street_name: payerStreetName,
+              street_number: payerStreetNumber ? (Number(payerStreetNumber.replace(/\D/g, "")) || payerStreetNumber) : undefined,
+            },
+          } : {}),
+        },
+      },
     }
 
     // Token para cartão de crédito
@@ -229,15 +265,14 @@ async function handler(request: NextRequest) {
         mpPaymentRequest.payer.address.federal_unit = federalUnitAbbr
       }
 
-      mpPaymentRequest.additional_info = {
-        payer: {
-          first_name: mpPaymentRequest.payer.first_name,
-          last_name: mpPaymentRequest.payer.last_name,
-          address: {
-            zip_code: mpPaymentRequest.payer?.address?.zip_code || "",
-            street_name: mpPaymentRequest.payer?.address?.street_name || "",
-            street_number: mpPaymentRequest.payer?.address?.street_number || "",
-          },
+      mpPaymentRequest.additional_info.payer = {
+        ...(mpPaymentRequest.additional_info?.payer || {}),
+        first_name: mpPaymentRequest.payer.first_name,
+        last_name: mpPaymentRequest.payer.last_name,
+        address: {
+          zip_code: mpPaymentRequest.payer?.address?.zip_code || "",
+          street_name: mpPaymentRequest.payer?.address?.street_name || "",
+          street_number: mpPaymentRequest.payer?.address?.street_number || "",
         },
       }
     }

@@ -78,11 +78,20 @@ export function ERPOnboardingWizard({
   )
   const [itemName, setItemName] = useState("")
   const [itemPrice, setItemPrice] = useState(0)
+  const [serviceDuration, setServiceDuration] = useState<number>(45)
 
   // Link copiado
   const [copied, setCopied] = useState(false)
 
-  if (!isOpen) return null
+  // Travar o scroll da página enquanto o wrapper estiver aberto
+  React.useEffect(() => {
+    if (!isOpen) return
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [isOpen])
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://dudit.com.br"
   const publicStoreUrl = partnerUrl.startsWith("http") ? partnerUrl : `${origin}${partnerUrl}`
@@ -121,6 +130,7 @@ export function ERPOnboardingWizard({
               name: itemName.trim(),
               price: itemPrice,
               itemType,
+              durationMinutes: itemType === "service" ? (Number(serviceDuration) || 45) : undefined,
             }
           : null,
       })
@@ -196,32 +206,40 @@ export function ERPOnboardingWizard({
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-50 flex h-screen w-full bg-[#022C2B] p-4 md:p-6 items-stretch overflow-hidden font-sans relative animate-fadeIn">
-        <div className="absolute inset-0 opacity-5 pointer-events-none" />
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[130] flex h-screen w-screen bg-[#022C2B] p-3 md:p-6 items-stretch overflow-hidden font-sans"
+          >
+            <div className="absolute inset-0 opacity-5 pointer-events-none" />
 
-        {/* Esquerda: Formulário / Wizard (Exatamente igual ao padrão do cadastro de parceiro) */}
-        <div className="w-full lg:w-[45%] xl:w-[40%] bg-white dark:bg-dark-surface rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative">
-          <div className="flex justify-between items-center mb-4 px-2 shrink-0">
-            <Link href="/erp/inicio" onClick={(e) => { e.preventDefault(); onClose() }}>
-              <img
-                src="https://img.dudit.com.br/static/Logo.png"
-                alt="Dudit"
-                width={90}
-                height={28}
-                className="h-7 w-auto hover:opacity-80 transition-opacity"
-              />
-            </Link>
-            <button
-              onClick={onClose}
-              className="text-xs font-semibold text-gray-900 dark:text-gray-100 hover:text-brand-green transition-colors cursor-pointer"
-            >
-              Fazer mais tarde
-            </button>
-          </div>
+            {/* Esquerda: Formulário / Wizard (Exatamente igual ao padrão do cadastro de parceiro) */}
+            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white dark:bg-dark-surface rounded-2xl flex flex-col p-6 overflow-hidden z-20 shadow-2xl relative h-full">
+              <div className="flex justify-between items-center mb-4 px-2 shrink-0">
+                <Link href="/erp/inicio" onClick={(e) => { e.preventDefault(); onClose() }}>
+                  <img
+                    src="https://img.dudit.com.br/static/Logo.png"
+                    alt="Dudit"
+                    width={90}
+                    height={28}
+                    className="h-7 w-auto hover:opacity-80 transition-opacity"
+                  />
+                </Link>
+                <button
+                  onClick={onClose}
+                  className="text-xs font-semibold text-gray-900 dark:text-gray-100 hover:text-brand-green transition-colors cursor-pointer"
+                >
+                  Fazer mais tarde
+                </button>
+              </div>
 
-          <div className="flex-1 flex flex-col justify-center overflow-y-auto scrollbar-hide px-2">
-            <div className="w-full max-w-md mx-auto">
-              {/* Barra de Progresso Fina */}
+              <div className="flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar px-2">
+                <div className="w-full max-w-md mx-auto my-auto py-2">
+                  {/* Barra de Progresso Fina */}
               <div className="flex gap-2 mb-6">
                 {Array.from({ length: totalSteps }).map((_, i) => (
                   <motion.div
@@ -411,6 +429,37 @@ export function ERPOnboardingWizard({
                           onChange={(val) => setItemPrice(val)}
                           placeholder="0,00"
                         />
+
+                        {itemType === "service" && (
+                          <div className="space-y-1.5">
+                            <Input
+                              label="Tempo do serviço (minutos)"
+                              type="number"
+                              min={1}
+                              max={1440}
+                              value={serviceDuration || ""}
+                              onChange={(e) => setServiceDuration(Math.max(1, parseInt(e.target.value) || 0))}
+                              placeholder="Ex: 45"
+                            />
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {[15, 30, 45, 60, 90, 120].map((mins) => (
+                                <button
+                                  key={mins}
+                                  type="button"
+                                  onClick={() => setServiceDuration(mins)}
+                                  className={cn(
+                                    "px-2.5 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer border",
+                                    serviceDuration === mins
+                                      ? "bg-brand-green text-white border-brand-green"
+                                      : "bg-white dark:bg-dark-surface text-brand-dark dark:text-dark-body border-brand-border dark:border-dark-border hover:border-brand-green/50"
+                                  )}
+                                >
+                                  {mins >= 60 && mins % 60 === 0 ? `${mins / 60}h` : `${mins} min`}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-3 pt-4">
@@ -502,7 +551,11 @@ export function ERPOnboardingWizard({
 
         {/* Direita: Visuais Decorativos (Idêntico ao cadastro de parceiro) */}
         <ERPOnboardingVisuals currentStep={step} totalSteps={totalSteps} />
-      </div>
-    </Portal>
+      </motion.div>
+    )}
+  </AnimatePresence>
+</Portal>
   )
 }
+
+export { ERPOnboardingWizard as ERPOnboardingWrapper }

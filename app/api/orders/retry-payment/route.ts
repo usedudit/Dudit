@@ -4,9 +4,19 @@ import { requireUser } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { captureError } from "@/lib/monitoring/sentry"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.PAYMENT)
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        rateLimit.body || { error: "Muitas tentativas. Tente novamente em breve." },
+        { status: rateLimit.status || 429 }
+      )
+    }
+
     const body = await request.json()
     const { orderId } = body
 

@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/authorization"
 import { generateSignedUploadUrl } from "@/lib/r2/server"
 import { validateUploadRequest } from "@/lib/security/file-validator"
 import { validateR2Config } from "@/lib/r2/r2-server-config"
+import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
+import { RateLimitCategory } from "@/lib/rate-limiter"
 
 export const runtime = "nodejs"
 
@@ -12,6 +14,15 @@ export const runtime = "nodejs"
  */
 export async function POST(req: NextRequest) {
   try {
+    // 0. RATE LIMITING
+    const rateLimit = await checkRateLimitForAPI(RateLimitCategory.UPLOAD)
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        rateLimit.body || { error: "Muitas requisições. Tente novamente mais tarde." },
+        { status: rateLimit.status || 429 }
+      )
+    }
+
     // 1. AUTHENTICATION - strict, throws on failure
     const user = await requireUser()
 

@@ -206,12 +206,12 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                                     O que a Cidade Quer
                                 </h3>
                             </div>
-                            <Badge variant="red">Demanda s/ Resultado</Badge>
+                            <Badge variant="red">Demandas Registradas</Badge>
                         </div>
 
                         <div className="p-6">
                             <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
-                                Termos que as pessoas pesquisaram na Dudit mas não encontraram lojas parceiras correspondentes:
+                                Demandas que os clientes cadastraram na Dudit procurando produtos, serviços ou lojas:
                             </p>
 
                             {topOpportunities.length > 0 ? (
@@ -243,14 +243,14 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <Badge variant="red">{item.count} {item.demandType ? 'demanda(s)' : 'buscas'}</Badge>
+                                                <Badge variant="red">{item.count} {item.count === 1 ? 'demanda' : 'demandas'}</Badge>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
                                 <div className="py-8 text-center text-xs text-brand-inactive-text dark:text-dark-body">
-                                    Nenhuma busca com 0 resultados registrada recentemente.
+                                    Nenhuma demanda registrada recentemente.
                                 </div>
                             )}
                         </div>
@@ -262,7 +262,7 @@ export function OverviewTab({ data, onNavigateTab }: OverviewTabProps) {
                             className="w-full text-xs font-semibold mt-4"
                             onClick={() => onNavigateTab("demanda")}
                         >
-                            Ver Todos os Termos da Cidade <ArrowRightIcon size={14} className="ml-1" />
+                            Ver Todas as Demandas da Cidade <ArrowRightIcon size={14} className="ml-1" />
                         </Button>
                     </div>
                 </div>

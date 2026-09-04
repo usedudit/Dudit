@@ -351,6 +351,7 @@ export async function getDashboardLayout(
     sellsProducts: context.sellsProducts,
     sellsServices: context.sellsServices,
     needsOnboarding,
+    onboardingCompleted,
     businessInfo: partner.business_info,
     greeting,
     checklist,
