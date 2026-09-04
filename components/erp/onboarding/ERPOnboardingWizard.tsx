@@ -15,6 +15,9 @@ import {
   StoreIcon,
   CheckCircleIcon,
   Check,
+  CameraIcon,
+  PinIcon,
+  PackageIcon,
 } from "@/lib/icons"
 import { ListItem } from "@/components/reusable/ListItem"
 import { Checkbox } from "@/components/reusable/Checkbox"
@@ -65,16 +68,26 @@ export function ERPOnboardingWizard({
   const [direction, setDirection] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Step 1: Objetivos principais (Multi-seleção)
+  const isDesapego = businessMode === "desapego"
+  const isERP = businessMode === "erp"
+  const isVitrine = !isDesapego && !isERP
+
+  // Step 1: Objetivos principais adaptados dinamicamente ao modo
   const [selectedGoals, setSelectedGoals] = useState<string[]>(() => {
-    if (sellsServices) return ["appointments"]
-    return ["whatsapp_catalog"]
+    if (isDesapego) return ["customize_profile", "location_pickup"]
+    if (isERP) {
+      if (sellsServices) return ["pos", "financial_control", "appointments_team"]
+      return ["pos", "stock_control", "financial_control"]
+    }
+    // Vitrine (quick / showcase)
+    if (sellsServices) return ["appointments", "whatsapp_services"]
+    return ["whatsapp_catalog", "pix_payments"]
   })
 
   // Step 2: Primeiro item (adaptado)
-  const isHybrid = sellsProducts && sellsServices
+  const isHybrid = !isDesapego && sellsProducts && sellsServices
   const [itemType, setItemType] = useState<"service" | "product">(
-    sellsServices ? "service" : "product"
+    isDesapego ? "product" : (sellsServices ? "service" : "product")
   )
   const [itemName, setItemName] = useState("")
   const [itemPrice, setItemPrice] = useState(0)
@@ -173,7 +186,9 @@ export function ERPOnboardingWizard({
   }
 
   const handleShareWhatsApp = () => {
-    const text = `Olá! Conheça nossa vitrine online e faça seu pedido/agendamento: ${publicStoreUrl}`
+    const text = isDesapego
+      ? `Olá! Dá uma olhada nos meus desapegos e itens à venda: ${publicStoreUrl}`
+      : `Olá! Conheça nossa vitrine online e faça seu pedido/agendamento: ${publicStoreUrl}`
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
   }
 
@@ -187,20 +202,32 @@ export function ERPOnboardingWizard({
   }
 
   const getStepTitle = () => {
-    if (step === 1) return "O que você quer resolver hoje?"
+    if (step === 1) {
+      if (isDesapego) return "O que você quer organizar hoje?"
+      if (isERP) return "O que você mais precisa gerenciar hoje?"
+      return "O que você quer resolver hoje?"
+    }
     if (step === 2) {
+      if (isDesapego) return "Cadastre seu primeiro desapego"
       if (itemType === "service") return "Cadastre seu principal serviço"
       return "Cadastre seu primeiro produto"
     }
+    if (isDesapego) return `Tudo pronto, ${storeName || "seu perfil"}!`
     return `Tudo pronto, ${storeName || "sua loja"}!`
   }
 
   const getStepSubtitle = () => {
-    if (step === 1) return "Selecione os objetivos principais para deixarmos seu painel organizado."
+    if (step === 1) {
+      if (isDesapego) return "Selecione o que deseja ajustar para começar a anunciar com segurança."
+      if (isERP) return "Selecione as ferramentas essenciais para deixarmos seu painel organizado."
+      return "Selecione os objetivos principais para deixarmos seu catálogo pronto."
+    }
     if (step === 2) {
-      if (itemType === "service") return "Apenas o nome e o valor para deixar sua página pronta para atender."
+      if (isDesapego) return "Informe o nome e o valor de desapego para começar a divulgar."
+      if (itemType === "service") return "Apenas o nome, valor e duração estimada para deixar sua agenda pronta."
       return "Informe o nome e o valor de venda para começar a divulgar."
     }
+    if (isDesapego) return "Sua página de desapegos já está pronta para receber compradores."
     return "Sua vitrine já está pronta para receber pedidos e clientes."
   }
 
@@ -273,89 +300,215 @@ export function ERPOnboardingWizard({
                     </p>
                   </div>
 
-                  {/* STEP 1: OBJETIVOS PRINCIPAIS COM CHECKBOX */}
+                  {/* STEP 1: OBJETIVOS PRINCIPAIS COM CHECKBOX ADAPTADO */}
                   {step === 1 && (
                     <div className="space-y-3">
-                      {sellsServices && (
+                      {/* MODO DESAPEGO */}
+                      {isDesapego && (
                         <>
                           <ListItem
-                            icon={CalendarIcon}
-                            title="Organizar meus agendamentos e clientes"
-                            description="Controlar horários e evitar confusão de atendimento no WhatsApp."
+                            icon={CameraIcon}
+                            title="Personalizar perfil do desapego"
+                            description="Foto de perfil, banner e bio para transmitir confiança aos compradores."
                             className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                            onClick={() => toggleGoal("appointments")}
+                            onClick={() => toggleGoal("customize_profile")}
                             right={
                               <Checkbox
-                                checked={selectedGoals.includes("appointments")}
-                                onChange={() => toggleGoal("appointments")}
+                                checked={selectedGoals.includes("customize_profile")}
+                                onChange={() => toggleGoal("customize_profile")}
+                              />
+                            }
+                          />
+
+                          <ListItem
+                            icon={PinIcon}
+                            title="Definir localização para retirada"
+                            description="Informar bairro ou cidade para compradores da sua região combinarem entrega."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("location_pickup")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("location_pickup")}
+                                onChange={() => toggleGoal("location_pickup")}
                               />
                             }
                           />
 
                           <ListItem
                             icon={WhatsappIcon}
-                            title="Divulgar serviços com link no WhatsApp"
-                            description="Mandar catálogo com fotos e preços onde o cliente escolhe o serviço."
+                            title="Divulgar meus desapegos no WhatsApp"
+                            description="Compartilhar o link com fotos e valores para negociar sem demora."
                             className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                            onClick={() => toggleGoal("whatsapp_services")}
+                            onClick={() => toggleGoal("whatsapp_share")}
                             right={
                               <Checkbox
-                                checked={selectedGoals.includes("whatsapp_services")}
-                                onChange={() => toggleGoal("whatsapp_services")}
+                                checked={selectedGoals.includes("whatsapp_share")}
+                                onChange={() => toggleGoal("whatsapp_share")}
                               />
                             }
                           />
                         </>
                       )}
 
-                      {sellsProducts && (
+                      {/* MODO VITRINE (QUICK / SHOWCASE) */}
+                      {!isDesapego && !isERP && (
                         <>
-                          <ListItem
-                            icon={ShoppingBagIcon}
-                            title="Montar catálogo online para pedidos"
-                            description="Enviar meu link com produtos e receber pedidos organizados no WhatsApp."
-                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                            onClick={() => toggleGoal("whatsapp_catalog")}
-                            right={
-                              <Checkbox
-                                checked={selectedGoals.includes("whatsapp_catalog")}
-                                onChange={() => toggleGoal("whatsapp_catalog")}
+                          {sellsServices && (
+                            <>
+                              <ListItem
+                                icon={CalendarIcon}
+                                title="Organizar agendamentos e horários"
+                                description="Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("appointments")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("appointments")}
+                                    onChange={() => toggleGoal("appointments")}
+                                  />
+                                }
                               />
-                            }
-                          />
 
-                          {businessMode === "erp" && (
+                              <ListItem
+                                icon={WhatsappIcon}
+                                title="Divulgar catálogo de serviços com preços"
+                                description="Mandar link onde o cliente vê duração, fotos e valores de cada atendimento."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("whatsapp_services")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("whatsapp_services")}
+                                    onChange={() => toggleGoal("whatsapp_services")}
+                                  />
+                                }
+                              />
+                            </>
+                          )}
+
+                          {sellsProducts && (
                             <ListItem
-                              icon={CashierIcon}
-                              title="Usar Frente de Caixa (PDV) no balcão"
-                              description="Registrar vendas rápidas no computador para clientes presenciais."
+                              icon={ShoppingBagIcon}
+                              title="Montar catálogo online para pedidos"
+                              description="Enviar link dos produtos e receber pedidos prontos e organizados no WhatsApp."
                               className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                              onClick={() => toggleGoal("pos")}
+                              onClick={() => toggleGoal("whatsapp_catalog")}
                               right={
                                 <Checkbox
-                                  checked={selectedGoals.includes("pos")}
-                                  onChange={() => toggleGoal("pos")}
+                                  checked={selectedGoals.includes("whatsapp_catalog")}
+                                  onChange={() => toggleGoal("whatsapp_catalog")}
                                 />
                               }
                             />
                           )}
+
+                          <ListItem
+                            icon={MoneyIcon}
+                            title="Receber pagamentos via Pix direto"
+                            description="Facilitar o acerto dos clientes exibindo chave Pix direto no pedido."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("pix_payments")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("pix_payments")}
+                                onChange={() => toggleGoal("pix_payments")}
+                              />
+                            }
+                          />
+
+                          <ListItem
+                            icon={StoreIcon}
+                            title="Personalizar minha marca e vitrine"
+                            description="Colocar logo, banner e horários de funcionamento para passar credibilidade."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("customize_storefront")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("customize_storefront")}
+                                onChange={() => toggleGoal("customize_storefront")}
+                              />
+                            }
+                          />
                         </>
                       )}
 
-                      {/* Opção Comum a Todos */}
-                      <ListItem
-                        icon={MoneyIcon}
-                        title="Controlar entradas e faturamento do caixa"
-                        description="Saber quanto faturei no mês sem precisar de caderninho de anotação."
-                        className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                        onClick={() => toggleGoal("financial")}
-                        right={
-                          <Checkbox
-                            checked={selectedGoals.includes("financial")}
-                            onChange={() => toggleGoal("financial")}
+                      {/* MODO ERP (GESTÃO COMPLETA) */}
+                      {isERP && (
+                        <>
+                          <ListItem
+                            icon={CashierIcon}
+                            title="Frente de Caixa (PDV) e vendas no balcão"
+                            description="Registrar vendas rápidas no computador e imprimir recibos na hora."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("pos")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("pos")}
+                                onChange={() => toggleGoal("pos")}
+                              />
+                            }
                           />
-                        }
-                      />
+
+                          {sellsProducts && (
+                            <ListItem
+                              icon={PackageIcon}
+                              title="Controle de estoque e reposição"
+                              description="Acompanhar entradas, saídas e estoque mínimo para evitar falta de mercadorias."
+                              className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                              onClick={() => toggleGoal("stock_control")}
+                              right={
+                                <Checkbox
+                                  checked={selectedGoals.includes("stock_control")}
+                                  onChange={() => toggleGoal("stock_control")}
+                                />
+                              }
+                            />
+                          )}
+
+                          <ListItem
+                            icon={MoneyIcon}
+                            title="Fluxo de caixa e gestão financeira"
+                            description="Controlar entradas, despesas, faturamento do mês e demonstrativo (DRE)."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("financial_control")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("financial_control")}
+                                onChange={() => toggleGoal("financial_control")}
+                              />
+                            }
+                          />
+
+                          {sellsServices && (
+                            <ListItem
+                              icon={CalendarIcon}
+                              title="Agenda da equipe e profissionais"
+                              description="Gerenciar horários dos profissionais, comissões e fila de atendimento."
+                              className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                              onClick={() => toggleGoal("appointments_team")}
+                              right={
+                                <Checkbox
+                                  checked={selectedGoals.includes("appointments_team")}
+                                  onChange={() => toggleGoal("appointments_team")}
+                                />
+                              }
+                            />
+                          )}
+
+                          <ListItem
+                            icon={StoreIcon}
+                            title="Vitrine online conectada ao estoque"
+                            description="Receber pedidos pela internet com baixa automática no estoque do sistema."
+                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            onClick={() => toggleGoal("integrated_storefront")}
+                            right={
+                              <Checkbox
+                                checked={selectedGoals.includes("integrated_storefront")}
+                                onChange={() => toggleGoal("integrated_storefront")}
+                              />
+                            }
+                          />
+                        </>
+                      )}
 
                       <div className="pt-4 flex gap-3">
                         <Button
@@ -412,9 +565,17 @@ export function ERPOnboardingWizard({
 
                       <div className="space-y-4">
                         <Input
-                          label={itemType === "service" ? "Nome do Serviço" : "Nome do Produto"}
+                          label={
+                            isDesapego
+                              ? "Nome do item ou desapego"
+                              : itemType === "service"
+                              ? "Nome do Serviço"
+                              : "Nome do Produto"
+                          }
                           placeholder={
-                            itemType === "service"
+                            isDesapego
+                              ? "Ex: Tênis Nike Tam 40, Sofá 3 Lugares, iPhone 12..."
+                              : itemType === "service"
                               ? "Ex: Corte Masculino, Manicure Completa, Consulta..."
                               : "Ex: Bolo de Pote, Camiseta Básica, Trufa de Chocolate..."
                           }
@@ -424,7 +585,13 @@ export function ERPOnboardingWizard({
                         />
 
                         <FormCurrencyInput
-                          label={itemType === "service" ? "Valor cobrado (R$)" : "Preço de venda (R$)"}
+                          label={
+                            isDesapego
+                              ? "Valor de desapego (R$)"
+                              : itemType === "service"
+                              ? "Valor cobrado (R$)"
+                              : "Preço de venda (R$)"
+                          }
                           value={itemPrice}
                           onChange={(val) => setItemPrice(val)}
                           placeholder="0,00"
@@ -550,7 +717,7 @@ export function ERPOnboardingWizard({
         </div>
 
         {/* Direita: Visuais Decorativos (Idêntico ao cadastro de parceiro) */}
-        <ERPOnboardingVisuals currentStep={step} totalSteps={totalSteps} />
+        <ERPOnboardingVisuals currentStep={step} totalSteps={totalSteps} businessMode={businessMode} />
       </motion.div>
     )}
   </AnimatePresence>

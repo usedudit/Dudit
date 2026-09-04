@@ -201,26 +201,29 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                     onClose={() => setShowOptionsModal(false)}
                     title="Opções da Vitrine Online"
                     description="Compartilhe seu link, divulgue no WhatsApp ou baixe a placa para o balcão"
-                    maxWidth="sm"
+                    maxWidth="xl"
                 >
-                    <div className="flex flex-col items-center justify-center p-2 gap-4">
-                        <div className="p-4 bg-white rounded-2xl border border-brand-border">
-                            {qrCodeUrl ? (
-                                <img
-                                    src={qrCodeUrl}
-                                    alt="QR Code da Loja"
-                                    className="w-44 h-44 object-contain rounded-lg"
-                                />
-                            ) : (
-                                <div className="w-44 h-44 bg-brand-gray animate-pulse rounded-lg" />
-                            )}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center py-2">
+                        {/* QR Code e Link */}
+                        <div className="md:col-span-6 flex flex-col items-center gap-3">
+                            <div className="p-4 bg-white rounded-2xl border border-brand-border">
+                                {qrCodeUrl ? (
+                                    <img
+                                        src={qrCodeUrl}
+                                        alt="QR Code da Loja"
+                                        className="w-44 h-44 object-contain rounded-lg"
+                                    />
+                                ) : (
+                                    <div className="w-44 h-44 bg-brand-gray animate-pulse rounded-lg" />
+                                )}
+                            </div>
+                            <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body max-w-xs font-mono break-all">
+                                {profileUrl}
+                            </p>
                         </div>
 
-                        <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body max-w-xs font-mono break-all">
-                            {profileUrl}
-                        </p>
-
-                        <div className="flex flex-col gap-2 w-full pt-1">
+                        {/* Botões de Ação */}
+                        <div className="md:col-span-6 flex flex-col gap-3">
                             <Button
                                 variant="default"
                                 size="sm"
@@ -253,7 +256,7 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                                 </Button>
                             </div>
 
-                            <div className="w-full flex justify-center pt-1">
+                            <div className="w-full pt-1">
                                 <QRCodePoster profileUrl={profileUrl} storeName={storeName} />
                             </div>
                         </div>

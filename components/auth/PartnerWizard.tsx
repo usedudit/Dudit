@@ -6,7 +6,8 @@ import { Upload, Briefcase, Tag, ChevronRight, Store } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "@/hooks/use-notification"
-import { cn, generateNameFromEmail } from "@/lib/utils"
+import { cn, generateNameFromEmail, getEmailProvider } from "@/lib/utils"
+import { MailIcon } from "@/lib/icons"
 import { motion, AnimatePresence } from "framer-motion"
 import Input from "@/components/reusable/Input"
 import NumberInputWithCheckbox from "@/components/ui/number-input-with-checkbox"
@@ -94,6 +95,51 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const isSubmittingRef = useRef(false)
     const [imageUploading, setImageUploading] = useState(false)
+    const [isVerifyEmailView, setIsVerifyEmailView] = useState(false)
+    const [resendTimer, setResendTimer] = useState(60)
+    const [canResend, setCanResend] = useState(false)
+    const [isResending, setIsResending] = useState(false)
+
+    React.useEffect(() => {
+        let timer: NodeJS.Timeout
+        if (isVerifyEmailView && resendTimer > 0) {
+            timer = setTimeout(() => setResendTimer(prev => prev - 1), 1000)
+        } else if (resendTimer === 0) {
+            setCanResend(true)
+        }
+        return () => {
+            if (timer) clearTimeout(timer)
+        }
+    }, [isVerifyEmailView, resendTimer])
+
+    const handleResendEmail = async () => {
+        setIsResending(true)
+        try {
+            const cleanEmail = email.trim().toLowerCase()
+            const announce = searchParams.get("announce")
+            const nextPath = announce === "product"
+                ? "/erp/produtos?create=true"
+                : announce === "service"
+                ? "/erp/servicos?create=true"
+                : "/erp/inicio"
+
+            const { error: resendErr } = await supabase.auth.resend({
+                type: "signup",
+                email: cleanEmail,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+                },
+            })
+            if (resendErr) throw resendErr
+            toast.success("E-mail de confirmação reenviado com sucesso!")
+            setResendTimer(60)
+            setCanResend(false)
+        } catch (err: any) {
+            toast.error(err.message || "Erro ao reenviar e-mail")
+        } finally {
+            setIsResending(false)
+        }
+    }
 
     const isDesapego = partnerData.businessInfo.mode === "desapego"
     const maxStep = isDesapego ? 3 : 5
@@ -294,12 +340,19 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
             if (!isUserLoggedIn) {
                 const cleanEmail = email.trim().toLowerCase()
+                const announce = searchParams.get("announce")
+                const nextPath = announce === "product"
+                    ? "/erp/produtos?create=true"
+                    : announce === "service"
+                    ? "/erp/servicos?create=true"
+                    : "/erp/inicio"
+
                 const { data: signUp, error: signErr } = await supabase.auth.signUp({
                     email: cleanEmail,
                     password,
                     options: {
                         data: { full_name: sellerName },
-                        emailRedirectTo: `${window.location.origin}/auth/callback?next=/erp/inicio`,
+                        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
                     },
                 })
                 if (signErr) throw signErr
@@ -348,7 +401,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             })
 
             if (!res.success) throw new Error(res.error)
-            
+
             if (typeof window !== "undefined") {
                 const { notifyAddressUpdated } = await import("@/lib/utils/address-sync")
                 notifyAddressUpdated()
@@ -366,7 +419,9 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                     }
                 }
             } else {
-                router.push(`/auth/login?mode=verify-email&email=${encodeURIComponent(email)}`)
+                setIsVerifyEmailView(true)
+                setResendTimer(60)
+                setCanResend(false)
             }
         } catch (e: any) {
             console.error("[PARTNER-WIZARD SUBMIT ERROR]", e)
@@ -381,6 +436,61 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
         setDirection(-1)
         if ((isUserLoggedIn && step > 2) || (!isUserLoggedIn && step > 1)) setStep(s => s - 1)
         else onBack()
+    }
+
+    if (isVerifyEmailView) {
+        const provider = getEmailProvider(email)
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="w-full flex flex-col items-center text-center space-y-6 py-4"
+            >
+                <div className="mx-auto h-20 w-20 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center">
+                    <MailIcon size={40} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                        Verifique seu email
+                    </h2>
+                    <p className="text-brand-inactive-text dark:text-dark-body text-sm">
+                        Enviamos um link de confirmação para <strong>{email}</strong>
+                    </p>
+                </div>
+
+                <Button
+                    onClick={() => window.open(provider ? provider.url : "mailto:" + email)}
+                    className="w-full h-[44px]"
+                >
+                    {provider ? `Abrir ${provider.name}` : "Abrir Email"}
+                </Button>
+
+                <div className="text-sm">
+                    {canResend ? (
+                        <Button variant="link" onClick={handleResendEmail} disabled={isResending}>
+                            Reenviar Email
+                        </Button>
+                    ) : (
+                        <div className="text-brand-inactive-text dark:text-dark-body">
+                            {resendTimer > 60 ? (
+                                <span>Reenviar em {Math.floor(resendTimer / 60)}:{(resendTimer % 60).toString().padStart(2, "0")}</span>
+                            ) : (
+                                <span>Reenviar em 00:{resendTimer.toString().padStart(2, "0")}</span>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium"
+                >
+                    ← Voltar para Login
+                </button>
+            </motion.div>
+        )
     }
 
     return (
@@ -461,7 +571,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         <Input
                                             name="storeName"
                                             label="Seu Nome de Vendedor"
-                                            placeholder="Ex: Murilo Silva"
+                                            placeholder="Ex: João Silva"
                                             value={partnerData.storeName}
                                             onChange={e => setPartnerData(p => ({ ...p, storeName: e.target.value }))}
                                             required

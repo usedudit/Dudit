@@ -108,3 +108,26 @@ export function isStoreDeleted(order: any): boolean {
   return false
 }
 
+/**
+ * Returns webmail provider info (name, url, icon) based on email domain
+ */
+export function getEmailProvider(email: string): { name: string; url: string; icon: string } | null {
+  const domain = email?.split("@")[1]?.toLowerCase()
+  if (!domain) return null
+
+  const providers: Record<string, { name: string; url: string; icon: string }> = {
+    "gmail.com": { name: "Gmail", url: "https://mail.google.com", icon: "📧" },
+    "googlemail.com": { name: "Gmail", url: "https://mail.google.com", icon: "📧" },
+    "outlook.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
+    "hotmail.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
+    "live.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
+    "yahoo.com": { name: "Yahoo Mail", url: "https://mail.yahoo.com", icon: "📬" },
+    "protonmail.com": { name: "Proton Mail", url: "https://mail.proton.me", icon: "🔒" },
+    "proton.me": { name: "Proton Mail", url: "https://mail.proton.me", icon: "🔒" },
+    "icloud.com": { name: "iCloud Mail", url: "https://www.icloud.com/mail", icon: "☁️" },
+    "me.com": { name: "iCloud Mail", url: "https://www.icloud.com/mail", icon: "☁️" },
+  }
+
+  return providers[domain] || null
+}
+

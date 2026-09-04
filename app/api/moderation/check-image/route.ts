@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth/authorization'
 import { moderateImageWithBase64 } from '@/lib/moderation/sightengine-moderation'
 import {
   calculateImageHash,
+  calculatePerceptualHash,
+  findSimilarImageInCache,
   getImageFromCache,
   cacheImageModeration,
 } from '@/lib/moderation/image-cache'
@@ -24,8 +26,19 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const hash = await calculateImageHash(Buffer.from(base64.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    const cached = await getImageFromCache(hash)
+    const imageBuffer = Buffer.from(base64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+    const [hash, phash] = await Promise.all([
+      calculateImageHash(imageBuffer),
+      calculatePerceptualHash(imageBuffer),
+    ])
+
+    let cached = await getImageFromCache(hash)
+    if (!cached && phash) {
+      const visualMatch = await findSimilarImageInCache(phash)
+      if (visualMatch) {
+        cached = visualMatch.cached
+      }
+    }
     if (cached) {
       return NextResponse.json({
         success: true,
@@ -49,7 +62,8 @@ export async function POST(req: NextRequest) {
       analysis.riskLevel,
       analysis.confidence,
       analysis.categories,
-      decision.status === 'FLAGGED' ? 'FLAGGED' : 'APPROVED'
+      decision.status === 'FLAGGED' ? 'FLAGGED' : 'APPROVED',
+      phash,
     )
 
     return NextResponse.json({

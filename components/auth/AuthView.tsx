@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { MailIcon } from "@/lib/icons"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
-import { generateNameFromEmail } from "@/lib/utils"
+import { generateNameFromEmail, getEmailProvider } from "@/lib/utils"
 import { Button, EmailInput, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner } from "@/components/reusable"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
@@ -27,26 +27,6 @@ function getSafeNext(rawNext: string | null): string {
     return "/"
 }
 
-// Helpers
-function getEmailProvider(email: string) {
-    const domain = email?.split("@")[1]?.toLowerCase()
-    if (!domain) return null
-
-    const providers: Record<string, { name: string; url: string; icon: string }> = {
-        "gmail.com": { name: "Gmail", url: "https://mail.google.com", icon: "📧" },
-        "googlemail.com": { name: "Gmail", url: "https://mail.google.com", icon: "📧" },
-        "outlook.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
-        "hotmail.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
-        "live.com": { name: "Outlook", url: "https://outlook.live.com", icon: "📨" },
-        "yahoo.com": { name: "Yahoo Mail", url: "https://mail.yahoo.com", icon: "📬" },
-        "protonmail.com": { name: "Proton Mail", url: "https://mail.proton.me", icon: "🔒" },
-        "proton.me": { name: "Proton Mail", url: "https://mail.proton.me", icon: "🔒" },
-        "icloud.com": { name: "iCloud Mail", url: "https://www.icloud.com/mail", icon: "☁️" },
-        "me.com": { name: "iCloud Mail", url: "https://www.icloud.com/mail", icon: "☁️" },
-    }
-
-    return providers[domain] || null
-}
 
 // Otimização: Static Background Memoized
 const WavesBackground = React.memo(() => (
@@ -93,6 +73,12 @@ export default function AuthView({
             setMode(initialMode)
         }
     }, [initialMode])
+
+    useEffect(() => {
+        if (initialEmail) {
+            setEmail(initialEmail)
+        }
+    }, [initialEmail])
 
     // Logic to handle timer decrement
     useEffect(() => {

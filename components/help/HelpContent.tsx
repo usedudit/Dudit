@@ -3,89 +3,17 @@
 import React, { useState } from "react"
 import { HelpArticle, helpCategories } from "@/lib/help-data"
 import { ChevronRightIcon, CopyIcon, CheckCircleIcon } from "@/lib/icons"
-import { Badge, InfoCard, Button, DefaultModal, FormTextarea } from "@/components/reusable"
+import { Badge, InfoCard, Button } from "@/components/reusable"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-
-import { submitFeedbackAction } from "@/app/actions/feedback"
-import { getClientFeedbackContext } from "@/lib/utils/client-feedback-context"
-import { Check } from "lucide-react"
-
-const HELP_EMOJIS = [
-    { sentiment: "positive" as const, emoji: "😊", label: "Útil" },
-    { sentiment: "neutral" as const, emoji: "😐", label: "Mais ou menos" },
-    { sentiment: "negative" as const, emoji: "🙁", label: "Não ajudou" },
-]
 
 export default function HelpContent({ article }: { article: HelpArticle }) {
     const [copied, setCopied] = useState(false)
-    const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false)
-    const [selectedSentiment, setSelectedSentiment] = useState<"positive" | "neutral" | "negative">("positive")
-    const [commentText, setCommentText] = useState("")
-    const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
-    const [submittedSentiment, setSubmittedSentiment] = useState<string | null>(null)
-    const [feedbackAuthError, setFeedbackAuthError] = useState(false)
-    const router = useRouter()
 
     const handleCopyLink = () => {
         if (typeof window !== "undefined") {
             navigator.clipboard.writeText(window.location.href)
             setCopied(true)
             setTimeout(() => setCopied(false), 2000)
-        }
-    }
-
-    const handleEmojiClick = (sentiment: "positive" | "neutral" | "negative") => {
-        setFeedbackAuthError(false)
-        setSelectedSentiment(sentiment)
-        setCommentText("")
-        setIsFeedbackModalOpen(true)
-    }
-
-    const handleSendFeedback = async (withComment: boolean) => {
-        setFeedbackAuthError(false)
-        setIsSubmittingFeedback(true)
-
-        try {
-            const clientContext = getClientFeedbackContext()
-            const sentimentLabel =
-                selectedSentiment === "positive"
-                    ? "Positivo"
-                    : selectedSentiment === "neutral"
-                        ? "Neutro"
-                        : "Negativo"
-
-            const comment = withComment ? commentText.trim() : ""
-            const message = comment
-                ? `Artigo ("${article.title}") [${sentimentLabel}]: ${comment}`
-                : `Artigo avaliado como ${sentimentLabel}: "${article.title}"`
-
-            const res = await submitFeedbackAction({
-                type: "help_article",
-                sentiment: selectedSentiment,
-                message,
-                pageUrl: clientContext.pageUrl,
-                metadata: {
-                    browser: clientContext.browser,
-                    screen: clientContext.screen,
-                    app_area: "Central de Ajuda",
-                    article_id: article.id,
-                    article_title: article.title,
-                    article_category: article.category,
-                },
-            })
-
-            if (res.success) {
-                setSubmittedSentiment(selectedSentiment)
-                setIsFeedbackModalOpen(false)
-            } else if (res.error?.includes("autenticado")) {
-                setFeedbackAuthError(true)
-                setIsFeedbackModalOpen(false)
-            }
-        } catch {
-            // Silently handle
-        } finally {
-            setIsSubmittingFeedback(false)
         }
     }
 
@@ -312,41 +240,6 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 {renderMarkdown(article.content)}
             </article>
 
-            {/* Isto foi útil? */}
-            <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
-                <h3 className="text-base font-medium text-gray-700 dark:text-dark-heading mb-3">
-                    Isto foi útil?
-                </h3>
-
-                {submittedSentiment ? (
-                    <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-3.5 py-2 rounded-xl w-fit">
-                        <Check className="w-4 h-4" />
-                        <span>Obrigado pelo seu feedback!</span>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3">
-                        {HELP_EMOJIS.map((item) => (
-                            <button
-                                key={item.sentiment}
-                                type="button"
-                                onClick={() => handleEmojiClick(item.sentiment)}
-                                className="w-11 h-11 rounded-full border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/50 flex items-center justify-center text-xl transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm hover:shadow"
-                                title={item.label}
-                                aria-label={item.label}
-                            >
-                                <span>{item.emoji}</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {feedbackAuthError && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                        Você precisa estar autenticado para enviar feedback. <Link href={`/auth/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/ajuda")}`} className="underline font-semibold">Entrar na conta</Link>
-                    </p>
-                )}
-            </div>
-
             {/* Footer Navigation */}
             <div className="mt-20 pt-10 border-t border-brand-border dark:border-dark-border flex justify-between items-center gap-4">
                 {prevArticle ? (
@@ -373,74 +266,6 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                     </Link>
                 ) : <div />}
             </div>
-
-            <DefaultModal
-                isOpen={isFeedbackModalOpen}
-                onClose={() => setIsFeedbackModalOpen(false)}
-                title="Isto foi útil?"
-                maxWidth="sm"
-                footer={
-                    <div className="flex items-center justify-end">
-                        <Button
-                            variant="outline"
-                            onClick={() => handleSendFeedback(false)}
-                            disabled={isSubmittingFeedback}
-                        >
-                            Apenas enviar
-                        </Button>
-                        <Button
-                            onClick={() => handleSendFeedback(true)}
-                            disabled={isSubmittingFeedback}
-                        >
-                            {isSubmittingFeedback ? "Enviando..." : "Enviar comentário"}
-                        </Button>
-                    </div>
-                }
-            >
-                <div className="space-y-4 pt-1">
-                    {/* Emojis selection row */}
-                    <div className="flex items-center justify-center gap-4 py-2">
-                        {HELP_EMOJIS.map((item) => {
-                            const isSelected = selectedSentiment === item.sentiment
-                            return (
-                                <button
-                                    key={item.sentiment}
-                                    type="button"
-                                    onClick={() => setSelectedSentiment(item.sentiment)}
-                                    className={`w-12 h-12 rounded-full border flex items-center justify-center text-2xl transition-all ${isSelected
-                                        ? "border-brand-primary bg-brand-primary/10 ring-2 ring-brand-primary scale-110"
-                                        : "border-brand-border dark:border-dark-border bg-gray-50/50 dark:bg-dark-surface opacity-60 hover:opacity-100 hover:scale-105"
-                                        }`}
-                                    title={item.label}
-                                >
-                                    <span>{item.emoji}</span>
-                                </button>
-                            )
-                        })}
-                    </div>
-
-                    <p className="text-xs text-center text-brand-inactive-text dark:text-dark-body">
-                        {selectedSentiment === "positive"
-                            ? "Que bom que ajudou! Quer deixar algum comentário ou sugestão?"
-                            : selectedSentiment === "neutral"
-                                ? "O que achou confuso ou o que poderíamos detalhar melhor?"
-                                : "Sentimos muito. O que faltou ou não funcionou para você?"}
-                    </p>
-
-                    {/* Textarea */}
-                    <div>
-                        <FormTextarea
-                            label="Quer escrever algo a mais? (opcional)"
-                            placeholder="Escreva seu comentário aqui se desejar..."
-                            value={commentText}
-                            onChange={(e: any) => setCommentText(e.target.value)}
-                            maxLength={1000}
-                            showCharacterCount
-                            className="min-h-[85px] text-xs"
-                        />
-                    </div>
-                </div>
-            </DefaultModal>
         </div>
     )
 }

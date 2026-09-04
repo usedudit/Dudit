@@ -81,9 +81,11 @@ const PricingCards = () => {
             "Pagamentos online com Mercado Pago",
             "Cupons e promoções para vender mais",
             "Variações de produtos (cor, tamanho e mais)",
+            "Complementos e adicionais",
+            "Gestão de trocas e devoluções",
             "Configuração simples de entregas",
             "Controle financeiro com visão do lucro",
-            "Relatórios básicos do negócio",
+            "Relatórios do negócio",
             "Gestão organizada de fornecedores",
             "Ordens de serviço em um só lugar"
          ],
@@ -102,17 +104,17 @@ const PricingCards = () => {
          features: [
             "Tudo do plano Crescer +",
             "Financeiro completo com fluxo de caixa e DRE",
-            "Relatórios avançados para decisões estratégicas",
             "Controle de expedição e entregas",
-            "Gestão fácil de trocas e devoluções",
-            "Kits e combos de produtos",
-            "Campanhas promocionais para vender mais"
+            "Campanhas promocionais",
+            "Metas e desempenho da equipe",
+            "Lembretes automáticos via WhatsApp",
+            "Importação de XML (NF-e)"
          ],
          limits: [
             "Itens e pedidos ilimitados",
             "Ordens de serviço ilimitadas",
             "Agendamentos ilimitados",
-            "15 imagens por item",
+            "Até 15 imagens por item",
             "10 usuários",
          ],
          variant: "outline" as const,
@@ -212,32 +214,28 @@ const ComparisonTable = () => {
       {
          title: "Vendas",
          items: [
-            { name: "Pedidos pelo sistema", g: "check", v: "check", c: "check" },
-            { name: "Checkout online", g: "x", v: "check", c: "check" },
+            { name: "Vitrine online", g: "check", v: "check", c: "check" },
+            { name: "Pedidos via WhatsApp", g: "check", v: "check", c: "check" },
+            { name: "Pedidos pelo sistema", g: "x", v: "check", c: "check" },
+            { name: "Checkout online (Mercado Pago)", g: "x", v: "check", c: "check" },
             { name: "PDV (caixa)", g: "Básico", v: "Completo", c: "Completo" },
             { name: "Pedidos/mês", g: "25", v: "150", c: "Ilimitado" },
-         ]
-      },
-      {
-         title: "Pagamentos",
-         items: [
-            { name: "Pagamento online", g: "x", v: "check", c: "check" },
          ]
       },
       {
          title: "Produtos",
          items: [
             { name: "Cadastro de produtos", g: "check", v: "check", c: "check" },
-            { name: "Variações (tamanho, etc.)", g: "x", v: "check", c: "check" },
-            { name: "Kits / combos", g: "x", v: "x", c: "check" },
+            { name: "Variações (tamanho, cor, etc.)", g: "x", v: "check", c: "check" },
+            { name: "Complementos e adicionais", g: "x", v: "check", c: "check" },
             { name: "Itens no catálogo", g: "15", v: "100", c: "Ilimitado" },
-            { name: "Imagens por item", g: "2", v: "5", c: "15" },
+            { name: "Imagens por item", g: "2", v: "5", c: "Até 15" },
          ]
       },
       {
          title: "Serviços",
          items: [
-            { name: "Agendamentos", g: "check", v: "check", c: "check" },
+            { name: "Agendamentos online", g: "check", v: "check", c: "check" },
             { name: "Ordens de serviço", g: "check", v: "check", c: "check" },
             { name: "Agendamentos/mês", g: "30", v: "150", c: "Ilimitado" },
          ]
@@ -245,22 +243,28 @@ const ComparisonTable = () => {
       {
          title: "Entrega",
          items: [
-            { name: "Entrega local", g: "x", v: "check", c: "check" },
-            { name: "Logística avançada", g: "x", v: "x", c: "check" },
-         ]
-      },
-      {
-         title: "Marketing",
-         items: [
-            { name: "Cupons", g: "x", v: "check", c: "check" },
-            { name: "Campanhas", g: "x", v: "x", c: "check" },
+            { name: "Configuração de entregas", g: "x", v: "check", c: "check" },
+            { name: "Controle de expedição", g: "x", v: "x", c: "check" },
          ]
       },
       {
          title: "Financeiro",
          items: [
             { name: "Controle financeiro", g: "x", v: "check", c: "check" },
+            { name: "Relatórios do negócio", g: "x", v: "check", c: "check" },
             { name: "Fluxo de caixa + DRE", g: "x", v: "x", c: "check" },
+         ]
+      },
+      {
+         title: "Marketing e Gestão",
+         items: [
+            { name: "Cupons e promoções", g: "x", v: "check", c: "check" },
+            { name: "Campanhas promocionais", g: "x", v: "x", c: "check" },
+            { name: "Metas e desempenho", g: "x", v: "x", c: "check" },
+            { name: "Trocas e devoluções", g: "x", v: "check", c: "check" },
+            { name: "Fornecedores", g: "x", v: "check", c: "check" },
+            { name: "Lembretes via WhatsApp", g: "x", v: "x", c: "check" },
+            { name: "Importação XML (NF-e)", g: "x", v: "x", c: "check" },
          ]
       },
       {

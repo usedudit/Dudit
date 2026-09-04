@@ -7,12 +7,9 @@ import {
     DownloadIcon,
     PrinterIcon,
     CopyIcon,
-    StoreIcon,
-    SparklesIcon,
 } from "@/lib/icons"
-import { DefaultModal, Button } from "@/components/reusable"
+import { DefaultModal, Button, InfoCard, ListItem, RadioButton } from "@/components/reusable"
 import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
 
 export type PlaqueTemplateId = "cavalete"
 
@@ -266,7 +263,7 @@ export function StorePlaqueModal({
                 {/* Preview */}
                 <div className="md:col-span-6 flex flex-col items-center bg-brand-gray/60 dark:bg-dark-border/20 border border-brand-border dark:border-dark-border rounded-2xl p-4 gap-3.5">
                     <div className="flex items-center justify-between w-full px-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">
+                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
                             Pré-visualização
                         </span>
                         {isRendering && (
@@ -276,7 +273,7 @@ export function StorePlaqueModal({
                         )}
                     </div>
 
-                    <div className="w-full max-w-[320px] aspect-square bg-[#F1F5F9] dark:bg-[#1E293B] rounded-2xl shadow-sm border border-brand-border/80 dark:border-dark-border overflow-hidden flex items-center justify-center relative">
+                    <div className="w-full max-w-[320px] aspect-square bg-[#F1F5F9] dark:bg-[#1E293B] rounded-2xl border border-brand-border/80 dark:border-dark-border overflow-hidden flex items-center justify-center relative">
                         <canvas ref={canvasRef} className="w-full h-full object-contain" />
                     </div>
 
@@ -295,93 +292,65 @@ export function StorePlaqueModal({
 
                 {/* Opções e Ações */}
                 <div className="md:col-span-6 flex flex-col gap-4">
-                    {/* Info da loja */}
-                    <div className="bg-brand-green/5 dark:bg-brand-green/10 border border-brand-green/20 rounded-2xl p-4">
-                        <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-brand-green/15 flex items-center justify-center shrink-0">
-                                <StoreIcon size={20} className="text-brand-green" />
-                            </div>
-                            <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-green">
-                                    Vitrine Conectada
-                                </span>
-                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">
-                                    {storeName || "Sua Loja"}
-                                </h4>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-relaxed">
-                                    O QR Code no cavalete do Dino direciona os clientes direto para a vitrine da sua loja online.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Estilo do Fundo */}
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-brand-dark dark:text-dark-heading block mb-2">
+                        <label className="text-sm text-brand-dark dark:text-dark-heading block mb-2">
                             Fundo da Imagem
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
+                            <ListItem
+                                className="px-4 py-3"
+                                title="Sem Fundo (PNG)"
                                 onClick={() => setBackgroundStyle("transparent")}
-                                className={cn(
-                                    "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs transition-all cursor-pointer",
-                                    backgroundStyle === "transparent"
-                                        ? "border-brand-green bg-brand-green/10 text-brand-green shadow-xs font-bold ring-1 ring-brand-green/30"
-                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-surface hover:border-brand-inactive-text/40 font-medium"
-                                )}
-                            >
-                                <span className="w-3.5 h-3.5 rounded-full border border-dashed border-gray-400 inline-block shrink-0" />
-                                Sem Fundo (PNG)
-                            </button>
-                            <button
-                                type="button"
+                                right={
+                                    <RadioButton
+                                        name="backgroundStyle"
+                                        value="transparent"
+                                        checked={backgroundStyle === "transparent"}
+                                        onChange={() => setBackgroundStyle("transparent")}
+                                    />
+                                }
+                            />
+                            <ListItem
+                                className="px-4 py-3"
+                                title="Cinza Claro (JPEG)"
                                 onClick={() => setBackgroundStyle("light_gray")}
-                                className={cn(
-                                    "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs transition-all cursor-pointer",
-                                    backgroundStyle === "light_gray"
-                                        ? "border-brand-green bg-brand-green/10 text-brand-green shadow-xs font-bold ring-1 ring-brand-green/30"
-                                        : "border-brand-border dark:border-dark-border text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-surface hover:border-brand-inactive-text/40 font-medium"
-                                )}
-                            >
-                                <span className="w-3.5 h-3.5 rounded-full border border-gray-300 bg-[#F3F4F6] inline-block shrink-0" />
-                                Cinza Clarinho
-                            </button>
+                                right={
+                                    <RadioButton
+                                        name="backgroundStyle"
+                                        value="light_gray"
+                                        checked={backgroundStyle === "light_gray"}
+                                        onChange={() => setBackgroundStyle("light_gray")}
+                                    />
+                                }
+                            />
                         </div>
                     </div>
 
                     {/* Botões de Ação */}
                     <div className="flex flex-col gap-2 pt-1">
                         <Button
-                            variant="default"
-                            size="default"
-                            className="w-full gap-2 rounded-xl font-bold text-sm bg-brand-green hover:bg-brand-green/90 text-white shadow-sm"
+                            className="w-full"
                             onClick={handleDownload}
                             disabled={isDownloading || isRendering}
+                            leftIcon={<DownloadIcon size={18} />}
                         >
-                            <DownloadIcon size={18} />
                             {isDownloading ? "Gerando arquivo..." : "Baixar Imagem em Alta Resolução"}
                         </Button>
 
                         <Button
                             variant="outline"
-                            size="default"
-                            className="w-full gap-2 rounded-xl font-semibold text-sm border-brand-border dark:border-dark-border hover:bg-brand-gray/50 dark:hover:bg-dark-border/20"
+                            className="w-full"
                             onClick={handlePrint}
                             disabled={isRendering}
+                            leftIcon={<PrinterIcon size={18} />}
                         >
-                            <PrinterIcon size={18} />
                             Imprimir para Balcão / Mesa
                         </Button>
                     </div>
 
                     {/* Dica de Uso */}
-                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body bg-brand-gray/40 dark:bg-dark-border/10 rounded-xl p-3 border border-brand-border/50 dark:border-dark-border/30">
-                        <p className="font-semibold text-brand-dark dark:text-dark-heading mb-0.5">
-                            💡 Dica para o seu balcão:
-                        </p>
-                        Imprima em papel couchê ou fotográfico (180g+) e coloque em um display de acrílico no balcão ou nas mesas para seus clientes escanearem.
-                    </div>
+                    <InfoCard title="Dica para o seu balcão" message="Imprima em papel couchê ou fotográfico (180g+) e coloque em um display de acrílico no balcão ou nas mesas para seus clientes escanearem." />
                 </div>
             </div>
         </DefaultModal>

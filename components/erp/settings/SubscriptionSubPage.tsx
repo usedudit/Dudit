@@ -17,6 +17,7 @@ import {
     EyeIcon,
     EditIcon,
     AlertCircleIcon,
+    ArrowUpIcon,
 } from "@/lib/icons"
 
 const CANCELLATION_REASONS = [
@@ -28,6 +29,8 @@ const CANCELLATION_REASONS = [
     { id: "other", label: "Outra coisa" },
 ]
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
+import { getNextPlanTarget } from "@/lib/subscription/limit-upgrade"
+import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { PixQrDisplayModal } from "@/components/erp/payments/shared"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -267,6 +270,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const effectivePartnerId = partnerId || subData?.partner_id
+    const { openPlanUpgrade } = usePlanUpgrade()
 
     // Wrapper state for Upgrade Plan
     const [plansOpen, setPlansOpen] = useState(false)
@@ -782,41 +786,49 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                             <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                        <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
                                             Plano atual
                                         </span>
-                                        {(hasActivePaidSub || activeRefund) && (
-                                            <Dropdown
-                                                trigger={
-                                                    <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
-                                                        <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
-                                                    </Button>
-                                                }
-                                                align="right"
-                                                showChevron={false}
-                                            >
-                                                {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status !== "past_due" && (
-                                                    <DropdownItem onClick={() => {
-                                                        setCancelReason("")
-                                                        setCancelCustomReason("")
-                                                        setCancelModal(true)
-                                                    }}>
-                                                        <CancelIcon size={18} /> Cancelar Plano
-                                                    </DropdownItem>
-                                                )}
-                                                {activeRefund && (
-                                                    <DropdownItem onClick={() => window.open(`/reembolso/${activeRefund.token}`, "_blank")}>
-                                                        <EyeIcon size={18} /> Acompanhar Reembolso
-                                                    </DropdownItem>
-                                                )}
+                                        <Dropdown
+                                            trigger={
+                                                <Button variant="outline" className="w-[40px] h-[40px] p-0 flex items-center justify-center">
+                                                    <ThreeDotsIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-heading" />
+                                                </Button>
+                                            }
+                                            align="right"
+                                            showChevron={false}
+                                        >
+                                            {displayPlanSlug !== "escalar" && (
+                                                <DropdownItem onClick={() => {
+                                                    const next = getNextPlanTarget(displayPlanSlug)
+                                                    if (next) openPlanUpgrade(next)
+                                                }}>
+                                                    <ArrowUpIcon size={18} /> Fazer upgrade
+                                                </DropdownItem>
+                                            )}
+                                            {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status !== "past_due" && (
+                                                <DropdownItem onClick={() => {
+                                                    setCancelReason("")
+                                                    setCancelCustomReason("")
+                                                    setCancelModal(true)
+                                                }}>
+                                                    <CancelIcon size={18} /> Cancelar Plano
+                                                </DropdownItem>
+                                            )}
+                                            {activeRefund && (
+                                                <DropdownItem onClick={() => window.open(`/reembolso/${activeRefund.token}`, "_blank")}>
+                                                    <EyeIcon size={18} /> Acompanhar Reembolso
+                                                </DropdownItem>
+                                            )}
+                                            {displayPlanSlug !== "free" && (
                                                 <DropdownItem onClick={() => setPlansOpen(true)}>
                                                     <EditIcon size={18} /> Alterar Plano
                                                 </DropdownItem>
-                                            </Dropdown>
-                                        )}
+                                            )}
+                                        </Dropdown>
                                     </div>
 
-                                    <h2 className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading mb-2">
+                                    <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                                         {subData ? `Plano ${getHardcodedPlan(displayPlanSlug).name}` : "Carregando..."}
                                     </h2>
 
@@ -827,7 +839,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-brand-border dark:border-dark-border mt-auto">
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-2xl md:text-3xl font-extrabold text-brand-dark dark:text-dark-heading">
+                                        <span className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading">
                                             {subData ? (displayPlanPrice > 0 ? formatCurrency(displayPlanPrice) : "Grátis") : "..."}
                                         </span>
                                         {displayPlanPrice > 0 && (
@@ -878,7 +890,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                             <div className="rounded-3xl p-6 md:p-8 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex flex-col justify-between relative">
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body">
+                                        <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">
                                             Próxima fatura
                                         </span>
                                         {isScheduledToCancel ? (
@@ -896,7 +908,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                         ) : null}
                                     </div>
 
-                                    <h2 className="text-3xl md:text-4xl font-extrabold text-brand-dark dark:text-dark-heading mb-6">
+                                    <h2 className="text-2xl md:text-3xl font-bold text-brand-dark dark:text-dark-heading mb-2">
                                         {subData ? (
                                             (!hasActivePaidSub || isScheduledToCancel)
                                                 ? "R$ 0,00"

@@ -1,10 +1,14 @@
-import React from "react";
-import { SparklesIcon } from "@/lib/icons"
-import { SummaryCards, Cashflow, NeedsAttention } from "./LeftColumn";
-import { ExpenseBreakdown } from "./MiddleColumn";
-import { TopCategories, RecentActivities } from "./RightColumn";
-import { LatestOrdersCard, CriticalStockCard, NextAppointmentsCard } from "./BottomCards";
-import { InsightsRegister } from "./InsightsRegister";
+import React from "react"
+import { SummaryCards, NeedsAttention } from "./LeftColumn"
+import { RecentActivities } from "./RightColumn"
+import { LatestOrdersCard, CriticalStockCard, NextAppointmentsCard } from "./BottomCards"
+import { InsightsRegister } from "./InsightsRegister"
+import {
+  DashboardLineChart,
+  DashboardDonutChart,
+  DashboardBarChart,
+  CHART_COLORS_CATEGORY,
+} from "./charts/DashboardCharts"
 import {
   getGeneralMetrics,
   getGeneralRevenueChart,
@@ -13,18 +17,24 @@ import {
   getGeneralActivity,
   getGeneralTopCategories,
   getDashboardGeneralData
-} from "@/lib/data/dashboard";
-import type { Period, CompareMode } from "@/lib/period-types";
-import { COMPARE_PRESET_LABELS, getPeriodDateRange, compareModeToPeriod, addDays } from "@/lib/period-types";
-import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters";
+} from "@/lib/data/dashboard"
+import type { Period, CompareMode } from "@/lib/period-types"
+import { COMPARE_PRESET_LABELS, getPeriodDateRange, compareModeToPeriod } from "@/lib/period-types"
+import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
+import { formatCurrency as brl } from "@/lib/utils"
+import {
+  TrendingUpIcon,
+  TagIcon,
+  CreditCardIcon,
+} from "@/lib/icons"
 
 interface DashboardProps {
-  partnerId: string;
-  sells: string[];
-  period?: Period;
-  compare?: CompareMode;
-  compareFrom?: string;
-  compareTo?: string;
+  partnerId: string
+  sells: string[]
+  period?: Period
+  compare?: CompareMode
+  compareFrom?: string
+  compareTo?: string
 }
 
 function parseMetricValue(value: string): number {
@@ -71,6 +81,41 @@ function getCompareInfo(compare: CompareMode, period: Period, compareFrom?: stri
   }
 }
 
+function CardHeader({
+  icon: Icon,
+  title,
+  legendItems,
+}: {
+  icon?: React.ElementType
+  title: string
+  legendItems?: Array<{ label: string; color: string }>
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex items-center space-x-3">
+        {Icon && (
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
+        )}
+        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{title}</h3>
+      </div>
+      {legendItems && legendItems.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3.5 sm:self-center">
+          {legendItems.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body">
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export async function Dashboard({
   partnerId, sells, period = "monthly", compare = "none",
   compareFrom, compareTo,
@@ -97,7 +142,7 @@ export async function Dashboard({
     compareInfo ? getGeneralMetrics(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     compareInfo ? getGeneralRevenueChart(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     getDashboardGeneralData(partnerId),
-  ]);
+  ])
 
   let metrics = metricsData.metrics
   let revenueData = revenueChartData.revenue
@@ -144,41 +189,70 @@ export async function Dashboard({
     insights.push({ message: `${alertCount} alerta(s) precisam de atenção no painel.`, color: "orange" })
   }
 
+  const evoData = revenueData.map(p => ({ label: p.label, value: p.value, secondary: p.secondary }))
+  const originDonutData = revenueOriginData.origins.map(o => ({ label: o.label, value: Number(o.value) }))
+  const totalOrigin = revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)
+  const categoriesBarData = topCategoriesData.categories.map(c => ({ label: c.label, value: Number(c.value) }))
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Register Insights in global client context */}
       <InsightsRegister insights={insights} />
 
+      {/* Row 1: KPI Horizontal Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        {/* Row 1: KPI Horizontal Card */}
         <div className="lg:col-span-12">
           <SummaryCards metrics={metrics} variant="horizontal" />
         </div>
+      </div>
 
-        {/* Row 2: Total Revenue (2/3) and Revenue Origin (1/3) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <Cashflow revenueData={revenueData} totalRevenue={revenueChartData.total} compareLabel={compareLabel || "Período Anterior"} />
+      {/* Row 2: Evolução de Receita (8) + Origem da Receita (4) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader
+              icon={TrendingUpIcon}
+              title="Evolução de Receita"
+              legendItems={[{ label: "Este Período", color: "#059669" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
+            />
+            <DashboardLineChart data={evoData} valueFormatter={v => brl(v)} />
+          </div>
         </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <ExpenseBreakdown originData={revenueOriginData.origins} revenueChartTrend={revenueChartData.trend} />
+        <div className="lg:col-span-4">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader icon={CreditCardIcon} title="Origem da Receita" />
+            <DashboardDonutChart
+              data={originDonutData}
+              totalValue={brl(totalOrigin)}
+              totalLabel="Receita Total"
+              colors={CHART_COLORS_CATEGORY}
+              valueFormatter={v => brl(v)}
+            />
+          </div>
         </div>
+      </div>
 
-        {/* Row 3: Top Categories (2/3) and Recent Activities (1/3) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <TopCategories categoriesData={topCategoriesData.categories} />
+      {/* Row 3: Principais Categorias (8) + Atividades Recentes (4) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader icon={TagIcon} title="Principais Categorias" />
+            <DashboardBarChart data={categoriesBarData} colors={["#059669"]} />
+          </div>
         </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4">
           <RecentActivities activities={activityData.activity} />
         </div>
+      </div>
 
-        {/* Row 4 (Bottom): 3 cards occupying 1/3 each */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+      {/* Row 4: Precisa de Atenção (4) + Últimos Pedidos (4) + Próximos Agendamentos/Estoque Crítico (4) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-4">
           <NeedsAttention alerts={alertsData.alerts} />
         </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4">
           <LatestOrdersCard items={generalData?.latestOrders || []} />
         </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4">
           {sells.includes("services") ? (
             <NextAppointmentsCard items={generalData?.nextAppointments || []} />
           ) : (
@@ -187,5 +261,5 @@ export async function Dashboard({
         </div>
       </div>
     </div>
-  );
+  )
 }

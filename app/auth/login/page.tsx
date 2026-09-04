@@ -99,6 +99,15 @@ function AuthContent() {
     }
   }, [verifiedParam, rawModeParam, router])
 
+  // Sincroniza o modo da página caso o query param da URL mude
+  useEffect(() => {
+    if (rawModeParam === "partner") {
+      setPageMode("partner")
+    } else if (rawModeParam === "verify-email" || rawModeParam === "login" || rawModeParam === "signup" || rawModeParam === "forgot-password") {
+      setPageMode("auth")
+    }
+  }, [rawModeParam])
+
   const lastCheckedUserId = useRef<string | null>(null)
 
   // Sessão logada + ?mode=partner: com ERP -> /erp/inicio; sem ERP -> fica no wizard

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, FormTextarea, InfoCard, IconPlaceholder } from "@/components/reusable"
+import { DefaultModal, Button, InfoCard, IconPlaceholder } from "@/components/reusable"
 import {
   checkERPOnboardingFeedbackPromptAction,
   recordFeedbackPromptShownAction,
@@ -52,7 +52,6 @@ export function ERPOnboardingFeedbackModal({
   const isModalOpen = isControlled ? !!propIsOpen : internalIsOpen
   const [partnerStoreName, setPartnerStoreName] = useState<string>("")
   const [selectedSentiment, setSelectedSentiment] = useState<FeedbackSentiment | null>(null)
-  const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -61,7 +60,6 @@ export function ERPOnboardingFeedbackModal({
     if (propIsOpen) {
       setIsSuccess(false)
       setSelectedSentiment(null)
-      setComment("")
       setErrorMessage(null)
     }
   }, [propIsOpen])
@@ -109,8 +107,8 @@ export function ERPOnboardingFeedbackModal({
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!selectedSentiment) {
       setErrorMessage("Por favor, selecione como está sendo sua experiência.")
       return
@@ -128,14 +126,12 @@ export function ERPOnboardingFeedbackModal({
             ? "Tenho algumas dificuldades"
             : "Estou tendo problemas"
 
-      const messageContent = comment.trim()
-        ? `[Experiência: ${sentimentLabel}]\n${comment.trim()}`
-        : `Experiência inicial no ERP: ${sentimentLabel}`
+      const message = `Experiência inicial no ERP: ${sentimentLabel}`
 
       const res = await submitFeedbackAction({
         type: "onboarding",
         sentiment: selectedSentiment,
-        message: messageContent,
+        message,
         pageUrl: clientContext.pageUrl,
         partnerId,
         metadata: {
@@ -180,10 +176,10 @@ export function ERPOnboardingFeedbackModal({
             </Button>
 
             <Button
-              type="submit"
+              onClick={handleSubmit}
               disabled={isSubmitting || !selectedSentiment}
             >
-              Enviar Resposta
+              {isSubmitting ? "Enviando..." : "Enviar"}
             </Button>
           </div>
         ) : undefined
@@ -203,7 +199,7 @@ export function ERPOnboardingFeedbackModal({
           />
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5 pt-1">
+        <div className="space-y-5 pt-1">
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
             Você está usando a Dudit há alguns dias. Queremos saber como está sendo sua experiência para continuarmos melhorando:
           </p>
@@ -239,26 +235,13 @@ export function ERPOnboardingFeedbackModal({
             })}
           </div>
 
-          {/* Campo aberto opcional */}
-          <div className="space-y-1">
-            <FormTextarea
-              label="Quer deixar algum comentário? (opcional)"
-              placeholder="O que você mais gostou, dúvidas que teve ou sugestões para a Dudit..."
-              value={comment}
-              onChange={(e: any) => setComment(e.target.value)}
-              maxLength={2000}
-              showCharacterCount
-              className="min-h-[90px]"
-            />
-          </div>
-
           {errorMessage && (
             <InfoCard
               color="red"
               message={errorMessage}
             />
           )}
-        </form>
+        </div>
       )}
     </DefaultModal>
   )

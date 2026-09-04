@@ -10,6 +10,8 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE, MIME_TO_EXT } from "@/lib/r2/config"
 import { moderateImageWithBase64 } from "@/lib/moderation/sightengine-moderation"
 import {
   calculateImageHash,
+  calculatePerceptualHash,
+  findSimilarImageInCache,
   getImageFromCache,
   cacheImageModeration,
 } from "@/lib/moderation/image-cache"
@@ -184,16 +186,29 @@ async function handleUpload(request: NextRequest) {
     const extension = MIME_TO_EXT_MAP.get(mimeType) || "jpg"
 
     // =============================
-    // Hash
+    // Hashes (SHA-256 para exato + dHash para similaridade visual)
     // =============================
-    const imageHash = await calculateImageHash(buffer)
+    const [imageHash, imagePHash] = await Promise.all([
+      calculateImageHash(buffer),
+      calculatePerceptualHash(buffer),
+    ])
 
     // =============================
+    // Moderação (Camada 1: SHA256 -> Camada 2: Visual pHash -> Camada 3: Sightengine)
     // =============================
     // Enforce moderation before accepting the object into R2. A cached hash
     // may reuse a prior decision; an unavailable provider is review-only for
     // authenticated uploads and fail-closed for public onboarding logos.
-    const cachedModeration = await getImageFromCache(imageHash)
+    let cachedModeration = await getImageFromCache(imageHash)
+
+    // Se miss no SHA-256 exato, tenta o cache visual perceptual (Camada 2)
+    if (!cachedModeration && imagePHash) {
+      const visualMatch = await findSimilarImageInCache(imagePHash)
+      if (visualMatch) {
+        cachedModeration = visualMatch.cached
+      }
+    }
+
     let decision: ReturnType<typeof decideImageStatus>
 
     if (cachedModeration) {
@@ -225,6 +240,7 @@ async function handleUpload(request: NextRequest) {
         analysis.confidence,
         analysis.categories,
         decision.status === "FLAGGED" ? "FLAGGED" : "APPROVED",
+        imagePHash,
       )
     }
 

@@ -205,7 +205,7 @@ export default function HelpCenterPage() {
                         </div>
 
                         {/* TOC (Desktop Only) */}
-                        {!isHome && article && <HelpTOC content={article.content} />}
+                        {!isHome && article && <HelpTOC content={article.content} article={article} />}
                     </div>
                 </main>
             </div>

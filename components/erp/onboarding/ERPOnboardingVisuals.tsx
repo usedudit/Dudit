@@ -39,26 +39,72 @@ export interface StepVisualData {
   image: string
 }
 
-const STEP_VISUALS: Record<number, StepVisualData> = {
-  1: {
-    title: "Seu negócio do seu jeito",
-    subtitle: "A Dudit organiza seu dia a dia sem complicação ou telas que você não vai usar.",
-    image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+const VISUALS_BY_MODE: Record<string, Record<number, StepVisualData>> = {
+  desapego: {
+    1: {
+      title: "Desapegue sem complicação",
+      subtitle: "A Dudit organiza seus itens para você anunciar com seu link próprio e negociar no WhatsApp.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+    },
+    2: {
+      title: "Seu primeiro desapego",
+      subtitle: "Cadastre com nome e valor para começar a divulgar e combinar retiradas com segurança.",
+      image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+    },
+    3: {
+      title: "Pronto para desapegar!",
+      subtitle: "Seu link exclusivo já pode ser compartilhado com interessados e grupos do WhatsApp.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+    },
   },
-  2: {
-    title: "Seu catálogo em 30 segundos",
-    subtitle: "Cadastre com nome e preço direto ao ponto para começar a divulgar para seus clientes.",
-    image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+  erp: {
+    1: {
+      title: "Gestão completa do negócio",
+      subtitle: "PDV no balcão, controle de estoque, financeiro e equipe integrados em um só lugar.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+    },
+    2: {
+      title: "Cadastre seu primeiro item",
+      subtitle: "Cadastre seus itens comerciais para abastecer o estoque e iniciar vendas no balcão.",
+      image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+    },
+    3: {
+      title: "Seu ERP está configurado!",
+      subtitle: "Tudo pronto para operar o balcão, acompanhar relatórios e gerenciar seu negócio.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+    },
   },
-  3: {
-    title: "Parabéns, está tudo pronto!",
-    subtitle: "Seu link exclusivo já pode ser compartilhado com seus clientes pelo WhatsApp.",
-    image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+  quick: {
+    1: {
+      title: "Seu negócio do seu jeito",
+      subtitle: "A Dudit organiza sua vitrine e catálogo sem complicação ou telas que você não vai usar.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+    },
+    2: {
+      title: "Seu catálogo em 30 segundos",
+      subtitle: "Cadastre com nome e preço direto ao ponto para começar a divulgar para seus clientes.",
+      image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+    },
+    3: {
+      title: "Parabéns, está tudo pronto!",
+      subtitle: "Seu link exclusivo já pode ser compartilhado com seus clientes pelo WhatsApp.",
+      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+    },
   },
 }
 
-export const ERPOnboardingVisuals = React.memo(({ currentStep, totalSteps = 3 }: { currentStep: number; totalSteps?: number }) => {
-  const visual = STEP_VISUALS[currentStep] || STEP_VISUALS[1]
+export const ERPOnboardingVisuals = React.memo(({
+  currentStep,
+  totalSteps = 3,
+  businessMode = "quick",
+}: {
+  currentStep: number
+  totalSteps?: number
+  businessMode?: "desapego" | "quick" | "showcase" | "erp"
+}) => {
+  const modeKey = businessMode === "desapego" ? "desapego" : (businessMode === "erp" ? "erp" : "quick")
+  const modeVisuals = VISUALS_BY_MODE[modeKey] || VISUALS_BY_MODE.quick
+  const visual = modeVisuals[currentStep] || modeVisuals[1]
 
   const variants = {
     enter: { x: 30, opacity: 0 },

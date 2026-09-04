@@ -269,7 +269,7 @@ export default function MarketplaceHome({
     const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
         localStorage.setItem('dudit_city', slug)
-        window.location.href = `/${slug}`
+        window.location.href = `/`
     }
 
     const handleIpLocation = async () => {
@@ -292,7 +292,7 @@ export default function MarketplaceHome({
 
                 document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
                 localStorage.setItem('dudit_city', slug)
-                window.location.href = `/${slug}`
+                window.location.href = `/`
             } else {
                 throw new Error("Dados de IP incompletos")
             }
