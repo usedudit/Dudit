@@ -32,7 +32,7 @@ export async function getAdminRefundRequestDetail(refundRequestId: string) {
                 trial_end, cancel_at_period_end, mercado_pago_subscription_id, cancelled_at, ended_at
             ),
             payment:payment_id (
-                id, gateway, status, gateway_payment_id, paid_at, amount
+                id, gateway, status, gateway_payment_id, paid_at, amount, payment_method_type, payment_method_details, gateway_response
             )
         `)
         .eq("id", refundRequestId)
@@ -40,6 +40,20 @@ export async function getAdminRefundRequestDetail(refundRequestId: string) {
 
     if (error) throw error
     if (!refund) return null
+
+    // Se payment for nulo na solicitação, buscar o pagamento mais recente da compra
+    if (!refund.payment && refund.purchase?.id) {
+        const { data: latestPayment } = await admin
+            .from("billing_payments")
+            .select("id, gateway, status, paid_at, amount, payment_method_type, payment_method_details, gateway_response, gateway_payment_id")
+            .eq("purchase_id", refund.purchase.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (latestPayment) {
+            refund.payment = latestPayment
+        }
+    }
 
     // Carregar plano se purchaseable_id existir
     let plan = null

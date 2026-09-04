@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import {
     DefaultModal,
     Button,
@@ -28,6 +28,53 @@ import {
     Store,
     Eye,
 } from "lucide-react"
+import { FileIcon } from "@/lib/icons"
+
+function formatFileSize(bytes?: number): string {
+    if (!bytes || bytes <= 0) return ""
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+interface RefundAttachmentItem {
+    url: string
+    name: string
+    size?: number
+    key?: string
+}
+
+function normalizeAttachments(raw: any, fallbackPrefix: string): RefundAttachmentItem[] {
+    if (!raw) return []
+    let items = raw
+    if (typeof raw === "string") {
+        try {
+            items = JSON.parse(raw)
+        } catch {
+            return []
+        }
+    }
+    if (!Array.isArray(items)) return []
+    return items.map((item, idx) => {
+        if (typeof item === "string") {
+            const rawFileName = item.split("/").pop()?.split("?")[0] || `${fallbackPrefix} ${idx + 1}`
+            const name = decodeURIComponent(rawFileName)
+            return { url: item, name }
+        }
+        if (item && typeof item === "object") {
+            const rawFileName = item.url ? item.url.split("/").pop()?.split("?")[0] : `${fallbackPrefix} ${idx + 1}`
+            const name = item.name || decodeURIComponent(rawFileName || `${fallbackPrefix} ${idx + 1}`)
+            return {
+                url: item.url || "",
+                name,
+                size: typeof item.size === "number" ? item.size : undefined,
+                key: item.key,
+            }
+        }
+        return { url: String(item), name: `${fallbackPrefix} ${idx + 1}` }
+    }).filter(item => Boolean(item.url))
+}
 
 interface AdminRefundReviewModalProps {
     isOpen: boolean
@@ -67,9 +114,10 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
 
     if (!refund) return null
 
-    const images: string[] = Array.isArray(refund.images) ? refund.images : []
-    const documents: string[] = Array.isArray(refund.documents) ? refund.documents : []
-    const totalAttachments = images.length + documents.length
+    const parsedImages = useMemo(() => normalizeAttachments(refund.images, "Imagem"), [refund.images])
+    const parsedDocs = useMemo(() => normalizeAttachments(refund.documents, "Documento"), [refund.documents])
+    const imageUrls = useMemo(() => parsedImages.map(img => img.url), [parsedImages])
+    const totalAttachments = parsedImages.length + parsedDocs.length
     const partner = refund.partner || {}
     const stores = partner.stores || []
     const hqStore = stores.find((s: any) => s.is_headquarters) || stores[0] || {}
@@ -388,10 +436,10 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
 
                     {/* ─── TAB 2: ANEXOS ─── */}
                     <TabsContent value="Anexos" className="pt-4 space-y-6 focus-visible:outline-none">
-                        {images.length > 0 && (
-                            <FormSection title="Imagens de Evidência">
+                        {imageUrls.length > 0 && (
+                            <FormSection title={`Imagens de Evidência (${imageUrls.length})`}>
                                 <ProductImagesSection
-                                    images={images}
+                                    images={imageUrls}
                                     onImageUpload={() => {}}
                                     onRemoveImage={() => {}}
                                     onSetPrimaryImage={() => {}}
@@ -400,26 +448,33 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                             </FormSection>
                         )}
 
-                        {documents.length > 0 && (
-                            <FormSection title="Documentos PDF" hasSeparator={images.length > 0}>
-                                <div className="space-y-2">
-                                    {documents.map((doc, idx) => (
+                        {parsedDocs.length > 0 && (
+                            <FormSection title={`Documentos PDF (${parsedDocs.length})`} hasSeparator={imageUrls.length > 0}>
+                                <div className="space-y-2.5">
+                                    {parsedDocs.map((doc, idx) => (
                                         <a
                                             key={idx}
-                                            href={doc}
+                                            href={doc.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center justify-between p-3 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs border border-brand-border dark:border-dark-border hover:bg-gray-200 dark:hover:bg-dark-border/60 transition-colors"
+                                            className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-dark-border/80 transition-all shadow-xs group"
                                         >
-                                            <div className="flex items-center gap-2 truncate">
-                                                <FileText size={16} className="text-brand-orange shrink-0" />
-                                                <span className="truncate font-medium text-brand-dark dark:text-dark-heading">
-                                                    Documento Anexo {idx + 1} (PDF)
-                                                </span>
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs group-hover:bg-brand-gray dark:group-hover:bg-dark-border transition-colors">
+                                                    <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0 text-left">
+                                                    <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                        {doc.name}
+                                                    </span>
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                        {doc.size ? formatFileSize(doc.size) : "Documento PDF"}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1 text-brand-green font-bold">
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-gray hover:bg-gray-200 dark:bg-dark-border/40 dark:hover:bg-dark-border/80 text-brand-dark dark:text-dark-heading text-xs font-semibold transition-colors ml-2 shrink-0">
                                                 <span>Abrir</span>
-                                                <ExternalLink size={13} />
+                                                <ExternalLink className="w-3.5 h-3.5 text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
                                             </div>
                                         </a>
                                     ))}
@@ -427,7 +482,7 @@ export function AdminRefundReviewModal({ isOpen, onClose, refund, onSuccess }: A
                             </FormSection>
                         )}
 
-                        {images.length === 0 && documents.length === 0 && (
+                        {imageUrls.length === 0 && parsedDocs.length === 0 && (
                             <div className="p-8 text-center border border-dashed border-brand-border dark:border-dark-border rounded-2xl text-xs text-brand-inactive-text">
                                 Nenhum anexo ou evidência foi enviado pelo lojista nesta solicitação.
                             </div>

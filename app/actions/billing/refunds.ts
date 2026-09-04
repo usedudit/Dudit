@@ -10,6 +10,16 @@ import { notifyPartnerTeam } from "@/lib/billing/notifications"
 
 // ─── SCHEMAS ─────────────────────────────────────────────────────────────────
 
+const evidenceItemSchema = z.union([
+    z.string(),
+    z.object({
+        url: z.string(),
+        name: z.string().optional(),
+        size: z.number().optional(),
+        key: z.string().optional(),
+    }),
+])
+
 const requestRefundSchema = z.object({
     partnerId: z.string().uuid(),
     purchaseId: z.string().uuid(),
@@ -22,8 +32,8 @@ const requestRefundSchema = z.object({
         "other",
     ]),
     reasonDescription: z.string().trim().min(10, "Por favor, explique o motivo do reembolso com pelo menos 10 caracteres."),
-    images: z.array(z.string().url()).max(5, "Máximo de 5 imagens permitido.").default([]),
-    documents: z.array(z.string().url()).max(3, "Máximo de 3 documentos PDF permitido.").default([]),
+    images: z.array(evidenceItemSchema).max(5, "Máximo de 5 imagens permitido.").default([]),
+    documents: z.array(evidenceItemSchema).max(3, "Máximo de 3 documentos PDF permitido.").default([]),
 })
 
 const adminProcessRefundSchema = z.object({
@@ -33,7 +43,7 @@ const adminProcessRefundSchema = z.object({
     }),
     refundPassword: z.string().min(1, "A senha de administrador é obrigatória para processar o estorno financeiro."),
     adminResponse: z.string().trim().optional().nullable(),
-    adminEvidence: z.array(z.string().url()).max(5).optional().default([]),
+    adminEvidence: z.array(evidenceItemSchema).max(5).optional().default([]),
     refundAmount: z.number().positive().optional().nullable(),
     idempotencyKey: z.string().trim().optional().nullable(),
 })
@@ -41,7 +51,7 @@ const adminProcessRefundSchema = z.object({
 const adminRejectRefundSchema = z.object({
     refundRequestId: z.string().uuid(),
     adminResponse: z.string().trim().min(5, "Informe uma justificativa de recusa para o lojista."),
-    adminEvidence: z.array(z.string().url()).max(5).optional().default([]),
+    adminEvidence: z.array(evidenceItemSchema).max(5).optional().default([]),
 })
 
 // ─── 1. SOLICITAR REEMBOLSO (LOJISTA) ─────────────────────────────────────────
@@ -243,13 +253,14 @@ export async function getPublicRefundDetailsAction(token: string) {
                 ),
                 purchase:purchase_id (
                     id, amount, total_amount, currency, status, purchase_type, description,
-                    billing_period_start, billing_period_end, created_at, purchaseable_type, purchaseable_id
+                    gateway, gateway_payment_id, billing_period_start, billing_period_end,
+                    created_at, purchaseable_type, purchaseable_id
                 ),
                 subscription:subscription_id (
                     id, status, current_period_start, current_period_end, trial_end, cancel_at_period_end
                 ),
                 payment:payment_id (
-                    id, gateway, status, paid_at, amount
+                    id, gateway, status, paid_at, amount, payment_method_type, payment_method_details, gateway_response, gateway_payment_id
                 )
             `)
             .eq("token", token)
@@ -257,6 +268,20 @@ export async function getPublicRefundDetailsAction(token: string) {
 
         if (refundErr || !refund) {
             return { error: "Solicitação de reembolso não encontrada." }
+        }
+
+        // Se payment for nulo na solicitação, buscar o pagamento mais recente da compra
+        if (!refund.payment && refund.purchase?.id) {
+            const { data: latestPayment } = await supabase
+                .from("billing_payments")
+                .select("id, gateway, status, paid_at, amount, payment_method_type, payment_method_details, gateway_response, gateway_payment_id")
+                .eq("purchase_id", refund.purchase.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            if (latestPayment) {
+                refund.payment = latestPayment
+            }
         }
 
         // Carregar plano se purchaseable_id existir

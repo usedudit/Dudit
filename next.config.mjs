@@ -76,6 +76,15 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Não persistir o cache de compilação do webpack em produção. O cache
+  // filesystem padrão acumula packs de cada compilação e, nesta aplicação
+  // com muitos entrypoints, já passou de 10 GB entre server/client.
+  // O custo é um build um pouco mais lento; o ganho é não consumir disco
+  // indefinidamente nem carregar vários GB na memória durante o build.
+  webpack(config, { dev }) {
+    if (!dev) config.cache = false
+    return config
+  },
   experimental: {
     optimizePackageImports: [
       '@/components',

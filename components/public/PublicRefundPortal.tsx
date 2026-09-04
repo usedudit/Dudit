@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useMemo } from "react"
+import { motion } from "framer-motion"
 import {
     Badge,
     Button,
@@ -10,48 +11,116 @@ import {
     TabsTrigger,
     TabsContent,
     FormSection,
+    ListItem,
 } from "@/components/reusable"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, formatFullDate } from "@/lib/utils"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import {
-    FileText,
-    ExternalLink,
-    Copy,
-    Check,
-} from "lucide-react"
+    ChevronLeftIcon,
+    ShareIcon,
+    FileIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    AlertCircleIcon,
+    XIcon,
+    StoreIcon,
+} from "@/lib/icons"
+import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
+import { HistoryTimeline } from "@/components/erp/shared/HistoryTimeline"
 
 interface PublicRefundPortalProps {
     refund: any
 }
 
-const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-        case "approved":
-            return "green" as const
-        case "rejected":
-            return "red" as const
-        case "under_review":
-            return "blue" as const
-        case "cancelled":
-            return "gray" as const
-        default:
-            return "orange" as const
-    }
+function formatFileSize(bytes?: number): string {
+    if (!bytes || bytes <= 0) return ""
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
-const getStatusLabel = (status: string) => {
+interface RefundAttachment {
+    url: string
+    name: string
+    size?: number
+    key?: string
+}
+
+function normalizeAttachments(raw: any, fallbackPrefix: string): RefundAttachment[] {
+    if (!raw) return []
+    let items = raw
+    if (typeof raw === "string") {
+        try {
+            items = JSON.parse(raw)
+        } catch {
+            return []
+        }
+    }
+    if (!Array.isArray(items)) return []
+    return items.map((item, idx) => {
+        if (typeof item === "string") {
+            const rawFileName = item.split("/").pop()?.split("?")[0] || `${fallbackPrefix} ${idx + 1}`
+            const name = decodeURIComponent(rawFileName)
+            return { url: item, name }
+        }
+        if (item && typeof item === "object") {
+            const rawFileName = item.url ? item.url.split("/").pop()?.split("?")[0] : `${fallbackPrefix} ${idx + 1}`
+            const name = item.name || decodeURIComponent(rawFileName || `${fallbackPrefix} ${idx + 1}`)
+            return {
+                url: item.url || "",
+                name,
+                size: typeof item.size === "number" ? item.size : undefined,
+                key: item.key,
+            }
+        }
+        return { url: String(item), name: `${fallbackPrefix} ${idx + 1}` }
+    }).filter(item => Boolean(item.url))
+}
+
+const getStatusConfig = (status: string) => {
     switch (status) {
         case "approved":
-            return "Aprovado / Estornado"
+            return {
+                label: "Aprovado / Estornado",
+                statusText: "Estornado",
+                color: "text-brand-green",
+                badgeVariant: "green" as const,
+                icon: CheckCircleIcon,
+            }
         case "rejected":
-            return "Solicitação Recusada"
+            return {
+                label: "Solicitação Recusada",
+                statusText: "Recusado",
+                color: "text-brand-red",
+                badgeVariant: "red" as const,
+                icon: XIcon,
+            }
         case "under_review":
-            return "Em Análise pela Equipe"
+            return {
+                label: "Em Análise pela Equipe",
+                statusText: "Em Análise",
+                color: "text-blue-500",
+                badgeVariant: "blue" as const,
+                icon: ClockIcon,
+            }
         case "cancelled":
-            return "Cancelado"
+            return {
+                label: "Cancelado",
+                statusText: "Cancelado",
+                color: "text-gray-500",
+                badgeVariant: "gray" as const,
+                icon: AlertCircleIcon,
+            }
         default:
-            return "Pendente de Análise"
+            return {
+                label: "Pendente de Análise",
+                statusText: "Pendente",
+                color: "text-brand-orange",
+                badgeVariant: "orange" as const,
+                icon: ClockIcon,
+            }
     }
 }
 
@@ -72,8 +141,15 @@ const getReasonLabel = (cat: string) => {
     }
 }
 
+const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex justify-between items-center text-sm gap-4 py-2.5 border-b border-brand-border/40 dark:border-dark-border/40 last:border-0">
+        <span className="text-brand-inactive-text dark:text-dark-body font-medium">{label}</span>
+        <div className="text-right font-semibold text-brand-dark dark:text-dark-heading">{value}</div>
+    </div>
+)
+
 export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
-    const [activeTab, setActiveTab] = useState("Dados Gerais")
+    const [activeTab, setActiveTab] = useState("details")
     const [copiedLink, setCopiedLink] = useState(false)
 
     const handleCopyLink = () => {
@@ -84,9 +160,11 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
         }
     }
 
-    const images: string[] = Array.isArray(refund.images) ? refund.images : []
-    const documents: string[] = Array.isArray(refund.documents) ? refund.documents : []
-    const totalAttachments = images.length + documents.length
+    const parsedImages = useMemo(() => normalizeAttachments(refund.images, "Imagem"), [refund.images])
+    const parsedDocs = useMemo(() => normalizeAttachments(refund.documents, "Documento"), [refund.documents])
+    const imageUrls = useMemo(() => parsedImages.map(img => img.url), [parsedImages])
+    const totalAttachments = parsedImages.length + parsedDocs.length
+
     const purchase = refund.purchase || {}
     const plan = purchase.plan || {}
     const payment = refund.payment || {}
@@ -95,11 +173,84 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
         return getR2ImageUrl(refund.partnerLogo || null)
     }, [refund.partnerLogo])
 
+    const paymentMethod = useMemo(() => {
+        return resolvePaymentMethodDetails(payment, purchase)
+    }, [payment, purchase])
+
+    const statusConfig = getStatusConfig(refund.status)
+    const refundNumber = refund.token ? (refund.token.length > 8 ? refund.token.slice(0, 8) : refund.token) : "N/A"
+    const dateStrFull = formatFullDate(refund.requested_at || refund.created_at)
+
+    const historyEntries = useMemo(() => {
+        const list: Array<{
+            id: string
+            actor_name: string
+            change_lines: string[]
+            created_at: string
+            entry_type?: string
+        }> = []
+
+        if (refund.requested_at || refund.created_at) {
+            list.push({
+                id: "requested",
+                actor_name: refund.partnerName || "Lojista",
+                change_lines: [
+                    `Solicitação de reembolso registrada sob protocolo #${refund.token}.`,
+                    `Motivo declarado: ${getReasonLabel(refund.reason_category)}.`,
+                ],
+                created_at: refund.requested_at || refund.created_at,
+                entry_type: "requested",
+            })
+        }
+
+        if (refund.status === "under_review") {
+            list.push({
+                id: "under_review",
+                actor_name: "Equipe Dudit",
+                change_lines: [
+                    "A solicitação entrou em análise pela equipe administrativa.",
+                ],
+                created_at: refund.updated_at || refund.requested_at || refund.created_at,
+                entry_type: "under_review",
+            })
+        }
+
+        if (refund.status === "approved") {
+            list.push({
+                id: "approved",
+                actor_name: "Equipe Dudit",
+                change_lines: [
+                    `Reembolso aprovado no valor de ${formatCurrency(refund.refunded_amount || refund.amount)}.`,
+                    refund.mp_refund_id ? `Estorno processado no gateway (ID do estorno: ${refund.mp_refund_id}).` : "Estorno financeiro efetuado com sucesso.",
+                    refund.grace_period_ends_at ? `Carência de 24h ativa até ${formatDate(refund.grace_period_ends_at)}.` : "",
+                ].filter(Boolean),
+                created_at: refund.processed_at || refund.updated_at || new Date().toISOString(),
+                entry_type: "approved",
+            })
+        }
+
+        if (refund.status === "rejected") {
+            list.push({
+                id: "rejected",
+                actor_name: "Equipe Dudit",
+                change_lines: [
+                    `Solicitação de reembolso recusada.`,
+                    refund.admin_response ? `Parecer oficial: "${refund.admin_response}".` : "Não atendeu aos critérios para estorno.",
+                ],
+                created_at: refund.processed_at || refund.updated_at || new Date().toISOString(),
+                entry_type: "rejected",
+            })
+        }
+
+        return list
+    }, [refund])
+
     return (
-        <>
-            <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
-                <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-2 mx-auto gap-4">
-                    <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300 w-full">
+            {/* Header Sticky Dudit */}
+            <header className="w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
+                <div className="w-full h-[68px] flex items-center justify-center max-w-[1400px] px-4 mx-auto">
+                    <a href="/" className="cursor-pointer shrink-0 pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
                             alt="Dudit"
@@ -111,302 +262,424 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                 </div>
             </header>
 
-            <div className="flex flex-col min-h-screen bg-white dark:bg-dark-background overflow-hidden relative">
-                <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="w-full max-w-3xl lg:max-w-[1400px] mx-auto px-4 md:px-6 pt-8 pb-32"
+            >
+                {/* Desktop Top Header (Idêntico a MyOrderDetailPage) */}
+                <div className="mb-8 hidden lg:flex flex-row items-center gap-4 w-full justify-start">
+                    <a href="/" className="cursor-pointer shrink-0">
+                        <Button variant="filled" className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                            <ChevronLeftIcon className="w-5 h-5" />
+                        </Button>
+                    </a>
+                    <div className="text-left flex-1 min-w-0">
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 flex-wrap">
+                            <span>Solicitação #{refundNumber}</span>
+                        </h1>
+                        <p className="text-md text-brand-inactive-text dark:text-dark-body mt-1">{dateStrFull}</p>
+                    </div>
+                    <div className={`flex items-center gap-1.5 text-sm font-bold ${statusConfig.color} shrink-0`}>
+                        <statusConfig.icon size={18} />
+                        <span>{statusConfig.statusText}</span>
+                    </div>
+                </div>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full min-h-screen">
-                    <div className="flex-1 w-full h-full relative flex flex-col lg:flex-row overflow-hidden">
+                {/* Tabs Principais */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="mb-8">
+                        <TabsTrigger value="details">Detalhes da Solicitação</TabsTrigger>
+                        {totalAttachments > 0 && (
+                            <TabsTrigger value="attachments" className="flex items-center gap-2">
+                                <span>Anexos</span>
+                                <Badge variant="green" className="px-1.5 py-0.2 text-[10px]">
+                                    {totalAttachments}
+                                </Badge>
+                            </TabsTrigger>
+                        )}
+                        <TabsTrigger value="history">Histórico do Reembolso</TabsTrigger>
+                    </TabsList>
 
-                        {/* LEFT COLUMN: INFO, TABS & CONTENT */}
-                        <div className="w-full lg:w-3/5 flex flex-col shrink-0 border-r-0 lg:border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
+                    {/* ─── TAB 1: DETALHES ─── */}
+                    <TabsContent value="details" className="mt-0 focus-visible:ring-0">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                            {/* Header Superior */}
-                            <div className="shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-                                <div className="px-4 md:px-6 pt-4">
-                                    <div className="flex items-center justify-between pb-2">
-                                        <div className="flex items-center gap-3">
+                            {/* Left Column (8 cols) */}
+                            <div className="lg:col-span-8 space-y-8">
+
+                                {/* Mobile Order Summary Card */}
+                                <div className="block lg:hidden">
+                                    <FormSection title={
+                                        <div className="flex items-center gap-2">
+                                            <span>Solicitação #{refundNumber}</span>
+                                            <Badge variant={statusConfig.badgeVariant}>{statusConfig.statusText}</Badge>
+                                        </div>
+                                    }>
+                                        <DetailRow
+                                            label="Status da Solicitação"
+                                            value={
+                                                <span className={statusConfig.color}>
+                                                    {statusConfig.label}
+                                                </span>
+                                            }
+                                        />
+                                        <DetailRow
+                                            label="Data da Solicitação"
+                                            value={dateStrFull}
+                                        />
+                                        <DetailRow
+                                            label="Protocolo"
+                                            value={<span className="font-mono text-xs">{refund.token}</span>}
+                                        />
+                                    </FormSection>
+                                </div>
+
+                                {/* Section 1: Plano Contratado (Item de Assinatura) */}
+                                <FormSection title="Plano Contratado">
+                                    <div className="flex flex-row items-center gap-4 py-3">
+                                        <div className="w-14 h-14 bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-xl flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
                                             {partnerLogo ? (
-                                                <img
-                                                    src={partnerLogo}
-                                                    alt={refund.partnerName}
-                                                    className="h-10 w-10 object-cover rounded-xl border border-brand-border dark:border-dark-border"
-                                                />
+                                                <img src={partnerLogo} alt="" className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="h-10 w-10 rounded-xl bg-brand-green flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                <div className="w-full h-full bg-brand-green flex items-center justify-center text-white font-bold text-sm">
                                                     {(refund.partnerName || "Dudit").substring(0, 2).toUpperCase()}
                                                 </div>
                                             )}
-                                            <div>
-                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block leading-tight">
-                                                    {refund.partnerName || "Empresa Parceira"}
-                                                </span>
-                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body block tracking-wider">
-                                                    Solicitação de Reembolso
-                                                </span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-brand-dark dark:text-dark-heading text-sm sm:text-md truncate">
+                                                {plan.name ? `Plano ${plan.name}` : purchase.description || "Assinatura Dudit"}
+                                            </h3>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                {purchase.billing_period_start && purchase.billing_period_end ? (
+                                                    <span>Ciclo: {formatDate(purchase.billing_period_start)} até {formatDate(purchase.billing_period_end)}</span>
+                                                ) : (
+                                                    <span>Assinatura Recorrente</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                <span>Fatura #{purchase.id?.slice(0, 8) || "N/A"}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <span className="text-sm sm:text-base font-bold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(purchase.total_amount || refund.amount)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </FormSection>
+
+                                {/* Section 2: Justificativa & Enquadramento */}
+                                <FormSection title="Justificativa da Solicitação">
+                                    <div className="space-y-4">
+                                        <DetailRow
+                                            label="Motivo Declarado"
+                                            value={getReasonLabel(refund.reason_category)}
+                                        />
+                                        <DetailRow
+                                            label="Enquadramento Legal"
+                                            value={
+                                                refund.is_within_7_days ? (
+                                                    <Badge variant="green">Garantia 7 Dias CDC (Art. 49)</Badge>
+                                                ) : (
+                                                    <Badge variant="orange">Análise Administrativa</Badge>
+                                                )
+                                            }
+                                        />
+
+                                        <div className="space-y-2 pt-2 text-left">
+                                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">
+                                                Justificativa do Lojista
+                                            </span>
+                                            <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
+                                                {refund.reason_description || "Nenhuma justificativa detalhada foi fornecida."}
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={getStatusBadgeVariant(refund.status)}>
-                                                {getStatusLabel(refund.status)}
-                                            </Badge>
+                                        {refund.admin_response && (
+                                            <div className="space-y-2 pt-2 text-left">
+                                                <span className="text-xs font-bold text-brand-green uppercase tracking-wider block">
+                                                    Parecer Oficial da Equipe Dudit
+                                                </span>
+                                                <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
+                                                    {refund.admin_response}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </FormSection>
+
+                                {/* Section 3: Pagamento (Forma Real com Ícone) */}
+                                <FormSection title="Pagamento">
+                                    <div>
+                                        <ListItem
+                                            icon={
+                                                <img
+                                                    src={paymentMethod.iconUrl}
+                                                    alt={paymentMethod.name}
+                                                    className="w-5 h-5 object-contain shrink-0"
+                                                />
+                                            }
+                                            title={
+                                                <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                    {paymentMethod.name}
+                                                </span>
+                                            }
+                                            description={
+                                                <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
+                                                    {refund.status === "approved"
+                                                        ? "Estornado no Mercado Pago"
+                                                        : payment.paid_at
+                                                            ? `Pago em ${formatDate(payment.paid_at)}`
+                                                            : paymentMethod.detailsText || "Pagamento da assinatura"}
+                                                </span>
+                                            }
+                                            className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
+                                            right={
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(purchase.total_amount || refund.amount)}
+                                                </span>
+                                            }
+                                        />
+                                    </div>
+                                </FormSection>
+
+                                {/* Section 4: Estabelecimento / Lojista */}
+                                <FormSection title="Estabelecimento / Lojista">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 shadow-xs">
+                                            {partnerLogo ? (
+                                                <img src={partnerLogo} alt={refund.partnerName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <StoreIcon size={24} className="text-brand-dark dark:text-dark-heading" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                {refund.partnerName || "Empresa Parceira"}
+                                            </div>
+                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                {refund.partnerDocument ? `Documento: ${refund.partnerDocument}` : "Conta de Lojista Dudit"}
+                                                {refund.partnerPhone ? ` • ${refund.partnerPhone}` : ""}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </FormSection>
+
+                                {/* Mobile Price Summary & Actions */}
+                                <div className="block lg:hidden space-y-6">
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                                        <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                            Resumo dos Valores
+                                        </div>
+                                        <div className="p-6 space-y-3">
+                                            <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
+                                                <span>Valor da Fatura</span>
+                                                <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(purchase.total_amount || refund.amount)}</span>
+                                            </div>
+                                            {refund.status === "approved" && (
+                                                <div className="flex justify-between text-sm text-brand-green">
+                                                    <span>Valor Estornado</span>
+                                                    <span className="font-medium">-{formatCurrency(refund.refunded_amount || refund.amount)}</span>
+                                                </div>
+                                            )}
+                                            <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
+                                                <span className="text-md font-bold text-brand-dark dark:text-dark-heading">Total Reembolsado</span>
+                                                <span className="font-bold text-lg text-brand-green">
+                                                    {refund.status === "approved" ? formatCurrency(refund.refunded_amount || refund.amount) : "R$ 0,00"}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Responsive Tabs List */}
-                                    <div className="w-full mt-4">
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="Dados Gerais">Dados Gerais</TabsTrigger>
-                                            <TabsTrigger value="Anexos" className="flex items-center gap-1.5">
-                                                <span>Anexos</span>
-                                                {totalAttachments > 0 && (
-                                                    <Badge variant="green" className="px-1.5 py-0.2 text-[10px]">
-                                                        {totalAttachments}
-                                                    </Badge>
-                                                )}
-                                            </TabsTrigger>
-                                            <TabsTrigger value="Resumo" className="lg:hidden">Resumo Financeiro</TabsTrigger>
-                                        </TabsList>
-                                    </div>
+                                    {refund.status === "approved" && (
+                                        <InfoCard
+                                            title="Reembolso Aprovado e Estorno Concluído"
+                                            message={`O valor de ${formatCurrency(refund.refunded_amount || refund.amount)} foi estornado com sucesso no Mercado Pago.${refund.grace_period_ends_at ? ` Carência de 24h ativa até ${formatDate(refund.grace_period_ends_at)}.` : ""}`}
+                                            color="green"
+                                        />
+                                    )}
+
+                                    {refund.status === "rejected" && (
+                                        <InfoCard
+                                            title="Solicitação de Reembolso Recusada"
+                                            message="Esta solicitação não atendeu aos critérios para estorno. Seu plano contratado permanece ativo normalmente."
+                                            color="red"
+                                        />
+                                    )}
+
+                                    <Button
+                                        variant="outline"
+                                        className="w-full h-12 font-bold"
+                                        onClick={handleCopyLink}
+                                    >
+                                        {copiedLink ? "Link Copiado!" : "Copiar Link de Acompanhamento"}
+                                    </Button>
                                 </div>
                             </div>
 
-                            {/* Scrollable Content */}
-                            <div className="flex-1 overflow-y-auto no-scrollbar relative p-4 md:p-6 pb-24 space-y-6">
+                            {/* Right Column (Desktop sidebar - Idêntico a MyOrderDetailPage) */}
+                            <div className="hidden lg:block lg:col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
+                                <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                                    <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                        Resumo dos Valores
+                                    </div>
+                                    <div className="p-6 space-y-3">
+                                        <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
+                                            <span>Valor da Fatura</span>
+                                            <span className="text-brand-dark dark:text-dark-heading font-medium">
+                                                {formatCurrency(purchase.total_amount || refund.amount)}
+                                            </span>
+                                        </div>
+                                        {refund.status === "approved" && (
+                                            <div className="flex justify-between text-sm text-brand-green">
+                                                <span>Valor Estornado</span>
+                                                <span className="font-medium">
+                                                    -{formatCurrency(refund.refunded_amount || refund.amount)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
+                                            <span className="text-md font-bold text-brand-dark dark:text-dark-heading">Total Reembolsado</span>
+                                            <span className="font-bold text-lg text-brand-green">
+                                                {refund.status === "approved"
+                                                    ? formatCurrency(refund.refunded_amount || refund.amount)
+                                                    : "R$ 0,00"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                {/* Status Info Banners */}
+                                {/* Status InfoCards */}
                                 {refund.status === "approved" && (
                                     <InfoCard
-                                        title="Reembolso Aprovado e Estorno Concluído"
-                                        message={`O valor de ${formatCurrency(refund.refunded_amount || refund.amount)} foi estornado com sucesso no Mercado Pago.${refund.grace_period_ends_at ? ` Carência de 24h ativa até ${formatDate(refund.grace_period_ends_at)}.` : ""}`}
+                                        title="Reembolso Aprovado"
+                                        message={`O estorno de ${formatCurrency(refund.refunded_amount || refund.amount)} foi processado no Mercado Pago.${refund.grace_period_ends_at ? ` Carência de 24h ativa até ${formatDate(refund.grace_period_ends_at)}.` : ""}`}
                                         color="green"
                                     />
                                 )}
 
                                 {refund.status === "rejected" && (
                                     <InfoCard
-                                        title="Solicitação de Reembolso Recusada"
-                                        message="Esta solicitação não atendeu aos critérios para estorno. Seu plano contratado permanece ativo normalmente."
+                                        title="Solicitação Recusada"
+                                        message="Esta solicitação não atendeu aos critérios para estorno. Seu plano permanece ativo."
                                         color="red"
                                     />
                                 )}
 
-                                {/* ─── TAB: DADOS GERAIS ─── */}
-                                <div className={`${activeTab === "Dados Gerais" ? "block" : "hidden"}`}>
-                                    <div className="space-y-6 text-left">
-                                        <FormSection title="Informações da solicitação">
-                                            <div className="space-y-3 text-sm">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Protocolo</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading font-mono text-xs">{refund.token}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Data da solicitação</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDate(refund.requested_at || refund.created_at)}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Motivo declarado</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{getReasonLabel(refund.reason_category)}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Enquadramento</span>
-                                                    {refund.is_within_7_days ? (
-                                                        <Badge variant="green">Garantia 7 Dias CDC (Art. 49)</Badge>
-                                                    ) : (
-                                                        <Badge variant="orange">Análise Administrativa</Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </FormSection>
+                                {refund.status !== "approved" && refund.status !== "rejected" && (
+                                    <InfoCard
+                                        title="Em Análise pela Dudit"
+                                        message="Nossa equipe está avaliando sua solicitação de acordo com os termos de contratação e CDC."
+                                        color="orange"
+                                    />
+                                )}
 
-                                        <FormSection title="Justificativa do lojista" hasSeparator>
-                                            <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
-                                                {refund.reason_description}
-                                            </div>
-                                        </FormSection>
-
-                                        {refund.admin_response && (
-                                            <FormSection title="Parecer da Equipe Dudit" hasSeparator>
-                                                <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
-                                                    {refund.admin_response}
-                                                </div>
-                                            </FormSection>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* ─── TAB: ANEXOS ─── */}
-                                <div className={`${activeTab === "Anexos" ? "block" : "hidden"}`}>
-                                    <div className="space-y-6 text-left">
-                                        {images.length > 0 && (
-                                            <FormSection title="Imagens de Evidência">
-                                                <ProductImagesSection
-                                                    images={images}
-                                                    onImageUpload={() => { }}
-                                                    onRemoveImage={() => { }}
-                                                    onSetPrimaryImage={() => { }}
-                                                    isEditing={false}
-                                                />
-                                            </FormSection>
-                                        )}
-
-                                        {documents.length > 0 && (
-                                            <FormSection title="Documentos em PDF" hasSeparator={images.length > 0}>
-                                                <div className="space-y-2">
-                                                    {documents.map((docUrl, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={docUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center justify-between p-3.5 bg-brand-gray dark:bg-dark-border/30 rounded-2xl text-xs border border-brand-border dark:border-dark-border hover:bg-gray-200 dark:hover:bg-dark-border/60 transition-colors"
-                                                        >
-                                                            <div className="flex items-center gap-2.5 truncate">
-                                                                <FileText className="w-5 h-5 text-brand-orange shrink-0" />
-                                                                <span className="truncate font-medium text-brand-dark dark:text-dark-heading">
-                                                                    Documento Anexo {idx + 1} (PDF)
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1 text-brand-green font-bold">
-                                                                <span>Abrir</span>
-                                                                <ExternalLink className="w-3.5 h-3.5" />
-                                                            </div>
-                                                        </a>
-                                                    ))}
-                                                </div>
-                                            </FormSection>
-                                        )}
-
-                                        {images.length === 0 && documents.length === 0 && (
-                                            <div className="p-8 text-center border border-dashed border-brand-border dark:border-dark-border rounded-2xl text-xs text-brand-inactive-text">
-                                                Nenhum anexo foi incluído nesta solicitação.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* ─── TAB MOBILE: RESUMO ─── */}
-                                <div className={`${activeTab === "Resumo" ? "block lg:hidden" : "hidden"}`}>
-                                    <div className="space-y-4 text-left">
-                                        <FormSection title="Resumo financeiro">
-                                            <div className="space-y-3 text-sm">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text font-semibold">Plano</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {plan.name ? `Plano ${plan.name}` : purchase.description || "Assinatura"}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-brand-inactive-text font-semibold">Valor da Fatura</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(purchase.total_amount || refund.amount)}
-                                                    </span>
-                                                </div>
-                                                {refund.status === "approved" && (
-                                                    <div className="flex justify-between items-center text-brand-green font-bold">
-                                                        <span>Valor Estornado</span>
-                                                        <span>{formatCurrency(refund.refunded_amount || refund.amount)}</span>
-                                                    </div>
-                                                )}
-                                                {purchase.billing_period_start && (
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-brand-inactive-text font-semibold">Ciclo</span>
-                                                        <span className="font-medium text-brand-dark dark:text-dark-body">
-                                                            {formatDate(purchase.billing_period_start)} até {formatDate(purchase.billing_period_end)}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </FormSection>
-
-                                        <Button
-                                            variant="outline"
-                                            className="w-full h-11"
-                                            leftIcon={copiedLink ? <Check className="w-4 h-4 text-brand-green" /> : <Copy className="w-4 h-4" />}
-                                            onClick={handleCopyLink}
-                                        >
-                                            {copiedLink ? "Link Copiado!" : "Copiar Link de Acompanhamento"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN (DESKTOP): FINANCIAL SUMMARY */}
-                        <div className="hidden lg:flex lg:w-2/5 flex-col bg-brand-gray/40 dark:bg-dark-surface/40 p-6 space-y-6 overflow-y-auto">
-                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-6 space-y-6 sticky top-6">
-                                <FormSection title="Resumo financeiro">
-                                    <div className="space-y-4 text-xs pt-1">
-                                        <div>
-                                            <span className="text-brand-inactive-text block font-semibold">Plano Contratado</span>
-                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading block mt-0.5">
-                                                {plan.name ? `Plano ${plan.name}` : purchase.description || "Assinatura"}
-                                            </span>
-                                        </div>
-
-                                        <div className="p-4 bg-brand-gray dark:bg-dark-border/40 rounded-2xl space-y-2 border border-brand-border dark:border-dark-border">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-brand-inactive-text">Valor da Fatura:</span>
-                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-sm">
-                                                    {formatCurrency(purchase.total_amount || refund.amount)}
-                                                </span>
-                                            </div>
-                                            {refund.status === "approved" && (
-                                                <div className="flex justify-between items-center text-brand-green border-t border-brand-border dark:border-dark-border pt-2 font-bold text-sm">
-                                                    <span>Valor Estornado:</span>
-                                                    <span>{formatCurrency(refund.refunded_amount || refund.amount)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {purchase.billing_period_start && (
-                                            <div>
-                                                <span className="text-brand-inactive-text block font-semibold">Ciclo de Faturamento</span>
-                                                <span className="font-medium text-brand-dark dark:text-dark-body block mt-0.5">
-                                                    {formatDate(purchase.billing_period_start)} até {formatDate(purchase.billing_period_end)}
-                                                </span>
-                                            </div>
-                                        )}
-
-                                        <div>
-                                            <span className="text-brand-inactive-text block font-semibold">Forma de Pagamento Original</span>
-                                            <span className="font-medium text-brand-dark dark:text-dark-body block mt-0.5">
-                                                Mercado Pago {payment.paid_at ? `(Pago em ${formatDate(payment.paid_at)})` : ""}
-                                            </span>
-                                        </div>
-
-                                        {refund.mp_refund_id && (
-                                            <div className="p-3 bg-brand-green/10 border border-brand-green/20 rounded-xl text-[11px] text-gray-700 dark:text-dark-body">
-                                                <span className="font-bold text-brand-green block">ID do Estorno no Mercado Pago:</span>
-                                                <code className="text-[10px] break-all font-mono">{refund.mp_refund_id}</code>
-                                            </div>
-                                        )}
-                                    </div>
-                                </FormSection>
-
-                                <div className="pt-2 border-t border-brand-border dark:border-dark-border space-y-3">
+                                {/* Ações */}
+                                <div className="space-y-3 pt-2">
                                     <Button
                                         variant="outline"
-                                        className="w-full h-11"
-                                        leftIcon={copiedLink ? <Check className="w-4 h-4 text-brand-green" /> : <Copy className="w-4 h-4" />}
+                                        className="w-full h-12 font-bold flex items-center justify-center gap-2"
                                         onClick={handleCopyLink}
                                     >
-                                        {copiedLink ? "Link Copiado!" : "Copiar Link de Acompanhamento"}
+                                        <ShareIcon size={16} />
+                                        <span>{copiedLink ? "Link Copiado!" : "Copiar Link de Acompanhamento"}</span>
                                     </Button>
-                                    <p className="text-[11px] text-brand-inactive-text text-center font-mono">
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center font-mono">
                                         Protocolo: {refund.token?.slice(0, 16)}...
                                     </p>
                                 </div>
                             </div>
                         </div>
+                    </TabsContent>
 
-                    </div>
+                    {/* ─── TAB 2: ANEXOS ─── */}
+                    {totalAttachments > 0 && (
+                        <TabsContent value="attachments" className="mt-0 focus-visible:ring-0">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                <div className="lg:col-span-8 space-y-8">
+                                    {imageUrls.length > 0 && (
+                                        <FormSection title={`Imagens de Evidência (${imageUrls.length})`}>
+                                            <ProductImagesSection
+                                                images={imageUrls}
+                                                onImageUpload={() => { }}
+                                                onRemoveImage={() => { }}
+                                                onSetPrimaryImage={() => { }}
+                                                isEditing={false}
+                                            />
+                                        </FormSection>
+                                    )}
+
+                                    {parsedDocs.length > 0 && (
+                                        <FormSection title={`Documentos em PDF (${parsedDocs.length})`} hasSeparator={imageUrls.length > 0}>
+                                            <div className="space-y-2.5">
+                                                {parsedDocs.map((doc, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={doc.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-dark-border/80 transition-all shadow-xs group"
+                                                    >
+                                                        <div className="flex items-center gap-3.5 min-w-0">
+                                                            <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs group-hover:bg-brand-gray dark:group-hover:bg-dark-border transition-colors">
+                                                                <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                            </div>
+                                                            <div className="flex flex-col min-w-0 text-left">
+                                                                <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                    {doc.name}
+                                                                </span>
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                    {doc.size ? formatFileSize(doc.size) : "Documento PDF"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-gray hover:bg-gray-200 dark:bg-dark-border/40 dark:hover:bg-dark-border/80 text-brand-dark dark:text-dark-heading text-xs font-semibold transition-colors ml-2 shrink-0">
+                                                            <span>Abrir</span>
+                                                            <ShareIcon size={14} className="text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
+                                                        </div>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </FormSection>
+                                    )}
+                                </div>
+
+                                <div className="hidden lg:block lg:col-span-4 pl-12 border-l border-brand-border dark:border-dark-border space-y-6">
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                                        <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                                            Resumo dos Anexos
+                                        </div>
+                                        <div className="p-6 space-y-2 text-sm">
+                                            <div className="flex justify-between text-brand-inactive-text">
+                                                <span>Imagens</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{imageUrls.length}</span>
+                                            </div>
+                                            <div className="flex justify-between text-brand-inactive-text">
+                                                <span>Documentos PDF</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{parsedDocs.length}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </TabsContent>
+                    )}
+
+                    {/* ─── TAB 3: HISTÓRICO ─── */}
+                    <TabsContent value="history" className="mt-0 focus-visible:ring-0">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <div className="lg:col-span-8 space-y-8">
+                                <FormSection title="Linha do Tempo da Solicitação">
+                                    <HistoryTimeline entries={historyEntries} emptyMessage="Nenhum evento registrado no histórico." />
+                                </FormSection>
+                            </div>
+                        </div>
+                    </TabsContent>
                 </Tabs>
-            </div>
-        </>
+            </motion.div>
+        </div>
     )
 }
-

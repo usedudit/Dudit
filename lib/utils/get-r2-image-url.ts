@@ -15,6 +15,10 @@ export function getR2ImageUrl(
     imagePath = imagePath[0];
   }
 
+  if (imagePath && typeof imagePath === 'object' && !Array.isArray(imagePath) && imagePath.url) {
+    imagePath = imagePath.url;
+  }
+
   if (typeof imagePath === 'string' && (imagePath.startsWith('[') || imagePath.startsWith('{'))) {
     try {
       const parsed = JSON.parse(imagePath);
@@ -30,6 +34,10 @@ export function getR2ImageUrl(
 
   if (Array.isArray(imagePath) && imagePath.length > 0) {
     imagePath = imagePath[0];
+  }
+
+  if (imagePath && typeof imagePath === 'object' && !Array.isArray(imagePath) && imagePath.url) {
+    imagePath = imagePath.url;
   }
 
   // Se for nulo, indefinido, vazio ou string inválida

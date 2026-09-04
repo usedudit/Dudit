@@ -23,7 +23,7 @@ export function PWAUpdatePrompt() {
     }
 
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("/sw.js", { updateViaCache: "none" })
       .catch((error) => {
         console.error("[PWA] Service worker registration failed:", error)
       })

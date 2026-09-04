@@ -24,6 +24,7 @@ import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInpu
 import DefaultModal from "@/components/reusable/DefaultModal"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { getCitiesData } from "@/lib/data/cities-loader"
+import { MarketplaceLandingView } from "./MarketplaceLandingView"
 
 const COMMON_CITY_ACCENTS: Record<string, string> = {
     "sao-paulo": "São Paulo",
@@ -179,6 +180,9 @@ export default function MarketplaceHome({
     const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
     const { success: notifySuccess, error: notifyError } = useNotification()
 
+    const hasNoLocation = !selectedCityName
+    const hasNoProductsOrVitrines = Boolean(selectedCityName && sections.length === 0)
+
     const [activeTrend, setActiveTrend] = useState(TRENDS[0])
     const [isAnnounceModalOpen, setIsAnnounceModalOpen] = useState(false)
     const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
@@ -191,10 +195,10 @@ export default function MarketplaceHome({
     const [citiesList, setCitiesList] = useState<string[]>([])
 
     useEffect(() => {
-        if (isVisitorModalOpen && citiesList.length === 0) {
+        if ((isVisitorModalOpen || hasNoLocation || hasNoProductsOrVitrines) && citiesList.length === 0) {
             getCitiesData().then(setCitiesList)
         }
-    }, [isVisitorModalOpen, citiesList.length])
+    }, [isVisitorModalOpen, hasNoLocation, hasNoProductsOrVitrines, citiesList.length])
 
     const [form, setForm] = useState({
         zipCode: "",
@@ -374,9 +378,6 @@ export default function MarketplaceHome({
             setIsSavingAddress(false)
         }
     }
-
-    const hasNoLocation = !selectedCityName
-    const hasNoProductsOrVitrines = selectedCityName && sections.length === 0
 
     const renderAddressModal = () => {
         if (!user || !isAddressModalOpen) return null
@@ -598,89 +599,25 @@ export default function MarketplaceHome({
 
     let content;
 
-    if (hasNoLocation) {
+    if (hasNoLocation || hasNoProductsOrVitrines) {
         content = (
             <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
                 <HeroBanner />
 
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-12 flex-grow flex items-center justify-center">
-                    <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 shadow-sm dark:bg-[#2a2417] dark:border-[#3a3120]">
-                        <div className="flex-grow text-center md:text-left md:max-w-[65%]">
-                            <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight dark:text-dark-heading">Onde você está?</h2>
-                            <p className="text-gray-600 text-lg mb-6 leading-relaxed dark:text-dark-body">
-                                Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização.
-                            </p>
-                            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                                {user ? (
-                                    <button
-                                        onClick={() => setIsAddressModalOpen(true)}
-                                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
-                                    >
-                                        Adicionar Endereço
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => setIsVisitorModalOpen(true)}
-                                        className="bg-brand-green text-white font-bold py-3.5 px-8 rounded-full hover:bg-[#047857] transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-md flex items-center gap-2"
-                                    >
-                                        Escolher Cidade
-                                    </button>
-                                )}
-
-                                <button
-                                    onClick={requestLocation}
-                                    disabled={isLocationLoading}
-                                    className="bg-white border-2 border-brand-green text-brand-green font-bold py-3.5 px-8 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 dark:bg-dark-surface"
-                                >
-                                    {isLocationLoading ? (
-                                        <>
-                                            <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                                            Localizando...
-                                        </>
-                                    ) : (
-                                        "Usar localização atual"
-                                    )}
-                                </button>
-                            </div>
-                            {locationError && (
-                                <p className="text-red-500 text-sm mt-3 font-semibold">{locationError}</p>
-                            )}
-                        </div>
-                        <div className="w-[180px] md:w-[240px] shrink-0 transform hover:scale-105 transition-transform duration-300">
-                            <img src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png" alt="Onde você está?" className="w-full h-auto object-contain" />
-                        </div>
-                    </div>
-                </div>
-
-                {renderAddressModal()}
-                {renderVisitorModal()}
-            </div>
-        )
-    } else if (hasNoProductsOrVitrines) {
-        content = (
-            <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
-                <HeroBanner />
-
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-10 flex-grow flex flex-col gap-10">
-                    <div className="flex justify-center">
-                        <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
-                            imageAlt="Estamos Chegando!"
-                            title="Estamos Chegando!"
-                            subtitle={`Ainda não temos vendedores ou produtos cadastrados em ${selectedCityName}. Que tal ser o pioneiro e começar a vender na sua cidade de graça, sem comissão nenhuma?`}
-                            itemButton={{
-                                text: "Começar a vender na Dudit",
-                                action: () => {
-                                    router.push(userProfile ? "/erp/trocar-erp" : "/auth/login?mode=partner")
-                                },
-                                variant: "default"
-                            }}
-                        />
-                    </div>
-
-                    <HomeValueProps />
-                </div>
+                <MarketplaceLandingView
+                    user={user}
+                    userProfile={userProfile}
+                    selectedCityName={selectedCityName}
+                    selectedCitySlug={selectedCitySlug}
+                    isCityEmpty={Boolean(hasNoProductsOrVitrines && selectedCityName && selectedCityName !== "Brasil")}
+                    onOpenAddressModal={() => setIsAddressModalOpen(true)}
+                    onOpenVisitorModal={() => setIsVisitorModalOpen(true)}
+                    onRequestLocation={requestLocation}
+                    isLocationLoading={isLocationLoading}
+                    locationError={locationError}
+                    onSelectCitySlug={handleSelectCitySlug}
+                    citiesList={citiesList}
+                />
 
                 {renderAddressModal()}
                 {renderVisitorModal()}

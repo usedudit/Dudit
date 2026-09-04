@@ -12,14 +12,16 @@ const ALLOWED_REFUND_EVIDENCE_MIME_TYPES = [
     "image/jpeg",
     "image/png",
     "image/webp",
+    "image/avif",
     "application/pdf",
 ] as const
 
-const ALLOWED_REFUND_EVIDENCE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".pdf"] as const
+const ALLOWED_REFUND_EVIDENCE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".avif", ".pdf"] as const
 const REFUND_EVIDENCE_MIME_TO_EXT: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
+    "image/avif": "avif",
     "application/pdf": "pdf",
 }
 
@@ -39,18 +41,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Configuração do R2 incompleta." }, { status: 500 })
         }
 
-        const { filename, contentType, fileSize } = await req.json()
-        if (!filename || !contentType) {
-            return NextResponse.json({ error: "filename e contentType são obrigatórios" }, { status: 400 })
-        }
+        const body = await req.json()
+        const { filename, fileSize } = body
+        let contentType = String(body.contentType || "").split(";")[0].trim().toLowerCase()
 
-        if (!ALLOWED_REFUND_EVIDENCE_MIME_TYPES.includes(contentType)) {
-            return NextResponse.json({ error: "Tipo de arquivo não permitido. Apenas imagens (JPG, PNG, WEBP) e documentos PDF são aceitos." }, { status: 400 })
+        if (!filename) {
+            return NextResponse.json({ error: "filename e contentType são obrigatórios" }, { status: 400 })
         }
 
         const ext = String(filename).toLowerCase().substring(String(filename).lastIndexOf("."))
         if (DANGEROUS_EXTENSIONS.includes(ext as any) || !ALLOWED_REFUND_EVIDENCE_EXTENSIONS.includes(ext as any)) {
             return NextResponse.json({ error: "Extensão não permitida." }, { status: 400 })
+        }
+
+        // Inferência/normalização caso venha vazio ou application/octet-stream
+        if (!contentType || contentType === "application/octet-stream") {
+            if (ext === ".pdf") contentType = "application/pdf"
+            else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg"
+            else if (ext === ".png") contentType = "image/png"
+            else if (ext === ".webp") contentType = "image/webp"
+            else if (ext === ".avif") contentType = "image/avif"
+        }
+
+        if (!ALLOWED_REFUND_EVIDENCE_MIME_TYPES.includes(contentType as any)) {
+            return NextResponse.json({ error: "Tipo de arquivo não permitido. Apenas imagens (JPG, PNG, WEBP, AVIF) e documentos PDF são aceitos." }, { status: 400 })
         }
 
         const expectedExt = Object.entries(REFUND_EVIDENCE_MIME_TO_EXT).find(([k]) => k === contentType)?.[1]
@@ -74,7 +88,10 @@ export async function POST(req: NextRequest) {
             mimeToExt: REFUND_EVIDENCE_MIME_TO_EXT,
         })
 
-        return NextResponse.json(result)
+        return NextResponse.json({
+            ...result,
+            signedUrl: result.uploadUrl,
+        })
     } catch (error: any) {
         console.error("[R2 billing refund evidence] Error:", error)
         return NextResponse.json({ error: error?.message || "Erro ao gerar URL de upload" }, { status: 500 })

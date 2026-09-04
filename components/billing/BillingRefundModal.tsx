@@ -13,19 +13,12 @@ import {
     FormSection,
     IconPlaceholder,
     InfoCard,
+    FormDropdown,
 } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { requestSubscriptionRefundAction } from "@/app/actions/billing/refunds"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
-import {
-    CheckCircle2,
-    AlertTriangle,
-    ShieldCheck,
-    ArrowRight,
-    FileText,
-} from "lucide-react"
-import { TrashIcon, UploadIcon } from "@/lib/icons"
-import Link from "next/link"
+import { TrashIcon, UploadIcon, CheckCircleIcon, FileIcon } from "@/lib/icons"
 
 interface BillingRefundModalProps {
     isOpen: boolean
@@ -44,16 +37,25 @@ const REASON_OPTIONS = [
     { value: "other", label: "Outro motivo" },
 ]
 
+function formatFileSize(bytes: number): string {
+    if (!bytes || bytes <= 0) return "0 KB"
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
 export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuccess }: BillingRefundModalProps) {
     const [activeTab, setActiveTab] = useState("Dados Gerais")
     const [reasonCategory, setReasonCategory] = useState("repentance_7_days")
     const [reasonDescription, setReasonDescription] = useState("")
-    
+
     // Staged files locally in memory (NOT uploaded until user submits)
     const [stagedImages, setStagedImages] = useState<File[]>([])
     const [stagedDocs, setStagedDocs] = useState<File[]>([])
 
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [uploadStatus, setUploadStatus] = useState<string | null>(null)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [createdToken, setCreatedToken] = useState<string | null>(null)
     const docInputId = useId()
@@ -66,6 +68,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             setStagedImages([])
             setStagedDocs([])
             setErrorMessage(null)
+            setUploadStatus(null)
             setCreatedToken(null)
         }
     }, [isOpen])
@@ -85,7 +88,8 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
 
         const incoming = Array.from(files)
         const validImages = incoming.filter((f) =>
-            ["image/jpeg", "image/png", "image/webp", "image/avif"].includes(f.type)
+            ["image/jpeg", "image/png", "image/webp", "image/avif"].includes(f.type) ||
+            /\.(jpg|jpeg|png|webp|avif)$/i.test(f.name)
         )
 
         if (validImages.length + stagedImages.length > 5) {
@@ -118,7 +122,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
         setErrorMessage(null)
 
         const incoming = Array.from(files)
-        const validDocs = incoming.filter((f) => f.type === "application/pdf")
+        const validDocs = incoming.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"))
 
         if (validDocs.length !== incoming.length) {
             setErrorMessage("Apenas arquivos PDF são permitidos.")
@@ -139,13 +143,23 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
     }
 
     // Upload a single file to R2 via signed URL
-    const uploadFileToR2 = async (file: File): Promise<string> => {
+    const uploadFileToR2 = async (file: File): Promise<{ url: string; name: string; size: number; key?: string }> => {
+        let contentType = file.type
+        const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."))
+        if (!contentType || contentType === "application/octet-stream") {
+            if (ext === ".pdf") contentType = "application/pdf"
+            else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg"
+            else if (ext === ".png") contentType = "image/png"
+            else if (ext === ".webp") contentType = "image/webp"
+            else if (ext === ".avif") contentType = "image/avif"
+        }
+
         const signedRes = await fetch("/api/r2/billing-refund-evidence", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 filename: file.name,
-                contentType: file.type,
+                contentType,
                 fileSize: file.size,
             }),
         })
@@ -156,10 +170,14 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
         }
 
         const signedData = await signedRes.json()
+        const uploadUrl = signedData.uploadUrl || signedData.signedUrl
+        if (!uploadUrl) {
+            throw new Error(`URL de upload não encontrada para ${file.name}`)
+        }
 
-        const uploadRes = await fetch(signedData.signedUrl, {
+        const uploadRes = await fetch(uploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": file.type },
+            headers: { "Content-Type": signedData.contentType || contentType },
             body: file,
         })
 
@@ -167,7 +185,12 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             throw new Error(`Falha no upload do arquivo ${file.name}`)
         }
 
-        return signedData.publicUrl
+        return {
+            url: signedData.publicUrl,
+            name: file.name,
+            size: file.size,
+            key: signedData.key,
+        }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -181,29 +204,36 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
         }
 
         setIsSubmitting(true)
+        setUploadStatus("Enviando evidências...")
         try {
             // 1. Upload staged images to R2
-            const uploadedImageUrls: string[] = []
-            for (const imgFile of stagedImages) {
-                const url = await uploadFileToR2(imgFile)
-                uploadedImageUrls.push(url)
+            const uploadedImages: { url: string; name: string; size: number; key?: string }[] = []
+            for (let i = 0; i < stagedImages.length; i++) {
+                const imgFile = stagedImages[i]
+                setUploadStatus(`Enviando imagem (${i + 1}/${stagedImages.length})...`)
+                const uploaded = await uploadFileToR2(imgFile)
+                uploadedImages.push(uploaded)
             }
 
             // 2. Upload staged documents to R2
-            const uploadedDocUrls: string[] = []
-            for (const docFile of stagedDocs) {
-                const url = await uploadFileToR2(docFile)
-                uploadedDocUrls.push(url)
+            const uploadedDocs: { url: string; name: string; size: number; key?: string }[] = []
+            for (let i = 0; i < stagedDocs.length; i++) {
+                const docFile = stagedDocs[i]
+                setUploadStatus(`Enviando documento (${i + 1}/${stagedDocs.length})...`)
+                const uploaded = await uploadFileToR2(docFile)
+                uploadedDocs.push(uploaded)
             }
 
-            // 3. Register refund request with the uploaded URLs
+            setUploadStatus("Registrando solicitação...")
+
+            // 3. Register refund request with the uploaded URLs and metadata
             const res = await requestSubscriptionRefundAction({
                 partnerId,
                 purchaseId: purchase.id,
                 reasonCategory: reasonCategory as any,
                 reasonDescription: reasonDescription.trim(),
-                images: uploadedImageUrls,
-                documents: uploadedDocUrls,
+                images: uploadedImages,
+                documents: uploadedDocs,
             })
 
             if (res.error) {
@@ -221,6 +251,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             setErrorMessage(err.message || "Erro ao solicitar reembolso.")
         } finally {
             setIsSubmitting(false)
+            setUploadStatus(null)
         }
     }
 
@@ -241,69 +272,36 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
             onClose={handleCloseModal}
             title="Solicitar Reembolso de Assinatura"
             maxWidth="3xl"
+            footer={
+                <div className="flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        isLoading={isSubmitting}
+                    >
+                        {isSubmitting ? (uploadStatus || "Enviando...") : "Enviar Solicitação"}
+                    </Button>
+                </div>
+            }
         >
             {createdToken ? (
-                <div className="space-y-6 pt-2 pb-4 text-center">
-                    <div className="w-16 h-16 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center mx-auto">
-                        <CheckCircle2 size={36} />
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
-                            Solicitação Registrada com Sucesso!
-                        </h3>
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mx-auto">
-                            Nossa equipe irá analisar sua solicitação. Você pode acompanhar o status e o parecer da equipe através do portal de reembolso.
-                        </p>
-                    </div>
-
-                    <div className="p-4 bg-brand-gray dark:bg-dark-border/40 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="text-left">
-                            <p className="text-xs text-brand-inactive-text font-medium">Link de Acompanhamento</p>
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Portal de Reembolso</p>
-                        </div>
-                        <Link href={`/reembolso/${createdToken}`} target="_blank">
-                            <Button variant="default" className="bg-brand-green text-white hover:bg-brand-green/90 font-bold flex items-center gap-2">
-                                <span>Acessar Portal</span>
-                                <ArrowRight size={16} />
-                            </Button>
-                        </Link>
-                    </div>
-
-                    <div className="pt-2">
-                        <Button variant="outline" onClick={handleCloseModal} className="w-full sm:w-auto">
-                            Fechar
-                        </Button>
-                    </div>
-                </div>
+                <IconPlaceholder
+                    icon={CheckCircleIcon}
+                    title="Solicitação Registrada com Sucesso!"
+                    subtitle="Nossa equipe irá analisar sua solicitação. Você pode acompanhar o status e o parecer da equipe através do portal de reembolso."
+                    itemButton={{
+                        text: "Acessar Portal",
+                        action: () => {
+                            window.open(`/reembolso/${createdToken}`, "_blank")
+                            handleCloseModal()
+                        },
+                    }}
+                />
             ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4 pt-1 pb-1">
-                    {/* Alerta de Garantia Legal do CDC */}
-                    {isWithin7Days ? (
-                        <div className="p-4 bg-brand-green/10 border border-brand-green/20 rounded-2xl flex items-start gap-3 text-left">
-                            <ShieldCheck className="w-6 h-6 text-brand-green flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm font-bold text-brand-green">
-                                    Garantia Legal do CDC (Art. 49) Ativa
-                                </p>
-                                <p className="text-xs text-brand-dark dark:text-dark-body mt-0.5">
-                                    Sua compra foi realizada há {Math.floor(daysElapsed)} dia(s). Você possui direito ao reembolso integral de 100% do valor pago.
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="p-4 bg-brand-orange/10 border border-brand-orange/20 rounded-2xl flex items-start gap-3 text-left">
-                            <AlertTriangle className="w-6 h-6 text-brand-orange flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="text-sm font-bold text-brand-orange">
-                                    Período Superior a 7 Dias
-                                </p>
-                                <p className="text-xs text-brand-dark dark:text-dark-body mt-0.5">
-                                    Sua compra foi realizada há {Math.floor(daysElapsed)} dias. Conforme os Termos de Uso, a solicitação será analisada individualmente pela administração.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Tabs de Navegação */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="w-full justify-start border-b border-brand-border dark:border-dark-border gap-6 bg-transparent p-0">
@@ -317,6 +315,13 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                                 )}
                             </TabsTrigger>
                         </TabsList>
+
+                        {/* Alerta de Garantia Legal do CDC */}
+                        {isWithin7Days ? (
+                            <InfoCard title="Garantia Legal do CDC (Art. 49) Ativa" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dia(s). Você possui direito ao reembolso integral de 100% do valor pago.`} color="green" />
+                        ) : (
+                            <InfoCard title="Período Superior a 7 Dias" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dias. Conforme os Termos de Uso, a solicitação será analisada individualmente pela administração.`} color="orange" />
+                        )}
 
                         {/* ─── TAB 1: DADOS GERAIS ─── */}
                         <TabsContent value="Dados Gerais" className="pt-4 space-y-5 focus-visible:outline-none">
@@ -346,32 +351,29 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
 
                             {/* Motivo */}
                             <div className="space-y-2 text-left">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Motivo Principal do Pedido <span className="text-brand-red">*</span>
-                                </label>
-                                <select
+                                <FormDropdown
+                                    label="Motivo"
                                     value={reasonCategory}
-                                    onChange={(e) => setReasonCategory(e.target.value)}
-                                    className="w-full h-11 px-3.5 text-sm bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green/20 focus:border-brand-green"
-                                >
-                                    {REASON_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    setValue={(val) => setReasonCategory(val)}
+                                    options={[
+                                        ...REASON_OPTIONS.map((opt) => ({
+                                            value: opt.value,
+                                            label: opt.label,
+                                        })),
+                                    ]}
+                                />
                             </div>
 
                             {/* Descrição Detalhada */}
                             <div className="space-y-2 text-left">
-                                <label className="block text-xs font-bold text-brand-dark dark:text-dark-heading">
-                                    Justificativa Detalhada <span className="text-brand-red">*</span>
-                                </label>
                                 <FormTextarea
+                                    required
+                                    label="Justificativa Detalhada"
                                     value={reasonDescription}
                                     onChange={(e) => setReasonDescription(e.target.value)}
                                     placeholder="Explique detalhadamente o motivo da sua solicitação de reembolso..."
                                     rows={4}
+                                    maxLength={2000}
                                 />
                             </div>
                         </TabsContent>
@@ -415,25 +417,30 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                                     )}
 
                                     {stagedDocs.length > 0 && (
-                                        <div className="space-y-2">
+                                        <div className="space-y-2.5">
                                             {stagedDocs.map((doc, idx) => (
                                                 <div
                                                     key={idx}
-                                                    className="flex items-center justify-between p-3 bg-brand-gray dark:bg-dark-border/30 rounded-xl border border-brand-border dark:border-dark-border text-xs"
+                                                    className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border shadow-xs"
                                                 >
-                                                    <div className="flex items-center gap-2.5 truncate">
-                                                        <FileText className="w-5 h-5 text-brand-orange shrink-0" />
-                                                        <span className="truncate font-medium text-brand-dark dark:text-dark-heading">
-                                                            {doc.name}
-                                                        </span>
-                                                        <span className="text-[11px] text-brand-inactive-text">
-                                                            ({(doc.size / 1024).toFixed(1)} KB)
-                                                        </span>
+                                                    <div className="flex items-center gap-3.5 min-w-0">
+                                                        <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs">
+                                                            <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                        </div>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                {doc.name}
+                                                            </span>
+                                                            <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                {formatFileSize(doc.size)}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveDoc(idx)}
-                                                        className="p-1.5 text-brand-inactive-text hover:text-brand-red rounded-lg transition-colors"
+                                                        className="p-2 text-brand-inactive-text hover:text-brand-red rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors ml-2 shrink-0"
+                                                        title="Remover documento"
                                                     >
                                                         <TrashIcon className="w-4 h-4" />
                                                     </button>
@@ -447,25 +454,8 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                     </Tabs>
 
                     {errorMessage && (
-                        <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 rounded-xl text-xs text-red-600 dark:text-red-400 text-left">
-                            {errorMessage}
-                        </div>
+                        <InfoCard color="red" title="Erro" message={errorMessage} />
                     )}
-
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button type="button" variant="outline" onClick={handleCloseModal} disabled={isSubmitting}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="default"
-                            className="bg-brand-green text-white hover:bg-brand-green/90 font-bold"
-                            disabled={isSubmitting}
-                            isLoading={isSubmitting}
-                        >
-                            Enviar Solicitação
-                        </Button>
-                    </div>
                 </form>
             )}
         </DefaultModal>

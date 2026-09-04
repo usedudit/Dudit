@@ -237,7 +237,11 @@ export async function createSubscriptionAction(
 /**
  * Cancel the current subscription for the current partner.
  */
-export async function cancelSubscriptionAction(): Promise<ActionResponse<any>> {
+export async function cancelSubscriptionAction(input?: {
+  reason?: string
+  reasonCategory?: string
+  feedback?: string
+}): Promise<ActionResponse<any>> {
   await requireRateLimit(RateLimitCategory.SUBSCRIPTION_CANCEL)
 
   try {
@@ -249,7 +253,9 @@ export async function cancelSubscriptionAction(): Promise<ActionResponse<any>> {
       return errorResponse(SUBSCRIPTION_MESSAGES.SUBSCRIPTION_NOT_FOUND)
     }
 
-    const result = await cancelMpSubscription(subscription.id, user.id)
+    const reasonText = input?.reason || (input?.feedback ? `Motivo: ${input.feedback}` : undefined)
+
+    const result = await cancelMpSubscription(subscription.id, user.id, reasonText)
 
     if (!result.success) {
       return errorResponse(result.error || "Erro ao cancelar assinatura")

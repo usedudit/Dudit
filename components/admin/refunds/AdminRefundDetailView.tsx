@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
     ChevronLeftIcon,
     ShareIcon,
@@ -8,6 +8,7 @@ import {
     FileIcon,
     ClockIcon,
     AlertCircleIcon,
+    ShieldIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -27,16 +28,54 @@ import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
-import {
-    ShieldCheck,
-    AlertTriangle,
-    CheckCircle2,
-    XCircle,
-    Lock,
-    FileText,
-    ExternalLink,
-} from "lucide-react"
 import { AdminRefundReviewModal } from "@/components/admin/AdminRefundReviewModal"
+import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
+
+function formatFileSize(bytes?: number): string {
+    if (!bytes || bytes <= 0) return ""
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+interface RefundAttachmentItem {
+    url: string
+    name: string
+    size?: number
+    key?: string
+}
+
+function normalizeAttachments(raw: any, fallbackPrefix: string): RefundAttachmentItem[] {
+    if (!raw) return []
+    let items = raw
+    if (typeof raw === "string") {
+        try {
+            items = JSON.parse(raw)
+        } catch {
+            return []
+        }
+    }
+    if (!Array.isArray(items)) return []
+    return items.map((item, idx) => {
+        if (typeof item === "string") {
+            const rawFileName = item.split("/").pop()?.split("?")[0] || `${fallbackPrefix} ${idx + 1}`
+            const name = decodeURIComponent(rawFileName)
+            return { url: item, name }
+        }
+        if (item && typeof item === "object") {
+            const rawFileName = item.url ? item.url.split("/").pop()?.split("?")[0] : `${fallbackPrefix} ${idx + 1}`
+            const name = item.name || decodeURIComponent(rawFileName || `${fallbackPrefix} ${idx + 1}`)
+            return {
+                url: item.url || "",
+                name,
+                size: typeof item.size === "number" ? item.size : undefined,
+                key: item.key,
+            }
+        }
+        return { url: String(item), name: `${fallbackPrefix} ${idx + 1}` }
+    }).filter(item => Boolean(item.url))
+}
 
 const getReasonLabel = (cat: string) => {
     switch (cat) {
@@ -107,8 +146,9 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
     const subscription = refund?.subscription || {}
     const payment = refund?.payment || {}
 
-    const images: string[] = Array.isArray(refund?.images) ? refund.images : []
-    const documents: string[] = Array.isArray(refund?.documents) ? refund.documents : []
+    const parsedImages = useMemo(() => normalizeAttachments(refund?.images, "Evidência"), [refund?.images])
+    const parsedDocs = useMemo(() => normalizeAttachments(refund?.documents, "Documento"), [refund?.documents])
+    const paymentMethod = useMemo(() => resolvePaymentMethodDetails(payment, purchase), [payment, purchase])
 
     useEffect(() => {
         if (!setHeaderOverride) return
@@ -235,9 +275,9 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                             <TabsTrigger value="parties">Loja & Comprador</TabsTrigger>
                                             <TabsTrigger value="attachments" className="flex items-center gap-2">
                                                 <span>Anexos</span>
-                                                {(images.length + documents.length) > 0 && (
+                                                {(parsedImages.length + parsedDocs.length) > 0 && (
                                                     <Badge variant="green" className="px-1.5 py-0.2 text-[10px]">
-                                                        {images.length + documents.length}
+                                                        {parsedImages.length + parsedDocs.length}
                                                     </Badge>
                                                 )}
                                             </TabsTrigger>
@@ -312,12 +352,12 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                 <span>Garantia CDC (7d)</span>
                                                                 {refund.is_within_7_days ? (
                                                                     <Badge variant="green" className="flex items-center gap-1">
-                                                                        <ShieldCheck size={12} />
+                                                                        <ShieldIcon size={12} />
                                                                         <span>Dentro do prazo</span>
                                                                     </Badge>
                                                                 ) : (
                                                                     <Badge variant="orange" className="flex items-center gap-1">
-                                                                        <AlertTriangle size={12} />
+                                                                        <AlertCircleIcon size={12} />
                                                                         <span>Fora do prazo</span>
                                                                     </Badge>
                                                                 )}
@@ -343,14 +383,13 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                     {purchase.purchase_type || "-"}
                                                                 </span>
                                                             </div>
-                                                            {purchase.gateway && (
-                                                                <div className="flex justify-between text-brand-inactive-text">
-                                                                    <span>Gateway</span>
-                                                                    <span className="font-medium text-brand-dark dark:text-dark-heading capitalize">
-                                                                        {purchase.gateway}
-                                                                    </span>
-                                                                </div>
-                                                            )}
+                                                            <div className="flex justify-between items-center text-brand-inactive-text">
+                                                                <span>Forma de Pagamento</span>
+                                                                <span className="font-medium text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
+                                                                    <img src={paymentMethod.iconUrl} alt={paymentMethod.name} className="w-4 h-4 object-contain shrink-0" />
+                                                                    <span>{paymentMethod.name}</span>
+                                                                </span>
+                                                            </div>
                                                             {payment.paid_at && (
                                                                 <div className="flex justify-between text-brand-inactive-text">
                                                                     <span>Pago em</span>
@@ -378,7 +417,7 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-green hover:underline"
                                                             >
                                                                 Abrir Portal
-                                                                <ExternalLink size={13} />
+                                                                <ShareIcon size={13} />
                                                             </a>
                                                         </div>
                                                     )}
@@ -497,22 +536,22 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                         <FadeIn key="attachments">
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    {images.length > 0 && (
-                                                        <FormSection title={`Imagens de Evidencia (${images.length})`} hasSeparator>
+                                                    {parsedImages.length > 0 && (
+                                                        <FormSection title={`Imagens de Evidência (${parsedImages.length})`} hasSeparator>
                                                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                                                {images.map((img: string, idx: number) => (
+                                                                {parsedImages.map((img, idx) => (
                                                                     <a
                                                                         key={idx}
-                                                                        href={getR2ImageUrl(img)}
+                                                                        href={getR2ImageUrl(img.url)}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="group rounded-xl border border-brand-border dark:border-dark-border overflow-hidden bg-brand-gray dark:bg-dark-border/20 flex flex-col hover:border-brand-dark/30 transition-colors"
+                                                                        className="group rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden bg-brand-gray dark:bg-dark-border/20 flex flex-col hover:border-brand-dark/30 transition-colors shadow-xs"
                                                                     >
-                                                                        <div className="aspect-square flex items-center justify-center overflow-hidden">
-                                                                            <img src={getR2ImageUrl(img)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                                        <div className="aspect-square flex items-center justify-center overflow-hidden bg-white dark:bg-dark-surface">
+                                                                            <img src={getR2ImageUrl(img.url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                                                         </div>
-                                                                        <div className="p-2 text-xs truncate font-medium text-brand-dark dark:text-dark-heading">
-                                                                            Evidencia {idx + 1}
+                                                                        <div className="p-2.5 text-xs truncate font-medium text-brand-dark dark:text-dark-heading border-t border-brand-border dark:border-dark-border">
+                                                                            {img.name || `Evidência ${idx + 1}`}
                                                                         </div>
                                                                     </a>
                                                                 ))}
@@ -520,26 +559,33 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                         </FormSection>
                                                     )}
 
-                                                    {documents.length > 0 && (
-                                                        <FormSection title={`Documentos PDF (${documents.length})`} hasSeparator={images.length > 0}>
-                                                            <div className="space-y-2">
-                                                                {documents.map((doc: string, idx: number) => (
+                                                    {parsedDocs.length > 0 && (
+                                                        <FormSection title={`Documentos PDF (${parsedDocs.length})`} hasSeparator={parsedImages.length > 0}>
+                                                            <div className="space-y-2.5">
+                                                                {parsedDocs.map((doc, idx) => (
                                                                     <a
                                                                         key={idx}
-                                                                        href={doc}
+                                                                        href={doc.url}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="flex items-center justify-between p-3 bg-brand-gray dark:bg-dark-border/30 rounded-xl text-xs border border-brand-border dark:border-dark-border hover:bg-gray-200 dark:hover:bg-dark-border/60 transition-colors"
+                                                                        className="flex items-center justify-between p-3.5 bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark/30 dark:hover:border-dark-border/80 transition-all shadow-xs group"
                                                                     >
-                                                                        <div className="flex items-center gap-2 truncate">
-                                                                            <FileText size={16} className="text-brand-orange shrink-0" />
-                                                                            <span className="truncate font-medium text-brand-dark dark:text-dark-heading">
-                                                                                Documento Anexo {idx + 1} (PDF)
-                                                                            </span>
+                                                                        <div className="flex items-center gap-3.5 min-w-0">
+                                                                            <div className="w-11 h-11 rounded-xl bg-white dark:bg-dark-border/60 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0 shadow-xs group-hover:bg-brand-gray dark:group-hover:bg-dark-border transition-colors">
+                                                                                <FileIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                                                                            </div>
+                                                                            <div className="flex flex-col min-w-0 text-left">
+                                                                                <span className="font-bold text-[13px] sm:text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                                    {doc.name}
+                                                                                </span>
+                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                                    {doc.size ? formatFileSize(doc.size) : "Documento PDF"}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
-                                                                        <div className="flex items-center gap-1 text-brand-green font-bold">
+                                                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-gray hover:bg-gray-200 dark:bg-dark-border/40 dark:hover:bg-dark-border/80 text-brand-dark dark:text-dark-heading text-xs font-semibold transition-colors ml-2 shrink-0">
                                                                             <span>Abrir</span>
-                                                                            <ExternalLink size={13} />
+                                                                            <ShareIcon className="w-3.5 h-3.5 text-brand-inactive-text group-hover:text-brand-dark dark:group-hover:text-dark-heading transition-colors" />
                                                                         </div>
                                                                     </a>
                                                                 ))}
@@ -547,9 +593,9 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                         </FormSection>
                                                     )}
 
-                                                    {images.length === 0 && documents.length === 0 && (
+                                                    {parsedImages.length === 0 && parsedDocs.length === 0 && (
                                                         <div className="p-8 text-center border border-dashed border-brand-border dark:border-dark-border rounded-2xl text-xs text-brand-inactive-text">
-                                                            Nenhum anexo ou evidencia foi enviado pelo lojista nesta solicitacao.
+                                                            Nenhum anexo ou evidência foi enviado pelo lojista nesta solicitação.
                                                         </div>
                                                     )}
                                                 </div>
@@ -562,11 +608,11 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                         <div className="space-y-2 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Imagens</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{images.length}</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{parsedImages.length}</span>
                                                             </div>
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Documentos PDF</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{documents.length}</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{parsedDocs.length}</span>
                                                             </div>
                                                         </div>
                                                     </div>

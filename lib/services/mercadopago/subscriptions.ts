@@ -342,9 +342,17 @@ export async function createMpSubscription(
  */
 export async function cancelMpSubscription(
   subscriptionId: string,
-  actorUserId: string,
+  actorUserId?: string,
+  reason?: string,
 ): Promise<CancelSubscriptionResult> {
   const admin = getAdminClient()
+
+  let effectiveActor = actorUserId || "system"
+  let effectiveReason = reason
+  if (actorUserId && !actorUserId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) && !reason) {
+    effectiveReason = actorUserId
+    effectiveActor = "system"
+  }
 
   const { data: sub, error: fetchError } = await admin
     .from("subscriptions")
@@ -419,19 +427,29 @@ export async function cancelMpSubscription(
     await logBillingEvent(admin, sub.partner_id, "subscription_cancel_scheduled", null, {
       subscription_id: subscriptionId,
       access_until: sub.current_period_end,
+      cancellation_reason: effectiveReason,
     })
 
     await auditLog({
       action: "subscription.cancelled",
-      actorUserId,
+      actorUserId: effectiveActor,
       partnerId: sub.partner_id,
       metadata: {
         subscription_id: subscriptionId,
         plan_id: sub.plan_id,
         scheduled_for: sub.current_period_end,
         type: "at_period_end",
+        cancellation_reason: effectiveReason,
       },
     })
+
+    try {
+      const { logBillingAudit } = await import("@/lib/billing/audit")
+      await logBillingAudit("billing.subscription.cancelled", sub.partner_id, {
+        subscription_id: subscriptionId,
+        cancellation_reason: effectiveReason,
+      }, effectiveActor)
+    } catch {}
 
     return {
       success: true,
@@ -483,14 +501,28 @@ export async function cancelMpSubscription(
 
   await logBillingEvent(admin, sub.partner_id, "subscription_cancelled", null, {
     subscription_id: subscriptionId,
+    cancellation_reason: effectiveReason,
   })
 
   await auditLog({
     action: "subscription.cancelled",
-    actorUserId,
+    actorUserId: effectiveActor,
     partnerId: sub.partner_id,
-    metadata: { subscription_id: subscriptionId, plan_id: sub.plan_id, type: "immediate" },
+    metadata: {
+      subscription_id: subscriptionId,
+      plan_id: sub.plan_id,
+      type: "immediate",
+      cancellation_reason: effectiveReason,
+    },
   })
+
+  try {
+    const { logBillingAudit } = await import("@/lib/billing/audit")
+    await logBillingAudit("billing.subscription.cancelled", sub.partner_id, {
+      subscription_id: subscriptionId,
+      cancellation_reason: effectiveReason,
+    }, effectiveActor)
+  } catch {}
 
   return { success: true, cancelAtPeriodEnd: false }
 }

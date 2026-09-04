@@ -11,6 +11,31 @@ import {
   CacheableResponsePlugin,
 } from "serwist"
 
+const CACHE_VERSION = "v2"
+const MAX_CACHED_IMAGE_BYTES = 2 * 1024 * 1024
+
+// ExpirationPlugin limita quantidade/idade, mas não limita tamanho em bytes.
+// Uma única imagem original grande podia consumir dezenas de MB e fazer o
+// cache de imagens chegar a GB mesmo com maxEntries baixo.
+const imageSizeLimitPlugin = {
+  cacheWillUpdate: async ({ response }: { response: Response }) => {
+    if (response.status !== 200) return null
+
+    const contentLength = Number(response.headers.get("content-length"))
+    if (Number.isFinite(contentLength) && contentLength > MAX_CACHED_IMAGE_BYTES) {
+      return null
+    }
+
+    // CDN responses sem Content-Length ainda precisam ser limitadas.
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      const body = await response.clone().arrayBuffer()
+      if (body.byteLength > MAX_CACHED_IMAGE_BYTES) return null
+    }
+
+    return response
+  },
+}
+
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
     __SW_MANIFEST: (PrecacheEntry | string)[] | undefined
@@ -111,28 +136,30 @@ const duditRuntimeCaching = [
       url.hostname === "fonts.googleapis.com" ||
       url.hostname === "fonts.gstatic.com",
     handler: new StaleWhileRevalidate({
-      cacheName: "dudit-fonts",
+      cacheName: `dudit-fonts-${CACHE_VERSION}`,
       plugins: [
-        new ExpirationPlugin({ maxAgeSeconds: 30 * 24 * 60 * 60 }),
+        new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 30 * 24 * 60 * 60 }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),
       ],
     }),
   },
 
-  // Imagens CDN - Stale While Revalidate, 7 dias, max 150 entries
+  // Imagens CDN - só imagens, 3 dias, max 24 entries e 2 MB por arquivo
   {
-    matcher: ({ url }: { url: URL }) =>
-      url.hostname.includes("img.dudit.com.br") ||
-      url.hostname.includes("r2.cloudflarestorage.com"),
+    matcher: ({ request, url }: { request: Request; url: URL }) =>
+      request.destination === "image" &&
+      (url.hostname === "img.dudit.com.br" ||
+        url.hostname.endsWith(".r2.cloudflarestorage.com")),
     handler: new StaleWhileRevalidate({
-      cacheName: "dudit-cdn-images",
+      cacheName: `dudit-cdn-images-${CACHE_VERSION}`,
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 80,
-          maxAgeSeconds: 7 * 24 * 60 * 60,
+          maxEntries: 24,
+          maxAgeSeconds: 3 * 24 * 60 * 60,
           purgeOnQuotaError: true,
         }),
-        new CacheableResponsePlugin({ statuses: [0, 200] }),
+        new CacheableResponsePlugin({ statuses: [200] }),
+        imageSizeLimitPlugin,
       ],
     }),
   },
@@ -142,11 +169,11 @@ const duditRuntimeCaching = [
     matcher: ({ url }: { url: URL }) =>
       url.pathname.startsWith("/_next/static"),
     handler: new CacheFirst({
-      cacheName: "dudit-next-static",
+      cacheName: `dudit-next-static-${CACHE_VERSION}`,
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 60,
-          maxAgeSeconds: 7 * 24 * 60 * 60, // 7 dias
+          maxEntries: 30,
+          maxAgeSeconds: 3 * 24 * 60 * 60, // 3 dias
           purgeOnQuotaError: true,
         }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),
@@ -172,12 +199,12 @@ const duditRuntimeCaching = [
       )
     },
     handler: new NetworkFirst({
-      cacheName: "dudit-public-pages",
+      cacheName: `dudit-public-pages-${CACHE_VERSION}`,
       networkTimeoutSeconds: 10,
       plugins: [
         new ExpirationPlugin({
-          maxEntries: 30,
-          maxAgeSeconds: 24 * 60 * 60,
+          maxEntries: 12,
+          maxAgeSeconds: 12 * 60 * 60,
         }),
         new CacheableResponsePlugin({ statuses: [0, 200] }),
       ],
@@ -224,10 +251,10 @@ self.addEventListener("activate", (event) => {
       try {
         const cacheNames = await self.caches.keys()
         const activeCaches = [
-          "dudit-fonts",
-          "dudit-cdn-images",
-          "dudit-next-static",
-          "dudit-public-pages",
+          `dudit-fonts-${CACHE_VERSION}`,
+          `dudit-cdn-images-${CACHE_VERSION}`,
+          `dudit-next-static-${CACHE_VERSION}`,
+          `dudit-public-pages-${CACHE_VERSION}`,
           serwist.precacheStrategy.cacheName,
         ]
         await Promise.all(

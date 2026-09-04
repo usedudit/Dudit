@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input, FormSection } from "@/components/reusable"
+import { Button, Badge, DefaultModal, AlertModal, InfoCard, Input, FormSection, IconPlaceholder, RadioButton, FormTextarea } from "@/components/reusable"
 import Portal from "@/components/Portal"
 import {
     CheckCircleIcon,
@@ -16,7 +16,17 @@ import {
     CancelIcon,
     EyeIcon,
     EditIcon,
+    AlertCircleIcon,
 } from "@/lib/icons"
+
+const CANCELLATION_REASONS = [
+    { id: "cost", label: "Redução de custos / Achei o valor elevado" },
+    { id: "low_usage", label: "Não estou utilizando o suficiente" },
+    { id: "missing_features", label: "Recursos insuficientes / Não atendeu às expectativas" },
+    { id: "technical_issues", label: "Dificuldades técnicas ou bugs" },
+    { id: "switching_platform", label: "Migrando para outra plataforma" },
+    { id: "other", label: "Outra coisa" },
+]
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
 import { PixQrDisplayModal } from "@/components/erp/payments/shared"
 import { toast } from "@/hooks/use-notification"
@@ -291,6 +301,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
     const [cancelModal, setCancelModal] = useState(false)
     const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+    const [cancelReason, setCancelReason] = useState<string>("")
+    const [cancelCustomReason, setCancelCustomReason] = useState<string>("")
     const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("annually")
 
     // Refund Modal State
@@ -518,7 +530,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
         setActionLoading("cancel")
 
         try {
-            const result = await cancelSubscriptionAction()
+            const selectedReasonLabel = CANCELLATION_REASONS.find(r => r.id === cancelReason)?.label || "Outra coisa"
+            const finalReason = cancelReason === "other"
+                ? (cancelCustomReason.trim() ? `Outra coisa: ${cancelCustomReason.trim()}` : "Outra coisa")
+                : (cancelCustomReason.trim() ? `${selectedReasonLabel} (${cancelCustomReason.trim()})` : selectedReasonLabel)
+
+            const result = await cancelSubscriptionAction({
+                reason: finalReason,
+                reasonCategory: cancelReason || "other",
+                feedback: cancelCustomReason.trim() || undefined,
+            })
 
             if (!result.success) {
                 toast.error(result.error)
@@ -528,6 +549,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
             toast.success(result.data?.message || "Assinatura cancelada com sucesso.")
             setCancelModal(false)
             setCancelConfirmOpen(false)
+            setCancelReason("")
+            setCancelCustomReason("")
             loadData()
         } catch {
             toast.error("Erro inesperado. Tente novamente.")
@@ -773,7 +796,11 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 showChevron={false}
                                             >
                                                 {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status !== "past_due" && (
-                                                    <DropdownItem onClick={() => setCancelModal(true)}>
+                                                    <DropdownItem onClick={() => {
+                                                        setCancelReason("")
+                                                        setCancelCustomReason("")
+                                                        setCancelModal(true)
+                                                    }}>
                                                         <CancelIcon size={18} /> Cancelar Plano
                                                     </DropdownItem>
                                                 )}
@@ -1110,21 +1137,68 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 <DefaultModal
                     isOpen={cancelModal}
                     onClose={() => {
-                        if (!actionLoading) setCancelModal(false)
+                        if (!actionLoading) {
+                            setCancelModal(false)
+                            setCancelReason("")
+                            setCancelCustomReason("")
+                        }
                     }}
                     title="Cancelar assinatura"
                 >
-                    <div className="space-y-5 py-2">
-                        <InfoCard
-                            title="Acesso garantido até o fim do ciclo"
-                            message={`Ao cancelar a renovação, você continuará com acesso total aos recursos do plano ${subData?.plan?.name || "atual"} até ${nextInvoiceDate ? formatDate(nextInvoiceDate) : "o fim do período pago"}. Nenhuma nova cobrança será realizada. Após essa data, sua conta migrará para o plano Grátis e produtos/serviços excedentes serão arquivados (nunca excluídos).`}
+                    <div className="space-y-4 py-1">
+                        <IconPlaceholder
+                            icon={CancelIcon}
+                            containerSize="w-16 h-16 bg-brand-red/10 dark:bg-brand-red/20 border border-brand-red/20 mb-2"
+                            iconSize="w-7 h-7 text-brand-red"
+                            title="Cancelar renovação do plano"
+                            subtitle={`Ao cancelar, você continuará com acesso total aos recursos do plano ${subData?.plan?.name || "atual"} até ${nextInvoiceDate ? formatDate(nextInvoiceDate) : "o fim do período pago"}. Nenhuma nova cobrança será realizada.`}
+                            titleClass="text-lg font-bold text-brand-dark dark:text-dark-heading text-center"
+                            subtitleClass="text-xs sm:text-sm text-brand-inactive-text dark:text-dark-body text-center max-w-md mx-auto"
                         />
 
-                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        {/* Opções de motivo */}
+                        <div className="space-y-2 text-left pt-2">
+                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">
+                                Qual o motivo do cancelamento?
+                            </span>
+                            <div className="space-y-0.5 bg-brand-gray/50 dark:bg-dark-border/20 p-2.5 sm:p-3 rounded-2xl border border-brand-border/60 dark:border-dark-border/60">
+                                {CANCELLATION_REASONS.map((opt) => (
+                                    <RadioButton
+                                        key={opt.id}
+                                        name="cancellation_reason"
+                                        value={opt.id}
+                                        checked={cancelReason === opt.id}
+                                        onChange={() => setCancelReason(opt.id)}
+                                        label={<span className="text-xs sm:text-sm text-brand-dark dark:text-dark-heading font-medium">{opt.label}</span>}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* FormTextBox / FormTextarea exibido quando "Outra coisa" for selecionada */}
+                        {cancelReason === "other" && (
+                            <div className="pt-1 text-left animate-in fade-in duration-200">
+                                <FormTextarea
+                                    label="Conte-nos o motivo (opcional)"
+                                    placeholder="Diga o que poderíamos ter feito melhor ou o motivo do cancelamento..."
+                                    value={cancelCustomReason}
+                                    onChange={(e) => setCancelCustomReason(e.target.value)}
+                                    rows={3}
+                                    maxLength={300}
+                                    showCharacterCount
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-3">
                             <Button
                                 variant="outline"
                                 className="flex-1 h-12"
-                                onClick={() => setCancelModal(false)}
+                                onClick={() => {
+                                    setCancelModal(false)
+                                    setCancelReason("")
+                                    setCancelCustomReason("")
+                                }}
                                 disabled={!!actionLoading}
                             >
                                 Manter meu plano
@@ -1136,9 +1210,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                     setCancelModal(false)
                                     setCancelConfirmOpen(true)
                                 }}
-                                disabled={!!actionLoading}
+                                disabled={!cancelReason || !!actionLoading}
                             >
-                                Cancelar renovação
+                                Continuar para cancelamento
                             </Button>
                         </div>
                     </div>
@@ -1147,10 +1221,12 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                 {/* ─── Cancel Subscription Confirmation (AlertModal) ────── */}
                 <AlertModal
                     isOpen={cancelConfirmOpen}
-                    onClose={() => setCancelConfirmOpen(false)}
+                    onClose={() => {
+                        if (!actionLoading) setCancelConfirmOpen(false)
+                    }}
                     onConfirm={handleCancel}
-                    title="Confirmar cancelamento"
-                    message="Tem certeza que deseja cancelar a renovação? Nenhuma nova cobrança será feita e você manterá o acesso total aos recursos do seu plano até o fim do ciclo vigente."
+                    title="Confirmar cancelamento da renovação"
+                    message={`Tem certeza que deseja cancelar a renovação? Nenhuma nova cobrança será feita e você manterá o acesso total aos recursos do seu plano até ${nextInvoiceDate ? formatDate(nextInvoiceDate) : "o fim do ciclo vigente"}.`}
                     variant="danger"
                     confirmText="Sim, cancelar renovação"
                     cancelText="Não, manter plano"
