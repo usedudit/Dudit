@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { resolveCityAndStateFromSlug } from '@/app/actions/marketplace/products'
-import { redirect, permanentRedirect } from 'next/navigation'
+import { redirect, permanentRedirect, notFound } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
 import { getCurrentUser } from '@/lib/auth/authorization'
 import { getUserSessionData } from '@/lib/data/user'
@@ -14,6 +14,13 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { cidadeUf } = await params
+
+    if (!isValidCitySlug(cidadeUf)) {
+        return {
+            title: "Página não encontrada | Dudit",
+            robots: { index: false, follow: false },
+        }
+    }
 
     const resolved = await resolveCityAndStateFromSlug(cidadeUf)
     const cityFormatted = resolved?.city || cidadeUf.split('-').slice(0, -1).join(' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -38,6 +45,10 @@ export default async function CityPage({ params }: Props) {
     const { cidadeUf } = await params
 
     if (!isValidCitySlug(cidadeUf)) {
+        if (cidadeUf.includes(".") || cidadeUf.length < 3) {
+            notFound()
+        }
+
         const cleanSearch = cidadeUf.replace(/-[a-z]{2}$/i, '')
 
         // Tenta obter localização do usuário

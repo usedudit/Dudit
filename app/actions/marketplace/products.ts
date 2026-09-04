@@ -455,6 +455,12 @@ function extractFirstVariantFallback(variants: any[] | null | undefined, basePri
 const cityResolveCache = new Map<string, { city: string; state: string } | null>()
 
 
+const BRAZIL_UFS = new Set([
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+  "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+  "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+])
+
 /**
  * Resolves a city-uf slug to capitalized/accented city name and state.
  * Queries unique addresses in the DB to match them. Fallback to formatting.
@@ -468,7 +474,10 @@ export async function resolveCityAndStateFromSlug(slug: string): Promise<{ city:
   const parts = slug.split("-")
   const state = parts.pop()?.toUpperCase()
   const citySlugWithoutState = parts.join("-")
-  if (!state) return null
+  if (!state || state.length !== 2 || !BRAZIL_UFS.has(state) || !citySlugWithoutState) {
+    cityResolveCache.set(slug, null)
+    return null
+  }
 
   const supabase = getAdminClient()
   const { data: addresses } = await supabase

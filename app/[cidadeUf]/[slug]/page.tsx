@@ -1,6 +1,6 @@
 import { cache } from "react"
 import type { Metadata } from 'next'
-import { redirect, permanentRedirect } from 'next/navigation'
+import { redirect, permanentRedirect, notFound } from 'next/navigation'
 import { isValidCitySlug } from '@/lib/validation/city'
 import { searchMarketplaceDirect } from '@/app/actions/marketplace/search'
 import ExplorarPage from '@/app/explorar/[[...slug]]/page'
@@ -42,6 +42,13 @@ const getStoreForPage = cache(async (slug: string, cidadeUf: string) => {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { cidadeUf, slug } = await params
 
+  if (!isValidCitySlug(cidadeUf) && cidadeUf.length !== 2) {
+    return {
+      title: "Página não encontrada | Dudit",
+      robots: { index: false, follow: false },
+    }
+  }
+
   const store = await getStoreForPage(slug, cidadeUf)
   if (store) {
     return generateStoreMetadata(store, cidadeUf)
@@ -82,6 +89,9 @@ export default async function CityTermPage({ params }: Props) {
   }
 
   if (!isValidCitySlug(cidadeUf)) {
+    if (cidadeUf.includes('.') || slug.includes('.')) {
+      notFound()
+    }
     redirect(`/explorar?q=${slug}`)
   }
 

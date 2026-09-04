@@ -20,6 +20,8 @@ import { cookies } from "next/headers"
 import { FALLBACK_CATEGORIES, CATEGORY_GRADIENTS, ESTADO_MAP } from "@/components/marketplace/explorar-constants"
 import { FormSection } from "@/components/reusable/FormSection"
 import { ListItem } from "@/components/reusable/ListItem"
+import { notFound } from "next/navigation"
+import { isValidCitySlug } from "@/lib/validation/city"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "alimentacao": "Alimentação",
@@ -33,6 +35,16 @@ const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "outros": "Outros"
 }
 
+function isValidLocationSlug(slug: string): boolean {
+    if (!slug) return false
+    if (slug === "brasil") return true
+    if (slug.startsWith("estado-")) {
+        const uf = slug.replace("estado-", "").toLowerCase()
+        return !!ESTADO_MAP[uf]
+    }
+    return isValidCitySlug(slug)
+}
+
 export async function generateMetadata({
     params,
 }: {
@@ -40,7 +52,28 @@ export async function generateMetadata({
 }): Promise<Metadata> {
     const resolvedParams = await params
     const slug = resolvedParams.slug || []
+    if (slug.length > 2) {
+        return {
+            title: "Página não encontrada | Dudit",
+            robots: { index: false, follow: false },
+        }
+    }
+
     const [location, category] = slug
+
+    if (location && !isValidLocationSlug(location)) {
+        return {
+            title: "Página não encontrada | Dudit",
+            robots: { index: false, follow: false },
+        }
+    }
+
+    if (category && !CATEGORY_SLUG_MAP[category]) {
+        return {
+            title: "Página não encontrada | Dudit",
+            robots: { index: false, follow: false },
+        }
+    }
 
     const categoryName = category ? (CATEGORY_SLUG_MAP[category] || category.replace(/-/g, " ")) : null
 
@@ -243,7 +276,19 @@ export default async function ExplorarPage({
     const resolvedSearchParams = await searchParams
 
     const routeSlugs = resolvedParams.slug || []
+    if (routeSlugs.length > 2) {
+        notFound()
+    }
+
     const routeFirstSlug = routeSlugs[0] || ""
+    if (routeFirstSlug && !isValidLocationSlug(routeFirstSlug)) {
+        notFound()
+    }
+
+    const routeCategorySlug = routeSlugs[1] || ""
+    if (routeCategorySlug && !CATEGORY_SLUG_MAP[routeCategorySlug]) {
+        notFound()
+    }
 
     const user = await getCurrentUser()
     const sessionData = user

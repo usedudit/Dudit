@@ -5,6 +5,7 @@ import { RateLimitCategory, getLimiter, RATE_LIMIT_CONFIGS } from "@/lib/rate-li
 import { isAllowedServerActionOrigin } from "@/lib/security/origin-validation"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { evaluateMaintenanceMode } from "@/lib/system/maintenance-guard"
+import { isBotSearch } from "@/lib/search/bot-detection"
 
 // ============================================================================
 // CONFIGURAÇÃO DE ROTAS
@@ -72,6 +73,28 @@ export async function middleware(request: NextRequest) {
     return maintenanceResponse
   }
 
+  // ─── 0.1 BLOQUEIO DE SCANNERS / PROBES DE ARQUIVOS SENSÍVEIS ──────────────
+  // Bloqueia bots que buscam arquivos de configuração/credenciais/dumps (.env, .json, .config, .yml, .tfstate, etc.)
+  // fora das rotas legítimas da API (/api/...) e arquivos estáticos públicos.
+  if (!pathname.startsWith("/api/")) {
+    const SUSPICIOUS_PROBE_REGEX = /\.(json|env|yml|yaml|config|properties|tfstate|tfvars|ini|sql|bak|git|php|asp|aspx|jsp|cgi|sh|bash|heapdump|action|axd)(\/.*)?$/i
+    const SUSPICIOUS_PATH_REGEX = /(\/|^)(\.env|\.git|\.well-known|actuator|heapdump|swagger|openapi|web\.config|credentials|service-account|terraform|wp-admin|wp-login|xmlrpc|phpinfo)/i
+
+    if (SUSPICIOUS_PROBE_REGEX.test(pathname) || SUSPICIOUS_PATH_REGEX.test(pathname)) {
+      const isAllowedProbe = pathname === "/manifest.webmanifest" || pathname === "/sitemap.xml" || pathname === "/robots.txt"
+      if (!isAllowedProbe) {
+        return new NextResponse("Not Found", {
+          status: 404,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=86400",
+            "X-Robots-Tag": "noindex, nofollow",
+          },
+        })
+      }
+    }
+  }
+
   // Remove hardcoded host overrides to prevent routing inconsistencies
   // request.headers.set("host", "dudit.com.br")
   // request.headers.set("x-forwarded-host", "dudit.com.br")
@@ -95,6 +118,17 @@ export async function middleware(request: NextRequest) {
         const match = slug.match(/-([a-z]{2})$/i);
         return match ? VALID_UFS.has(match[1].toLowerCase()) : false;
       };
+
+      if (isBotSearch(seg1) || (seg2 && isBotSearch(seg2))) {
+        return new NextResponse("Not Found", {
+          status: 404,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=86400",
+            "X-Robots-Tag": "noindex, nofollow",
+          },
+        });
+      }
 
       let redirectUrl = new URL('/explorar', request.url);
       let shouldRedirect = false;

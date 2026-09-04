@@ -30,6 +30,12 @@ export function isBotSearch(query: string): boolean {
         /\.tmp$/i,
         /\.log$/i,
         /\.config$/i,
+        /\.yml$/i,
+        /\.yaml$/i,
+        /\.tfstate$/i,
+        /\.tfvars$/i,
+        /\.properties$/i,
+        /\.ini$/i,
     ]
 
     // Specific scanner probe patterns
@@ -75,6 +81,13 @@ export function isBotSearch(query: string): boolean {
         "browserconfig.xml",
         "security.txt",
         "humans.txt",
+        "heapdump",
+        "actuator",
+        "swagger",
+        "openapi",
+        "credentials",
+        "service-account",
+        "terraform",
     ]
 
     // Check for file extensions

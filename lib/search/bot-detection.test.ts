@@ -8,6 +8,12 @@ describe("isBotSearch", () => {
         expect(isBotSearch(".env")).toBe(true)
         expect(isBotSearch("config.json")).toBe(true)
         expect(isBotSearch("dump.sql")).toBe(true)
+        expect(isBotSearch("swagger.json")).toBe(true)
+        expect(isBotSearch("credentials.json")).toBe(true)
+        expect(isBotSearch("terraform.tfstate")).toBe(true)
+        expect(isBotSearch("docker-compose.yml")).toBe(true)
+        expect(isBotSearch("aws-exports.js")).toBe(true)
+        expect(isBotSearch("application.properties")).toBe(true)
     })
 
     it("identifies known scanner probe strings", () => {
@@ -16,6 +22,10 @@ describe("isBotSearch", () => {
         expect(isBotSearch("xmlrpc")).toBe(true)
         expect(isBotSearch("/etc/passwd")).toBe(true)
         expect(isBotSearch("eval(")).toBe(true)
+        expect(isBotSearch("heapdump")).toBe(true)
+        expect(isBotSearch("swagger")).toBe(true)
+        expect(isBotSearch("credentials")).toBe(true)
+        expect(isBotSearch("web.config")).toBe(true)
     })
 
     it("identifies path-like queries with file extensions", () => {

@@ -663,6 +663,8 @@ export function routeToLegacyPermissions(routePerms: PartnerRoutePermissions): P
         services: mapRoute("services"),
         service_orders: {
             ...mapRoute("service_orders"),
+            can_assign_technician: hasSpecificPermission(routePerms, "service_orders", "can_assign_technician"),
+            can_change_status: hasSpecificPermission(routePerms, "service_orders", "can_change_status"),
             can_generate_invoice: hasSpecificPermission(routePerms, "service_orders", "can_generate_invoice"),
         },
         quotes: {
@@ -798,6 +800,8 @@ export function legacyToRoutePermissions(legacy: PartnerPermissions, role: Partn
             ...mapLegacy(legacy.service_orders),
             specific: {
                 ...(base.service_orders?.specific || {}),
+                can_assign_technician: legacy.service_orders.can_assign_technician ?? false,
+                can_change_status: legacy.service_orders.can_change_status ?? false,
                 can_generate_invoice: legacy.service_orders.can_generate_invoice ?? false,
             },
         })

@@ -118,11 +118,19 @@ export async function resolveCityCoordsFromSlug(cidadeSlug: string): Promise<{ l
     const state = parts.pop()?.toUpperCase() || ""
     const targetCitySlug = parts.join("-")
 
+    if (!state || state.length !== 2 || !targetCitySlug) {
+        cityCoordsCache.set(cidadeSlug, null)
+        return null
+    }
+
     const resolved = await resolveCityAndStateFromSlug(cidadeSlug)
     const dbCity = resolved?.city
     const dbState = resolved?.state || state
 
-    if (!dbCity) return null
+    if (!dbCity) {
+        cityCoordsCache.set(cidadeSlug, null)
+        return null
+    }
 
     const supabase = getAdminClient()
     const { data, error } = await supabase
