@@ -262,7 +262,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                             title="Evolução de Vendas"
                             legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
                         />
-                        <DashboardLineChart data={evoData} valueFormatter={v => brl(v)} />
+                        <DashboardLineChart data={evoData} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -293,7 +293,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader icon={ShoppingBagIcon} title="Itens Mais Vendidos" />
-                        <HorizontalBarRankingList items={combinedItems} colors={CHART_COLORS_VIVID} maxItems={5} valueFormatter={v => `${v} un`} />
+                        <HorizontalBarRankingList items={combinedItems} colors={CHART_COLORS_VIVID} maxItems={5} format="quantity" />
                     </div>
                 </div>
             </div>
@@ -308,7 +308,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                             totalValue={salesData.metrics.revenueFormatted}
                             totalLabel="Faturamento"
                             colors={CHART_COLORS_CATEGORY}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -425,7 +425,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                             totalValue={String(productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0)}
                             totalLabel="Produtos"
                             colors={CHART_COLORS_CATEGORY}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -440,7 +440,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                             title="Faturamento vs Devoluções"
                             legendItems={[{ label: "Vendido", color: "#059669" }, { label: "Devolvido", color: "#ef4444" }, { label: "Líquido", color: "#0284c7" }]}
                         />
-                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} valueFormatter={v => brl(v)} />
+                        <DashboardBarChart data={faturamentoData} colors={["#059669", "#ef4444", "#0284c7"]} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -562,7 +562,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                             totalValue={String(totalCategoryServices)}
                             totalLabel="Serviços"
                             colors={CHART_COLORS_CATEGORY}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -596,7 +596,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                         <HorizontalBarRankingList
                             items={(servicesData.serviceRows || []).slice(0, 5).map(s => ({ label: s.title, value: parseBrl(s.value) }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -630,7 +630,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
                         <HorizontalBarRankingList
                             items={(servicesData.serviceRows || []).slice(0, 5).map(s => ({ label: s.title, value: parseBrl(s.value) }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -919,7 +919,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                         <HorizontalBarRankingList
                             items={serviceOrdersData.assigneeRanking.slice(0, 5).map(a => ({ label: a.name, value: a.revenue }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -1014,7 +1014,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                             title="Fluxo de Caixa"
                             legendItems={[{ label: "Entradas", color: "#059669" }, { label: "Saídas", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} valueFormatter={v => brl(v)} />
+                        <DashboardLineChart data={cashflowData} colors={["#059669", "#ef4444"]} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1023,7 +1023,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                         <DashboardBarChart
                             data={expensesByDay}
                             colors={["#ef4444"]}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                             height="h-[260px]"
                         />
                     </div>
@@ -1089,7 +1089,7 @@ function FinancialSection({ financialData }: { financialData: FinancialDashboard
                         <DashboardBarChart
                             data={(financialData.expensesByCategory || []).slice(0, 6).map(e => ({ label: String(e.label), value: Number(e.value) }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                             height="h-[260px]"
                         />
                     </div>
@@ -1232,7 +1232,7 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
                         <HorizontalBarRankingList
                             items={customerData.topCustomers.slice(0, 5).map(c => ({ label: c.label, value: parseFloat(String(c.value || "0").replace(/[^\d,]/g, "").replace(",", ".")) || 0 }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -1341,7 +1341,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                             title="Evolução de Faturamento por Canal"
                             legendItems={[{ label: "Online", color: "#059669" }, { label: "Presencial", color: "#2563eb" }, { label: "Outros", color: "#f59e0b" }]}
                         />
-                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} valueFormatter={v => brl(v)} />
+                        <DashboardLineChart data={evoMultiLine} colors={["#059669", "#2563eb", "#f59e0b"]} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1352,7 +1352,7 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
                             totalValue={marketingData.totalRevenueFormatted}
                             totalLabel="Total"
                             colors={CHART_COLORS_CATEGORY}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>
@@ -1584,7 +1584,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
                         <HorizontalBarRankingList
                             items={productivityData.staffRanking.slice(0, 5).map(s => ({ label: s.label, value: s.revenue }))}
                             colors={CHART_COLORS_VIVID}
-                            valueFormatter={v => brl(v)}
+                            format="currency"
                         />
                     </div>
                 </div>

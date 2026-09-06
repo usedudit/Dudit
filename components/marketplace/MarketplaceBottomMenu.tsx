@@ -146,7 +146,7 @@ export function MarketplaceBottomMenu() {
         pathname.startsWith("/print") ||
         pathname.startsWith("/entregadores")
 
-    const homePath = citySlug && citySlug !== "brasil" ? `/${citySlug}` : "/"
+    const homePath = "/"
     const explorePath = citySlug && citySlug !== "brasil" ? `/explorar/${citySlug}` : "/explorar/brasil"
 
     const isCollectionDetailOwner = !!collectionMenu?.isOwner && pathname?.startsWith("/colecoes/")

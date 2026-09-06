@@ -53,15 +53,22 @@ BEGIN
     ), 0)
     WHERE id = v_store_id;
   ELSE
-    -- Avaliação de nível do parceiro → atualiza todas as stores do parceiro
+    -- Avaliação de nível do parceiro → atualiza stores que NÃO têm reviews próprias
+    -- (stores com reviews próprias mantêm seu rating individual)
     UPDATE stores
     SET rating = COALESCE((
-      SELECT AVG(r.rating)
+      SELECT CASE WHEN COUNT(r.rating) >= 3 THEN AVG(r.rating) ELSE 0 END
       FROM reviews r
-      WHERE r.partner_id = v_partner_id
+      WHERE r.store_id IS NULL
+        AND r.partner_id = v_partner_id
         AND r.rating IS NOT NULL
     ), 0)
-    WHERE partner_id = v_partner_id;
+    WHERE partner_id = v_partner_id
+      AND NOT EXISTS (
+        SELECT 1 FROM reviews r
+        WHERE r.store_id = stores.id
+          AND r.rating IS NOT NULL
+      );
   END IF;
 
   -- Manter o rating do produto em sincronia
@@ -125,13 +132,21 @@ BEGIN
     SET rating = new_rating
     WHERE id = v_store_id;
   ELSE
-    SELECT COALESCE(AVG(rating), 0) INTO new_rating
-    FROM reviews
-    WHERE partner_id = v_partner_id;
+    -- Avaliação de nível do parceiro → atualiza apenas stores sem reviews próprias
+    SELECT COALESCE(
+      (SELECT CASE WHEN COUNT(rating) >= 3 THEN AVG(rating) ELSE 0 END
+       FROM reviews
+       WHERE store_id IS NULL AND partner_id = v_partner_id),
+      0
+    ) INTO new_rating;
 
     UPDATE stores
     SET rating = new_rating
-    WHERE partner_id = v_partner_id;
+    WHERE partner_id = v_partner_id
+      AND NOT EXISTS (
+        SELECT 1 FROM reviews
+        WHERE store_id = stores.id AND rating IS NOT NULL
+      );
   END IF;
 
   RETURN COALESCE(NEW, OLD);

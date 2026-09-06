@@ -840,19 +840,19 @@ async function saveQuoteSnapshot(supabase: any, quoteId: string, partnerId: stri
 
     // 2. Fetch partner, store and address details
     const [partnerRes, storeRes, addressRes] = await Promise.all([
-        supabase.from("partners").select("id, user_id, name, store_name, logo_url, store_image_url, phone, address").eq("id", partnerId).maybeSingle(),
+        supabase.from("partners").select("id, user_id").eq("id", partnerId).maybeSingle(),
         quote.store_id
-            ? supabase.from("stores").select("id, name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
-            : supabase.from("stores").select("id, name, logo_url, image_url, phone").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
+            ? supabase.from("stores").select("id, name, logo_url, phone").eq("id", quote.store_id).maybeSingle()
+            : supabase.from("stores").select("id, name, logo_url, phone").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
         getPartnerAddressAction(partnerId, quote.store_id || undefined)
     ])
     const partner = partnerRes.data
     const store = storeRes.data
 
-    const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || partner?.address || "Endereço não cadastrado"
-    const resolvedPartnerName = store?.name || partner?.store_name || partner?.name || "Parceiro"
-    const resolvedPartnerLogo = store?.logo_url || store?.image_url || partner?.logo_url || partner?.store_image_url || null
-    const resolvedPartnerPhone = store?.phone || partner?.phone || null
+    const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || "Endereço não cadastrado"
+    const resolvedPartnerName = store?.name || "Parceiro"
+    const resolvedPartnerLogo = store?.logo_url || null
+    const resolvedPartnerPhone = store?.phone || null
 
     let partnerEmail = null
     if (partner?.user_id) {
@@ -2360,8 +2360,11 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                         id, name, email, phone,
                         addresses (*)
                     ),
+                    stores!left (
+                        id, name, logo_url, phone
+                    ),
                     partners (
-                        id, user_id, name, store_name, logo_url, store_image_url, phone, address
+                        id, user_id
                     )
                 `)
                 .eq("public_token", cleanToken)
@@ -2543,23 +2546,25 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
             })
 
             // 6. Fetch store, partner and address details with full fallbacks
-            const [storeRes, partnerRes, addressRes] = await Promise.all([
-                quote.store_id
-                    ? admin.from("stores").select("id, name, logo_url, image_url, phone").eq("id", quote.store_id).maybeSingle()
-                    : admin.from("stores").select("id, name, logo_url, image_url, phone").eq("partner_id", quote.partner_id).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-                admin.from("partners").select("id, user_id, name, store_name, logo_url, store_image_url, phone, address").eq("id", quote.partner_id).maybeSingle(),
-                getPartnerAddressAction(quote.partner_id, quote.store_id || undefined)
-            ])
+            let store = quote.stores ? (Array.isArray(quote.stores) ? quote.stores[0] : quote.stores) : null
+            if (!store) {
+                const storeQuery = quote.store_id
+                    ? admin.from("stores").select("id, name, logo_url, phone").eq("id", quote.store_id).maybeSingle()
+                    : admin.from("stores").select("id, name, logo_url, phone").eq("partner_id", quote.partner_id).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
+                const { data: storeFallback } = await storeQuery
+                store = storeFallback
+            }
 
-            const store = storeRes.data
-            const partnerRow = partnerRes.data || (Array.isArray(quote.partners) ? quote.partners[0] : quote.partners)
-            const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || partnerRow?.address || "Endereço não cadastrado"
-            const resolvedPartnerName = store?.name || partnerRow?.store_name || partnerRow?.name || "Parceiro"
-            const resolvedPartnerLogo = store?.logo_url || store?.image_url || partnerRow?.logo_url || partnerRow?.store_image_url || null
-            const resolvedPartnerPhone = store?.phone || partnerRow?.phone || null
+            const addressRes = await getPartnerAddressAction(quote.partner_id, quote.store_id || store?.id || undefined)
 
+            const partnerAddressFormatted = (addressRes.success && addressRes.data?.formatted) || "Endereço não cadastrado"
+            const resolvedPartnerName = store?.name || "Parceiro"
+            const resolvedPartnerLogo = store?.logo_url || null
+            const resolvedPartnerPhone = store?.phone || null
+
+            const partnerRow = Array.isArray(quote.partners) ? quote.partners[0] : quote.partners
             let partnerEmail = null
-            const partnerOwnerId = partnerRow?.user_id || (Array.isArray(quote.partners) ? quote.partners[0]?.user_id : quote.partners?.user_id)
+            const partnerOwnerId = partnerRow?.user_id
             if (partnerOwnerId) {
                 try {
                     const { data: authData } = await admin.auth.admin.getUserById(partnerOwnerId)
@@ -2690,9 +2695,9 @@ export async function getPublicQuoteAction(publicToken: string, ip?: string, use
                     partners: {
                         id: quote.partner_id,
                         name: resolvedPartnerName,
-                        store_name: partnerRow?.store_name || null,
+                        store_name: resolvedPartnerName,
                         logo_url: resolvedPartnerLogo,
-                        store_image_url: partnerRow?.store_image_url || null,
+                        store_image_url: resolvedPartnerLogo,
                         phone: resolvedPartnerPhone,
                         address: partnerAddressFormatted,
                         plan_tier: planTier,

@@ -409,21 +409,21 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
-                                          onEdit={handleEditClick}
-                                          onStatus={() => setShowStatusModal(true)}
-                                          onShare={async () => {
-                                            if (!hasMinimumPlan(planSlug, "crescer")) {
-                                              openPlanUpgrade("crescer");
-                                              return
-                                            }
-                                            const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
-                                            const token = await ensurePublicTokenAction(partnerId, order.id)
-                                            if (token) {
-                                              setOrder((prev: any) => ({ ...prev, public_token: token }))
-                                            }
-                                            setShowShareModal(true);
-                                          }}
-                                          onDelete={() => setConfirmDelete(true)}
+                                            onEdit={handleEditClick}
+                                            onStatus={() => setShowStatusModal(true)}
+                                            onShare={async () => {
+                                                if (!hasMinimumPlan(planSlug, "crescer")) {
+                                                    openPlanUpgrade("crescer");
+                                                    return
+                                                }
+                                                const { ensurePublicTokenAction } = await import("@/app/actions/erp/service-orders")
+                                                const token = await ensurePublicTokenAction(partnerId, order.id)
+                                                if (token) {
+                                                    setOrder((prev: any) => ({ ...prev, public_token: token }))
+                                                }
+                                                setShowShareModal(true);
+                                            }}
+                                            onDelete={() => setConfirmDelete(true)}
                                         />
                                     </div>
                                 </div>
@@ -777,7 +777,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         <div className="space-y-3">
                                                             <Button
                                                                 variant="outline"
-                                                                className="w-full text-xs font-semibold justify-center py-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30"
+                                                                className="w-full"
                                                                 onClick={() => {
                                                                     const text = `Olá! Segue o link para visualizar e assinar a Ordem de Serviço *#${order.order_number}*:\n\n${window.location.origin}/os/${order.public_token}\n\n*Código de Assinatura:* ${order.metadata?.plain_code || "Enviado por aqui"}`;
                                                                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");

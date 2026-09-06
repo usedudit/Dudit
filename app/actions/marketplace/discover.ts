@@ -147,7 +147,7 @@ function sectionDisplay(
     const MAP: Record<string, Record<string, [string, string]>> = {
         trending: {
             country: ["Produtos na Dudit", "Encontre produtos de vendedores locais"],
-            state: [`Produtos no ${stateName}`, `Encontre produtos disponíveis no ${stateName}`],
+            state: [`Produtos em ${stateName}`, `Encontre produtos disponíveis em ${stateName}`],
             city: [`Produtos em ${cityName}`, `Encontre produtos de vendedores perto de você`],
         },
         endingSoon: {
@@ -162,7 +162,7 @@ function sectionDisplay(
         },
         recent: {
             country: ["Recém anunciados", "Acabaram de chegar na Dudit"],
-            state: [`Recém anunciados no ${stateName}`, `Acabaram de chegar no ${stateName}`],
+            state: [`Recém anunciados em ${stateName}`, `Acabaram de chegar em ${stateName}`],
             city: [`Recém anunciados em ${cityName}`, `Acabaram de chegar em ${cityName}`],
         },
         gems: {
@@ -177,7 +177,7 @@ function sectionDisplay(
         },
         bestSellers: {
             country: ["Mais vendidos", "Os produtos mais vendidos da Dudit"],
-            state: [`Mais vendidos no ${stateName}`, `Os mais vendidos no ${stateName}`],
+            state: [`Mais vendidos em ${stateName}`, `Os mais vendidos em ${stateName}`],
             city: [`Mais vendidos em ${cityName}`, `Os mais vendidos em ${cityName}`],
         },
         topRated: {
@@ -197,17 +197,17 @@ function sectionDisplay(
         },
         services: {
             country: ["Serviços e profissionais", "Encontre os melhores serviços para o seu dia a dia"],
-            state: [`Serviços no ${stateName}`, `Profissionais e serviços disponíveis no ${stateName}`],
+            state: [`Serviços em ${stateName}`, `Profissionais e serviços disponíveis em ${stateName}`],
             city: [`Serviços em ${cityName}`, `Profissionais e serviços perto de você`],
         },
         topVitrines: {
             country: ["Lojas e vitrines locais", "Conheça negócios e lojas para você visitar"],
-            state: [`Lojas e vitrines do ${stateName}`, `Conheça negócios e lojas no ${stateName}`],
+            state: [`Lojas e vitrines em ${stateName}`, `Conheça negócios e lojas em ${stateName}`],
             city: [`Lojas e vitrines em ${cityName}`, `Descubra lojas e negócios perto de você`],
         },
         popular: {
             country: ["Populares na Dudit", "O que está bombando por aqui"],
-            state: [`Populares no ${stateName}`, `O que está bombando no ${stateName}`],
+            state: [`Populares em ${stateName}`, `O que está bombando em ${stateName}`],
             city: [`Populares em ${cityName}`, `O que está bombando em ${cityName}`],
         },
     }
@@ -1426,9 +1426,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
     }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
 
     const displayScope = determineDisplayScope(tagged, ctx)
-    // Without coords, never show "próximos" (city-level implies proximity)
-    const titleScope = !ctx.coords && displayScope === "city" ? "state" : displayScope
-    const display = sectionDisplay("services", ctx, titleScope)
+    const display = sectionDisplay("services", ctx, displayScope)
 
     const scoped = filterByScope(tagged, displayScope)
     if (scoped.length === 0) {

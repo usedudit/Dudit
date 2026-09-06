@@ -18,11 +18,8 @@ export function SkeletonLoader({
     return (
         <div
             className={cn(
-                "relative overflow-hidden bg-brand-border/40 dark:bg-dark-border/40",
-                "before:absolute before:inset-0",
-                "before:animate-shimmer",
-                "before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent",
-                circle ? "rounded-full" : "rounded-xl",
+                "bg-gray-200 dark:bg-dark-border animate-pulse",
+                circle ? "rounded-full" : "rounded-md",
                 className
             )}
             style={{

@@ -260,6 +260,7 @@ export async function createServiceAction(data: any): Promise<ActionResponse<any
             warranty: data.warranty || null,
             technical_details: data.technical_details || data.technicalDetails || null,
             resources: data.resources || [],
+            assigned_staff: data.assigned_staff || { all: true, staff_ids: [] },
             status: (data.isActive !== false && data.is_active !== false) ? "ativo" : "inativo",
             fulfillment_modes: Array.isArray(data.fulfillment_modes)
                 ? data.fulfillment_modes
@@ -387,6 +388,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         if (data.technical_details !== undefined) payload.technical_details = data.technical_details
         if (data.technicalDetails !== undefined) payload.technical_details = data.technicalDetails
         if (data.resources !== undefined) payload.resources = data.resources
+        if (data.assigned_staff !== undefined) payload.assigned_staff = data.assigned_staff
         if (data.isActive !== undefined) {
             payload.status = data.isActive ? "ativo" : "inativo"
         }

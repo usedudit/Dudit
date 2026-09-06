@@ -41,14 +41,15 @@ export async function getMarketplaceCategoriesClient(parentId: string | null = n
 /**
  * Client-side fetcher for full category path.
  */
-export async function getCategoryPathClient(categoryId: string) {
+export async function getCategoryPathClient(categoryId: string, type: "product" | "service" = "product") {
   const supabase = createClient()
+  const tableName = type === "service" ? "marketplace_service_categories" : "marketplace_product_categories"
   const path = []
   let currentId: string | null = categoryId
 
   while (currentId && !currentId.startsWith("auto-")) {
     const { data, error }: { data: any; error: any } = await supabase
-      .from("marketplace_product_categories")
+      .from(tableName)
       .select("id, name, parent_id")
       .eq("id", currentId)
       .single()

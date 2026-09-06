@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { validateCronRequest, acquireExecutionLock, releaseExecutionLock, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getLimiter, RateLimitCategory } from "@/lib/rate-limiter"
+import { processWhatsappMessageById } from "@/lib/services/whatsapp-dispatch.service"
 
 const JOB_NAME = "process-pending-automations"
 const BATCH_SIZE = 100
@@ -17,7 +18,9 @@ const BATCH_SIZE = 100
  * 3. Acquire idempotency lock
  * 4. Claim pending messages from DB (atomically sets status to 'processing')
  * 5. Enqueue each to Trigger.dev "whatsapp-send-message"
- * 6. Return quickly
+ * 6. Fallback: If Trigger.dev is unavailable/unconfigured or fails to enqueue,
+ *    execute processWhatsappMessageById directly in Next.js.
+ * 7. Return summary
  */
 export async function POST(req: Request) {
   const startTime = Date.now()
@@ -76,7 +79,7 @@ export async function POST(req: Request) {
     if (messages.length === 0) {
       const durationMs = Date.now() - startTime
       cronLogger.success(JOB_NAME, { enqueued: 0, message: "No pending messages" }, durationMs)
-      return NextResponse.json({ success: true, enqueued: 0, failed: 0 })
+      return NextResponse.json({ success: true, enqueued: 0, failed: 0, executedDirectly: 0 })
     }
 
     // 5. Enqueue each to Trigger.dev with correlation context
@@ -98,14 +101,45 @@ export async function POST(req: Request) {
       JOB_NAME,
     )
 
-    // Reset failed-to-enqueue messages back to pending
-    if (result.failed > 0) {
-      const failedMessages = messages.slice(result.enqueued)
-      for (const msg of failedMessages) {
-        await admin
-          .from("whatsapp_messages")
-          .update({ status: "pending" })
-          .eq("id", String(msg.id))
+    let executedDirectly = 0
+    let executionFailed = 0
+
+    // 6. Resilient Fallback: If Trigger.dev failed to enqueue (e.g. quota limit, unavailable, or unconfigured),
+    // execute processWhatsappMessageById directly inside Next.js instead of dropping or perpetually retrying.
+    if (result.failed > 0 && result.failedIndices.length > 0) {
+      const failedMessages = result.failedIndices.map((idx) => messages[idx])
+      cronLogger.warn(JOB_NAME, `Trigger.dev enqueue failed for ${failedMessages.length} messages - executing direct fallback`, {
+        count: failedMessages.length,
+      })
+
+      // Process in small batches of 5 to protect WhatsApp API from sudden bursts
+      const CHUNK_SIZE = 5
+      for (let i = 0; i < failedMessages.length; i += CHUNK_SIZE) {
+        const chunk = failedMessages.slice(i, i + CHUNK_SIZE)
+        const settleResults = await Promise.allSettled(
+          chunk.map(async (msg) => {
+            await processWhatsappMessageById(String(msg.id))
+          })
+        )
+
+        for (let j = 0; j < settleResults.length; j++) {
+          const res = settleResults[j]
+          const msg = chunk[j]
+          if (res.status === "fulfilled") {
+            executedDirectly++
+          } else {
+            executionFailed++
+            cronLogger.error(JOB_NAME, "Direct fallback execution failed for message", {
+              messageId: String(msg.id),
+              error: res.reason instanceof Error ? res.reason.message : String(res.reason),
+            })
+            // Reset to pending so future sweeps can retry
+            await admin
+              .from("whatsapp_messages")
+              .update({ status: "pending" })
+              .eq("id", String(msg.id))
+          }
+        }
       }
     }
 
@@ -113,14 +147,16 @@ export async function POST(req: Request) {
     cronLogger.success(JOB_NAME, {
       claimed: messages.length,
       enqueued: result.enqueued,
-      failed: result.failed,
+      executedDirectly,
+      executionFailed,
     }, durationMs)
 
     return NextResponse.json({
       success: true,
       claimed: messages.length,
       enqueued: result.enqueued,
-      failed: result.failed,
+      executedDirectly,
+      failed: executionFailed,
       durationMs,
     })
   } catch (error: unknown) {

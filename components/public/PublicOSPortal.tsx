@@ -113,6 +113,8 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         return !!(currentUser && customerEmail && currentUser.email?.toLowerCase() === customerEmail.toLowerCase())
     }, [currentUser, customerEmail])
 
+    const isDirectSigner = Boolean(order?.can_direct_sign || isClientEmailMatched)
+
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const buildImageUrl = (key: string) => {
         if (!key) return ""
@@ -264,7 +266,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
     // ─── ONLINE SIGNING FLOW ─────────────────────────────────────────────────
     const handleSignOS = async () => {
         const canvas = canvasRef.current
-        if (!canvas || (!isClientEmailMatched && signatureCode.length < 4)) return
+        if (!canvas || (!isDirectSigner && signatureCode.length < 4)) return
 
         setIsProcessingSignature(true)
         setErrorMessage(null)
@@ -303,7 +305,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
             const signRes = await signPublicServiceOrderAction(
                 token,
                 "Cliente",
-                (isClientEmailMatched || !!currentUser) ? "" : signatureCode,
+                isDirectSigner ? "" : signatureCode,
                 urlRes.key,
                 ip,
                 userAgent
@@ -322,6 +324,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                     setProducts(refreshRes.data.products)
                     setAttachments(refreshRes.data.attachments)
                     setHistory(refreshRes.data.history)
+                    setSale(refreshRes.data.sale)
                 }
             } else {
                 setSignModalError(signRes.error || "Erro ao verificar código e assinar.")
@@ -724,7 +727,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             </Button>
                             <Button
                                 onClick={handleSignOS}
-                                disabled={(!isClientEmailMatched && !currentUser && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
+                                disabled={(!isDirectSigner && signatureCode.length < 4) || !hasCanvasContent || isProcessingSignature}
                                 className="flex-1 bg-brand-green hover:bg-brand-green/90 text-white font-bold py-2.5 h-auto border-none"
                             >
                                 {isProcessingSignature ? "Assinando..." : "Confirmar Assinatura"}
@@ -737,13 +740,13 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                             <InfoCard message={signModalError} color="red" />
                         )}
 
-                        <InfoCard color="blue" message={currentUser
-                            ? `Você está conectado como ${maskEmail(currentUser.email)} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
+                        <InfoCard color="blue" message={isDirectSigner
+                            ? `Você está conectado como ${maskEmail(currentUser?.email || "usuário autorizado")} e pode assinar esta ordem de serviço diretamente. Desenhe sua assinatura abaixo.`
                             : "Preencha o campo de código e desenhe sua assinatura no quadro. O código de assinatura de 4 dígitos foi gerado pelo profissional responsável pela OS."
                         } />
 
                         <div className="space-y-3">
-                            {!currentUser && (
+                            {!isDirectSigner && (
                                 <Input
                                     label="Código de assinatura (4 dígitos)"
                                     maxLength={4}

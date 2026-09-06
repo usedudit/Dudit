@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import { StarIcon, FlagIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { ReportModal } from "./ReportModal"
 import { IconPlaceholder } from "@/components/reusable"
+import Pagination from "@/components/reusable/Pagination"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { formatQuantityWithUnit } from "@/lib/utils/formatters"
 
@@ -71,10 +72,11 @@ function getVariantLabel(v: any): string | null {
     return null
 }
 
+const REVIEWS_PER_PAGE = 10
+
 export function ReviewsSection({ reviews, showItemInfo = false, className = "" }: ReviewsSectionProps) {
     const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null)
-    const [visibleCount, setVisibleCount] = useState(20)
-    const sentinelRef = useRef<HTMLDivElement>(null)
+    const [currentPage, setCurrentPage] = useState(1)
 
     const avgRating = reviews.length > 0
         ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
@@ -85,33 +87,12 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
         count: reviews.filter(r => r.rating === star).length
     }))
 
+    const totalPages = Math.max(1, Math.ceil(reviews.length / REVIEWS_PER_PAGE))
+
     const displayedReviews = useMemo(() => {
-        return reviews.slice(0, visibleCount)
-    }, [reviews, visibleCount])
-
-    const hasMore = reviews.length > visibleCount
-
-    useEffect(() => {
-        if (!hasMore) return
-
-        const observer = new IntersectionObserver((entries) => {
-            const first = entries[0]
-            if (first.isIntersecting) {
-                setVisibleCount(prev => Math.min(prev + 20, reviews.length))
-            }
-        }, { rootMargin: "200px" })
-
-        const currentSentinel = sentinelRef.current
-        if (currentSentinel) {
-            observer.observe(currentSentinel)
-        }
-
-        return () => {
-            if (currentSentinel) {
-                observer.unobserve(currentSentinel)
-            }
-        }
-    }, [hasMore, reviews.length])
+        const start = (currentPage - 1) * REVIEWS_PER_PAGE
+        return reviews.slice(start, start + REVIEWS_PER_PAGE)
+    }, [reviews, currentPage])
 
     if (reviews.length === 0) {
         return (
@@ -241,10 +222,12 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                 })}
             </div>
 
-            {hasMore && (
-                <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
-                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">Carregando mais avaliações...</span>
-                </div>
+            {totalPages > 1 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
             )}
 
             {reportTarget && (

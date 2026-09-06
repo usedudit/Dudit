@@ -553,29 +553,20 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
     if (!nextSlug) return null;
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                <SparklesIcon className="w-5 h-5 text-brand-green" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Teste grátis
-                    </span>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        {descriptions[nextSlug]}
-                    </p>
-                </div>
-            </div>
-            <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full text-xs font-bold px-4 shrink-0 text-brand-green border-brand-green hover:bg-brand-green-light/30"
-                onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
-            >
-                ativar plano
-            </Button>
-        </div>
+        <ListItem
+            title="Teste grátis"
+            description={descriptions[nextSlug]}
+            icon={<SparklesIcon className="text-brand-green w-5 h-5 shrink-0" />}
+            className="px-4 py-3"
+            right={
+                <Button
+                    size="sm"
+                    onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
+                >
+                    Ativar plano
+                </Button>
+            }
+        />
     );
 }
 
@@ -621,6 +612,20 @@ function ModeCard({
     if (isDesapego) {
         return (
             <>
+                <ListItem
+                    title="Evoluir negócio"
+                    description="Ative o modo Quick, ideal para pequenos comércios com vendas presenciais."
+                    icon={<SparklesIcon className="text-brand-green w-5 h-5 shrink-0" />}
+                    className="px-4 py-3"
+                    right={
+                        <Button
+                            size="sm"
+                            onClick={() => setModalOpen(true)}
+                        >
+                            Evoluir
+                        </Button>
+                    }
+                />
                 <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                         <RocketIcon size={20} className="text-brand-green" />
@@ -794,29 +799,15 @@ function TipsCard({ mode }: { mode?: string }) {
     const currentTip = tipsList[tipIdx] || tipsList[0];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                <SparklesIcon size={20} className="text-brand-green" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Dica {tipIdx + 1}/{tipsList.length}
-                    </span>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        {currentTip}
-                    </p>
-                </div>
-            </div>
-            <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1 text-brand-green font-bold text-xs shrink-0"
-                onClick={() => setTipIdx((prev) => (prev + 1) % tipsList.length)}
-            >
-                Próxima <ChevronRightIcon size={14} />
-            </Button>
-        </div>
+        <ListItem
+            title="Dica"
+            description={currentTip}
+            icon={<SparklesIcon className="text-brand-green w-5 h-5 shrink-0" />}
+            className="px-4 py-3"
+            right={
+                <ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />
+            }
+        />
     );
 }
 
@@ -826,24 +817,16 @@ function TipsCard({ mode }: { mode?: string }) {
 
 function FeedbackCard({ onOpen }: { onOpen: () => void }) {
     return (
-        <div
-            className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-brand-green/40 dark:hover:border-brand-green/30 transition-colors"
+        <ListItem
+            title="Feedback"
+            description="Conte como está sendo sua experiência na Dudit e nos ajude a evoluir a plataforma."
+            icon={<MessageSquare size={20} className="text-brand-green" />}
+            className="px-4 py-3"
+            right={
+                <ChevronRightIcon className="text-brand-inactive-text w-5 h-5 shrink-0" />
+            }
             onClick={onOpen}
-        >
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                <MessageSquare size={20} className="text-brand-green" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Feedback
-                    </span>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        Conte como está sendo sua experiência na Dudit e nos ajude a evoluir a plataforma.
-                    </p>
-                </div>
-            </div>
-        </div>
+        />
     );
 }
 

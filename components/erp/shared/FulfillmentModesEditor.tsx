@@ -36,9 +36,9 @@ export function FulfillmentModesEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{label}</p>
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         {allowedModes.map((mode) => (
           <Checkbox
             key={mode}

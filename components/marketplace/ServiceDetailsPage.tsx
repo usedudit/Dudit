@@ -1220,8 +1220,8 @@ export function ServiceDetailsPageClient({
                             <button
                                 key={member.id}
                                 onClick={() => setSelectedStaffId(member.id)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all ${selectedStaffId === member.id
-                                    ? "border-brand-green bg-green-50 text-brand-green"
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-bold transition-all ${selectedStaffId === member.id
+                                    ? "border-brand-green bg-green-50 dark:bg-dark-border/50 text-brand-green"
                                     : "border-brand-border text-brand-dark dark:text-dark-heading hover:border-gray-300 dark:hover:border-dark-border bg-white dark:bg-dark-surface"
                                     }`}
                             >
@@ -2163,35 +2163,32 @@ export function ServiceDetailsPageClient({
                                             </div>
                                         </div>
 
-                                        {/* Desktop Next Button */}
-                                        <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                        {/* Desktop Next Button + Actions Column */}
+                                        <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
+                                            {(() => {
+                                                const isFavService = isFav(service.id, "servico")
+                                                return (
+                                                    <Button variant="outline" size="icon" className="w-10 h-10"
+                                                        onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                                                        title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                                        <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                                    </Button>
+                                                )
+                                            })()}
+
+                                            <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                                                <ShareIcon size={18} className="text-brand-green" />
+                                            </Button>
+                                            <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
+                                                <PlusIcon size={18} className="text-brand-green" />
+                                            </Button>
+
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                     <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                                                 </Button>
                                             )}
                                         </div>
-                                    </div>
-
-                                    {/* Desktop Right Column (Actions) - top aligned, same X axis as Next button */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center pt-1">
-                                        {(() => {
-                                            const isFavService = isFav(service.id, "servico")
-                                            return (
-                                                <Button variant="outline" size="icon" className="w-10 h-10"
-                                                    onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
-                                                    title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                                                    <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                                                </Button>
-                                            )
-                                        })()}
-
-                                        <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
-                                            <ShareIcon size={18} className="text-brand-green" />
-                                        </Button>
-                                        <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
-                                            <PlusIcon size={18} className="text-brand-green" />
-                                        </Button>
                                     </div>
                                 </div>
                             </div>

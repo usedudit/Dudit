@@ -99,7 +99,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             setOfficialCategoryPath("")
             return
         }
-        getCategoryPathClient(id).then((path) => {
+        getCategoryPathClient(id, "service").then((path) => {
             if (!alive) return
             setOfficialCategoryPath(path || "")
         })
@@ -158,33 +158,35 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 {/* ESQUERDA (Principal) */}
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* Imagens do Serviço no Topo */}
-                    <div className="mb-8">
-                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                            {images && images.length > 0 ? (
-                                images.map((img, index) => (
-                                    <div
-                                        key={index}
-                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
-                                    >
-                                        <img
-                                            src={getImageSrc(img)}
-                                            alt={`${serviceData.name || "Serviço"} ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                        />
-                                        {index === 0 && (
-                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
-                                                Principal
-                                            </div>
-                                        )}
+                    {!isDesapego && (
+                        <div className="mb-8">
+                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                                {images && images.length > 0 ? (
+                                    images.map((img, index) => (
+                                        <div
+                                            key={index}
+                                            className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                        >
+                                            <img
+                                                src={getImageSrc(img)}
+                                                alt={`${serviceData.name || "Serviço"} ${index + 1}`}
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                            {index === 0 && (
+                                                <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                                                    Principal
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                        Sem imagens
                                     </div>
-                                ))
-                            ) : (
-                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
-                                    Sem imagens
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Informações Básicas */}
                     <FormSection title="Informações Básicas" className="mb-8">
@@ -341,24 +343,26 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                 {/* DIREITA (SidebarCard) */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip title="Organização">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{serviceData.sku || "-"}</span>
-                            </div>
+                    {!isDesapego && (
+                        <SidebarCard hasTopStrip title="Organização">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{serviceData.sku || "-"}</span>
+                                </div>
 
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
-                            </div>
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
+                                </div>
 
-                            <div className="flex justify-between items-center py-2">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
+                                <div className="flex justify-between items-center py-2">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
+                                </div>
                             </div>
-                        </div>
-                    </SidebarCard>
+                        </SidebarCard>
+                    )}
 
                     {isQuickMode && officialCategoryPath && (
                         <SidebarCard title="Categoria oficial">
@@ -386,9 +390,11 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações básicas" className="mb-8">
-                    <div className="mb-10">
-                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
-                    </div>
+                    {!isDesapego && (
+                        <div className="mb-10">
+                            <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
+                        </div>
+                    )}
 
                     <div className="space-y-6">
                         <div className="grid grid-cols-12 gap-6">
@@ -451,13 +457,15 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 />
                             </div>
 
-                            <FulfillmentModesEditor
-                                label="Formas de atendimento (vitrine)"
-                                allowedModes={["on_site", "customer_location"]}
-                                value={(serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]}
-                                onChange={(modes) => manualChange("fulfillment_modes", modes)}
-                                disabled={!isEditing}
-                            />
+                            <div className="col-span-12">
+                                <FulfillmentModesEditor
+                                    label="Formas de atendimento (vitrine)"
+                                    allowedModes={["on_site", "customer_location"]}
+                                    value={(serviceData.fulfillment_modes || ["on_site"]) as FulfillmentMode[]}
+                                    onChange={(modes) => manualChange("fulfillment_modes", modes)}
+                                    disabled={!isEditing}
+                                />
+                            </div>
                         </div>
                     </div>
                 </FormSection>
@@ -657,102 +665,97 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
             {/* DIREITA (Widgets) */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                <SidebarCard hasTopStrip title="Organização">
-                    <div className="space-y-5">
-                        <Input
-                            label="Código do Serviço (SKU)"
-                            name="sku"
-                            value={serviceData.sku}
-                            onChange={handleFieldChange}
-                            disabled={!isEditing}
-                            suffix={
-                                <div
-                                    onClick={generateRandomCode}
-                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                >
-                                    <DiceIcon size={20} />
-                                </div>
-                            }
-                        />
+                {!isDesapego && (
+                    <SidebarCard hasTopStrip title="Organização">
+                        <div className="space-y-5">
+                            <Input
+                                label="Código do Serviço (SKU)"
+                                name="sku"
+                                value={serviceData.sku}
+                                onChange={handleFieldChange}
+                                disabled={!isEditing}
+                                suffix={
+                                    <div
+                                        onClick={generateRandomCode}
+                                        className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                    >
+                                        <DiceIcon size={20} />
+                                    </div>
+                                }
+                            />
 
-                        {!isQuickMode && (
-                            <>
-                                <FormCombobox
-                                    label="Categoria"
-                                    options={categories}
-                                    value={serviceData.category_id}
-                                    onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                    actionItem={{
-                                        label: metadataPlanBlocked ? (
-                                            <span className="inline-flex items-center gap-1.5">
-                                                Nova categoria
-                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                            </span>
-                                        ) : "Criar nova categoria",
-                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
-                                    }}
-                                />
+                            {!isQuickMode && (
+                                <>
+                                    <FormCombobox
+                                        label="Categoria"
+                                        options={categories}
+                                        value={serviceData.category_id}
+                                        onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                        disabled={!isEditing}
+                                        width="w-full"
+                                        actionItem={{
+                                            label: metadataPlanBlocked ? (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    Nova categoria
+                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                </span>
+                                            ) : "Criar nova categoria",
+                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                        }}
+                                    />
 
-                                <FormCombobox
-                                    label="Subcategoria"
-                                    options={subCategories}
-                                    value={serviceData.subcategory_id}
-                                    onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                    actionItem={{
-                                        label: metadataPlanBlocked ? (
-                                            <span className="inline-flex items-center gap-1.5">
-                                                Nova subcategoria
-                                                <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                            </span>
-                                        ) : "Criar nova subcategoria",
-                                        icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                        onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
-                                    }}
-                                />
-                            </>
-                        )}
-                    </div>
-                </SidebarCard>
+                                    <FormCombobox
+                                        label="Subcategoria"
+                                        options={subCategories}
+                                        value={serviceData.subcategory_id}
+                                        onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                        disabled={!isEditing}
+                                        width="w-full"
+                                        actionItem={{
+                                            label: metadataPlanBlocked ? (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    Nova subcategoria
+                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                </span>
+                                            ) : "Criar nova subcategoria",
+                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                        }}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    </SidebarCard>
+                )}
 
                 {isQuickMode && (
-                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
-                        {officialCategoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-
-                        <p className="text-sm text-gray-500 mt-2 mb-4">
+                    <SidebarCard title="Categoria oficial">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
                             Selecione a categoria oficial do seu serviço.
                         </p>
-
-                        <div
-                            onClick={() => isEditing && setIsOfficialCategoryModalOpen(true)}
-                            className={`
-                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                                ${officialCategoryPath
-                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                                }
-                                ${!isEditing && "opacity-60 pointer-events-none"}
-                            `}
+                        <button
+                            type="button"
+                            disabled={!isEditing}
+                            onClick={() => setIsOfficialCategoryModalOpen(true)}
+                            className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${officialCategoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                    {officialCategoryPath || "Selecionar categoria..."}
-                                </span>
-                                {officialCategoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                        {officialCategoryPath || "Selecionar categoria..."}
+                                    </div>
+                                    {officialCategoryPath ? (
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
+                                            Clique para alterar
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div className="shrink-0 text-brand-inactive-text">
+                                    <PlusIcon className="w-4 h-4" />
+                                </div>
                             </div>
-
-                            <div className={`p-2 rounded-full ${officialCategoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                                {officialCategoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
-                            </div>
-                        </div>
+                        </button>
 
                         <MarketplaceCategoryModal
                             isOpen={isOfficialCategoryModalOpen}
@@ -761,6 +764,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 manualChange("marketplace_category_id", category.id)
                                 setOfficialCategoryPath(category.path)
                             }}
+                            type="service"
                         />
                     </SidebarCard>
                 )}

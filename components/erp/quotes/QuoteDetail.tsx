@@ -794,7 +794,7 @@ const QuoteDetail = ({ quoteId, partnerId, onBack, onEditQuote, onDuplicateQuote
 
                                                         <Button
                                                             variant="outline"
-                                                            className="w-full text-xs font-semibold justify-center py-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30"
+                                                            className="w-full"
                                                             onClick={() => {
                                                                 const text = `Olá! Segue o link para visualizar e aprovar a proposta comercial *${quote.quote_number}*:\n\n${window.location.origin}/quote/${quote.public_token}\n\n*Código de Aprovação:* ${quote.metadata?.plain_code || "Enviado por aqui"}`;
                                                                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");

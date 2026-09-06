@@ -13,7 +13,8 @@ export const metadata: Metadata = {
     description: "Seus produtos e serviços favoritos no marketplace Dudit. Encontre rapidamente tudo que você salvou.",
 }
 
-export default async function FavoritosPage() {
+export default async function FavoritosPage({ searchParams }: { searchParams?: Promise<{ page?: string }> }) {
+    const resolvedParams = await searchParams
     const user = await getCurrentUser()
 
     if (!user) {
@@ -33,9 +34,13 @@ export default async function FavoritosPage() {
 
     const cartCount = sessionData?.cartCount || 0
 
+    const currentPage = Math.max(1, Number(resolvedParams?.page) || 1)
+
     // Fetch initial favorites on server to eliminate initial loading flash
-    const favResult = await getUserFavoritesAction({ type: "todos" })
+    const favResult = await getUserFavoritesAction({ type: "todos", page: currentPage, pageSize: 24 })
     const initialItems = favResult.success ? favResult.items : []
+    const total = favResult.total || 0
+    const totalPages = Math.max(1, Math.ceil(total / 24))
     const initialCounts = favResult.counts || {
         total: initialItems.length,
         produtos: initialItems.filter((i: any) => i.itemType === "produto").length,
@@ -51,6 +56,8 @@ export default async function FavoritosPage() {
                 cartCount={cartCount}
                 initialItems={initialItems}
                 initialCounts={initialCounts}
+                currentPage={currentPage}
+                totalPages={totalPages}
             />
 
             <MarketplaceFooter />

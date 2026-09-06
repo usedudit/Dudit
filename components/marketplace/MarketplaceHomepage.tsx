@@ -177,7 +177,7 @@ export default function MarketplaceHome({
     homeAds = [],
 }: MarketplaceHomeProps) {
     const router = useRouter()
-    const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect()
+    const { requestLocation, loading: isLocationLoading, error: locationError } = useLocationRedirect('/')
     const { success: notifySuccess, error: notifyError } = useNotification()
 
     const hasNoLocation = !selectedCityName
@@ -269,7 +269,13 @@ export default function MarketplaceHome({
     const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
         localStorage.setItem('dudit_city', slug)
-        window.location.href = `/`
+        if (typeof window !== 'undefined') {
+            if (window.location.pathname === '/') {
+                window.location.reload()
+            } else {
+                window.location.href = `/`
+            }
+        }
     }
 
     const handleIpLocation = async () => {
@@ -292,7 +298,13 @@ export default function MarketplaceHome({
 
                 document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
                 localStorage.setItem('dudit_city', slug)
-                window.location.href = `/`
+                if (typeof window !== 'undefined') {
+                    if (window.location.pathname === '/') {
+                        window.location.reload()
+                    } else {
+                        window.location.href = `/`
+                    }
+                }
             } else {
                 throw new Error("Dados de IP incompletos")
             }
@@ -546,14 +558,16 @@ export default function MarketplaceHome({
                             {filteredCities.length > 0 && (
                                 <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:bg-dark-surface dark:border-dark-border dark:divide-dark-border">
                                     {filteredCities.map((slug) => (
-                                        <button
+                                        <Button
                                             key={slug}
                                             onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray text-brand-dark text-sm transition-colors font-medium flex items-center gap-2 dark:hover:bg-dark-border/50 dark:text-dark-heading"
+                                            className="w-full"
+                                            leftIcon={
+                                                <MapPinIcon size={14} />
+                                            }
                                         >
-                                            <MapPinIcon size={14} className="text-brand-green shrink-0" />
                                             {formatCitySlugForDisplay(slug)}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}

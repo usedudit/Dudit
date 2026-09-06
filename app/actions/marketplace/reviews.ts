@@ -280,9 +280,10 @@ export async function createReviewAction(data: {
   if (data.serviceId) {
     await updateServiceRating(adminSupabase, data.serviceId)
   }
-  await updatePartnerRating(adminSupabase, data.partnerId)
   if (data.storeId) {
     await updateStoreRating(adminSupabase, data.storeId)
+  } else {
+    await updatePartnerRating(adminSupabase, data.partnerId)
   }
 
   // Invalidate partner cache tags to ensure seller page shows real-time stats
@@ -363,9 +364,10 @@ export async function updateReviewAction(reviewId: string, data: {
   if (review.service_id) {
     await updateServiceRating(adminSupabase, review.service_id)
   }
-  await updatePartnerRating(adminSupabase, review.partner_id)
   if (review.store_id) {
     await updateStoreRating(adminSupabase, review.store_id)
+  } else {
+    await updatePartnerRating(adminSupabase, review.partner_id)
   }
 
   // Invalidate cache tags
@@ -433,9 +435,10 @@ export async function deleteReviewAction(reviewId: string, csrf_token?: string) 
   if (review.service_id) {
     await updateServiceRating(adminSupabase, review.service_id)
   }
-  await updatePartnerRating(adminSupabase, review.partner_id)
   if (review.store_id) {
     await updateStoreRating(adminSupabase, review.store_id)
+  } else {
+    await updatePartnerRating(adminSupabase, review.partner_id)
   }
 
   // Invalidate cache tags
@@ -639,4 +642,41 @@ export async function getBuyerReviewsAction() {
   }
 
   return { success: true, data: reviewsData }
+}
+
+export async function getBuyerReviewsPaginatedAction(page: number = 1, limit: number = 10) {
+  const adminSupabase = createAdminClient()
+  const user = await requireUser()
+
+  const offset = (Math.max(1, page) - 1) * limit
+
+  const [reviewsResult, countResult] = await Promise.all([
+    adminSupabase
+      .from("reviews")
+      .select(`
+        *,
+        products(id, short_id, name, images, video_thumbnail),
+        services(id, short_id, name, images),
+        partners(id),
+        stores(id, short_id, slug, name, logo_url, addresses!store_id!left(city, state))
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1),
+    adminSupabase
+      .from("reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
+  ])
+
+  const { data: reviewsData, error } = reviewsResult
+
+  if (error || !reviewsData) {
+    console.error("[Reviews] Fetch error:", error?.message)
+    return { success: false, error: error?.message || "Erro ao buscar avaliações", data: [], total: 0 }
+  }
+
+  const total = countResult.count || 0
+
+  return { success: true, data: reviewsData, total }
 }

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import { StarIcon, ChevronLeftIcon } from "@/lib/icons"
 import { Button, InfoCard, DefaultModal, FormTextarea, SkeletonLoader, IconPlaceholder } from "@/components/reusable"
-import { getBuyerReviewsAction, updateReviewAction, deleteReviewAction } from "@/app/actions/marketplace/reviews"
+import Pagination from "@/components/reusable/Pagination"
+import { getBuyerReviewsPaginatedAction, updateReviewAction, deleteReviewAction } from "@/app/actions/marketplace/reviews"
 import { getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { formatFullDate } from "@/lib/utils"
@@ -21,6 +22,8 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
     const [reviews, setReviews] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
 
     // Edit modal state
     const [editingReview, setEditingReview] = useState<any | null>(null)
@@ -32,13 +35,16 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
     const csrfToken = useCSRFToken()
 
-    const fetchReviews = useCallback(async () => {
+    const REVIEWS_PER_PAGE = 10
+
+    const fetchReviews = useCallback(async (page: number = 1) => {
         setIsLoading(true)
         setError(null)
         try {
-            const res = await getBuyerReviewsAction()
+            const res = await getBuyerReviewsPaginatedAction(page, REVIEWS_PER_PAGE)
             if (res.success && res.data) {
                 setReviews(res.data)
+                setTotalPages(Math.max(1, Math.ceil((res.total || 0) / REVIEWS_PER_PAGE)))
             } else {
                 setError(res.error || "Não foi possível carregar suas avaliações.")
             }
@@ -50,8 +56,8 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
     }, [])
 
     useEffect(() => {
-        fetchReviews()
-    }, [fetchReviews])
+        fetchReviews(currentPage)
+    }, [fetchReviews, currentPage])
 
     const handleOpenEdit = (review: any) => {
         setEditingReview(review)
@@ -80,7 +86,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
             if (res.success) {
                 notifySuccess("Avaliação atualizada", "Sua avaliação foi atualizada com sucesso!")
                 handleCloseEdit()
-                await fetchReviews()
+                await fetchReviews(currentPage)
             } else {
                 notifyError("Erro ao atualizar", res.error || "Ocorreu um erro.")
             }
@@ -100,7 +106,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
             if (res.success) {
                 notifySuccess("Avaliação excluída", "Sua avaliação foi removida com sucesso.")
                 handleCloseEdit()
-                await fetchReviews()
+                await fetchReviews(currentPage)
             } else {
                 notifyError("Erro ao excluir", res.error || "Ocorreu um erro.")
             }
@@ -263,6 +269,14 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                         )
                     })}
                 </div>
+            )}
+
+            {!isLoading && totalPages > 1 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                />
             )}
 
             {/* Edit Review Modal */}

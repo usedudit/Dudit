@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { CollectionCard } from "@/components/marketplace/CollectionCard"
 import { createCollection } from "@/app/actions/marketplace/collections"
 import { Button, DefaultModal, Input, FormTextarea, IconPlaceholder } from "@/components/reusable"
+import Pagination from "@/components/reusable/Pagination"
 import { PlusIcon } from "@/lib/icons"
 import { getCollectionUrl } from "@/lib/utils/url-generator"
 
@@ -26,16 +27,26 @@ interface Collection {
 
 interface UserCollectionsPageProps {
     collections: Collection[]
+    currentPage?: number
+    totalPages?: number
 }
 
-export function UserCollectionsPage({ collections: initialCollections }: UserCollectionsPageProps) {
+export function UserCollectionsPage({ collections: initialCollections, currentPage = 1, totalPages = 1 }: UserCollectionsPageProps) {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [collections, setCollections] = useState(initialCollections)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [name, setName] = useState("")
     const [description, setDescription] = useState("")
     const [error, setError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+
+    const handlePageChange = (page: number) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('page', String(page))
+        router.push(`/colecoes?${params.toString()}`)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
 
     const handleCreate = () => {
         setError(null)
@@ -119,6 +130,16 @@ export function UserCollectionsPage({ collections: initialCollections }: UserCol
                                     <CollectionCard key={collection.id} collection={collection} className="w-full" />
                                 ))}
                             </div>
+
+                            {totalPages > 1 && (
+                                <div className="mt-8">
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        onPageChange={handlePageChange}
+                                    />
+                                </div>
+                            )}
 
                             {/* Mobile Sticky Button */}
                             <div className="sm:hidden fixed bottom-20 right-4 z-40">

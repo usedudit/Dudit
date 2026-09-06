@@ -21,6 +21,17 @@ export function formatCompact(value: number) {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(value || 0)
 }
 
+export function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0)
+}
+
+export function getFormatter(format?: "currency" | "compact" | "number" | "quantity") {
+  if (format === "currency") return formatCurrency
+  if (format === "number") return (v: number) => v.toLocaleString("pt-BR")
+  if (format === "quantity") return (v: number) => `${v} un`
+  return formatCompact
+}
+
 /**
  * Universal custom tooltip with solid branding, bold typography and dark mode support
  */
@@ -102,16 +113,17 @@ export function DashboardLineChart({
   colors = ["#059669", "#94a3b8"],
   showLegend = false,
   legendLabels,
-  valueFormatter,
+  format,
   height = "h-[260px]",
 }: {
   data: any[]
   colors?: string[]
   showLegend?: boolean
   legendLabels?: Record<string, string>
-  valueFormatter?: (v: number) => string
+  format?: "currency" | "compact" | "number" | "quantity"
   height?: string
 }) {
+  const valueFormatter = getFormatter(format)
   const keys = Object.keys(data[0] || {}).filter(k => k !== "label" && k !== "id")
   return (
     <div className={cn("w-full mt-2", height)}>
@@ -127,7 +139,7 @@ export function DashboardLineChart({
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <YAxis
-            tickFormatter={valueFormatter || formatCompact}
+            tickFormatter={valueFormatter}
             tickLine={false}
             axisLine={false}
             width={60}
@@ -170,7 +182,7 @@ export function DashboardBarChart({
   showLegend = false,
   layout = "vertical",
   legendLabels,
-  valueFormatter,
+  format,
   height = "h-[240px]",
 }: {
   data: ChartPoint[]
@@ -178,9 +190,10 @@ export function DashboardBarChart({
   showLegend?: boolean
   layout?: "vertical" | "horizontal"
   legendLabels?: Record<string, string>
-  valueFormatter?: (v: number) => string
+  format?: "currency" | "compact" | "number" | "quantity"
   height?: string
 }) {
+  const valueFormatter = getFormatter(format)
   const barColors = colors || [CHART_COLORS_VIVID[0]]
   const hasMultiColor = barColors.length > 1
 
@@ -198,7 +211,7 @@ export function DashboardBarChart({
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <YAxis
-            tickFormatter={valueFormatter || formatCompact}
+            tickFormatter={valueFormatter}
             tickLine={false}
             axisLine={false}
             width={60}
@@ -239,7 +252,7 @@ export function DashboardDonutChart({
   className,
   colors = CHART_COLORS_CATEGORY,
   maxLegendItems = 6,
-  valueFormatter,
+  format,
 }: {
   data: ChartPoint[]
   totalValue?: string | number
@@ -249,8 +262,9 @@ export function DashboardDonutChart({
   className?: string
   colors?: string[]
   maxLegendItems?: number
-  valueFormatter?: (val: number) => string
+  format?: "currency" | "compact" | "number" | "quantity"
 }) {
+  const valueFormatter = getFormatter(format)
   const sortedData = [...data].sort((a, b) => Number(b.value || 0) - Number(a.value || 0))
   const displayLegend = sortedData.slice(0, maxLegendItems)
   const sumTotal = sortedData.reduce((acc, item) => acc + Number(item.value || 0), 0)
@@ -333,15 +347,16 @@ export function HorizontalBarRankingList({
   items,
   colors = CHART_COLORS_VIVID,
   maxItems = 5,
-  valueFormatter,
+  format,
   className,
 }: {
   items: Array<{ label: string; value: number | string; subtitle?: string }>
   colors?: string[]
   maxItems?: number
-  valueFormatter?: (v: number) => string
+  format?: "currency" | "compact" | "number" | "quantity"
   className?: string
 }) {
+  const valueFormatter = getFormatter(format)
   const displayItems = items.slice(0, maxItems)
   const maxVal = Math.max(...displayItems.map(i => Number(i.value) || 0), 1)
 

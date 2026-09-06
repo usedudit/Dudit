@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { orderId } = body
 
+    if (!orderId) {
+      return NextResponse.json({ error: "Missing orderId" }, { status: 400 })
+    }
+
     const user = await getCurrentUser()
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })

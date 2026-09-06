@@ -37,10 +37,10 @@ export async function enqueueTriggerTask(
   correlation?: CronCorrelation,
 ): Promise<boolean> {
   if (!process.env.TRIGGER_SECRET_KEY) {
-    cronLogger.error("enqueue", "TRIGGER_SECRET_KEY is not configured - cannot enqueue tasks", {
+    cronLogger.warn("enqueue", "TRIGGER_SECRET_KEY is not configured - fallback execution will be used", {
       taskId,
     }, correlation)
-    throw new Error("TRIGGER_SECRET_KEY is required for Trigger.dev task enqueue")
+    return false
   }
 
   for (let attempt = 0; attempt < MAX_ENQUEUE_RETRIES; attempt++) {
@@ -92,12 +92,12 @@ export async function enqueueTriggerTask(
  * Enqueue multiple Trigger.dev tasks in sequence with per-item error handling.
  *
  * Each item is enqueued independently. If one fails, the others still proceed.
- * Returns a summary of successes and failures.
+ * Returns a summary with enqueued count, failed count, and failedIndices.
  *
  * @param taskId - The Trigger.dev task ID
  * @param items - Array of items to enqueue, each with payload and optional options
  * @param jobName - Job name for logging context
- * @returns Summary with enqueued and failed counts
+ * @returns Summary with enqueued, failed counts and failedIndices
  */
 export async function enqueueTriggerBatch(
   taskId: string,
@@ -107,11 +107,13 @@ export async function enqueueTriggerBatch(
     correlation?: CronCorrelation
   }>,
   jobName: string,
-): Promise<{ enqueued: number; failed: number }> {
+): Promise<{ enqueued: number; failed: number; failedIndices: number[] }> {
   let enqueued = 0
   let failed = 0
+  const failedIndices: number[] = []
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
     const success = await enqueueTriggerTask(
       taskId,
       item.payload,
@@ -123,6 +125,7 @@ export async function enqueueTriggerBatch(
       enqueued++
     } else {
       failed++
+      failedIndices.push(i)
     }
   }
 
@@ -133,5 +136,5 @@ export async function enqueueTriggerBatch(
     failed,
   })
 
-  return { enqueued, failed }
+  return { enqueued, failed, failedIndices }
 }

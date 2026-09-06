@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import Button from "../reusable/Button"
 
 export const CategoryCarousel = ({
     categories,
@@ -57,28 +58,31 @@ export const CategoryCarousel = ({
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                 <div className="flex items-center gap-3">
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={onSeeAllCategories}
-                        className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                        className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
                     >
                         Ver tudo
-                    </button>
+                    </Button>
                     <div className="hidden lg:flex items-center gap-1.5">
                         {showLeftArrow && (
-                            <button
+                            <Button
+                                variant="filled"
                                 onClick={() => scroll('left')}
-                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors duration-200 shadow-sm cursor-pointer"
+                                className="w-8 h-8"
                             >
-                                <ChevronLeft className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                            </button>
+                                <ChevronLeft size={16} />
+                            </Button>
                         )}
                         {showRightArrow && (
-                            <button
+                            <Button
+                                variant="filled"
                                 onClick={() => scroll('right')}
-                                className="w-8 h-8 rounded-full border border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/30 transition-colors duration-200 shadow-sm cursor-pointer"
+                                className="w-8 h-8"
                             >
-                                <ChevronRight className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
-                            </button>
+                                <ChevronRight size={16} />
+                            </Button>
                         )}
                     </div>
                 </div>

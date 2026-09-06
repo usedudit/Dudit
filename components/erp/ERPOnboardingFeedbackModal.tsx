@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, InfoCard, IconPlaceholder } from "@/components/reusable"
+import { DefaultModal, Button, FormTextarea, InfoCard, IconPlaceholder } from "@/components/reusable"
 import {
   checkERPOnboardingFeedbackPromptAction,
   recordFeedbackPromptShownAction,
@@ -52,6 +52,7 @@ export function ERPOnboardingFeedbackModal({
   const isModalOpen = isControlled ? !!propIsOpen : internalIsOpen
   const [partnerStoreName, setPartnerStoreName] = useState<string>("")
   const [selectedSentiment, setSelectedSentiment] = useState<FeedbackSentiment | null>(null)
+  const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -60,6 +61,7 @@ export function ERPOnboardingFeedbackModal({
     if (propIsOpen) {
       setIsSuccess(false)
       setSelectedSentiment(null)
+      setComment("")
       setErrorMessage(null)
     }
   }, [propIsOpen])
@@ -126,7 +128,10 @@ export function ERPOnboardingFeedbackModal({
             ? "Tenho algumas dificuldades"
             : "Estou tendo problemas"
 
-      const message = `Experiência inicial no ERP: ${sentimentLabel}`
+      const commentText = comment.trim()
+      const message = commentText
+        ? `[Experiência: ${sentimentLabel}]\n${commentText}`
+        : `Experiência inicial no ERP: ${sentimentLabel}`
 
       const res = await submitFeedbackAction({
         type: "onboarding",
@@ -233,6 +238,19 @@ export function ERPOnboardingFeedbackModal({
                 </button>
               )
             })}
+          </div>
+
+          {/* Comentário opcional */}
+          <div className="space-y-1">
+            <FormTextarea
+              label="Comentário (opcional)"
+              placeholder="Quer deixar algum comentário ou sugestão?"
+              value={comment}
+              onChange={(e: any) => setComment(e.target.value)}
+              maxLength={2000}
+              showCharacterCount
+              className="min-h-[80px]"
+            />
           </div>
 
           {errorMessage && (

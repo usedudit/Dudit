@@ -13,10 +13,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string }> }) {
+const ORDERS_PER_PAGE = 10
+
+export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string; page?: string }> }) {
   const resolvedParams = await searchParams
   const user = await requireUser()
   const adminClient = await createAdminClient()
+  const currentPage = Math.max(1, Number(resolvedParams?.page) || 1)
+  const offset = (currentPage - 1) * ORDERS_PER_PAGE
   const orderSelect = `
     id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
     delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, updated_at, payment_method,
@@ -47,15 +51,16 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   `
 
   // Parallelize all independent data fetches
-  const [ordersResult, reviewsResult, sessionData] = await Promise.all([
+  const [ordersResult, reviewsResult, sessionData, countResult] = await Promise.all([
     adminClient
       .from("orders")
       .select(orderSelect)
       .eq("buyer_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50),
+      .range(offset, offset + ORDERS_PER_PAGE - 1),
     adminClient.from("reviews").select("order_id, product_id, service_id").eq("user_id", user.id),
     getUserSessionData(user.id),
+    adminClient.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", user.id),
   ])
 
   let orders = ordersResult.data || []
@@ -71,7 +76,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       .select(fallbackOrderSelect)
       .eq("buyer_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .range(offset, offset + ORDERS_PER_PAGE - 1)
 
     if (fallbackResult.error) {
       console.error("[MY_ORDERS_PAGE] fallback orders query failed", {
@@ -227,6 +232,8 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
 
   const isDetails = resolvedParams?.tab === 'details'
   const headerTitle = isDetails ? "Detalhes do pedido" : "Meus pedidos"
+  const totalOrders = countResult.count || 0
+  const totalPages = Math.max(1, Math.ceil(totalOrders / ORDERS_PER_PAGE))
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
@@ -236,6 +243,8 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
         orders={orders}
         reviewedItemsArray={reviewedItemsArray}
         userId={user.id}
+        currentPage={currentPage}
+        totalPages={totalPages}
       />
 
       <MarketplaceFooter />

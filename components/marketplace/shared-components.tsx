@@ -836,12 +836,13 @@ export const HorizontalCarousel = ({
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                     {onSeeAll && (
-                        <button
+                        <Button
+                            variant="ghost"
                             onClick={onSeeAll}
-                            className="text-[13px] font-extrabold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                            className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
                         >
                             Ver tudo
-                        </button>
+                        </Button>
                     )}
                     <div className="hidden lg:flex items-center gap-1.5">
                         {showLeftArrow && (
@@ -850,7 +851,7 @@ export const HorizontalCarousel = ({
                                 variant="filled"
                                 className="w-8 h-8"
                             >
-                                <ChevronLeftIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                <ChevronLeftIcon size={16} />
                             </Button>
                         )}
                         {showRightArrow && (
@@ -859,7 +860,7 @@ export const HorizontalCarousel = ({
                                 variant="filled"
                                 className="w-8 h-8"
                             >
-                                <ChevronRightIcon className="w-4 h-4 text-brand-dark dark:text-dark-heading" />
+                                <ChevronRightIcon size={16} />
                             </Button>
                         )}
                     </div>

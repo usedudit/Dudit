@@ -29,7 +29,16 @@ export type RouteOrigin = {
   address?: string
 } | null | undefined
 
+interface RouteStats {
+  distanceKm: number
+  durationMinutes: number
+}
+
+// Cache em memória para evitar chamadas duplicadas à Directions API na mesma sessão
+const routeCache = new Map<string, { geometry: any; stats: RouteStats }>()
+
 const STORE_PIN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>`
+const ROUTE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>`
 
 export function DeliveryRouteMap({
   points,
@@ -48,6 +57,8 @@ export function DeliveryRouteMap({
   const readyRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [mapError, setMapError] = useState<{ message: string; status: number | null } | null>(null)
+  const [routeStats, setRouteStats] = useState<RouteStats | null>(null)
+  const [isRouteLoading, setIsRouteLoading] = useState(false)
 
   const rawToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
   const token = rawToken ? rawToken.replace(/['"]/g, "").trim() : ""
@@ -253,7 +264,96 @@ export function DeliveryRouteMap({
       mapRef.current?.resize()
     } catch {}
 
+    const clearRouteLayer = () => {
+      if (!mapRef.current) return
+      const map = mapRef.current
+      try {
+        if (map.getLayer("delivery-route-line")) map.removeLayer("delivery-route-line")
+        if (map.getLayer("delivery-route-casing")) map.removeLayer("delivery-route-casing")
+        if (map.getSource("delivery-route")) map.removeSource("delivery-route")
+      } catch {}
+    }
+
+    const renderRoute = (geometry: any) => {
+      if (!mapRef.current || !readyRef.current) return
+      const map = mapRef.current
+
+      const applyLayers = () => {
+        try {
+          const geojson: any = {
+            type: "Feature",
+            properties: {},
+            geometry,
+          }
+
+          if (map.getSource("delivery-route")) {
+            (map.getSource("delivery-route") as any).setData(geojson)
+          } else {
+            map.addSource("delivery-route", {
+              type: "geojson",
+              data: geojson,
+            })
+
+            // Casing para contraste da linha sobre o mapa
+            map.addLayer({
+              id: "delivery-route-casing",
+              type: "line",
+              source: "delivery-route",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#14532d",
+                "line-width": 6,
+                "line-opacity": 0.4,
+              },
+            })
+
+            // Linha principal com cor verde da Dudit
+            map.addLayer({
+              id: "delivery-route-line",
+              type: "line",
+              source: "delivery-route",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#16a34a",
+                "line-width": 4,
+              },
+            })
+          }
+
+          if (geometry?.coordinates && geometry.coordinates.length > 1) {
+            const bounds = new mapboxgl.LngLatBounds(
+              geometry.coordinates[0],
+              geometry.coordinates[0],
+            )
+            for (let i = 1; i < geometry.coordinates.length; i++) {
+              bounds.extend(geometry.coordinates[i])
+            }
+            map.fitBounds(bounds, { padding: 48, maxZoom: 15, duration: 600 })
+          }
+        } catch (layerErr) {
+          console.warn("[DeliveryRouteMap] renderRoute error:", layerErr)
+        }
+      }
+
+      if (map.isStyleLoaded()) {
+        applyLayers()
+      } else {
+        map.once("style.load", applyLayers)
+      }
+    }
+
+    let cancelled = false
+    const abortCtrl = new AbortController()
+
     if (allCoords.length === 1) {
+      clearRouteLayer()
+      setRouteStats(null)
       try {
         mapRef.current.easeTo({ center: allCoords[0], zoom: 14, duration: 500 })
       } catch {}
@@ -267,8 +367,68 @@ export function DeliveryRouteMap({
       } catch (boundsErr) {
         console.warn("[DeliveryRouteMap] fitBounds error:", boundsErr)
       }
+
+      const fetchRoute = async () => {
+        // Mapbox Directions API suporta até 25 waypoints por chamada
+        const coordsForApi = allCoords.length <= 25 ? allCoords : allCoords.slice(0, 25)
+        const coordsString = coordsForApi.map(([lng, lat]) => `${lng},${lat}`).join(";")
+        const cacheKey = coordsString
+
+        if (routeCache.has(cacheKey)) {
+          const cached = routeCache.get(cacheKey)!
+          if (!cancelled) {
+            renderRoute(cached.geometry)
+            setRouteStats(cached.stats)
+          }
+          return
+        }
+
+        try {
+          if (!cancelled) setIsRouteLoading(true)
+          const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${token}`
+          const res = await fetch(url, { signal: abortCtrl.signal })
+          if (!res.ok) throw new Error(`Directions API ${res.status}`)
+          const data = await res.json()
+          if (cancelled) return
+
+          if (data.code === "Ok" && data.routes?.[0]?.geometry) {
+            const r = data.routes[0]
+            const stats: RouteStats = {
+              distanceKm: Number((r.distance / 1000).toFixed(1)),
+              durationMinutes: Math.max(1, Math.round(r.duration / 60)),
+            }
+            routeCache.set(cacheKey, { geometry: r.geometry, stats })
+            renderRoute(r.geometry)
+            setRouteStats(stats)
+          } else {
+            throw new Error("No route geometry")
+          }
+        } catch (err: any) {
+          if (err.name !== "AbortError") {
+            console.warn("[DeliveryRouteMap] Falha ao traçar rota via Directions API, usando fallback linear:", err)
+            // Fallback suave: traça linha direta entre os pontos sem quebrar a tela
+            const fallbackGeometry = {
+              type: "LineString",
+              coordinates: allCoords,
+            }
+            renderRoute(fallbackGeometry)
+          }
+        } finally {
+          if (!cancelled) setIsRouteLoading(false)
+        }
+      }
+
+      void fetchRoute()
+    } else {
+      clearRouteLayer()
+      setRouteStats(null)
     }
-  }, [points, origin, ready])
+
+    return () => {
+      cancelled = true
+      abortCtrl.abort()
+    }
+  }, [points, origin, ready, token])
 
   if (!token) {
     return (
@@ -277,6 +437,8 @@ export function DeliveryRouteMap({
       </div>
     )
   }
+
+  const hasMultipleStops = (origin?.lat != null && points && points.length > 0) || (points && points.length > 1)
 
   return (
     <div className="w-full h-full rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden relative min-h-[250px]">
@@ -304,20 +466,49 @@ export function DeliveryRouteMap({
       )}
 
       {ready && (
-        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5 rounded-lg bg-white/95 dark:bg-dark-surface/95 px-3 py-2 shadow-sm border border-brand-border dark:border-dark-border text-[11px] text-brand-dark dark:text-dark-heading">
-          <span className="flex items-center gap-2 font-medium">
-            <span className="w-3 h-3 rounded-full bg-brand-green border border-white dark:border-dark-surface shadow-sm shrink-0" />
-            Loja (Início)
-          </span>
-          <span className="flex items-center gap-2 font-medium">
-            <span className="w-3 h-3 rounded-full bg-brand-dark border border-white dark:border-dark-surface shadow-sm shrink-0" />
-            Pedidos na rota
-          </span>
-          {points && points.length > 1 && (
+        <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-2 rounded-xl bg-white/95 dark:bg-dark-surface/95 px-3 py-2.5 shadow-md border border-brand-border dark:border-dark-border text-[11px] text-brand-dark dark:text-dark-heading backdrop-blur-sm max-w-[240px]">
+          <div className="flex flex-col gap-1.5">
             <span className="flex items-center gap-2 font-medium">
-              <span className="w-3 h-3 rounded-full bg-purple-600 border border-white dark:border-dark-surface shadow-sm shrink-0" />
-              Destino final
+              <span className="w-3 h-3 rounded-full bg-brand-green border border-white dark:border-dark-surface shadow-sm shrink-0" />
+              Loja (Início)
             </span>
+            <span className="flex items-center gap-2 font-medium">
+              <span className="w-3 h-3 rounded-full bg-brand-dark border border-white dark:border-dark-surface shadow-sm shrink-0" />
+              Pedidos na rota
+            </span>
+            {points && points.length > 1 && (
+              <span className="flex items-center gap-2 font-medium">
+                <span className="w-3 h-3 rounded-full bg-purple-600 border border-white dark:border-dark-surface shadow-sm shrink-0" />
+                Destino final
+              </span>
+            )}
+            {hasMultipleStops && (
+              <span className="flex items-center gap-2 font-medium text-brand-inactive-text dark:text-dark-body">
+                <span className="w-3.5 h-1 rounded-full bg-brand-green shrink-0" />
+                Traçado da rota
+              </span>
+            )}
+          </div>
+
+          {(routeStats || isRouteLoading) && (
+            <div className="pt-2 border-t border-brand-border dark:border-dark-border flex flex-col gap-1">
+              {isRouteLoading && !routeStats ? (
+                <span className="text-[10px] text-brand-inactive-text flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+                  Traçando rota...
+                </span>
+              ) : routeStats ? (
+                <div className="flex items-center justify-between gap-3 text-[11px]">
+                  <div className="flex items-center gap-1.5 font-semibold text-brand-dark dark:text-dark-heading">
+                    <span dangerouslySetInnerHTML={{ __html: ROUTE_ICON_SVG }} className="text-brand-green shrink-0 inline-flex items-center" />
+                    <span>{routeStats.distanceKm} km</span>
+                  </div>
+                  <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                    ~{routeStats.durationMinutes} min
+                  </span>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       )}

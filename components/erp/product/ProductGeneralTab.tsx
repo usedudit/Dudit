@@ -219,33 +219,35 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 {/* ESQUERDA (Principal) */}
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* Imagens do Produto no Topo */}
-                    <div className="mb-8">
-                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                            {images && images.length > 0 ? (
-                                images.map((img, index) => (
-                                    <div
-                                        key={index}
-                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
-                                    >
-                                        <img
-                                            src={getImageSrc(img)}
-                                            alt={`${productData.name || "Produto"} ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                        />
-                                        {index === 0 && (
-                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
-                                                Principal
-                                            </div>
-                                        )}
+                    {!isDesapego && (
+                        <div className="mb-8">
+                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                                {images && images.length > 0 ? (
+                                    images.map((img, index) => (
+                                        <div
+                                            key={index}
+                                            className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                        >
+                                            <img
+                                                src={getImageSrc(img)}
+                                                alt={`${productData.name || "Produto"} ${index + 1}`}
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            />
+                                            {index === 0 && (
+                                                <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                                                    Principal
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                        Sem imagens
                                     </div>
-                                ))
-                            ) : (
-                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
-                                    Sem imagens
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Informações Básicas */}
                     <FormSection title="Informações Básicas" className="mb-8">
@@ -430,41 +432,43 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                 {/* DIREITA (SidebarCard) */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip title="Organização">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{hasVariants ? "Múltiplos SKUs" : (productData.sku || "-")}</span>
-                            </div>
-
-                            {!isQuickMode && (
-                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código de Barras</span>
-                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.gtin || "-"}</span>
+                    {!isDesapego && (
+                        <SidebarCard hasTopStrip title="Organização">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{hasVariants ? "Múltiplos SKUs" : (productData.sku || "-")}</span>
                                 </div>
-                            )}
 
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
-                            </div>
+                                {!isQuickMode && (
+                                    <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código de Barras</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.gtin || "-"}</span>
+                                    </div>
+                                )}
 
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
-                            </div>
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Categoria</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{categoryName}</span>
+                                </div>
 
-                            <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Marca</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{brandName}</span>
-                            </div>
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Subcategoria</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{subcategoryName}</span>
+                                </div>
 
-                            <div className="flex justify-between items-center py-2">
-                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Unidade</span>
-                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.unidade || "UN"}</span>
+                                <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Marca</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{brandName}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-2">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Unidade</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">{productData.unidade || "UN"}</span>
+                                </div>
                             </div>
-                        </div>
-                    </SidebarCard>
+                        </SidebarCard>
+                    )}
 
                     {isQuickMode && officialCategoryPath && (
                         <SidebarCard title="Categoria oficial">
@@ -500,9 +504,11 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações Básicas" className="mb-8">
-                    <div className="mb-10">
-                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
-                    </div>
+                    {!isDesapego && (
+                        <div className="mb-10">
+                            <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
+                        </div>
+                    )}
 
                     <div className="space-y-6">
                         <div className="grid grid-cols-12 gap-6">
@@ -858,304 +864,338 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
             {/* Right Column (Organização / Categoria) */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                {/* Mobile/Tablet: FormSection */}
-                <div className="block lg:hidden space-y-8">
-                    <FormSection title="Organização" hasSeparator>
-                        <div className="space-y-5">
-                            {!hasVariants && (
-                                <Input
-                                    label="Código do Produto"
-                                    name="sku"
-                                    value={productData.sku}
-                                    placeholder="Gerar automaticamente"
-                                    onChange={handleFieldChange}
-                                    disabled={!isEditing}
-                                    dataField="sku"
-                                    suffix={
-                                        <div
-                                            onClick={generateRandomCode}
-                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                        >
-                                            <DiceIcon size={20} />
-                                        </div>
-                                    }
-                                />
-                            )}
-
-                            {!isQuickMode && (
-                                <>
-                                    <div className="space-y-1.5 w-full">
+                {!isDesapego && (
+                    <>
+                        {/* Mobile/Tablet: FormSection */}
+                        <div className="block lg:hidden space-y-8">
+                            <FormSection title="Organização" hasSeparator>
+                                <div className="space-y-5">
+                                    {!hasVariants && (
                                         <Input
-                                            label="Código de Barras (EAN/GTIN)"
-                                            name="gtin"
-                                            value={productData.gtin || ""}
+                                            label="Código do Produto"
+                                            name="sku"
+                                            value={productData.sku}
+                                            placeholder="Gerar automaticamente"
                                             onChange={handleFieldChange}
                                             disabled={!isEditing}
-                                            dataField="gtin"
+                                            dataField="sku"
                                             suffix={
                                                 <div
-                                                    onClick={onGenerateBarcode}
+                                                    onClick={generateRandomCode}
                                                     className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                 >
                                                     <DiceIcon size={20} />
                                                 </div>
                                             }
                                         />
-                                    </div>
+                                    )}
 
-                                    <FormCombobox
-                                        label="Categoria"
-                                        options={categories}
-                                        value={productData.category_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        dataField="category_id"
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova categoria
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova categoria",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
-                                        }}
-                                    />
-
-                                    <FormCombobox
-                                        label="Subcategoria"
-                                        options={subCategories}
-                                        value={productData.subcategory_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova subcategoria
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova subcategoria",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
-                                        }}
-                                    />
-
-                                    <FormCombobox
-                                        label="Marca"
-                                        options={brands}
-                                        value={productData.brand_id || productData.brand || ""}
-                                        onChange={handleBrandChange}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        creatable={true}
-                                        searchPlaceholder="Buscar ou digitar nova marca..."
-                                        placeholder="Selecione ou digite..."
-                                        createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova marca
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova marca",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
-                                        }}
-                                    />
-
-                                    <FormCombobox
-                                        label="Unidade"
-                                        options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
-                                        value={productData.unidade}
-                                        onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                    />
-                                </>
-                            )}
-                        </div>
-                    </FormSection>
-
-                    {isQuickMode && (
-                        <FormSection title="Categoria oficial" description="Selecione a categoria oficial do seu produto." hasSeparator>
-                            <button
-                                type="button"
-                                disabled={!isEditing}
-                                onClick={() => setIsOfficialCategoryModalOpen(true)}
-                                className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                            {officialCategoryPath || "Selecionar categoria..."}
-                                        </div>
-                                        {officialCategoryPath ? (
-                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                                Clique para alterar
+                                    {!isQuickMode && (
+                                        <>
+                                            <div className="space-y-1.5 w-full">
+                                                <Input
+                                                    label="Código de Barras (EAN/GTIN)"
+                                                    name="gtin"
+                                                    value={productData.gtin || ""}
+                                                    onChange={handleFieldChange}
+                                                    disabled={!isEditing}
+                                                    dataField="gtin"
+                                                    suffix={
+                                                        <div
+                                                            onClick={onGenerateBarcode}
+                                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            <DiceIcon size={20} />
+                                                        </div>
+                                                    }
+                                                />
                                             </div>
-                                        ) : null}
-                                    </div>
-                                    <div className="shrink-0 text-brand-inactive-text">
-                                        <PlusIcon className="w-4 h-4" />
-                                    </div>
+
+                                            <FormCombobox
+                                                label="Categoria"
+                                                options={categories}
+                                                value={productData.category_id}
+                                                onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                dataField="category_id"
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova categoria
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova categoria",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                                }}
+                                            />
+
+                                            <FormCombobox
+                                                label="Subcategoria"
+                                                options={subCategories}
+                                                value={productData.subcategory_id}
+                                                onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova subcategoria
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova subcategoria",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                                }}
+                                            />
+
+                                            <FormCombobox
+                                                label="Marca"
+                                                options={brands}
+                                                value={productData.brand_id || productData.brand || ""}
+                                                onChange={handleBrandChange}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                creatable={true}
+                                                searchPlaceholder="Buscar ou digitar nova marca..."
+                                                placeholder="Selecione ou digite..."
+                                                createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova marca
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova marca",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
+                                                }}
+                                            />
+
+                                            <FormCombobox
+                                                label="Unidade"
+                                                options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
+                                                value={productData.unidade}
+                                                onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                            />
+                                        </>
+                                    )}
                                 </div>
-                            </button>
-                        </FormSection>
-                    )}
-                </div>
+                            </FormSection>
 
-                {/* Desktop: SidebarCard */}
-                <div className="hidden lg:block">
-                    <SidebarCard hasTopStrip title="Organização">
-                        <div className="space-y-5">
-                            {!hasVariants && (
-                                <Input
-                                    label="Código do Produto"
-                                    name="sku"
-                                    value={productData.sku}
-                                    placeholder="Gerar automaticamente"
-                                    onChange={handleFieldChange}
-                                    disabled={!isEditing}
-                                    dataField="sku"
-                                    suffix={
-                                        <div
-                                            onClick={generateRandomCode}
-                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                        >
-                                            <DiceIcon size={20} />
+                            {isQuickMode && (
+                                <FormSection title="Categoria oficial" description="Selecione a categoria oficial do seu produto." hasSeparator>
+                                    <button
+                                        type="button"
+                                        disabled={!isEditing}
+                                        onClick={() => setIsOfficialCategoryModalOpen(true)}
+                                        className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                    {officialCategoryPath || "Selecionar categoria..."}
+                                                </div>
+                                                {officialCategoryPath ? (
+                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
+                                                        Clique para alterar
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                            <div className="shrink-0 text-brand-inactive-text">
+                                                <PlusIcon className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                    }
-                                />
+                                    </button>
+                                </FormSection>
                             )}
+                        </div>
 
-                            {!isQuickMode && (
-                                <>
-                                    <div className="space-y-1.5 w-full">
+                        {/* Desktop: SidebarCard */}
+                        <div className="hidden lg:block">
+                            <SidebarCard hasTopStrip title="Organização">
+                                <div className="space-y-5">
+                                    {!hasVariants && (
                                         <Input
-                                            label="Código de Barras (EAN/GTIN)"
-                                            name="gtin"
-                                            value={productData.gtin || ""}
+                                            label="Código do Produto"
+                                            name="sku"
+                                            value={productData.sku}
+                                            placeholder="Gerar automaticamente"
                                             onChange={handleFieldChange}
                                             disabled={!isEditing}
-                                            dataField="gtin"
+                                            dataField="sku"
                                             suffix={
                                                 <div
-                                                    onClick={onGenerateBarcode}
+                                                    onClick={generateRandomCode}
                                                     className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
                                                 >
                                                     <DiceIcon size={20} />
                                                 </div>
                                             }
                                         />
-                                    </div>
+                                    )}
 
-                                    <FormCombobox
-                                        label="Categoria"
-                                        options={categories}
-                                        value={productData.category_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        dataField="category_id"
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova categoria
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova categoria",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
-                                        }}
-                                    />
+                                    {!isQuickMode && (
+                                        <>
+                                            <div className="space-y-1.5 w-full">
+                                                <Input
+                                                    label="Código de Barras (EAN/GTIN)"
+                                                    name="gtin"
+                                                    value={productData.gtin || ""}
+                                                    onChange={handleFieldChange}
+                                                    disabled={!isEditing}
+                                                    dataField="gtin"
+                                                    suffix={
+                                                        <div
+                                                            onClick={onGenerateBarcode}
+                                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                        >
+                                                            <DiceIcon size={20} />
+                                                        </div>
+                                                    }
+                                                />
+                                            </div>
 
-                                    <FormCombobox
-                                        label="Subcategoria"
-                                        options={subCategories}
-                                        value={productData.subcategory_id}
-                                        onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova subcategoria
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova subcategoria",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
-                                        }}
-                                    />
+                                            <FormCombobox
+                                                label="Categoria"
+                                                options={categories}
+                                                value={productData.category_id}
+                                                onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                dataField="category_id"
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova categoria
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova categoria",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                                }}
+                                            />
 
-                                    <FormCombobox
-                                        label="Marca"
-                                        options={brands}
-                                        value={productData.brand_id || productData.brand || ""}
-                                        onChange={handleBrandChange}
-                                        disabled={!isEditing}
-                                        width="w-full"
-                                        creatable={true}
-                                        searchPlaceholder="Buscar ou digitar nova marca..."
-                                        placeholder="Selecione ou digite..."
-                                        createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
-                                        actionItem={{
-                                            label: metadataPlanBlocked ? (
-                                                <span className="inline-flex items-center gap-1.5">
-                                                    Nova marca
-                                                    <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                </span>
-                                            ) : "Criar nova marca",
-                                            icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                            onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
-                                        }}
-                                    />
+                                            <FormCombobox
+                                                label="Subcategoria"
+                                                options={subCategories}
+                                                value={productData.subcategory_id}
+                                                onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova subcategoria
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova subcategoria",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                                }}
+                                            />
 
-                                    <FormCombobox
-                                        label="Unidade"
-                                        options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
-                                        value={productData.unidade}
-                                        onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
+                                            <FormCombobox
+                                                label="Marca"
+                                                options={brands}
+                                                value={productData.brand_id || productData.brand || ""}
+                                                onChange={handleBrandChange}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                                creatable={true}
+                                                searchPlaceholder="Buscar ou digitar nova marca..."
+                                                placeholder="Selecione ou digite..."
+                                                createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
+                                                actionItem={{
+                                                    label: metadataPlanBlocked ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            Nova marca
+                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        </span>
+                                                    ) : "Criar nova marca",
+                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
+                                                }}
+                                            />
+
+                                            <FormCombobox
+                                                label="Unidade"
+                                                options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
+                                                value={productData.unidade}
+                                                onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
+                                                disabled={!isEditing}
+                                                width="w-full"
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            </SidebarCard>
+
+                            {isQuickMode && (
+                                <SidebarCard title="Categoria oficial">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                        Selecione a categoria oficial do seu produto.
+                                    </p>
+                                    <button
+                                        type="button"
                                         disabled={!isEditing}
-                                        width="w-full"
-                                    />
-                                </>
+                                        onClick={() => setIsOfficialCategoryModalOpen(true)}
+                                        className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                                    {officialCategoryPath || "Selecionar categoria..."}
+                                                </div>
+                                                {officialCategoryPath ? (
+                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
+                                                        Clique para alterar
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                            <div className="shrink-0 text-brand-inactive-text">
+                                                <PlusIcon className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                    </button>
+                                </SidebarCard>
                             )}
                         </div>
+                    </>
+                )}
+
+                {isDesapego && isQuickMode && (
+                    <SidebarCard title="Categoria oficial">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                            Selecione a categoria oficial do seu produto.
+                        </p>
+                        <button
+                            type="button"
+                            disabled={!isEditing}
+                            onClick={() => setIsOfficialCategoryModalOpen(true)}
+                            className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
+                                        {officialCategoryPath || "Selecionar categoria..."}
+                                    </div>
+                                    {officialCategoryPath ? (
+                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
+                                            Clique para alterar
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div className="shrink-0 text-brand-inactive-text">
+                                    <PlusIcon className="w-4 h-4" />
+                                </div>
+                            </div>
+                        </button>
                     </SidebarCard>
-
-                    {isQuickMode && (
-                        <SidebarCard title="Categoria oficial">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                Selecione a categoria oficial do seu produto.
-                            </p>
-                            <button
-                                type="button"
-                                disabled={!isEditing}
-                                onClick={() => setIsOfficialCategoryModalOpen(true)}
-                                className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                            {officialCategoryPath || "Selecionar categoria..."}
-                                        </div>
-                                        {officialCategoryPath ? (
-                                            <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                                Clique para alterar
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                    <div className="shrink-0 text-brand-inactive-text">
-                                        <PlusIcon className="w-4 h-4" />
-                                    </div>
-                                </div>
-                            </button>
-                        </SidebarCard>
-                    )}
-                </div>
+                )}
 
                 <MarketplaceCategoryModal
                     isOpen={isOfficialCategoryModalOpen}

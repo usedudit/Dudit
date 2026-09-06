@@ -233,6 +233,7 @@ export async function createServiceOrderAction(
     payment_breakdown?: any
     created_at?: string | null
     specifications?: { name: string; value: string }[]
+    metadata?: Record<string, any>
     services?: Array<{ service_id: string | null; service_name?: string; service_price?: number; quantity?: number }>
     products?: Array<{ product_id: string | null; variant_id?: string | null; product_name?: string; unit_price?: number; quantity?: number }>
   },
@@ -327,6 +328,27 @@ export async function createServiceOrderAction(
     const finalTotal = Math.max(0, subtotal - discountAmount + otherCosts)
     const publicToken = generateShortId(6)
 
+    // Generate 4-digit approval code & salt
+    const crypto = await import("crypto")
+    const plainCode = crypto.randomInt(1000, 10000).toString()
+    const salt = crypto.randomBytes(16).toString("hex")
+    let approvalHash: string | null = null
+
+    try {
+      const { data: hashData } = await admin.rpc("compute_approval_hash", {
+        salt,
+        code: plainCode,
+      })
+      approvalHash = (hashData as string) || null
+    } catch (e) {
+      console.warn("[createServiceOrderAction] failed to compute approval hash:", e)
+    }
+
+    const orderMetadata = {
+      ...(input.metadata || {}),
+      plain_code: plainCode,
+    }
+
     // 1. Insert service order with final totals
     const { data, error } = await admin
       .from("service_orders")
@@ -363,6 +385,9 @@ export async function createServiceOrderAction(
         payment_breakdown: input.payment_breakdown ? JSON.stringify(input.payment_breakdown) : null,
         created_at: input.created_at || undefined,
         specifications: input.specifications && input.specifications.length > 0 ? input.specifications : undefined,
+        approval_code_salt: salt,
+        approval_code_hash: approvalHash,
+        metadata: orderMetadata,
       })
       .select("*")
       .single()
@@ -1225,7 +1250,7 @@ export async function getServiceOrderByTokenAction(
       .select(`
         id, store_id, customer_id, order_number, status, title, description, diagnosis, expected_completion_date, completed_at,
         total_service_amount, total_product_amount, total_amount, signature_image_key, signed_at,
-        customer_snapshot, created_at, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
+        customer_snapshot, created_at, created_by, sale_id, specifications, metadata, lockout_until, partner_id, assigned_user_id,
         public_token, payment_status, paid_amount, payment_method, priority, estimated_hours, expected_completion_time,
         stores!left (
           id, name, logo_url, phone
@@ -1316,18 +1341,13 @@ export async function getServiceOrderByTokenAction(
     if (!storeObj && row.partner_id) {
       const { data: storeFallback } = await admin
         .from("stores")
-        .select("id, name, logo_url, image_url, phone")
+        .select("id, name, logo_url, phone")
         .eq("partner_id", row.partner_id)
+        .order("is_headquarters", { ascending: false })
         .limit(1)
         .maybeSingle()
       storeObj = storeFallback
     }
-
-    const { data: partnerRow } = await admin
-      .from("partners")
-      .select("id, name, store_name, logo_url, store_image_url, phone, address")
-      .eq("id", row.partner_id)
-      .maybeSingle()
 
     const addressesList = addressRes.data || []
     const addressRow = addressesList.find((a: any) => a.is_default) || addressesList[0]
@@ -1336,13 +1356,11 @@ export async function getServiceOrderByTokenAction(
       const streetNumber = [addressRow.street, addressRow.number].filter(Boolean).join(", ")
       const neighborhoodCityState = [addressRow.neighborhood, [addressRow.city, addressRow.state].filter(Boolean).join("/")].filter(Boolean).join(" - ")
       partnerAddress = [streetNumber, neighborhoodCityState].filter(Boolean).join("\n")
-    } else if (partnerRow?.address) {
-      partnerAddress = partnerRow.address
     }
 
-    const resolvedPartnerName = storeObj?.name || partnerRow?.store_name || partnerRow?.name || "Parceiro"
-    const resolvedPartnerLogo = storeObj?.logo_url || storeObj?.image_url || partnerRow?.logo_url || partnerRow?.store_image_url || null
-    const resolvedPartnerPhone = storeObj?.phone || partnerRow?.phone || ""
+    const resolvedPartnerName = storeObj?.name || "Parceiro"
+    const resolvedPartnerLogo = storeObj?.logo_url || null
+    const resolvedPartnerPhone = storeObj?.phone || ""
 
     const maskedCustomer = resolvedCustomer ? {
       name: resolvedCustomer.name || null,
@@ -1359,6 +1377,43 @@ export async function getServiceOrderByTokenAction(
         complement: "***",
       })) : undefined,
     } : null
+
+    let canDirectSign = false
+    try {
+      const { getCurrentUser } = await import("@/lib/auth/server-user")
+      const loggedUser = await getCurrentUser()
+      if (loggedUser) {
+        const { data: partnerUser } = await admin
+          .from("partner_users")
+          .select("role")
+          .eq("partner_id", row.partner_id)
+          .eq("user_id", loggedUser.id)
+          .maybeSingle()
+
+        const { data: partnerOwner } = await admin
+          .from("partners")
+          .select("id")
+          .eq("id", row.partner_id)
+          .eq("user_id", loggedUser.id)
+          .maybeSingle()
+
+        const isErpMember = Boolean(
+          partnerOwner ||
+          partnerUser ||
+          (row.assigned_user_id && row.assigned_user_id === loggedUser.id) ||
+          (row.created_by && row.created_by === loggedUser.id)
+        )
+
+        const rawCustomerEmail = (resolvedCustomer as any)?.email || null
+        if (isErpMember) {
+          canDirectSign = true
+        } else if (rawCustomerEmail && loggedUser.email && loggedUser.email.toLowerCase() === rawCustomerEmail.toLowerCase()) {
+          canDirectSign = true
+        }
+      }
+    } catch {
+      // User not authenticated or session error
+    }
 
     const safeMetadata = { ...(row.metadata || {}) }
     delete safeMetadata.plain_code
@@ -1394,6 +1449,7 @@ export async function getServiceOrderByTokenAction(
       priority: row.priority,
       estimated_hours: row.estimated_hours,
       expected_completion_time: row.expected_completion_time,
+      can_direct_sign: canDirectSign,
       partners: {
         name: resolvedPartnerName,
         logo_url: resolvedPartnerLogo,
@@ -2229,11 +2285,10 @@ export async function regenerateServiceOrderApprovalCodeAction(
 
     const hash = hashData as string
 
-    // Clean any legacy plain_code from metadata
-    const cleanMetadata = { ...(so.metadata || {}) }
-    delete cleanMetadata.plain_code
+    // Store plain_code in metadata for merchant viewing and sharing
+    const cleanMetadata = { ...(so.metadata || {}), plain_code: plainCode }
 
-    // 3. Update service order without persisting plain_code
+    // 3. Update service order with new code
     const { error: updateErr } = await supabase
       .from("service_orders")
       .update({
@@ -2344,7 +2399,7 @@ export async function signPublicServiceOrderAction(
     // 1. Fetch OS strictly by public_token
     const { data: order, error } = await admin
       .from("service_orders")
-      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key")
+      .select("id, status, assigned_user_id, partner_id, customer_snapshot, signature_image_key, created_by")
       .eq("public_token", cleanToken)
       .maybeSingle()
 
@@ -2372,14 +2427,54 @@ export async function signPublicServiceOrderAction(
       // Not logged in
     }
 
-    const customerEmail = (order.customer_snapshot as any)?.email || null
+    let rawCustomer = order.customer_snapshot
+    if (typeof rawCustomer === "string") {
+      try {
+        rawCustomer = JSON.parse(rawCustomer)
+      } catch {
+        rawCustomer = null
+      }
+    }
+    const customerEmail = (rawCustomer as any)?.email || null
     let isAuthorized = false
     let method = "code"
+    let approverDisplayName = approverName?.trim() || "Cliente"
 
     if (loggedUser) {
-      if (customerEmail && loggedUser.email && loggedUser.email.toLowerCase() === customerEmail.toLowerCase()) {
+      const { data: partnerUser } = await admin
+        .from("partner_users")
+        .select("role")
+        .eq("partner_id", order.partner_id)
+        .eq("user_id", loggedUser.id)
+        .maybeSingle()
+
+      const { data: partnerOwner } = await admin
+        .from("partners")
+        .select("id")
+        .eq("id", order.partner_id)
+        .eq("user_id", loggedUser.id)
+        .maybeSingle()
+
+      const isErpMember = Boolean(
+        partnerOwner ||
+        partnerUser ||
+        (order.assigned_user_id && order.assigned_user_id === loggedUser.id) ||
+        (order.created_by && order.created_by === loggedUser.id)
+      )
+
+      if (isErpMember) {
+        isAuthorized = true
+        method = "erp_portal"
+        const { data: profile } = await admin
+          .from("user_profiles")
+          .select("full_name")
+          .eq("user_id", loggedUser.id)
+          .maybeSingle()
+        approverDisplayName = profile?.full_name?.trim() || loggedUser.email?.split("@")[0] || "Lojista"
+      } else if (customerEmail && loggedUser.email && loggedUser.email.toLowerCase() === customerEmail.toLowerCase()) {
         isAuthorized = true
         method = "auth"
+        approverDisplayName = (rawCustomer as any)?.name || loggedUser.email?.split("@")[0] || "Cliente"
       }
     }
 
@@ -2388,10 +2483,11 @@ export async function signPublicServiceOrderAction(
         return { success: false, error: "Código de assinatura é obrigatório." }
       }
       method = "code"
+      approverDisplayName = (rawCustomer as any)?.name || approverName?.trim() || "Cliente"
     }
 
-    if (method === "auth") {
-      // Direct update for client signature to avoid creator/professional database RPC restriction
+    if (isAuthorized) {
+      // Direct update for authorized user (partner member, assigned tech, or authenticated customer)
       const { error: updateErr } = await admin
         .from("service_orders")
         .update({
@@ -2410,24 +2506,28 @@ export async function signPublicServiceOrderAction(
 
       await logAuditEvent({
         partnerId: order.partner_id,
-        actorUserId: loggedUser.id || null,
+        actorUserId: loggedUser?.id || null,
         entityType: 'service_order',
         entityId: order.id,
         actionType: 'signed',
-        changeLines: ['OS assinada pelo cliente via portal público (autenticado por e-mail)'],
+        changeLines: [
+          method === "erp_portal"
+            ? 'OS assinada diretamente via portal (membro da loja autenticado)'
+            : 'OS assinada pelo cliente via portal público (autenticado por e-mail)'
+        ],
         source: 'system',
         metadata: {
           ipAddress: ip || null,
           userAgent: userAgent || null,
           timestamp: new Date().toISOString(),
-          approver_name: loggedUser.email || "Cliente"
+          approver_name: approverDisplayName
         }
       })
     } else {
       // Call DB function for code signature validation
       const { data: rpcRes, error: rpcErr } = await admin.rpc("sign_public_service_order", {
         p_so_id: order.id,
-        p_name: "Cliente",
+        p_name: approverDisplayName,
         p_code: approvalCode.trim(),
         p_signature_key: signatureImageKey,
         p_ip: ip || null,

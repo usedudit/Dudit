@@ -381,47 +381,52 @@ export default async function ExplorarPage({
                                     {productCategories.map((cat) => {
                                         const href = `/explorar/${landingCitySlug}/${cat.slug}`
                                         return (
-                                            <a key={cat.slug} href={href}>
-                                                <ListItem
-                                                    icon={
-                                                        cat.icon_url ? (
-                                                            <img
-                                                                src={cat.icon_url}
-                                                                alt={cat.name}
-                                                                className="w-6 h-6 object-contain"
-                                                            />
-                                                        ) : (
-                                                            <span className="text-lg">📦</span>
-                                                        )
-                                                    }
-                                                    className="px-4 py-3 gap-4"
-                                                    title={cat.name}
-                                                    showChevron
-                                                />
-                                            </a>
+                                            <div className="space-y-6">
+                                                <a key={cat.slug} href={href}>
+                                                    <ListItem
+                                                        icon={
+                                                            cat.icon_url ? (
+                                                                <img
+                                                                    src={cat.icon_url}
+                                                                    alt={cat.name}
+                                                                    className="w-6 h-6 object-contain"
+                                                                />
+                                                            ) : (
+                                                                <span className="text-lg">📦</span>
+                                                            )
+                                                        }
+                                                        className="px-4 py-3"
+                                                        title={cat.name}
+                                                        showChevron
+                                                    />
+                                                </a>
+                                            </div>
                                         )
                                     })}
                                 </FormSection>
 
                                 {serviceCategory && (
                                     <FormSection title="Categorias de Serviços" hasSeparator>
-                                        <a href={`/explorar/${landingCitySlug}?type=servicos`}>
-                                            <ListItem
-                                                icon={
-                                                    serviceCategory.icon_url ? (
-                                                        <img
-                                                            src={serviceCategory.icon_url}
-                                                            alt={serviceCategory.name}
-                                                            className="w-6 h-6 object-contain"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-lg">🔧</span>
-                                                    )
-                                                }
-                                                title={serviceCategory.name}
-                                                showChevron
-                                            />
-                                        </a>
+                                        <div className="space-y-6">
+                                            <a href={`/explorar/${landingCitySlug}?type=servicos`}>
+                                                <ListItem
+                                                    icon={
+                                                        serviceCategory.icon_url ? (
+                                                            <img
+                                                                src={serviceCategory.icon_url}
+                                                                alt={serviceCategory.name}
+                                                                className="w-6 h-6 object-contain"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-lg">🔧</span>
+                                                        )
+                                                    }
+                                                    className="px-4 py-3"
+                                                    title={serviceCategory.name}
+                                                    showChevron
+                                                />
+                                            </a>
+                                        </div>
                                     </FormSection>
                                 )}
                             </>

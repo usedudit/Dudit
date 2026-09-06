@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { DefaultModal, Button, InfoCard, IconPlaceholder } from "@/components/reusable"
+import { DefaultModal, Button, FormTextarea, InfoCard, IconPlaceholder } from "@/components/reusable"
 import { submitFeedbackAction, type FeedbackSentiment } from "@/app/actions/feedback"
 import { getClientFeedbackContext } from "@/lib/utils/client-feedback-context"
 
@@ -42,6 +42,7 @@ export function GeneralFeedbackModal({
   userRole,
 }: GeneralFeedbackModalProps) {
   const [sentiment, setSentiment] = useState<FeedbackSentiment | null>(null)
+  const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -50,6 +51,7 @@ export function GeneralFeedbackModal({
     if (isOpen) {
       setIsSuccess(false)
       setErrorMessage(null)
+      setMessage("")
       setSentiment(null)
     }
   }, [isOpen])
@@ -73,10 +75,15 @@ export function GeneralFeedbackModal({
             ? "Neutro"
             : "Negativo"
 
+      const commentText = message.trim()
+      const feedbackMessage = commentText
+        ? `Feedback [${sentimentLabel}]: ${commentText}`
+        : `Feedback: ${sentimentLabel}`
+
       const res = await submitFeedbackAction({
         type: "general",
         sentiment,
-        message: `Feedback: ${sentimentLabel}`,
+        message: feedbackMessage,
         pageUrl: clientContext.pageUrl,
         partnerId: partnerId || null,
         metadata: {
@@ -171,6 +178,19 @@ export function GeneralFeedbackModal({
                 </button>
               )
             })}
+          </div>
+
+          {/* Comentário opcional */}
+          <div className="space-y-1">
+            <FormTextarea
+              label="Comentário (opcional)"
+              placeholder="Quer escrever algo mais?"
+              value={message}
+              onChange={(e: any) => setMessage(e.target.value)}
+              maxLength={2000}
+              showCharacterCount
+              className="min-h-[80px]"
+            />
           </div>
 
           {errorMessage && (

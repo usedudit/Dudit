@@ -45,7 +45,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
     useEffect(() => {
         const fetchPath = async () => {
             if (serviceData?.marketplace_category_id) {
-                const path = await getCategoryPathClient(serviceData.marketplace_category_id)
+                const path = await getCategoryPathClient(serviceData.marketplace_category_id, "service")
                 if (path) setCategoryPath(path)
             }
         }

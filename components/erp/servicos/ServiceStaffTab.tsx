@@ -62,6 +62,10 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
         })
     }
 
+    const displayStaffList = assignedStaff.all
+        ? staffList.filter((s) => s.role !== "DELIVERY")
+        : staffList
+
     return (
         <div className="animate-fade-in">
             <div>
@@ -75,6 +79,11 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
                                 disabled={!isEditing}
                                 name="all_staff"
                             />
+                            {assignedStaff.all && (
+                                <p className="text-brand-inactive-text text-xs mt-1 ml-6">
+                                    Entregadores ficam de fora por padrão
+                                </p>
+                            )}
                         </div>
 
                         {!assignedStaff.all && (
@@ -82,15 +91,19 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
                                 <FormSection title="Selecione os profissionais:" hasSeparator>
                                     {isLoading ? (
                                         <p className="text-brand-inactive-text text-sm">Carregando equipe...</p>
-                                    ) : staffList.length === 0 ? (
+                                    ) : displayStaffList.length === 0 ? (
                                         <p className="text-brand-inactive-text text-sm">Nenhum profissional encontrado.</p>
                                     ) : (
                                         <div className="grid grid-cols-1 gap-4">
-                                            {staffList.map((staff) => (
+                                            {displayStaffList.map((staff) => (
                                                 <ListItem
                                                     key={staff.id}
                                                     title={staff.fullName || staff.email || "Sem Nome"}
-                                                    description={staff.isOwner ? "Proprietário" : "Membro da equipe"}
+                                                    description={
+                                                        staff.isOwner ? "Proprietário" :
+                                                        staff.role === "DELIVERY" ? "Entregador" :
+                                                        "Membro da equipe"
+                                                    }
                                                     className="p-4"
                                                     left={
                                                         <UserProfileImage

@@ -214,7 +214,7 @@ export async function Dashboard({
               title="Evolução de Receita"
               legendItems={[{ label: "Este Período", color: "#059669" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
             />
-            <DashboardLineChart data={evoData} valueFormatter={v => brl(v)} />
+            <DashboardLineChart data={evoData} format="currency" />
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -225,7 +225,7 @@ export async function Dashboard({
               totalValue={brl(totalOrigin)}
               totalLabel="Receita Total"
               colors={CHART_COLORS_CATEGORY}
-              valueFormatter={v => brl(v)}
+              format="currency"
             />
           </div>
         </div>

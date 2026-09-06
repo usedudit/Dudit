@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { validateCronRequest, acquireExecutionLock, releaseExecutionLock, enqueueTriggerBatch, cronLogger } from "@/lib/internal-cron"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getLimiter, RateLimitCategory } from "@/lib/rate-limiter"
+import { processWhatsappMessageById } from "@/lib/services/whatsapp-dispatch.service"
 
 const JOB_NAME = "retry-failed-whatsapp"
 const BATCH_SIZE = 100
@@ -21,7 +22,8 @@ const MAX_PERMANENT_RETRIES = 5
  * 4. Query failed messages that are retryable (retry_count < max, next_retry_at <= NOW())
  * 5. Mark messages that exceeded max retries as dead-letter (failed_permanently)
  * 6. Enqueue retryable messages to Trigger.dev with jitter delay
- * 7. Return quickly
+ * 7. Fallback: If Trigger.dev is unavailable or fails, execute processWhatsappMessageById directly
+ * 8. Return summary
  */
 export async function POST(req: Request) {
   const startTime = Date.now()
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
     if (messages.length === 0) {
       const durationMs = Date.now() - startTime
       cronLogger.success(JOB_NAME, { enqueued: 0, deadLettered: 0, message: "No retryable messages" }, durationMs)
-      return NextResponse.json({ success: true, enqueued: 0, deadLettered: 0, failed: 0 })
+      return NextResponse.json({ success: true, enqueued: 0, deadLettered: 0, failed: 0, executedDirectly: 0 })
     }
 
     // 5. Separate: dead-letter vs retryable
@@ -128,7 +130,6 @@ export async function POST(req: Request) {
     // 7. Claim retryable messages (set status to processing to prevent race)
     // and enqueue to Trigger.dev with jitter delay
     if (retryableMessages.length > 0) {
-      // Mark as processing before enqueueing
       const retryableIds = retryableMessages.map((m) => String(m.id))
       await admin
         .from("whatsapp_messages")
@@ -162,16 +163,46 @@ export async function POST(req: Request) {
           }),
           JOB_NAME,
         )
-      : { enqueued: 0, failed: 0 }
+      : { enqueued: 0, failed: 0, failedIndices: [] }
 
-    // Reset failed-to-enqueue messages back to failed for next retry cycle
-    if (result.failed > 0) {
-      const failedRetries = retryableMessages.slice(result.enqueued)
-      for (const msg of failedRetries) {
-        await admin
-          .from("whatsapp_messages")
-          .update({ status: "failed" })
-          .eq("id", String(msg.id))
+    let executedDirectly = 0
+    let executionFailed = 0
+
+    // 8. Resilient Fallback: If Trigger.dev failed to enqueue,
+    // execute processWhatsappMessageById directly inside Next.js instead of dropping.
+    if (result.failed > 0 && result.failedIndices.length > 0) {
+      const failedRetries = result.failedIndices.map((idx) => retryableMessages[idx])
+      cronLogger.warn(JOB_NAME, `Trigger.dev enqueue failed for ${failedRetries.length} retries - executing direct fallback`, {
+        count: failedRetries.length,
+      })
+
+      const CHUNK_SIZE = 5
+      for (let i = 0; i < failedRetries.length; i += CHUNK_SIZE) {
+        const chunk = failedRetries.slice(i, i + CHUNK_SIZE)
+        const settleResults = await Promise.allSettled(
+          chunk.map(async (msg) => {
+            await processWhatsappMessageById(String(msg.id))
+          })
+        )
+
+        for (let j = 0; j < settleResults.length; j++) {
+          const res = settleResults[j]
+          const msg = chunk[j]
+          if (res.status === "fulfilled") {
+            executedDirectly++
+          } else {
+            executionFailed++
+            cronLogger.error(JOB_NAME, "Direct fallback retry execution failed for message", {
+              messageId: String(msg.id),
+              error: res.reason instanceof Error ? res.reason.message : String(res.reason),
+            })
+            // Reset to failed status with error message
+            await admin
+              .from("whatsapp_messages")
+              .update({ status: "failed" })
+              .eq("id", String(msg.id))
+          }
+        }
       }
     }
 
@@ -180,7 +211,8 @@ export async function POST(req: Request) {
       total: messages.length,
       enqueued: result.enqueued,
       deadLettered: deadLetterMessages.length,
-      enqueueFailed: result.failed,
+      executedDirectly,
+      executionFailed,
     }, durationMs)
 
     return NextResponse.json({
@@ -188,7 +220,8 @@ export async function POST(req: Request) {
       total: messages.length,
       enqueued: result.enqueued,
       deadLettered: deadLetterMessages.length,
-      failed: result.failed,
+      executedDirectly,
+      failed: executionFailed,
       durationMs,
     })
   } catch (error: unknown) {

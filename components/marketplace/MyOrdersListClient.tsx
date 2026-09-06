@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ReviewButton } from "@/components/marketplace/review-button";
 import { OrderRetryPayment } from "@/components/order-retry-payment";
 import { BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-load";
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger } from "@/components/reusable";
+import Pagination from "@/components/reusable/Pagination";
 import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,8 +52,9 @@ function calculateDiscountedPrice(item: any, order: any) {
     return { discountedPrice: Math.round(basePrice * itemDiscountRatio * 100) / 100, hasItemDiscount: true, basePrice }
 }
 
-export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {
+export function MyOrdersListClient({ orders, reviewedItemsArray, userId, currentPage = 1, totalPages = 1 }: { orders: any[], reviewedItemsArray: any[], userId: string, currentPage?: number, totalPages?: number }) {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<string>("todos");
 
@@ -115,6 +117,13 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
             return;
         }
         handleOpenDetails(id, orderNumber);
+    };
+
+    const handlePageChange = (page: number) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('page', String(page));
+        router.push(`/pedidos?${params.toString()}`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const activeOrder = orders?.find((o: any) => o.id === activeOrderId);
@@ -487,6 +496,14 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { ord
                                 </div>
                             )}
                         </div>
+
+                        {totalPages > 1 && (
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={handlePageChange}
+                            />
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

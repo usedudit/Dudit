@@ -72,8 +72,6 @@ async function ProductFeedWrapper({ user, userProfile, cartCount, citySlug, city
 
         displayCityName = ctxCity
 
-        // console.log(`[DIAG] scope=${scope} displayCity=${ctxCity} displayState=${ctxState} cityName=${cityName} isDefaultSP=${isDefaultSP}`)
-
         const [sectionsResult, adsResult] = await Promise.all([
             getHomeSections({
                 city: ctxCity,
@@ -144,32 +142,32 @@ export default async function HomePage() {
         : Promise.resolve(null)
 
     const sessionData = await sessionDataPromise
-
     const dbProfile = sessionData?.profile
 
-    // Resolve city selection (either from user profile or visitor cookie)
+    // Resolve city selection (check explicit city cookie first, fallback to user profile address)
     let citySlug: string | null = null
     let cityName: string | null = null
 
-    if (dbProfile?.city && dbProfile?.state) {
-        cityName = dbProfile.city
-        const normalizedCity = dbProfile.city
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "")
-        citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
-    } else if (!user) {
-        // Logged-out visitors only: check the location cookie
-        const cookieStore = await cookies()
-        const cookieCity = cookieStore.get("dudit_city")?.value
-        if (cookieCity) {
-            const resolved = await resolveCityAndStateFromSlug(cookieCity)
-            if (resolved) {
-                citySlug = cookieCity
-                cityName = resolved.city
-            }
+    const cookieStore = await cookies()
+    const cookieCity = cookieStore.get("dudit_city")?.value
+    if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
+        const resolved = await resolveCityAndStateFromSlug(cookieCity)
+        if (resolved) {
+            citySlug = cookieCity
+            cityName = resolved.city
+        }
+    }
+
+    if (!citySlug || !cityName) {
+        if (dbProfile?.city && dbProfile?.state) {
+            cityName = dbProfile.city
+            const normalizedCity = dbProfile.city
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "")
+            citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
         }
     }
 
@@ -185,11 +183,11 @@ export default async function HomePage() {
             full_name: dbProfile.full_name,
             latitude: dbProfile.latitude,
             longitude: dbProfile.longitude,
-            address: dbProfile.city
-                ? `${dbProfile.city} - ${dbProfile.state}`
-                : null,
-            city: dbProfile.city || null,
-            state: dbProfile.state || null,
+            address: cityName && citySlug
+                ? `${cityName} - ${citySlug.split("-").pop()?.toUpperCase()}`
+                : (dbProfile.city ? `${dbProfile.city} - ${dbProfile.state}` : null),
+            city: cityName || dbProfile.city || null,
+            state: (citySlug ? citySlug.split("-").pop()?.toUpperCase() : dbProfile.state) || null,
         }
         : (cityName && citySlug ? {
             full_name: null,

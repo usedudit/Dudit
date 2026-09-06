@@ -293,6 +293,30 @@ export async function getUserCollections(userId: string, cursor?: string, limit 
   return { items, nextCursor, hasMore }
 }
 
+export async function getUserCollectionsPaginated(userId: string, page: number = 1, limit: number = 20) {
+  const supabase = await getSupabaseServerClient()
+
+  const offset = (Math.max(1, page) - 1) * limit
+
+  const [collectionsResult, countResult] = await Promise.all([
+    supabase
+      .from("collections")
+      .select("*")
+      .eq("author_id", userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1),
+    supabase
+      .from("collections")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", userId),
+  ])
+
+  const items = collectionsResult.data || []
+  const total = countResult.count || 0
+
+  return { items, total }
+}
+
 export async function getCommunityCollections(cursor?: string, limit = 20) {
   const supabase = await getSupabaseServerClient()
 

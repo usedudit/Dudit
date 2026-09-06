@@ -789,20 +789,17 @@ export function PlanDetailsPageClient({
                                         </div>
                                     </div>
 
-                                    {/* Desktop Next Button */}
-                                    <div className="hidden lg:flex w-10 shrink-0 items-center justify-center">
+                                    {/* Desktop Next Button + Actions Column */}
+                                    <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
+                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center border-brand-border rounded-full" title="Compartilhar">
+                                            <ShareIcon className="w-5 h-5 text-brand-green" />
+                                        </Button>
+
                                         {galleryItems.length > 1 && (
                                             <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                 <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />
                                             </Button>
                                         )}
-                                    </div>
-
-                                    {/* Desktop Right Column (Actions) */}
-                                    <div className="hidden lg:flex flex-col gap-3 shrink-0 items-center">
-                                        <Button variant="outline" onClick={() => setShowShareModal(true)} className="w-10 h-10 flex items-center justify-center border-brand-border rounded-full" title="Compartilhar">
-                                            <ShareIcon className="w-5 h-5 text-brand-green" />
-                                        </Button>
                                     </div>
                                 </div>
                             </div>

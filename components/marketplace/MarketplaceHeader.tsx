@@ -305,7 +305,11 @@ const Header: React.FC<HeaderProps> = ({
     const handleSelectCitySlug = (slug: string) => {
         document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
         localStorage.setItem('dudit_city', slug)
-        window.location.href = `/${slug}`
+        if (currentView === 'home' || (typeof window !== 'undefined' && window.location.pathname === '/')) {
+            window.location.reload()
+        } else {
+            window.location.href = `/explorar/${slug}`
+        }
     }
 
     const handleIpLocation = async () => {
@@ -328,7 +332,11 @@ const Header: React.FC<HeaderProps> = ({
 
                 document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
                 localStorage.setItem('dudit_city', slug)
-                window.location.href = `/${slug}`
+                if (currentView === 'home' || (typeof window !== 'undefined' && window.location.pathname === '/')) {
+                    window.location.reload()
+                } else {
+                    window.location.href = `/explorar/${slug}`
+                }
             } else {
                 throw new Error("Dados de IP incompletos")
             }

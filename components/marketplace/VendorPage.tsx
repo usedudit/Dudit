@@ -1033,7 +1033,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
-                <div className="w-full max-w-[1400px] mx-auto sm:px-4 lg:px-0">
+                <div className="w-full max-w-[1400px] mx-auto">
                     <div className="relative w-full aspect-[1400/300] md:rounded-2xl overflow-hidden bg-gray-100 dark:bg-dark-border/50 lg:mb-4 shadow-xs">
                         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                     </div>
@@ -1376,12 +1376,13 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     </div>
 
                                                     <div className="flex items-center gap-4 flex-wrap">
-                                                        <button
+                                                        <Button
+                                                            variant="ghost"
                                                             onClick={() => openCategory(`campaign-${promo.id}`)}
-                                                            className="text-[12px] md:text-xs font-black uppercase tracking-wider text-brand-dark hover:opacity-80 transition-opacity bg-white px-3 py-1.5 rounded-full shadow-sm"
+                                                            className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
                                                         >
                                                             Ver tudo
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </div>
 

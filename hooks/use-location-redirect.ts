@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { isValidCitySlug } from '@/lib/validation/city';
 
-export function useLocationRedirect() {
+export function useLocationRedirect(redirectTo?: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +51,17 @@ export function useLocationRedirect() {
           if (isValidCitySlug(slug)) {
             document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`;
             localStorage.setItem('dudit_city', slug);
-            window.location.href = `/${slug}`;
+            if (redirectTo) {
+              if (redirectTo === '/' && typeof window !== 'undefined' && window.location.pathname === '/') {
+                window.location.reload();
+              } else {
+                window.location.href = redirectTo;
+              }
+            } else if (typeof window !== 'undefined' && window.location.pathname === '/') {
+              window.location.reload();
+            } else {
+              window.location.href = `/explorar/${slug}`;
+            }
           } else {
             setError('Ainda não estamos na sua cidade');
             setLoading(false);
