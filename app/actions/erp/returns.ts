@@ -1100,9 +1100,7 @@ export async function processReturnRequestAction(input: unknown) {
             }
         }
 
-        const refundStatus = data.refundAmount > 0
-            ? (isMpRefund ? "PENDING" : data.refundStatus)
-            : data.refundStatus
+        const refundStatus = data.refundStatus
 
         const useSelectiveReturn = data.returnToInventoryItems !== undefined && data.returnToInventoryItems !== null
         const pReturnToInventoryForRpc = useSelectiveReturn ? false : data.returnToInventory

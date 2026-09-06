@@ -22,12 +22,12 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
   const currentPage = Math.max(1, Number(resolvedParams?.page) || 1)
   const offset = (currentPage - 1) * ORDERS_PER_PAGE
   const orderSelect = `
-    id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
+    id, order_number, situation, delivery_status, total_amount, amount_paid, paid_amount, subtotal_original, discount_total, shipping_total,
     delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, updated_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
-    mp_date_approved, notes,
-    partners(id, is_active, addresses(city, state)),
+    mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id,
+    partners(id, is_active, mp_public_key, addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,
@@ -37,12 +37,12 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       recurring_plans(id, short_id, name))
   `
   const fallbackOrderSelect = `
-    id, order_number, situation, delivery_status, total_amount, amount_paid, subtotal_original, discount_total, shipping_total,
+    id, order_number, situation, delivery_status, total_amount, amount_paid, paid_amount, subtotal_original, discount_total, shipping_total,
     delivery_fee, discount_amount, payment_method_discount_amount, payment_method_extra_amount, payment_breakdown, checkout_fulfillment, created_at, updated_at, payment_method,
     payment_provider, delivery_type, delivery_address, customer_name,
     partner_id, store_id, buyer_id, mp_payment_id, return_policy_snapshot, payment_expires_at,
-    mp_date_approved, notes,
-    partners(id, is_active, addresses(city, state)),
+    mp_date_approved, notes, order_source, exchange_parent_order_id, exchange_return_request_id,
+    partners(id, is_active, mp_public_key, addresses(city, state)),
     stores!left(id, short_id, name, slug, logo_url, banner_url, description, phone, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state)),
     return_requests!order_id(id, request_type, status, desired_resolution, approved_resolution, refund_amount, store_credit_amount, customer_message, seller_notes, eligibility_status, sla_status, sla_due_at, sla_expired_at, reported_to_dudit_at, dudit_report_id, policy_snapshot, created_at, updated_at, deleted_at, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
     order_items(id, product_id, product_name, product_price, quantity, subtotal, line_type, fulfillment_mode, service_id, recurring_plan_id,

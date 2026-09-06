@@ -140,8 +140,12 @@ export function patchDepositCheckoutOnPayment(
   }
 }
 
-/** Expected MP charge: full total, or initial charge when deposit-only checkout. */
+/** Expected MP charge: full total, initial charge when deposit-only checkout, or remaining balance when partial/exchange paid. */
 export function getExpectedMpChargeAmount(order: OrderFinancialSnapshot): number {
+  const paidAmount = getOrderPaidAmount(order)
+  if (paidAmount > 0.009) {
+    return getOrderRemainingBalance(order)
+  }
   const meta = getDepositCheckoutMeta(order.checkout_fulfillment ?? null)
   if (meta.initialChargeAmount != null && Number(meta.initialChargeAmount) > 0.009) {
     return Number(meta.initialChargeAmount)

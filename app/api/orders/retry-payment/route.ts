@@ -51,10 +51,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
-    if (order.payment_provider !== "Mercado Pago") {
-      return NextResponse.json({ error: "This order does not use Mercado Pago" }, { status: 400 })
-    }
-
     let mpAccessToken: string
     try {
       mpAccessToken = await getValidMercadoPagoAccessToken(order.partner_id)
@@ -67,49 +63,115 @@ export async function POST(request: NextRequest) {
         entityId: order.id,
       })
       SecureLogger.error("Partner has no valid MP access token in retry-payment", { error: err.message })
-      return NextResponse.json({ error: "Seller has not configured Mercado Pago" }, { status: 400 })
+      return NextResponse.json({ error: "O vendedor não possui o Mercado Pago configurado para pagamentos online." }, { status: 400 })
     }
 
     // Verificar se o pedido está com pagamento pendente
     if (order.situation !== "pending") {
       return NextResponse.json(
-        { error: "This order is not pending payment" },
+        { error: "Este pedido não está com pagamento pendente" },
         { status: 400 },
       )
     }
 
-    // Verificar se tem ID do pagamento no Mercado Pago
-    if (!order.mp_payment_id) {
-      return NextResponse.json(
-        { error: "No payment ID found for this order" },
-        { status: 400 },
-      )
+    const totalAmount = Number(order.total_amount || 0)
+    const paidAmount = Number(order.paid_amount ?? order.amount_paid ?? 0)
+    const chargeAmount = Math.round((Math.max(0, totalAmount - paidAmount) + Number.EPSILON) * 100) / 100
+
+    if (chargeAmount <= 0) {
+      await adminClient
+        .from("orders")
+        .update({ situation: "paid", updated_at: new Date().toISOString() })
+        .eq("id", order.id)
+      return NextResponse.json({ success: true, alreadyPaid: true })
     }
 
+    let paymentData: any = null
 
+    // Se já tiver mp_payment_id, tentar buscar dados existentes
+    if (order.mp_payment_id) {
+      try {
+        const mpResponse = await fetch(
+          `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${mpAccessToken}`,
+              "X-Idempotency-Key": `get-payment-${order.mp_payment_id}`,
+            },
+          },
+        )
+        if (mpResponse.ok) {
+          const fetched = await mpResponse.json()
+          if (fetched.status === "pending" && fetched.point_of_interaction?.transaction_data?.qr_code) {
+            paymentData = fetched
+          }
+        }
+      } catch (err: any) {
+        SecureLogger.warn("Failed to fetch existing MP payment in retry-payment, creating new", { orderId: order.id })
+      }
+    }
 
-    // Buscar dados do pagamento do Mercado Pago usando token do vendedor
-    const mpResponse = await fetch(
-      `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
-      {
+    // Se não tem pagamento ou o anterior não está pendente/válido, cria um novo Pix
+    if (!paymentData) {
+      const isExchange = order.order_source === "Troca" || !!order.exchange_return_request_id
+      const description = isExchange
+        ? `Diferença de troca - Pedido #${order.order_number || order.id.slice(0, 8)}`
+        : `Pedido #${order.order_number || order.id.slice(0, 8)}`
+
+      const payerName = (order.customer_name || user.user_metadata?.full_name || user.email || "Cliente").trim()
+      const nameParts = payerName.split(/\s+/)
+      const firstName = nameParts[0] || "Cliente"
+      const lastName = nameParts.slice(1).join(" ") || "Comprador"
+
+      const mpPaymentRequest: Record<string, any> = {
+        transaction_amount: chargeAmount,
+        payment_method_id: "pix",
+        notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
+        external_reference: order.id,
+        statement_descriptor: "DUDIT",
+        description: description.slice(0, 250),
+        payer: {
+          email: user.email,
+          first_name: firstName,
+          last_name: lastName,
+        },
+      }
+
+      const createResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+        method: "POST",
         headers: {
           Authorization: `Bearer ${mpAccessToken}`,
-          "X-Idempotency-Key": `get-payment-${order.mp_payment_id}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": `retry-${order.id}-${Date.now()}`,
         },
-      },
-    )
+        body: JSON.stringify(mpPaymentRequest),
+      })
 
-    if (!mpResponse.ok) {
-      SecureLogger.error("MP get payment error in retry-payment")
-      return NextResponse.json(
-        { error: "Failed to get payment from Mercado Pago" },
-        { status: mpResponse.status },
-      )
+      if (!createResponse.ok) {
+        let errText = ""
+        try {
+          errText = await createResponse.text()
+        } catch (_) {}
+        SecureLogger.error("Failed to create MP Pix payment in retry-payment", {
+          status: createResponse.status,
+          error: errText,
+        })
+        return NextResponse.json({ error: "Erro ao gerar cobrança Pix no Mercado Pago" }, { status: 400 })
+      }
+
+      paymentData = await createResponse.json()
+
+      await adminClient
+        .from("orders")
+        .update({
+          payment_provider: "Mercado Pago",
+          mp_payment_id: paymentData.id.toString(),
+          payment_status: paymentData.status,
+          payment_expires_at: paymentData.date_of_expiration,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
     }
-
-    const paymentData = await mpResponse.json()
-
-
 
     // Extrai dados relevantes
     const qrCode = paymentData.point_of_interaction?.transaction_data?.qr_code || null
@@ -133,6 +195,7 @@ export async function POST(request: NextRequest) {
       paymentId: paymentData.id,
       paymentStatus: paymentData.status,
       paymentMethod: paymentData.payment_method_id || paymentData.payment_method?.type,
+      chargeAmount,
       pixData: {
         qrCode,
         qrCodeBase64,
@@ -152,9 +215,9 @@ export async function POST(request: NextRequest) {
           const image = opts?.image || item.products?.images?.[0] || null;
 
           return {
-            id: item.variant_id || item.product_id,
-            name: `${item.products?.name} ${item.product_variants?.variant_name || ""}`,
-            price: Number(item.price_at_time),
+            id: item.variant_id || item.product_id || item.id,
+            name: item.product_name || `${item.products?.name || "Produto"} ${item.product_variants?.variant_name || ""}`.trim(),
+            price: Number(item.product_price ?? item.price_at_time ?? 0),
             quantity: item.quantity,
             image: image,
           }

@@ -347,6 +347,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [showPixModal, setShowPixModal] = useState(false);
     const [pixData, setPixData] = useState<any>(null);
     const [pixOrderDetails, setPixOrderDetails] = useState<any>(null);
+    const [chargedAmount, setChargedAmount] = useState<number>(Number(order?.total_amount || 0));
     const [isCanceling, setIsCanceling] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState("changed_mind");
@@ -699,10 +700,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         return baseLabel;
     };
 
-    const paymentMethodName = getPaymentTypeLabel();
-    const isMercadoPago = order.payment_provider === "Mercado Pago";
-    const isPixPayment = paymentMethodName.toLowerCase().includes("pix");
-    const canRetryPixPayment = order.situation === "pending" && isMercadoPago && isPixPayment;
+    const isExchangeOrder = order.order_source === "Troca" || !!order.exchange_return_request_id;
+    const exchangeTotal = Number(order.total_amount || 0);
+    const exchangeCredit = Number(order.paid_amount ?? order.amount_paid ?? 0);
+    const exchangeShortfall = Math.max(0, Math.round((exchangeTotal - exchangeCredit) * 100) / 100);
+    const isPendingExchangeShortfall = isExchangeOrder && exchangeShortfall > 0.009 && order.situation === "pending";
+    const hasMercadoPagoOnline = order.payment_provider === "Mercado Pago" || Boolean(order.partners?.mp_public_key);
+
+    const paymentMethodName = isExchangeOrder
+        ? (exchangeShortfall > 0 ? "Troca (com diferença)" : "Troca (Quitada)")
+        : getPaymentTypeLabel();
+    const isMercadoPago = order.payment_provider === "Mercado Pago" || (isExchangeOrder && hasMercadoPagoOnline);
+    const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
+    const canRetryPixPayment = order.situation === "pending" && (
+        (isMercadoPago && isPixPayment) ||
+        (hasMercadoPagoOnline && isPendingExchangeShortfall) ||
+        (hasMercadoPagoOnline && !order.payment_provider)
+    );
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         if (isMercadoPago) {
@@ -713,7 +727,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
         // Extract submethod name
         const nameLower = paymentMethodName.toLowerCase();
-        if (nameLower.includes("pix")) {
+        if (nameLower.includes("pix") || isExchangeOrder) {
             icons.push(<img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />);
         } else if (nameLower.includes("crédito") || nameLower.includes("credito") || nameLower.includes("credit") || nameLower.includes("débito") || nameLower.includes("debito") || nameLower.includes("debit")) {
             icons.push(<img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />);
@@ -774,6 +788,31 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     }
 
     const renderPriceSummary = () => {
+        if (isExchangeOrder) {
+            return (
+                <div className="space-y-3">
+                    <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
+                        <span>Subtotal da Troca</span>
+                        <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(exchangeTotal)}</span>
+                    </div>
+                    {exchangeCredit > 0 && (
+                        <div className="flex justify-between text-sm text-brand-green font-medium">
+                            <span>Crédito do Item Devolvido</span>
+                            <span>-{formatCurrency(exchangeCredit)}</span>
+                        </div>
+                    )}
+                    <div className="border-t border-brand-border dark:border-dark-border my-2 pt-2 flex justify-between items-end">
+                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                            {exchangeShortfall > 0 ? "Diferença a Pagar" : "Total da Troca"}
+                        </span>
+                        <span className={`font-bold text-lg ${exchangeShortfall > 0 ? "text-brand-orange" : "text-brand-green"}`}>
+                            {formatCurrency(exchangeShortfall > 0 ? exchangeShortfall : 0)}
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="space-y-3">
                 <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
@@ -835,8 +874,26 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         );
     };
 
+    const handleWhatsAppExchangeDifference = () => {
+        const rawPhone = sellerReturnCapabilities.phone || store?.phone || order.partners?.phone || "";
+        const cleanPhone = rawPhone.replace(/\D/g, "");
+        if (!cleanPhone) {
+            toast({
+                title: "Telefone não informado",
+                description: "O vendedor não possui um telefone de contato cadastrado para WhatsApp.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const phoneWithCountry = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+        const text = `Olá! Gostaria de combinar o pagamento da diferença da minha troca (Pedido #${orderNumber}). O valor a acertar é de ${formatCurrency(exchangeShortfall)}. Como podemos proceder para retirada/envio dos produtos?`;
+        const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`;
+        window.open(whatsappUrl, "_blank");
+    };
+
     const handlePixClick = async () => {
-        if (!canRetryPixPayment) return;
+        if (!canRetryPixPayment && !isPendingExchangeShortfall) return;
         try {
             setLoadingPayment(true);
             const response = await fetch("/api/orders/retry-payment", {
@@ -844,15 +901,31 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ orderId: order.id }),
             });
-            if (!response.ok) throw new Error("Failed");
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "Erro ao carregar pagamento");
+            }
             const data = await response.json();
+            if (data.alreadyPaid) {
+                toast({ title: "Pedido quitado", description: "O pagamento já foi registrado com sucesso." });
+                router.refresh();
+                return;
+            }
+            if (data.chargeAmount != null) {
+                setChargedAmount(data.chargeAmount);
+            }
             if (data.pixData?.qrCodeBase64) {
                 setPixData(data.pixData);
                 setPixOrderDetails(data.orderDetails);
                 setShowPixModal(true);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            toast({
+                title: "Erro ao gerar pagamento",
+                description: err?.message || "Não foi possível carregar o Pix.",
+                variant: "destructive"
+            });
         } finally {
             setLoadingPayment(false);
         }
@@ -1554,17 +1627,61 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 }
                                                 description={
                                                     <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                        {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
+                                                        {isExchangeOrder
+                                                            ? (exchangeShortfall > 0 ? "Diferença pendente de pagamento" : "Crédito da devolução anterior aplicado")
+                                                            : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto")}
                                                     </span>
                                                 }
                                                 className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
-                                                onClick={handlePixClick}
+                                                onClick={canRetryPixPayment ? handlePixClick : undefined}
                                                 right={
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(totalAmount)}</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                        {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : totalAmount)}
+                                                    </span>
                                                 }
                                             />
-                                            {canRetryPixPayment && order.payment_expires_at && (
-                                                <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
+                                            {isPendingExchangeShortfall ? (
+                                                hasMercadoPagoOnline ? (
+                                                    <InfoCard
+                                                        title="Diferença da Troca Pendente"
+                                                        message={`O valor da diferença para os novos itens é de ${formatCurrency(exchangeShortfall)}. Pague via Pix para aprovar e liberar a entrega/retirada.`}
+                                                        color="orange"
+                                                        className="mt-4"
+                                                        rightElement={
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={handlePixClick}
+                                                                disabled={loadingPayment}
+                                                                className="whitespace-nowrap"
+                                                            >
+                                                                {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
+                                                                Pagar via Pix
+                                                            </Button>
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <InfoCard
+                                                        title="Diferença da Troca"
+                                                        message={`O valor da diferença é de ${formatCurrency(exchangeShortfall)}. Esta loja não utiliza pagamentos online na Dudit. O pagamento deve ser realizado diretamente no balcão da loja no momento da retirada ou combinado via WhatsApp.`}
+                                                        color="blue"
+                                                        className="mt-4"
+                                                        rightElement={
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={handleWhatsAppExchangeDifference}
+                                                                className="whitespace-nowrap flex items-center gap-1.5"
+                                                            >
+                                                                <WhatsappIcon size={14} className="text-[#25D366]" />
+                                                                Combinar no WhatsApp
+                                                            </Button>
+                                                        }
+                                                    />
+                                                )
+                                            ) : (
+                                                canRetryPixPayment && order.payment_expires_at && (
+                                                    <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
+                                                )
                                             )}
                                         </div>
                                     </FormSection>
@@ -1666,6 +1783,32 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                             {/* Mobile/Tablet Actions / Buttons */}
                                             <div className="block lg:hidden space-y-4 pt-4">
+                                                {isPendingExchangeShortfall && (
+                                                    <div>
+                                                        {hasMercadoPagoOnline ? (
+                                                            <Button
+                                                                className="w-full h-12 font-bold bg-brand-primary text-white"
+                                                                onClick={handlePixClick}
+                                                                disabled={loadingPayment}
+                                                            >
+                                                                {loadingPayment ? (
+                                                                    <><Spinner size={16} className="text-white mr-2" /> Gerando Pix...</>
+                                                                ) : (
+                                                                    `Pagar Diferença via Pix (${formatCurrency(exchangeShortfall)})`
+                                                                )}
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                className="w-full h-12 font-bold bg-[#25D366] hover:bg-[#1EBE5D] text-white flex items-center justify-center gap-2"
+                                                                onClick={handleWhatsAppExchangeDifference}
+                                                            >
+                                                                <WhatsappIcon size={18} className="fill-white" />
+                                                                Combinar Diferença no WhatsApp
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )}
+
                                                 {canCancelOrder && (
                                                     <Button
                                                         variant="outlinered"
@@ -1733,6 +1876,32 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Desktop Actions / Buttons */}
                                     <div className="space-y-4 pt-4">
+                                        {isPendingExchangeShortfall && (
+                                            <div>
+                                                {hasMercadoPagoOnline ? (
+                                                    <Button
+                                                        className="w-full h-12 font-bold bg-brand-primary text-white"
+                                                        onClick={handlePixClick}
+                                                        disabled={loadingPayment}
+                                                    >
+                                                        {loadingPayment ? (
+                                                            <><Spinner size={16} className="text-white mr-2" /> Gerando Pix...</>
+                                                        ) : (
+                                                            `Pagar Diferença via Pix (${formatCurrency(exchangeShortfall)})`
+                                                        )}
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        className="w-full h-12 font-bold bg-[#25D366] hover:bg-[#1EBE5D] text-white flex items-center justify-center gap-2"
+                                                        onClick={handleWhatsAppExchangeDifference}
+                                                    >
+                                                        <WhatsappIcon size={18} className="fill-white" />
+                                                        Combinar Diferença no WhatsApp
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {canCancelOrder && (
                                             <Button
                                                 variant="outlinered"
@@ -1836,7 +2005,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         onClose={() => setShowPixModal(false)}
                         pixData={pixData}
                         orderId={order.id}
-                        amount={Number(totalAmount)}
+                        amount={chargedAmount || (isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : Number(totalAmount))}
                         orderDetails={pixOrderDetails}
                     />
                 )}

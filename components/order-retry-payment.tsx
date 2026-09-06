@@ -21,6 +21,8 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider }: 
   const [orderDetails, setOrderDetails] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [chargedAmount, setChargedAmount] = useState<number>(amount)
+
   const handlePayNow = async () => {
     try {
       setLoading(true)
@@ -39,6 +41,10 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider }: 
       }
 
       const paymentData = await response.json()
+
+      if (paymentData.chargeAmount != null) {
+        setChargedAmount(paymentData.chargeAmount)
+      }
 
       console.log("Full payment data received:", paymentData)
 
@@ -72,7 +78,8 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider }: 
     }
   }
 
-  if (status !== "pending" || paymentProvider !== "Mercado Pago") {
+  const isExcludedProvider = paymentProvider && paymentProvider !== "Mercado Pago"
+  if (status !== "pending" || isExcludedProvider) {
     return null
   }
 
@@ -102,7 +109,7 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider }: 
           pixData={pixData}
           boletoData={boletoData}
           orderId={orderId}
-          amount={amount}
+          amount={chargedAmount || amount}
           orderDetails={orderDetails}
           orderNumber={orderDetails?.orderNumber}
           sellerName={orderDetails?.sellerName}

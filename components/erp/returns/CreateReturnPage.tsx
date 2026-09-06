@@ -2137,10 +2137,10 @@ export default function CreateReturnPage({
                     </div>
 
                     <h4 className="text-brand-dark dark:text-dark-heading text-xl font-bold mb-2 text-center">
-                        Confirmar Reembolso Automático
+                        Confirmar Registro de Devolução
                     </h4>
                     <p className="text-brand-inactive-text dark:text-dark-body text-[15px] mb-6 text-center leading-relaxed">
-                        Você está prestes a aprovar uma devolução com reembolso automático via <strong>Mercado Pago</strong>. O valor será estornado diretamente na conta ou cartão do comprador.
+                        Você está registrando a devolução com método <strong>Mercado Pago</strong>. O Dudit atualizará o financeiro e o estoque no sistema.
                     </p>
 
                     <div className="bg-brand-gray dark:bg-dark-border/30 rounded-xl p-4 mb-6 space-y-2.5">
@@ -2153,23 +2153,23 @@ export default function CreateReturnPage({
                             <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedOrder?.customer_name || selectedOrder?.customer?.name}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Estorno</span>
+                            <span className="text-brand-inactive-text dark:text-dark-body">Valor do Reembolso</span>
                             <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
                                 {formatCurrency(refundValue)}
                             </span>
                         </div>
                     </div>
 
-                    <div className="mb-6 flex items-start gap-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl p-4">
+                    <div className="mb-6 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4">
                         <Checkbox
                             checked={mpWarningChecked}
                             onChange={(checked: boolean) => setMpWarningChecked(!!checked)}
                         />
                         <div
-                            className="text-xs font-medium text-red-800 dark:text-red-300 leading-normal select-none cursor-pointer"
+                            className="text-xs font-medium text-amber-900 dark:text-amber-200 leading-normal select-none cursor-pointer"
                             onClick={() => setMpWarningChecked(!mpWarningChecked)}
                         >
-                            Estou ciente de que o estorno de <strong className="font-bold">{formatCurrency(refundValue)}</strong> será solicitado imediatamente ao Mercado Pago e que esta ação não poderá ser desfeita.
+                            Por segurança da sua loja, o estorno de dinheiro não é disparado automaticamente pela plataforma. Estou ciente de que devo realizar o estorno de <strong className="font-bold">{formatCurrency(refundValue)}</strong> diretamente no aplicativo ou painel do Mercado Pago / banco.
                         </div>
                     </div>
 
