@@ -4,6 +4,13 @@ import { ptBR } from "date-fns/locale"
 import { getDefaultTimezone } from "./tz"
 
 export function formatInTz(date: Date | string | number, tz: string, pattern: string): string {
+  if (typeof date === "string") {
+    const s = date.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const dt = parseDateOnly(s, tz)
+      return format(dt, pattern, { locale: ptBR })
+    }
+  }
   const zoned = new TZDate(+new Date(date), tz)
   return format(zoned, pattern, { locale: ptBR })
 }

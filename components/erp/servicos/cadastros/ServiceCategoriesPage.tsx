@@ -140,7 +140,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
             } else {
                 url.searchParams.set("tab", tab)
             }
-            window.history.pushState(null, "", url.toString())
+            router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
         }
     }
 

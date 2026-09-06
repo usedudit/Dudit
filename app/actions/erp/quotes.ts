@@ -2807,7 +2807,7 @@ export async function approvePublicQuoteAction(
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
                 method = "code"
-                approverDisplayName = (quote as any).customers?.name || approverName.trim().substring(0, 100) || "Cliente"
+                approverDisplayName = approverName?.trim() || "Cliente"
             }
 
             // 3. Call RPC to approve public quote
@@ -2952,7 +2952,7 @@ export async function rejectPublicQuoteAction(
                     return errorResponse("Código de aprovação é obrigatório.")
                 }
                 method = "code"
-                rejectorDisplayName = (quote as any).customers?.name || rejectorName.trim().substring(0, 100) || "Cliente"
+                rejectorDisplayName = rejectorName?.trim() || "Cliente"
             }
 
             // 3. Call RPC to reject public quote

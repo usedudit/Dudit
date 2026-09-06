@@ -33,7 +33,7 @@ export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: C
       onClick={handleOpen}
       className={`flex flex-col group cursor-pointer transition-all duration-300 text-left ${className}`}
     >
-      <div className="relative w-full aspect-[9/16] rounded-[16px] overflow-hidden bg-brand-gray mb-3 shrink-0 shadow-sm dark:bg-dark-border/30">
+      <div className="relative w-full aspect-[9/16] rounded-[16px] overflow-hidden bg-brand-gray mb-3 shrink-0 dark:bg-dark-border/30">
         <img
           src={video.video_thumbnail}
           alt={video.title || "Vídeo"}

@@ -369,12 +369,7 @@ export const AppointmentSheet = ({
         }
     };
 
-    const handleCheckoutNavigation = useCallback(() => {
-        const linkedOrderId = appointment?.marketplaceOrderId || appointment?.saleId;
-        if (linkedOrderId) {
-            router.push(`/erp/pedidos?edit=${linkedOrderId}&payment=1`);
-        }
-    }, [appointment?.marketplaceOrderId, appointment?.saleId, router]);
+
 
     // Recurrence State
     const [recurrenceFreq, setRecurrenceFreq] = useState('Não se repete');
@@ -1278,6 +1273,19 @@ export const AppointmentSheet = ({
 
     const linkedSalePaymentStatus = String(orderPaymentInfo?.situation || appointment?.paymentStatus || '').toLowerCase();
     const isSalePriceLocked = mode === 'view' && (linkedSalePaymentStatus === 'paid' || linkedSalePaymentStatus === 'partially_paid');
+
+    const handleCheckoutNavigation = useCallback(() => {
+        const targetId = appointment?.marketplaceOrderId || appointment?.saleId;
+        if (targetId) {
+            const effStatus = String(orderPaymentInfo?.situation || appointment?.paymentStatus || '').toLowerCase();
+            const isFullyPaid = effStatus === 'paid' || (orderPaymentInfo && orderPaymentInfo.totalAmount > 0 && orderPaymentInfo.paidAmount >= orderPaymentInfo.totalAmount - 0.009);
+            if (isFullyPaid) {
+                router.push(`/erp/pedidos?edit=${targetId}`);
+            } else {
+                router.push(`/erp/pedidos?edit=${targetId}&payment=1`);
+            }
+        }
+    }, [appointment?.marketplaceOrderId, appointment?.saleId, appointment?.paymentStatus, orderPaymentInfo, router]);
 
     useEffect(() => {
         if (!partnerId) return;

@@ -17,6 +17,7 @@ interface ProcessErpPaymentRequest {
   amount: number
   paymentQuote?: string
   description?: string
+  orderId?: string
 }
 
 /**
@@ -37,7 +38,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessErpPaymentRequest = await request.json()
-    const { paymentFormData, partnerId, amount, paymentQuote, description } = body
+    const { paymentFormData, partnerId, amount, paymentQuote, description, orderId } = body
 
     // Validações
     if (!paymentFormData?.payment_method_id) {
@@ -59,6 +60,24 @@ async function handler(request: NextRequest) {
 
     // Validar que o usuário tem acesso ao parceiro (é dono ou membro da equipe)
     const adminClient = createAdminClient()
+
+    if (orderId) {
+      const { data: targetOrder } = await adminClient
+        .from("orders")
+        .select("id, situation, total_amount, paid_amount")
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+      if (targetOrder) {
+        const isOrderPaid =
+          targetOrder.situation === "paid" ||
+          (Number(targetOrder.paid_amount || 0) >= Number(targetOrder.total_amount || 0) - 0.009 && Number(targetOrder.total_amount || 0) > 0)
+        if (isOrderPaid) {
+          return NextResponse.json({ error: "Este pedido já está totalmente pago e não permite novas cobranças." }, { status: 400 })
+        }
+      }
+    }
     const { data: partner, error: partnerError } = await adminClient
       .from("partners")
       .select("id, user_id")

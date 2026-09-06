@@ -128,7 +128,7 @@ export function MarketplaceLandingView({
     return (
         <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-8 flex flex-col gap-10 font-sans">
             {/* 1. HERO COM LOCALIZAÇÃO E O DINO "ONDE VOCÊ ESTÁ" OU BLOCO DE AÇÃO DA CIDADE */}
-            <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-8 md:p-12 w-full flex flex-col md:flex-row items-center justify-between gap-8 dark:bg-[#2a2417] dark:border-[#3a3120]">
+            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-8">
                 <div className={`flex-grow text-center md:text-left ${isCityEmpty ? "md:max-w-[58%]" : "md:max-w-[65%]"}`}>
                     <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight dark:text-dark-heading">
                         {isCityEmpty && effectiveCityName ? (
@@ -258,7 +258,7 @@ export function MarketplaceLandingView({
             {/* 2. CARDS ESTILO IFOOD COM OS DINOS DA DUDIT */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Card 1: Vendedores / Lojistas */}
-                <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6 dark:bg-[#2a2417] dark:border-[#3a3120]">
+                <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6">
                     <div className="w-28 h-28 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center">
                         <img
                             src="https://img.dudit.com.br/static/mascots/PlanoVender.png"
@@ -284,7 +284,7 @@ export function MarketplaceLandingView({
                 </div>
 
                 {/* Card 2: Consumidores / Compradores */}
-                <div className="bg-[#fcf8f2] rounded-[24px] border border-[#f5e9d9] p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6 dark:bg-[#2a2417] dark:border-[#3a3120]">
+                <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6">
                     <div className="w-28 h-28 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center">
                         <img
                             src="https://img.dudit.com.br/static/mascots/HappyDino.png"

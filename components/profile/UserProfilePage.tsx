@@ -282,7 +282,7 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
 
         const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
         if (typeof window !== "undefined") {
-            window.history.pushState(null, "", url)
+            router.push(url, { scroll: false })
         }
     }
 

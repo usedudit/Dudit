@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
@@ -66,6 +66,7 @@ export default function DeliveriesPage({
     planGate?: { requiredPlanSlug: "crescer" | "escalar"; message: string }
     userRole?: string
 }) {
+    const router = useRouter()
     const searchParams = useSearchParams()
     const { openPlanUpgrade } = usePlanUpgrade()
 
@@ -90,9 +91,9 @@ export default function DeliveriesPage({
             } else {
                 url.searchParams.delete("search")
             }
-            window.history.replaceState(window.history.state, "", url.toString())
+            router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
         }
-    }, [])
+    }, [router])
 
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
     const [filters, setFilters] = useState<{ status: string[]; datePeriod: DatePeriodFilterValue }>({

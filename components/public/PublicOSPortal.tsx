@@ -123,8 +123,9 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
 
     const formatDateString = (dateStr: string) => {
         if (!dateStr) return "---"
-        const parts = dateStr.split("-")
-        if (parts.length === 3) {
+        const clean = String(dateStr).split("T")[0]
+        const parts = clean.split("-")
+        if (parts.length === 3 && parts[0].length === 4) {
             return `${parts[2]}/${parts[1]}/${parts[0]}`
         }
         const d = new Date(dateStr)
@@ -466,7 +467,10 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                         {order.expected_completion_date && (
                                                             <div className="flex justify-between items-center text-sm">
                                                                 <span className="text-brand-inactive-text dark:text-dark-body font-semibold">Previsão de conclusão</span>
-                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDateTime(order.expected_completion_date)}</span>
+                                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatDateString(order.expected_completion_date)}
+                                                                    {order.expected_completion_time ? ` às ${order.expected_completion_time}` : ""}
+                                                                </span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -650,6 +654,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                                     invoiceNumber={order.order_number}
                                                     orderDate={order.created_at}
                                                     expectedCompletionDate={order.expected_completion_date}
+                                                    expectedCompletionTime={order.expected_completion_time}
                                                     selectedCustomer={selectedCustomer}
                                                     services={services}
                                                     products={products}
@@ -680,6 +685,7 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
                                     invoiceNumber={order.order_number}
                                     orderDate={order.created_at}
                                     expectedCompletionDate={order.expected_completion_date}
+                                    expectedCompletionTime={order.expected_completion_time}
                                     selectedCustomer={selectedCustomer}
                                     services={services}
                                     products={products}

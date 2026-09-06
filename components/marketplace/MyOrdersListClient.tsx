@@ -89,7 +89,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
         const query = params.toString();
         const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
 
-        window.history.pushState(null, '', nextUrl);
+        router.push(nextUrl, { scroll: false });
     };
 
     const handleOpenDetails = (id: string, orderNumber: string) => {

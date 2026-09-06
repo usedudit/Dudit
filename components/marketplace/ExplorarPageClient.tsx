@@ -22,7 +22,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { getProductDisplayImages, getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { StarIcon, ClockIcon } from "@/lib/icons"
+import { StarIcon, ClockIcon, SearchIcon, XIcon } from "@/lib/icons"
 import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
 import { getStoreUrl, getPlanUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils"
@@ -249,7 +249,7 @@ export function ExplorarPageClient({
             if (Object.keys(resolved).length > 0) {
                 setCityAccentCache((prev) => ({ ...prev, ...resolved }))
             }
-        }).catch(() => {})
+        }).catch(() => { })
     }, [isCityModalOpen])
 
     // Filters state
@@ -2017,71 +2017,98 @@ export function ExplorarPageClient({
                 sortOptions={contextualSortOptions}
             />
 
-            {/* ========================================================
-                PREMIUM REUSABLE MODALS (REPLACING OLD INLINE POPOVERS)
-                ======================================================== */}
-
             {/* 1. CITY SELECTOR MODAL */}
             <DefaultModal
                 isOpen={isCityModalOpen}
                 onClose={() => setIsCityModalOpen(false)}
-                title="📍 Localização"
                 maxWidth="md"
+                hideHeader={true}
             >
-                <div className="flex flex-col gap-4 py-2 text-brand-dark dark:text-dark-heading">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-500 dark:text-dark-body">Filtrar vendedores da cidade:</span>
-                        {selectedCitySlug && (
-                            <button
-                                onClick={() => {
-                                    handleSelectCity(null)
-                                    setIsCityModalOpen(false)
-                                }}
-                                className="text-xs text-red-500 font-bold underline"
-                            >
-                                Remover filtro
-                            </button>
-                        )}
-                    </div>
+                <div className="flex flex-col relative text-[#003229]">
+                    <button
+                        onClick={() => setIsCityModalOpen(false)}
+                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        title="Fechar"
+                    >
+                        <XIcon size={16} />
+                    </button>
 
-                    <div className="relative flex items-center">
-                        <input
-                            type="text"
-                            placeholder="Buscar cidade... (ex: São Paulo, Bauru)"
-                            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none text-brand-dark dark:text-dark-heading"
-                            value={citySearchText}
-                            onChange={(e) => setCitySearchText(e.target.value)}
+                    {/* Header with gradient and mascot */}
+                    <div
+                        className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
+                        style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
+                    >
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                            alt="Onde você está?"
+                            className="w-48 h-auto object-contain transform translate-y-4"
                         />
                     </div>
 
-                    <button
-                        onClick={() => {
-                            requestLocation()
-                            setIsCityModalOpen(false)
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border rounded-md text-xs font-bold text-brand-dark dark:text-dark-heading"
-                    >
-                        <MapPin className="w-4 h-4" />
-                        <span>Usar minha localização</span>
-                    </button>
+                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center dark:text-dark-heading">Onde você está?</h4>
+                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed dark:text-dark-body">
+                        Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
+                    </p>
 
-                    {filteredCitiesSuggestions.length > 0 && (
-                        <div className="flex flex-col gap-1 border-t pt-2">
-                            {filteredCitiesSuggestions.map((slug) => (
-                                <button
-                                    key={slug}
-                                    onClick={() => {
-                                        handleSelectCity(slug)
-                                        setIsCityModalOpen(false)
-                                    }}
-                                    className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
-                                >
-                                    <span>{formatCitySlug(slug)}</span>
-                                    {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
-                                </button>
-                            ))}
+                    <div className="space-y-4">
+                        <div className="relative">
+                            {selectedCitySlug && (
+                                <Input
+                                    placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
+                                    value={citySearchText}
+                                    onChange={(e) => setCitySearchText(e.target.value)}
+                                    className="h-[42px] w-full"
+                                    variant="full-rounded"
+                                    prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
+                                />
+                            )}
+                            {filteredCitiesSuggestions.length > 0 && (
+                                <div className="flex flex-col gap-1 border-t pt-2">
+                                    {filteredCitiesSuggestions.map((slug) => (
+                                        <button
+                                            key={slug}
+                                            onClick={() => {
+                                                handleSelectCity(slug)
+                                                setIsCityModalOpen(false)
+                                            }}
+                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
+                                        >
+                                            <span>{formatCitySlug(slug)}</span>
+                                            {selectedCitySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
+
+                        <Button
+                            onClick={() => {
+                                requestLocation()
+                                setIsCityModalOpen(false)
+                            }}
+                            variant="outline"
+                            className="w-full"
+                        >
+                            <MapPin className="w-4 h-4" />
+                            <span>Usar minha localização</span>
+                        </Button>
+
+                        <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Já tem uma conta cadastrada com endereço salvo?
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setIsCityModalOpen(false)
+                                    router.push("/auth/login")
+                                }}
+                                variant="link"
+                                className="text-sm mt-1 inline-block"
+                            >
+                                Entrar na minha conta
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </DefaultModal>
 
@@ -2132,11 +2159,10 @@ export function ExplorarPageClient({
                         <ListItem
                             title="Quero comprar"
                             description="Produtos, peças, eletrônicos, roupas ou itens físicos"
-                            className={`p-3.5 transition-all cursor-pointer ${
-                                selectedDemandType === "comprar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                            }`}
+                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "comprar"
+                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                : ""
+                                }`}
                             onClick={() => setSelectedDemandType("comprar")}
                             right={
                                 <RadioButton
@@ -2151,11 +2177,10 @@ export function ExplorarPageClient({
                         <ListItem
                             title="Quero contratar"
                             description="Serviços, profissionais, reformas, assistências ou diárias"
-                            className={`p-3.5 transition-all cursor-pointer ${
-                                selectedDemandType === "contratar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                            }`}
+                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "contratar"
+                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                : ""
+                                }`}
                             onClick={() => setSelectedDemandType("contratar")}
                             right={
                                 <RadioButton
@@ -2170,11 +2195,10 @@ export function ExplorarPageClient({
                         <ListItem
                             title="Quero encontrar loja ou empresa"
                             description="Estabelecimentos comerciais, empresas locais ou pontos de atendimento"
-                            className={`p-3.5 transition-all cursor-pointer ${
-                                selectedDemandType === "loja" || selectedDemandType === "encontrar"
-                                    ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
-                                    : ""
-                            }`}
+                            className={`p-3.5 transition-all cursor-pointer ${selectedDemandType === "loja" || selectedDemandType === "encontrar"
+                                ? "border-brand-green ring-1 ring-brand-green bg-green-50/20 dark:bg-green-950/20"
+                                : ""
+                                }`}
                             onClick={() => setSelectedDemandType("loja")}
                             right={
                                 <RadioButton

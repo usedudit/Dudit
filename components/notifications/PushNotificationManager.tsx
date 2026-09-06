@@ -130,16 +130,13 @@ export async function syncFcmToken(userId: string, force = false): Promise<strin
  */
 export function usePushNotificationStatus() {
   const { user } = useSupabase()
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default")
-  const [isEnabling, setIsEnabling] = useState(false)
-
-  useEffect(() => {
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() => {
     if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-      setPermission("unsupported")
-      return
+      return "unsupported"
     }
-    setPermission(Notification.permission)
-  }, [])
+    return Notification.permission
+  })
+  const [isEnabling, setIsEnabling] = useState(false)
 
   const requestEnable = useCallback(async (): Promise<boolean> => {
     if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {

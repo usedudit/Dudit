@@ -144,7 +144,7 @@ export default function ProductCadastrosPage({ initialMetadata, partnerId, planG
             } else {
                 url.searchParams.set("tab", tab)
             }
-            window.history.pushState(null, "", url.toString())
+            router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
         }
     }
 

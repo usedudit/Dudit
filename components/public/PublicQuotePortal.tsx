@@ -93,8 +93,9 @@ export default function PublicQuotePortal({ token, initialData, ip, userAgent }:
     // ─── FORMATTING HELPERS ──────────────────────────────────────────────────
     const formatDateString = (dateStr: string) => {
         if (!dateStr) return "---"
-        const parts = dateStr.split("-")
-        if (parts.length === 3) {
+        const clean = String(dateStr).split("T")[0]
+        const parts = clean.split("-")
+        if (parts.length === 3 && parts[0].length === 4) {
             return `${parts[2]}/${parts[1]}/${parts[0]}`
         }
         const d = new Date(dateStr)

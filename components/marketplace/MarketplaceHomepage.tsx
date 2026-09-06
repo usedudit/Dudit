@@ -1,17 +1,12 @@
 "use client"
 
-import dynamic from "next/dynamic"
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import MarketplaceFooter from "./MarketplaceFooter"
 import { HeroBanner, HorizontalCarousel, ItemCard, VitrineCard } from "./shared-components"
 import { SponsoredAdsCarousel } from "@/components/marketplace/ads/SponsoredAdsCarousel"
 import type { SponsoredAd } from "@/lib/ads/types"
 import type { HomeSection } from "@/app/actions/marketplace/discover"
-import { CommunityVideoCard } from "./CommunityVideoCard"
-
-const VideoModal = dynamic(() => import("./VideoModal").then(mod => mod.VideoModal), { ssr: false })
-
 import { useRouter } from "next/navigation"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { useNotification } from "@/hooks/use-notification"
@@ -22,7 +17,6 @@ import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import IconPlaceholder from "@/components/reusable/IconPlaceholder"
 import { getCitiesData } from "@/lib/data/cities-loader"
 import { MarketplaceLandingView } from "./MarketplaceLandingView"
 
@@ -88,31 +82,30 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
     "joao-pessoa": "João Pessoa",
 };
 
-import { MapPinIcon, XIcon } from "@/lib/icons"
-import { Search, ShoppingBag, MessageCircle } from "lucide-react"
+import { ShoppingBagIcon, XIcon, SearchIcon, WhatsappIcon, MapPinIcon, CheckIcon } from "@/lib/icons"
 import type { LocationContext } from "@/lib/utils/location-label"
 
 function HomeValueProps() {
     const items = [
         {
-            icon: Search,
+            icon: SearchIcon,
             title: "Encontre o que precisa",
             desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou resolver uma necessidade do dia a dia. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
         },
         {
-            icon: ShoppingBag,
+            icon: ShoppingBagIcon,
             title: "Produtos & Serviços",
             desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, perto de você.",
         },
         {
-            icon: MessageCircle,
+            icon: WhatsappIcon,
             title: "Contato direto",
             desc: "Tire dúvidas no WhatsApp de quem vende, compare opções e feche o negócio sem burocracia. Direto com o vendedor.",
         },
     ]
 
     return (
-        <section className="my-6 sm:my-8 border-y border-gray-100 dark:border-dark-border/60 py-6 sm:py-8 bg-gray-50/60 dark:bg-dark-surface/40 rounded-2xl md:rounded-3xl">
+        <section className="my-6 sm:my-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0">
                 {items.map((item, idx) => {
                     const Icon = item.icon
@@ -548,63 +541,54 @@ export default function MarketplaceHome({
                     <div className="space-y-4">
                         <div className="relative">
                             <Input
-                                label="Digite sua cidade"
-                                id="visitorCitySearchHome"
-                                name="visitorCitySearchHome"
-                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                className="h-[42px] w-full"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                             />
                             {filteredCities.length > 0 && (
-                                <div className="absolute z-[100] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:bg-dark-surface dark:border-dark-border dark:divide-dark-border">
+                                <div className="flex flex-col gap-1 border-t pt-2">
                                     {filteredCities.map((slug) => (
-                                        <Button
+                                        <button
                                             key={slug}
                                             onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full"
-                                            leftIcon={
-                                                <MapPinIcon size={14} />
-                                            }
+                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
                                         >
-                                            {formatCitySlugForDisplay(slug)}
-                                        </Button>
+                                            <span>{formatCitySlugForDisplay(slug)}</span>
+                                            {selectedCitySlug === slug && <CheckIcon className="w-4 h-4 text-brand-green" />}
+                                        </button>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        <button
+                        <Button
                             onClick={handleIpLocation}
                             disabled={isIpLoading || isLocationLoading}
-                            className="w-full flex items-center justify-center gap-2 border-2 border-brand-green text-brand-green font-bold py-3 px-4 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 text-sm shadow-sm"
+                            variant="outline"
+                            className="w-full"
                         >
-                            {isIpLoading || isLocationLoading ? (
-                                <>
-                                    <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                                    Detectando...
-                                </>
-                            ) : (
-                                <>
-                                    <MapPinIcon size={16} className="shrink-0" />
-                                    Usar minha localização
-                                </>
-                            )}
-                        </button>
-                    </div>
+                            <MapPinIcon className="w-4 h-4" />
+                            <span>Usar minha localização</span>
+                        </Button>
 
-                    <div className="text-center mt-8 pt-5 border-t border-gray-100 dark:border-dark-border">
-                        <p className="text-xs text-gray-400 dark:text-dark-body/70">
-                            Já tem uma conta cadastrada com endereço salvo?
-                        </p>
-                        <button
-                            onClick={() => {
-                                setIsVisitorModalOpen(false)
-                                router.push("/auth/login")
-                            }}
-                            className="text-brand-green font-bold text-sm hover:underline mt-1 inline-block"
-                        >
-                            Entrar na minha conta
-                        </button>
+                        <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Já tem uma conta cadastrada com endereço salvo?
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setIsVisitorModalOpen(false)
+                                    router.push("/auth/login")
+                                }}
+                                variant="link"
+                                className="text-sm mt-1 inline-block"
+                            >
+                                Entrar na minha conta
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </DefaultModal>

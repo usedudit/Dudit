@@ -596,7 +596,8 @@ export default function OrdersPage({
         if (!order.canEdit) return
         const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
         const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
-        if (isMarketplace || hasMethod) {
+        const isPaid = order.situation === "paid" || (Number(order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
+        if (isMarketplace || hasMethod || isPaid) {
             openPaymentStatusModal(order)
         } else {
             router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
@@ -894,7 +895,8 @@ export default function OrdersPage({
                             onUpdatePaymentStatus={(order: any) => {
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
                                 const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
-                                if (isMarketplace || hasMethod) {
+                                const isPaid = order.situation === "paid" || (Number(order.paid_amount || order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
+                                if (isMarketplace || hasMethod || isPaid) {
                                     const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
                                     const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
                                         ? order.customer_name

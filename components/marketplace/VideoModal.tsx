@@ -8,7 +8,8 @@ import { getLinkedItemData, type LinkedItemData } from "@/app/actions/marketplac
 import Link from "next/link"
 import { XIcon, StarIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
-import { ShoppingBag, Sparkles } from "lucide-react"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { ShoppingBag } from "lucide-react"
 
 interface VideoData {
   id: string
@@ -98,7 +99,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const description = video?.description || ""
   const shouldTruncate = description.length > MAX_DESC_LENGTH
   const storeName = video?.partner?.name || video?.partner?.store_name || "Loja Parceira"
-  const storeLogo = video?.partner?.store_image_url
+  const storeLogo = video?.partner?.store_image_url ? getR2ImageUrl(video.partner.store_image_url, "thumb") : null
 
   if (!mounted) return null
 
@@ -171,7 +172,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                 e.stopPropagation()
                 onClose()
               }}
-              className="pointer-events-auto w-10 h-10 sm:w-11 sm:h-11 bg-black/40 hover:bg-black/70 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95 border border-white/15 cursor-pointer shadow-lg shrink-0"
+              className="pointer-events-auto w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
               aria-label="Fechar vídeo"
             >
               <XIcon size={20} />
@@ -228,7 +229,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                     e.stopPropagation()
                     setIsCardMinimized(true)
                   }}
-                  className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-brand-dark/80 hover:bg-brand-dark text-white rounded-full flex items-center justify-center shadow-md transition-transform hover:scale-110 cursor-pointer border border-white/20"
+                  className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-brand-dark/80 hover:bg-brand-dark text-white rounded-full flex items-center justify-center shadow-md transition-colors cursor-pointer border border-white/20"
                   title="Ocultar item"
                   aria-label="Ocultar item"
                 >
@@ -246,7 +247,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                       <img
                         src={linkedItem.imageUrl}
                         alt={linkedItem.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        className="w-full h-full object-cover transition-transform duration-200"
                       />
                     </div>
                   </Link>
@@ -258,9 +259,6 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                     className="flex-1 min-w-0 flex flex-col justify-between hover:no-underline group"
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[9px] sm:text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-brand-green/15 text-brand-green dark:bg-brand-green/25 shrink-0">
-                        {linkedItem.type === "product" ? "Produto" : linkedItem.type === "service" ? "Serviço" : "Coleção"}
-                      </span>
                       {(linkedItem.rating ?? 0) > 0 && (
                         <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-500">
                           <StarIcon size={11} className="fill-amber-500 text-amber-500" />
@@ -301,7 +299,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                   <Link
                     href={linkedItem.url}
                     onClick={handleLinkedClick}
-                    className="shrink-0 px-3 py-2 rounded-xl bg-brand-green hover:bg-[#047857] text-white text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center hover:no-underline"
+                    className="shrink-0 px-3 py-2 rounded-xl bg-brand-green hover:bg-[#047857] text-white text-xs font-bold transition-colors shadow-sm flex items-center justify-center hover:no-underline"
                   >
                     Ver
                   </Link>
@@ -319,7 +317,7 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
                   e.stopPropagation()
                   setIsCardMinimized(false)
                 }}
-                className="bg-white/95 dark:bg-[#18181b]/95 hover:bg-white dark:hover:bg-dark-surface backdrop-blur-md px-3.5 py-2 rounded-full shadow-2xl border border-white/30 dark:border-dark-border/60 text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                className="bg-white/95 dark:bg-[#18181b]/95 hover:bg-white dark:hover:bg-dark-surface backdrop-blur-md px-3.5 py-2 rounded-full shadow-2xl border border-white/30 dark:border-dark-border/60 text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 transition-colors cursor-pointer"
                 title="Ver item linkado"
                 aria-label="Ver item linkado"
               >

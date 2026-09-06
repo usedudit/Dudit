@@ -35,7 +35,7 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
     let q = supabase
       .from("products")
       .select(`
-        id, name, price, promotional_price, images, rating, show_price_in_store,
+        id, name, price, promotional_price, images, rating, show_price_in_store, short_id,
         partner_id,
         partners!partner_id(id, addresses(city, state)),
         stores!left(id, name, logo_url, addresses!store_id!left(city, state))
@@ -83,7 +83,7 @@ async function _getLinkedItemData(type: string, id: string, storeId?: string): P
     let q = supabase
       .from("services")
       .select(`
-        id, name, price, promotional_price, images, rating, show_price_in_store,
+        id, name, price, promotional_price, images, rating, show_price_in_store, short_id,
         partner_id,
         partners!partner_id(id, addresses(city, state)),
         stores!left(id, name, logo_url, addresses!store_id!left(city, state))

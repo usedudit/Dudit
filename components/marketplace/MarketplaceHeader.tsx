@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon, PlusIcon } from "@/lib/icons"
+import { MapPin, Check } from "lucide-react"
 import { useSupabase } from "@/providers/supabase-provider"
 import { Button } from "@/components/reusable/Button"
 import DefaultModal from "@/components/reusable/DefaultModal"
@@ -387,61 +388,54 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="space-y-4">
                         <div className="relative">
                             <Input
-                                label="Digite sua cidade"
-                                id="visitorCitySearchHeader"
-                                name="visitorCitySearchHeader"
-                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                placeholder="Buscar por cidade... (ex: São Paulo, Bauru)"
                                 value={visitorSearchQuery}
                                 onChange={(e) => setVisitorSearchQuery(e.target.value)}
+                                className="h-[42px] w-full"
+                                variant="full-rounded"
+                                prefix={<SearchIcon size={18} className="text-brand-inactive-text shrink-0" />}
                             />
                             {filteredCities.length > 0 && (
-                                <div className="absolute z-[110] left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
+                                <div className="flex flex-col gap-1 border-t pt-2">
                                     {filteredCities.map((slug) => (
                                         <button
                                             key={slug}
                                             onClick={() => handleSelectCitySlug(slug)}
-                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 text-brand-dark dark:text-dark-heading text-sm transition-colors font-medium flex items-center gap-2"
+                                            className="w-full text-left px-4 py-3 flex items-center justify-between text-sm font-medium text-brand-dark dark:text-dark-heading"
                                         >
-                                            <MapPinIcon size={14} className="text-brand-green shrink-0" />
-                                            {formatCitySlugForDisplay(slug)}
+                                            <span>{formatCitySlugForDisplay(slug)}</span>
+                                            {citySlug === slug && <Check className="w-4 h-4 text-brand-green" />}
                                         </button>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        <button
+                        <Button
                             onClick={handleIpLocation}
                             disabled={isIpLoading || isLocationLoading}
-                            className="w-full flex items-center justify-center gap-2 border-2 border-brand-green text-brand-green font-bold py-3 px-4 rounded-full hover:bg-brand-green/5 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 text-sm shadow-sm"
+                            variant="outline"
+                            className="w-full"
                         >
-                            {isIpLoading || isLocationLoading ? (
-                                <>
-                                    <span className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin"></span>
-                                    Detectando...
-                                </>
-                            ) : (
-                                <>
-                                    <MapPinIcon size={16} className="shrink-0" />
-                                    Usar minha localização
-                                </>
-                            )}
-                        </button>
-                    </div>
+                            <MapPin className="w-4 h-4" />
+                            <span>Usar minha localização</span>
+                        </Button>
 
-                    <div className="text-center mt-8 pt-5 border-t border-gray-100">
-                        <p className="text-xs text-gray-400">
-                            Já tem uma conta cadastrada com endereço salvo?
-                        </p>
-                        <button
-                            onClick={() => {
-                                setIsVisitorModalOpen(false)
-                                router.push("/auth/login")
-                            }}
-                            className="text-brand-green font-bold text-sm hover:underline mt-1 inline-block"
-                        >
-                            Entrar na minha conta
-                        </button>
+                        <div className="text-center mt-8 pt-5 border-t border-brand-border dark:border-dark-border">
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Já tem uma conta cadastrada com endereço salvo?
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    setIsVisitorModalOpen(false)
+                                    router.push("/auth/login")
+                                }}
+                                variant="link"
+                                className="text-sm mt-1 inline-block"
+                            >
+                                Entrar na minha conta
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </DefaultModal>

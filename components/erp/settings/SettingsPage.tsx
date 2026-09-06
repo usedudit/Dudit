@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent, ListItem } from "@/components/reusable"
 import {
@@ -61,6 +61,7 @@ type ActivePage =
   | "resources"
 
 export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [activePage, setActivePage] = useState<ActivePage>("home")
   const [activeTab, setActiveTab] = useState("empresa")
@@ -103,10 +104,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
       const url = new URL(window.location.href)
       if (slug) {
         url.searchParams.set("tab", slug)
-        window.history.pushState(null, "", url.toString())
+        router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
       } else {
         url.searchParams.delete("tab")
-        window.history.pushState(null, "", url.toString())
+        router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
       }
     }
   }
@@ -116,7 +117,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
     if (activePage === "home" && typeof window !== "undefined") {
       const url = new URL(window.location.href)
       url.searchParams.set("tab", tab)
-      window.history.replaceState(null, "", url.toString())
+      router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
     }
   }
 

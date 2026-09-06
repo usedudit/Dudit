@@ -346,6 +346,7 @@ export type PaymentModalProps = {
     depositChargeAmount?: number
     depositPercentage?: number
     deliveryBreakdown?: Record<string, unknown> | null
+    orderId?: string
 }
 
 /** Mesmo texto em PDV e venda manual - importe nos pais para garantir paridade. */
@@ -375,6 +376,7 @@ const PaymentModal = ({
     depositChargeAmount = 0,
     depositPercentage: propsDepositPercentage,
     deliveryBreakdown,
+    orderId,
 }: PaymentModalProps) => {
     const { toast } = useToast();
     const { selectedStore } = useStore();
@@ -529,6 +531,10 @@ const PaymentModal = ({
     };
 
     const handleGenerateDepositCharge = async () => {
+        if (isAlreadyFullyPaid) {
+            toast({ title: "Pedido já quitado", description: "Este pedido já foi totalmente pago e não possui saldo pendente.", variant: "destructive" });
+            return;
+        }
         if (depositMpPixData) {
             setShowDepositPixModal(true);
             return;
@@ -582,6 +588,7 @@ const PaymentModal = ({
                         }
                     },
                     partnerId,
+                    orderId,
                     amount: depositChargeAmount,
                     paymentQuote: mpPaymentQuoteRef.current,
                     description: `Sinal - ${customerName || "Cliente"}`,
@@ -664,6 +671,7 @@ const PaymentModal = ({
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
     const chargeTarget = Math.max(0, Number(amountDue ?? total));
+    const isAlreadyFullyPaid = (amountDue !== undefined && amountDue <= 0.009) || (existingPaidAmount > 0.009 && chargeTarget <= 0.009);
 
     const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
     const effectiveCreditApplied = useStoreCredit
@@ -1092,6 +1100,14 @@ const PaymentModal = ({
     };
 
     const handleMpBrickSubmit = async (formData: any) => {
+        if (isAlreadyFullyPaid) {
+            toast({
+                title: "Pedido já quitado",
+                description: "Este pedido já foi totalmente pago e não possui saldo pendente.",
+                variant: "destructive",
+            });
+            return;
+        }
         setMpIsProcessing(true);
         setMpBrickError(null);
         try {
@@ -1100,6 +1116,7 @@ const PaymentModal = ({
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
                 method: "POST",
                 body: {
+                    orderId,
                     paymentFormData: resolvedFormData,
                     partnerId,
                     amount: chargeTarget,
@@ -2060,6 +2077,14 @@ const PaymentModal = ({
     };
 
     const handleStartProcessing = async (forcedPayload?: any, isUnpaidRegister?: boolean) => {
+        if (isAlreadyFullyPaid && !isUnpaidRegister) {
+            toast({
+                title: "Pedido já quitado",
+                description: "Este pedido já foi totalmente pago e não possui saldo pendente.",
+                variant: "destructive",
+            });
+            return;
+        }
         if (view === 'money' && wantsChange && payWithAmount <= paymentBaseAmount + 0.005 && !isUnpaidRegister) {
             toast({
                 title: "Valor de troco inválido",
@@ -2434,12 +2459,17 @@ const PaymentModal = ({
                                                             )}
                                                         </div>
                                                     )}
+                                                    {isAlreadyFullyPaid && (
+                                                        <div className="w-full mb-4">
+                                                            <InfoCard color="orange" title="Pedido já quitado" message="Este pedido já foi totalmente pago e não possui saldo pendente para cobrança." />
+                                                        </div>
+                                                    )}
                                                     <div className="grid grid-cols-2 gap-4">
                                                         {availableMethodTypes.has("cash") && (
                                                             <PaymentMethodCard
                                                                 icon={MoneyIcon}
                                                                 label="Dinheiro"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("cash")}
                                                             />
                                                         )}
@@ -2447,7 +2477,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={QRCodeIcon}
                                                                 label="Pix"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("pix")}
                                                             />
                                                         )}
@@ -2455,7 +2485,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Crédito"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("credit_card")}
                                                             />
                                                         )}
@@ -2463,7 +2493,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={CreditCardIcon}
                                                                 label="Cartão de Débito"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("debit_card")}
                                                             />
                                                         )}
@@ -2471,7 +2501,7 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={FileIcon}
                                                                 label="Transferência"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("bank_transfer")}
                                                             />
                                                         )}
@@ -2479,17 +2509,17 @@ const PaymentModal = ({
                                                             <PaymentMethodCard
                                                                 icon={TagIcon}
                                                                 label="Outros"
-                                                                disabled={isMarketplaceOrder}
+                                                                disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                                 onClick={() => openMethodTypeSelection("other")}
                                                             />
                                                         )}
                                                         <PaymentMethodCard
                                                             icon={SplitIcon}
                                                             label="Dividir"
-                                                            disabled={isMarketplaceOrder}
+                                                            disabled={isMarketplaceOrder || isAlreadyFullyPaid}
                                                             onClick={() => { resetSelectedMethodPricing({ clearType: true }); setView('split'); }}
                                                         />
-                                                        {mpConnected && !isMarketplaceOrder && (
+                                                        {mpConnected && !isMarketplaceOrder && !isAlreadyFullyPaid && (
                                                             <button
                                                                 onClick={() => { resetSelectedMethodPricing({ clearType: true }); setMpStep("brick"); setView('mercadopago'); }}
                                                                 className="flex flex-col items-center justify-center gap-2 md:gap-3 h-28 md:h-32 rounded-2xl border border-brand-border dark:border-dark-border transition-colors group bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20"

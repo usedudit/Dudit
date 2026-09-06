@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, TrashIcon, PlusIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -18,19 +18,15 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, Spinner, MoneyInput, Separator, Checkbox, FormSection } from "@/components/reusable"
+import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
-import { useNotification } from "@/hooks/use-notification"
-import { fetchWithCSRF } from "@/lib/utils/fetch-with-csrf"
-import ImageCropperModal from "@/components/ImageCropperModal"
-import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
 import { sortByVendorRelevance } from "@/lib/marketplace/ranking"
@@ -669,6 +665,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const displayReviewsCount = hasEnoughReviews ? calculatedReviewsCount : 0
 
     const pathname = usePathname()
+    const router = useRouter()
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
@@ -692,8 +689,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [activeSection, mobileModalTab, isAboutPageOpen])
 
-    const [gallery, setGallery] = useState<string[]>(() => partner.gallery || [])
-    const [localImages, setLocalImages] = useState<string[]>(() => partner.gallery || [])
+    const gallery: string[] = useMemo(() => partner?.gallery || [], [partner?.gallery])
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")
     const [isCategorySearchOpen, setIsCategorySearchOpen] = useState(false)
@@ -716,7 +712,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const tabsScrollRef = useRef<HTMLDivElement>(null)
     const topRef = useRef<HTMLDivElement>(null)
     const { user } = useSupabase()
-    const isStoreOwner = user?.id === partner.userId || user?.id === partner.user_id
+    const isStoreOwner = Boolean(user?.id && ((partner?.userId && user.id === partner.userId) || (partner?.user_id && user.id === partner.user_id)))
 
     const [partnerPromotions, setPartnerPromotions] = useState<any[]>([])
 
@@ -881,8 +877,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         if (tag) params.set("categoria", tag)
         else params.delete("categoria")
         const query = params.toString()
-        window.history.pushState({}, "", query ? `${pathname}?${query}` : pathname)
-    }, [pathname])
+        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    }, [pathname, router])
     const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })
 
     useEffect(() => {
@@ -1448,7 +1444,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             {galleryHasBeenOpened && (
                                 <>
                                     <FormSection title="Galeria">
-                                        <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                                        <GalleryTab gallery={gallery} />
                                     </FormSection>
                                 </>
                             )}
@@ -1532,7 +1528,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
                         <div style={{ display: mobileModalTab === "gallery" ? "block" : "none" }}>
                             {galleryHasBeenOpened && (
-                                <GalleryTab partner={partner} isStoreOwner={isStoreOwner} gallery={gallery} setGallery={setGallery} localImages={localImages} setLocalImages={setLocalImages} />
+                                <GalleryTab gallery={gallery} />
                             )}
                         </div>
                     </div>
@@ -1594,21 +1590,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 }
 
 interface GalleryTabProps {
-    partner: any
-    isStoreOwner: boolean
     gallery: string[]
-    setGallery: React.Dispatch<React.SetStateAction<string[]>>
-    localImages: string[]
-    setLocalImages: React.Dispatch<React.SetStateAction<string[]>>
 }
 
-function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, setLocalImages }: GalleryTabProps) {
-    const { success: notifySuccess, error: notifyError } = useNotification()
-    const [isSaving, setIsSaving] = useState(false)
-    const [cropModalOpen, setCropModalOpen] = useState(false)
-    const [tempImageFile, setTempImageFile] = useState<File | null>(null)
-    const fileInputRef = useRef<HTMLInputElement>(null)
-
+function GalleryTab({ gallery = [] }: GalleryTabProps) {
     const [isLightboxOpen, setIsLightboxOpen] = useState(false)
     const [lightboxActiveImg, setLightboxActiveImg] = useState(0)
     const [slideDirection, setSlideDirection] = useState<1 | -1>(1)
@@ -1621,11 +1606,11 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
     }, [])
 
     const galleryItems = useMemo(() => {
-        return localImages.map(img => ({
+        return gallery.map(img => ({
             type: "image" as const,
             src: img.startsWith("data:") ? img : getR2ImageUrl(img)
         }))
-    }, [localImages])
+    }, [gallery])
 
     const lightboxNav = useCallback((dir: 1 | -1) => {
         lightboxJustOpened.current = false
@@ -1654,88 +1639,10 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
         return () => window.removeEventListener("keydown", handleKeyDown)
     }, [isLightboxOpen, lightboxNav])
 
-    const planLimits = {
-        free: 1,
-        crescer: 5,
-        escalar: 10
-    }
-    const limit = planLimits[partner.planSlug as 'free' | 'crescer' | 'escalar'] || 1
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        e.currentTarget.value = ""
-        if (!file) return
-        if (file.size > 3 * 1024 * 1024) return void notifyError("Máximo 3MB por imagem")
-        setTempImageFile(file)
-        setCropModalOpen(true)
-    }
-
-    const handleCropComplete = (croppedBase64: string) => {
-        if (localImages.length >= limit) {
-            notifyError(`Seu plano atual permite apenas até ${limit} imagem(ns) na galeria.`)
-            return
-        }
-        setLocalImages(prev => [...prev, croppedBase64])
-        setTempImageFile(null)
-    }
-
-    const handleRemoveImage = (indexToRemove: number) => {
-        setLocalImages(prev => prev.filter((_, i) => i !== indexToRemove))
-    }
-
-    const handleCancel = () => {
-        setLocalImages(gallery)
-    }
-
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            const finalGalleryUrls = [...localImages]
-            for (let i = 0; i < finalGalleryUrls.length; i++) {
-                const img = finalGalleryUrls[i]
-                if (img.startsWith("data:")) {
-                    const blob = await (await fetch(img)).blob()
-                    const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
-                    const file = new File([blob], `gallery-image-${Date.now()}-${i}.${ext}`, { type: blob.type })
-                    const formData = new FormData()
-                    formData.append("file", file)
-                    const res = await fetchWithCSRF("/api/upload-image?uploadType=products", {
-                        method: "POST",
-                        body: formData
-                    })
-                    const data = await res.json()
-                    if (data.success && data.key) {
-                        finalGalleryUrls[i] = data.key
-                    } else {
-                        throw new Error(data.error || "Erro no upload da imagem")
-                    }
-                }
-            }
-
-            const result = await updatePartnerAction(partner.id, {
-                gallery: finalGalleryUrls,
-                userId: partner.userId || partner.user_id,
-            })
-
-            if (result?.error) {
-                notifyError(result.error)
-            } else {
-                notifySuccess("Galeria atualizada com sucesso!")
-                setGallery(finalGalleryUrls)
-            }
-        } catch (err: any) {
-            notifyError(err.message || "Erro ao salvar galeria")
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const isDirty = JSON.stringify(localImages) !== JSON.stringify(gallery)
-
     return (
         <div className="pb-10 animate-fade-in relative">
-            {localImages.length === 0 && !isStoreOwner ? (
-                <div className="flex flex-col items-center justify-center text-center">
+            {gallery.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center py-12">
                     <IconPlaceholder
                         icon={ImageIcon}
                         title="Galeria de imagens vazia"
@@ -1744,82 +1651,21 @@ function GalleryTab({ partner, isStoreOwner, gallery, setGallery, localImages, s
                 </div>
             ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {localImages.map((img, idx) => {
+                    {gallery.map((img, idx) => {
                         const srcUrl = img.startsWith("data:") ? img : getR2ImageUrl(img)
                         return (
-                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray dark:bg-dark-border/30 group shadow-sm">
+                            <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-brand-border bg-brand-gray dark:bg-dark-border/30">
                                 <img
                                     src={srcUrl}
                                     alt={`Galeria ${idx + 1}`}
-                                    className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                                    className="w-full h-full object-cover cursor-pointer"
                                     onClick={() => openLightbox(idx)}
                                 />
-                                {isStoreOwner && (
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-10">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemoveImage(idx);
-                                            }}
-                                            className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                                            title="Remover imagem"
-                                        >
-                                            <TrashIcon size={18} />
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         )
                     })}
-
-                    {isStoreOwner && localImages.length < limit && (
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            className="relative aspect-square rounded-2xl border-2 border-dashed border-gray-300 hover:border-brand-green dark:border-white/10 dark:hover:border-brand-green flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-brand-green/[0.02]"
-                        >
-                            <PlusIcon size={24} className="text-brand-inactive-text dark:text-dark-body hover:text-brand-green transition-colors mb-2" />
-                            <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">Adicionar foto</span>
-                            <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-1">{localImages.length} de {limit}</span>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                hidden
-                                onChange={handleFileChange}
-                            />
-                        </div>
-                    )}
                 </div>
             )}
-
-            {isStoreOwner && isDirty && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white/90 dark:bg-dark-surface/90 border border-brand-border dark:border-dark-border backdrop-blur-md px-6 py-4 rounded-2xl shadow-xl flex items-center gap-6 animate-slide-up max-w-[90%] md:max-w-md w-full justify-between">
-                    <div className="flex flex-col">
-                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Alterações pendentes</span>
-                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body">Galeria modificada ({localImages.length} de {limit})</span>
-                    </div>
-                    <div className="flex gap-2.5">
-                        <Button variant="outline" size="sm" onClick={handleCancel} disabled={isSaving} className="h-9 px-3">
-                            Descartar
-                        </Button>
-                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-9 px-4 flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-hover text-white border-none">
-                            {isSaving && <Spinner size={14} className="text-white" />}
-                            Salvar
-                        </Button>
-                    </div>
-                </div>
-            )}
-
-            <ImageCropperModal
-                isOpen={cropModalOpen}
-                onClose={() => {
-                    setCropModalOpen(false)
-                    setTempImageFile(null)
-                }}
-                imageFile={tempImageFile}
-                onCropComplete={handleCropComplete}
-                aspectRatio={1}
-            />
 
             {isMounted && createPortal(
                 <AnimatePresence>

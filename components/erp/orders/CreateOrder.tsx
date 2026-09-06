@@ -246,7 +246,7 @@ function normalizeCustomerForCard(customer: any) {
 
 export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOrderProps) {
     const { toast } = useToast()
-    const { success: notifySuccess, error: notifyError } = useNotification()
+    const { success: notifySuccess, error: notifyError, warning: notifyWarning } = useNotification()
     const { planSlug, role, hasSpecific, canRbac } = usePermissions()
     const canDiscount = hasSpecific("orders", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -498,6 +498,14 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const isPaidOrderLocked = Boolean(editOrderId && originalPaymentStatus === "paid")
     const isMarketplaceOrder = originalOrderSource === "Online Store"
 
+    const isAlreadyPaid = Boolean(
+        editOrderId && (
+            originalPaymentStatus === "paid" ||
+            remainingAmount <= 0.009 ||
+            (originalPaidAmount >= totalAmount - 0.009 && totalAmount > 0)
+        )
+    )
+
     const isPaidOrder = originalPaymentStatus === 'paid' || originalPaymentStatus === 'partially_paid'
     const isDeliveredOrder = originalDeliveryStatus === 'delivered'
     const isMarketplaceLocked = isMarketplaceOrder && isPaidOrder
@@ -681,9 +689,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const searchParams = useSearchParams()
     useEffect(() => {
         if (!isLoadingData && editOrderId && searchParams?.get("payment") === "1") {
+            if (isAlreadyPaid) {
+                notifyWarning("Pedido já quitado", "Este pedido já foi totalmente pago e não permite novos pagamentos.")
+                const params = new URLSearchParams(searchParams?.toString())
+                params.delete("payment")
+                const newQuery = params.toString() ? `?${params.toString()}` : ""
+                router.replace(`/erp/pedidos${newQuery}`)
+                setIsPaymentModalOpen(false)
+                return
+            }
             setIsPaymentModalOpen(true)
         }
-    }, [isLoadingData, editOrderId, searchParams])
+    }, [isLoadingData, editOrderId, searchParams, isAlreadyPaid, notifyWarning, router])
 
     useEffect(() => {
         async function loadAccounts() {
@@ -1513,6 +1530,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         if (!validateOrderBeforeSubmit()) {
             return { error: "Sem itens" }
         }
+        if (isAlreadyPaid) {
+            notifyError("Ação bloqueada", "Este pedido já está totalmente pago e não aceita novos pagamentos.")
+            return { error: "Pedido já está totalmente pago." }
+        }
         return submitOrder({
             paymentStatus: paymentData.paymentStatus,
             paymentMethod: paymentData.paymentMethod,
@@ -1536,6 +1557,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const handleOpenPaymentModal = async () => {
         if (!validateOrderBeforeSubmit()) {
+            return
+        }
+        if (isAlreadyPaid) {
+            notifyWarning("Pedido já quitado", "Este pedido já está totalmente pago e não permite novos pagamentos.")
             return
         }
         setIsPaymentModalOpen(true)
@@ -1777,7 +1802,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                 setNewAccountIsActive(true)
                                                 setIsAccountModalOpen(true)
                                             }}
-                                            handleSaveOrder={handleOpenPaymentModal}
+                                            handleSaveOrder={editOrderId ? handleSaveOrder : handleOpenPaymentModal}
                                             isQuickMode={isQuick}
                                             salesChannelOptions={salesChannelOptions}
                                             deliveryMethodOptions={deliveryMethodOptions}
@@ -2220,10 +2245,11 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                             otherCosts={parseFloat(otherCosts || "0")}
                             discountAmount={discountAmount + effectiveCouponDiscountAmount}
                             headerSubtitle={PAYMENT_MODAL_HEADER_SUBTITLE}
-                            amountDue={editOrderId && remainingAmount > 0.009 ? remainingAmount : undefined}
+                            amountDue={editOrderId ? remainingAmount : undefined}
                             existingPaidAmount={editOrderId ? originalPaidAmount : 0}
                             existingPaymentBreakdown={editOrderId ? originalPaymentBreakdown : []}
-                            lockPaymentCompletion={false}
+                            lockPaymentCompletion={isAlreadyPaid}
+                            orderId={editOrderId || undefined}
                             isMarketplaceOrder={isMarketplaceOrder}
                             role={role}
                             originalPaymentMethod={originalPaymentMethod}

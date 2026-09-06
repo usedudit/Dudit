@@ -257,7 +257,15 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         }
     }
 
-    const formatDateStr = (d: string) => d ? new Date(d).toLocaleDateString("pt-BR") : "-"
+    const formatDateStr = (d: string) => {
+        if (!d) return "-"
+        const clean = String(d).split("T")[0]
+        const parts = clean.split("-")
+        if (parts.length === 3 && parts[0].length === 4) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`
+        }
+        return new Date(d).toLocaleDateString("pt-BR")
+    }
     const formatDateTime = (d: string) => d ? new Date(d).toLocaleString("pt-BR") : "-"
 
     const buildImageUrl = (key: string) => key.startsWith("http") ? key : `${CDN_URL}/${key}`

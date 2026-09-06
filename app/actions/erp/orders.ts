@@ -2822,6 +2822,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     if (currentOrderError || !currentOrder) return { error: currentOrderError?.message || "Pedido não encontrado" }
 
+    if (currentOrder.situation === "cancelled") {
+        return { error: "Pedidos cancelados não podem ser editados." }
+    }
+
     const { data: partnerRow } = await supabase
         .from("partners")
         .select("business_info")
@@ -2842,7 +2846,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     }
 
     // Enforce role-based and status-based editing locks
-    const isPaidOrder = currentOrder.situation === 'paid' || currentOrder.situation === 'partially_paid'
+    const isOrderFullyPaid =
+        currentOrder.situation === 'paid' ||
+        (Number(currentOrder.paid_amount || 0) >= Number(currentOrder.total_amount || 0) - 0.009 && Number(currentOrder.total_amount || 0) > 0)
+    const isOrderPartiallyPaid = currentOrder.situation === 'partially_paid' && !isOrderFullyPaid
     const isDeliveredOrder = currentOrder.delivery_status === 'delivered'
 
     if (!can(orderAccess as RbacUserLike, "orders.edit")) {
@@ -2878,23 +2885,35 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         data.salesChannel !== currentOrder.order_source ||
         data.deliveryMethod !== currentOrder.delivery_type ||
         data.customerName !== currentOrder.customer_name ||
-        data.paymentStatus !== currentOrder.situation
+        data.paymentStatus !== currentOrder.situation ||
+        (data.paidAmount !== undefined && Math.abs(Number(currentOrder.paid_amount || 0) - Number(data.paidAmount || 0)) > 0.009)
 
     const hasGeneralChanged = hasItemsChanged || hasAddressChanged || hasFinancialChanged
 
-    if (isPaidOrder) {
-        if (isDeliveredOrder) {
-            // Paid and delivered: only observations (notes) can change.
-            // If anything else changed, block it.
-            const hasDeliveryChanged = data.deliveryStatus !== currentOrder.delivery_status
-            if (hasGeneralChanged || hasDeliveryChanged) {
+    if (isOrderFullyPaid) {
+        if (data.paidAmount !== undefined && Number(data.paidAmount) > Number(currentOrder.paid_amount || 0) + 0.009) {
+            return { error: "Este pedido já está totalmente pago e não permite novos pagamentos." }
+        }
+        if (hasGeneralChanged) {
+            if (isDeliveredOrder) {
                 return { error: "Não é permitido alterar dados após a entrega do pedido pago." }
+            } else {
+                return { error: "Não é permitido alterar itens, valores, cliente ou dados de pagamento de um pedido já pago." }
             }
-        } else {
-            // Paid but not delivered: items, values, client details, address details are locked.
-            if (hasGeneralChanged) {
-                return { error: "Não é permitido alterar itens, valores ou dados do cliente após o pagamento do pedido." }
-            }
+        }
+    } else if (isOrderPartiallyPaid) {
+        if (hasItemsChanged || hasAddressChanged || data.customerName !== currentOrder.customer_name) {
+            return { error: "Não é permitido alterar itens, endereço ou cliente de um pedido com pagamento parcial." }
+        }
+        const hasPricingChanged = Math.abs(Number(currentOrder.total_amount || 0) - Number(data.totalAmount || 0)) > 0.009 ||
+            Math.abs(Number(currentOrder.discount_value || 0) - Number(data.discountValue || 0)) > 0.009 ||
+            Math.abs(Number(currentOrder.delivery_fee || 0) - Number(data.shippingCost || 0)) > 0.009 ||
+            Math.abs(Number(currentOrder.additional_costs || 0) - Number(data.additionalCosts || 0)) > 0.009
+        if (hasPricingChanged) {
+            return { error: "Não é permitido alterar valores de um pedido com pagamento parcial." }
+        }
+        if (data.paidAmount !== undefined && Number(data.paidAmount) > Number(currentOrder.total_amount || 0) + 0.009) {
+            return { error: "O valor pago não pode exceder o valor total do pedido." }
         }
     }
 
@@ -3116,10 +3135,10 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         customer_name: data.customerName || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
         delivery_type: data.deliveryMethod,
-        situation: paymentState.situation,
+        situation: isOrderFullyPaid ? "paid" : paymentState.situation,
         delivery_status: data.deliveryStatus,
-        total_amount: updateServerTotal,
-        paid_amount: paymentState.paidAmount,
+        total_amount: isOrderFullyPaid ? Number(currentOrder.total_amount || updateServerTotal) : updateServerTotal,
+        paid_amount: isOrderFullyPaid ? Number(currentOrder.paid_amount || 0) : paymentState.paidAmount,
         discount_value: data.discountValue,
         discount_type: data.discountType,
         coupon_id: couponIdToSave,
@@ -3133,8 +3152,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         delivery_payer: updateEffectiveDeliveryPayer,
         additional_costs: data.additionalCosts,
         notes: sanitizeNotes(data.notes),
-        payment_method: paymentMethodSummary,
-        payment_breakdown: adjustedPaymentBreakdown,
+        payment_method: isOrderFullyPaid ? (currentOrder.payment_method || paymentMethodSummary) : paymentMethodSummary,
+        payment_breakdown: isOrderFullyPaid ? (currentOrder.payment_breakdown || adjustedPaymentBreakdown) : adjustedPaymentBreakdown,
         finance_account_id: data.financeAccountId,
         payment_provider: data.paymentProvider !== undefined ? data.paymentProvider : ((currentOrder as any).payment_provider || null),
         mp_payment_id: data.mpPaymentId !== undefined ? data.mpPaymentId : ((currentOrder as any).mp_payment_id || null),
@@ -3165,7 +3184,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const orderError = orderUpdateResult.error
     if (orderError) return { error: orderError.message }
 
-    if (paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009) {
+    if (!isOrderFullyPaid && paymentState.paidAmount > (currentOrder.paid_amount || 0) + 0.009) {
         const finalBreakdown = (adjustedPaymentBreakdown && adjustedPaymentBreakdown.length > 0)
             ? adjustedPaymentBreakdown
             : [{

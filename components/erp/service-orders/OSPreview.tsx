@@ -14,6 +14,7 @@ interface OSPreviewProps {
     invoiceNumber: string;
     orderDate: string;
     expectedCompletionDate?: string;
+    expectedCompletionTime?: string | null;
     selectedCustomer: any;
     services: any[];
     products: any[];
@@ -43,6 +44,7 @@ const OSPreview = ({
     invoiceNumber,
     orderDate,
     expectedCompletionDate,
+    expectedCompletionTime,
     selectedCustomer,
     services = [],
     products = [],
@@ -247,7 +249,11 @@ const OSPreview = ({
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Previsão</span>
-                                                    <span className="font-bold text-sm text-brand-dark">{expectedCompletionDate ? formatDateTime(expectedCompletionDate) : "-"}</span>
+                                                    <span className="font-bold text-sm text-brand-dark">
+                                                        {expectedCompletionDate
+                                                            ? `${formatDate(expectedCompletionDate)}${expectedCompletionTime ? ` às ${expectedCompletionTime}` : ""}`
+                                                            : "-"}
+                                                    </span>
                                                 </div>
                                                 {salespersonName && (
                                                     <div className="flex flex-col">
