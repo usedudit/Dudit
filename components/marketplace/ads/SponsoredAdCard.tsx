@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react"
 import type { SponsoredAd } from "@/lib/ads/types"
-import { trackAdClick, trackAdImpression } from "@/app/actions/marketplace/ads"
+import { trackAdClick } from "@/app/actions/marketplace/ads"
+import { queueAdImpression } from "@/lib/ads/impression-tracker"
 
 interface SponsoredAdCardProps {
     ad: SponsoredAd
@@ -16,7 +17,7 @@ export function SponsoredAdCard({ ad, variant = "banner", className = "" }: Spon
     useEffect(() => {
         if (trackedRef.current) return
         trackedRef.current = true
-        trackAdImpression(ad.id)
+        queueAdImpression(ad.id)
     }, [ad.id])
 
     const handleClick = () => {

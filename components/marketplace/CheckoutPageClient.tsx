@@ -2294,10 +2294,7 @@ export function CheckoutPageClient() {
                         couponDiscount: couponDiscount,
                         deliveryFee: isPickup ? 0 : deliveryFee,
                         checkoutPricing: checkoutPricingSnapshot,
-                        cartItemIds:
-                            sessionData?.source === "cart"
-                                ? (sessionData.cartItems || []).map((item) => item.cartItemId)
-                                : undefined,
+                        cartItemIds: undefined,
                     },
                     sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                     mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || "",

@@ -499,7 +499,7 @@ export function PaymentWrapper({
                     deliveryFee: orderDetails.deliveryFee,
                     payDepositOnly,
                     checkoutPricing: orderDetails.checkoutPricing,
-                    existingOrderId: orderId,  // Pass the existing orderId to update instead of creating a new one
+                    existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
                 },
             })
 

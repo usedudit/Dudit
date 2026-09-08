@@ -746,48 +746,14 @@ export default function OrdersPage({
         const ids = explicitIds?.length ? explicitIds : (singleCancelId ? [singleCancelId] : Array.from(selection.ids))
         if (ids.length === 0) return
 
-        // Cancelamento individual direto
-        if (singleCancelId) {
-            setActionModal({ open: true, text: "Cancelando pedido..." })
-            try {
-                const result = await updateOrdersStatusInBatchAction({
-                    orderIds: ids,
-                    partnerId,
-                    actionType: 'cancel',
-                    cancelReason: cancelReason.trim() || undefined,
-                    restoreStock: shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false,
-                    generateAutomaticRefund: shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false,
-                    userName: currentUserName
-                })
-                if (result.success) {
-                    afterMutation()
-                    toast({ title: "Sucesso", description: "Pedido cancelado" })
-                    if ((result as any).warning) {
-                        toast({ title: "Atenção", description: (result as any).warning, variant: "destructive" })
-                    }
-                } else {
-                    toast({ title: "Erro", description: result.error, variant: "destructive" })
-                }
-            } catch (error) {
-                console.error(error)
-                toast({ title: "Erro", description: "Ocorreu um erro.", variant: "destructive" })
-            } finally {
-                setConfirmations(p => ({ ...p, bulkCancel: false }))
-                setSingleCancelId(null)
-                setCancelReason("")
-                setRestoreStockOnCancel(true)
-                setGenerateAutomaticRefundOnCancel(true)
-                setActionModal({ open: false, text: "" })
-            }
-            return
-        }
-
-        // Cancelamento em massa com janela de 10s para desfazer
+        // Cancelamento com janela de 10s para desfazer (individual ou em massa)
         const savedReason = cancelReason.trim() || undefined
         const savedRestoreStock = shouldShowRestoreStockCheckbox ? restoreStockOnCancel : false
         const savedRefund = shouldShowAutomaticRefundCheckbox ? generateAutomaticRefundOnCancel : false
+        const isSingle = ids.length === 1
 
         setConfirmations(p => ({ ...p, bulkCancel: false }))
+        setSingleCancelId(null)
         setCancelReason("")
         setRestoreStockOnCancel(true)
         setGenerateAutomaticRefundOnCancel(true)
@@ -795,7 +761,7 @@ export default function OrdersPage({
 
         undoManager.schedule({
             id: `orders-cancel-${Date.now()}`,
-            title: `Cancelando ${ids.length} pedidos...`,
+            title: isSingle ? "Cancelando pedido..." : `Cancelando ${ids.length} pedidos...`,
             description: "Você tem 10 segundos para desfazer.",
             itemCount: ids.length,
             payload: { ids, savedReason, savedRestoreStock, savedRefund },
@@ -822,7 +788,7 @@ export default function OrdersPage({
                 afterMutation()
                 toast({
                     title: "Sucesso",
-                    description: `${result.processedCount || ids.length} pedidos cancelados.`
+                    description: isSingle ? "Pedido cancelado com sucesso." : `${result.processedCount || ids.length} pedidos cancelados.`
                 })
                 if (result.warning) {
                     toast({ title: "Atenção", description: result.warning, variant: "destructive" })

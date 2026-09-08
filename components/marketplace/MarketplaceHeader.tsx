@@ -662,7 +662,6 @@ const Header: React.FC<HeaderProps> = ({
                                 {simpleTitle}
                             </h1>
                         </div>
-                        <div className="w-8 shrink-0" /> {/* Spacer for centering */}
                     </div>
                 </header>
             )

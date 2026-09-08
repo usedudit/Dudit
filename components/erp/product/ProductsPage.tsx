@@ -21,7 +21,6 @@ import { getNextPlanTarget, isPlanLimitReachedError } from "@/lib/subscription/l
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
-
 import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 
 // Actions
@@ -590,10 +589,6 @@ export default function ProductsPage({
         openEntity('duplicate', product.id)
     }, [openEntity])
 
-    const handleDeleteProduct = useCallback((product: Product) => {
-        setSelection((s) => ({ ...s, delete: product }))
-        setConfirmations((c) => ({ ...c, delete: true }))
-    }, [])
 
     const handleSaveProduct = async (formData: any) => {
         setIsSaving(true)
@@ -650,23 +645,18 @@ export default function ProductsPage({
         }
     }
 
-    const confirmDelete = () => {
-        if (!selection.delete) return
-        const productToDelete = selection.delete
-        const deleteId = productToDelete.id
+    const handleDeleteProduct = useCallback((product: Product) => {
+        const deleteId = product.id
 
-        setConfirmations((p) => ({ ...p, delete: false }))
-        setSelection((s) => ({ ...s, delete: null }))
-
-        // Optimistically remove from state
+        // Optimistically remove from state immediately (instant modern UX, no blocking modal)
         setProducts((p) => p.filter((prod) => prod.id !== deleteId))
 
         undoManager.schedule({
             id: `product-delete-${deleteId}`,
-            title: `Excluindo produto "${productToDelete.name}"...`,
+            title: `Excluindo produto "${product.name}"...`,
             description: "Você tem 10 segundos para desfazer.",
             itemCount: 1,
-            payload: productToDelete,
+            payload: product,
             onExecute: async (prod: Product) => {
                 const result = await deleteProductAction(prod.id)
                 if (!result.success) {
@@ -689,15 +679,15 @@ export default function ProductsPage({
             },
             onError: (err: any) => {
                 setProducts((prev) => {
-                    if (prev.some((p) => p.id === productToDelete.id)) return prev
-                    return [productToDelete, ...prev]
+                    if (prev.some((p) => p.id === product.id)) return prev
+                    return [product, ...prev]
                 })
                 const isPermission = err?.message?.includes("permissão")
                 notifyError(isPermission ? "Sem permissão" : "Erro", err?.message || "Erro ao excluir produto")
                 afterMutation()
             },
         })
-    }
+    }, [undoManager, afterMutation, cache, notifySuccess, notifyError])
 
     const handleArchiveProduct = async (product: Product) => {
         setProducts((p) => p.map((prod) => prod.id === product.id ? { ...prod, status: "archived" } : prod))
@@ -1383,16 +1373,6 @@ export default function ProductsPage({
                 onClear={handleClearFilters}
             />
 
-            <AlertModal
-                isOpen={confirmations.delete}
-                onClose={() => setConfirmations((p) => ({ ...p, delete: false }))}
-                onConfirm={confirmDelete}
-                title="Excluir Produto"
-                message="O item será excluído permanentemente."
-                confirmText="Excluir"
-                icon={<TrashIcon />}
-                variant="danger"
-            />
             <AlertModal
                 isOpen={confirmations.bulkDelete}
                 onClose={() => setConfirmations((p) => ({ ...p, bulkDelete: false }))}

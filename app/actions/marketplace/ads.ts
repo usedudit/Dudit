@@ -31,16 +31,26 @@ export async function getSponsoredAdsForSlot(
 }
 
 export async function trackAdImpression(adId: string): Promise<void> {
-    await traceServerAction("ads.trackImpression")
-    const safeId = sanitizeUUID(adId)
-    if (!safeId) return
+    await trackAdImpressions([adId])
+}
+
+export async function trackAdImpressions(adIds: string[]): Promise<boolean> {
+    await traceServerAction("ads.trackImpressions")
+    const safeIds = [...new Set((adIds || []).map(sanitizeUUID).filter((id): id is string => Boolean(id)))].slice(0, 50)
+    if (safeIds.length === 0) return true
 
     try {
         await requireRateLimit(RateLimitCategory.ERP_GENERAL)
         const supabase = getAdminClient()
-        await supabase.rpc("increment_ad_impression", { ad_id: safeId })
+        const { error } = await supabase.rpc("increment_ad_impressions", { p_ad_ids: safeIds })
+        if (error) {
+            console.error("[ads] impression tracking failed:", error)
+            return false
+        }
+        return true
     } catch (err) {
         console.error("[ads] impression tracking failed:", err)
+        return false
     }
 }
 

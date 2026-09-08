@@ -1212,25 +1212,43 @@ export default function TransactionsPage({
 
     const handleConfirmCancelPending = useCallback(async () => {
         if (!confirmCancelTransaction || cancellingTransaction) return
-        setCancellingTransaction(true)
-        try {
-            const res = await cancelPendingTransactionAction({
-                transactionId: confirmCancelTransaction.id,
-                partnerId,
-                reason: cancelReason.trim() || null,
-            })
-            if (!res.success) {
-                notifyError(res.error || "Erro ao cancelar transação.")
-                return
+        const tx = confirmCancelTransaction
+        const reason = cancelReason.trim() || null
+
+        setConfirmCancelTransaction(null)
+        setCancelReason("")
+
+        undoManager.schedule({
+            id: `transaction-cancel-${tx.id}`,
+            title: `Cancelando transação "${tx.description || 'Pendente'}"...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: 1,
+            payload: { tx, reason },
+            onExecute: async (p) => {
+                const res = await cancelPendingTransactionAction({
+                    transactionId: p.tx.id,
+                    partnerId,
+                    reason: p.reason,
+                })
+                if (!res.success) {
+                    throw new Error(res.error || "Erro ao cancelar transação.")
+                }
+                return res
+            },
+            onUndo: () => {
+                notifySuccess("Cancelamento desfeito.")
+                void refreshTransactionsNow()
+            },
+            onSuccess: () => {
+                notifySuccess("Transação cancelada com sucesso.")
+                void refreshTransactionsNow()
+            },
+            onError: (err: any) => {
+                notifyError(err?.message || "Erro ao cancelar transação.")
+                void refreshTransactionsNow()
             }
-            notifySuccess("Transação cancelada com sucesso.")
-            setConfirmCancelTransaction(null)
-            setCancelReason("")
-            void refreshTransactionsNow()
-        } finally {
-            setCancellingTransaction(false)
-        }
-    }, [confirmCancelTransaction, cancellingTransaction, partnerId, cancelReason, notifyError, notifySuccess, refreshTransactionsNow])
+        })
+    }, [confirmCancelTransaction, cancellingTransaction, undoManager, partnerId, cancelReason, notifySuccess, notifyError, refreshTransactionsNow])
 
     const handleSettleInstallmentGroup = useCallback(
         async (transaction: ERPTransaction) => {

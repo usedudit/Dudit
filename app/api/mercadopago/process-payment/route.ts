@@ -119,9 +119,9 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Método de pagamento não informado" }, { status: 400 })
     }
 
-    const useUnifiedCart = Boolean(cartItemIds && cartItemIds.length > 0)
+    const useUnifiedCart = Boolean(!existingOrderId && cartItemIds && cartItemIds.length > 0)
 
-    if ((!items || items.length === 0) && !useUnifiedCart) {
+    if (!existingOrderId && (!items || items.length === 0) && !useUnifiedCart) {
       return NextResponse.json({ error: "Nenhum item informado" }, { status: 400 })
     }
 
@@ -145,10 +145,33 @@ async function handler(request: NextRequest) {
     // SEGURANÃ‡A: Validar parceiro e token MP (usa admin client para bypass RLS â€” dados sensíveis)
     const adminClient = createAdminClient()
 
+    let existingOrder: any = null
+    if (existingOrderId) {
+      const { data: fetchedOrder, error: fetchError } = await adminClient
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("id", existingOrderId)
+        .single()
+
+      if (fetchError || !fetchedOrder) {
+        SecureLogger.error("Failed to fetch existing order", { orderId: existingOrderId, error: fetchError?.message })
+        return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
+      }
+
+      if (fetchedOrder.buyer_id !== buyerId) {
+        SecureLogger.warn("Order ID mismatch attempt", { orderId: existingOrderId, buyerId, userId: buyerId })
+        return NextResponse.json({ error: "Acesso negado ao pedido" }, { status: 403 })
+      }
+
+      existingOrder = fetchedOrder
+    }
+
     // The client partnerId is only a claim. Resolve the canonical partner
     // from owned cart/products before reading any Mercado Pago configuration.
     let canonicalPartnerId: string | undefined
-    if (useUnifiedCart) {
+    if (existingOrder) {
+      canonicalPartnerId = existingOrder.partner_id
+    } else if (useUnifiedCart) {
       const resolved = await resolveCheckoutCartLinesFresh(adminClient, buyerId, cartItemIds!)
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
@@ -272,7 +295,24 @@ async function handler(request: NextRequest) {
     let depositPercent = 50
     let cartPmtConfig: import("@/lib/services/pricing-engine").PricingInput["paymentMethod"] = null
 
-    if (useUnifiedCart) {
+    if (existingOrder) {
+      fullOrderTotal = Number(existingOrder.total_amount || 0)
+      deliveryFee = Number(existingOrder.delivery_fee || 0)
+      couponIdToSave = existingOrder.coupon_id || null
+      couponDiscountAmount = Number(existingOrder.discount_amount || 0)
+      paymentMethodDiscountAmount = Number(existingOrder.payment_method_discount_amount || 0)
+      paymentMethodExtraAmount = Number(existingOrder.payment_method_extra_amount || 0)
+      resolvedOrderDeliveryType = (existingOrder.delivery_type === "delivery" ? "delivery" : "pickup") as "delivery" | "pickup"
+      resolvedOrderDeliveryAddress = existingOrder.delivery_address || deliveryAddress || null
+      checkoutFulfillment = (existingOrder.checkout_fulfillment as Record<string, unknown>) || null
+      productIdsForCache = (existingOrder.order_items || []).map((i: any) => i.product_id).filter(Boolean)
+
+      const remainingToPay = Math.max(
+        0,
+        Number((fullOrderTotal - Number(existingOrder.store_credit_amount || 0) - Number(existingOrder.paid_amount || 0)).toFixed(2))
+      )
+      totalAmount = remainingToPay
+    } else if (useUnifiedCart) {
       // Update pay_deposit_only and fulfillment_mode in DB for cart items
       await adminClient
         .from("cart_items")
@@ -423,7 +463,7 @@ async function handler(request: NextRequest) {
       }
     } else if (isDev) console.log("Starting item validation for", items.length, "items")
 
-    if (!useUnifiedCart) for (const item of items) {
+    if (!existingOrder && !useUnifiedCart) for (const item of items) {
       if (isDev) console.log("Validating item:", item)
 
       // Validar formato do ID
@@ -520,7 +560,7 @@ async function handler(request: NextRequest) {
 
     if (isDev) console.log("All items validated. Total amount:", totalAmount)
 
-    if (!useUnifiedCart) {
+    if (!existingOrder && !useUnifiedCart) {
       if (normalizedDeliveryType === "delivery") {
         if (!deliveryAddress?.trim()) {
           return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
@@ -631,9 +671,15 @@ async function handler(request: NextRequest) {
 
     // SEGURANÇA: Validar que o total do servidor coincide com o snapshot do frontend
     if (checkoutPricing) {
-      if (Math.abs(totalAmount - checkoutPricing.finalTotal) > 0.01) {
+      const tolerance = 0.05
+      const matches =
+        Math.abs(totalAmount - checkoutPricing.finalTotal) <= tolerance ||
+        (existingOrder && Math.abs(fullOrderTotal - checkoutPricing.finalTotal) <= tolerance)
+
+      if (!matches) {
         SecureLogger.error("Checkout pricing mismatch in process-payment", {
           serverTotal: totalAmount,
+          serverFullTotal: fullOrderTotal,
           clientFinalTotal: checkoutPricing.finalTotal,
         })
         return NextResponse.json({
@@ -681,13 +727,17 @@ async function handler(request: NextRequest) {
     const payerFederalUnit = String(rawPayerAddr?.federalUnit || rawPayerAddr?.federal_unit || "").trim()
 
     // Itens formatados para o motor antifraude do Mercado Pago (+12 pontos)
-    const additionalItems = (validatedItems.length > 0 ? validatedItems : (items || [])).map(item => ({
-      id: String((item as any).product_id || (item as any).id || "item"),
-      title: String((item as any).product_name || (item as any).name || "Item").slice(0, 256),
-      description: String((item as any).product_name || (item as any).name || "Produto").slice(0, 256),
+    const orderItemsList = (existingOrder?.order_items && existingOrder.order_items.length > 0)
+      ? existingOrder.order_items
+      : (validatedItems.length > 0 ? validatedItems : (items || []))
+
+    const additionalItems = orderItemsList.map((item: any) => ({
+      id: String(item.product_id || item.service_id || item.id || "item"),
+      title: String(item.product_name || item.name || "Item").slice(0, 256),
+      description: String(item.product_name || item.name || "Produto").slice(0, 256),
       category_id: "others",
-      quantity: Math.max(1, Math.round(Number((item as any).quantity) || 1)),
-      unit_price: roundMoney(Number((item as any).product_price || (item as any).price) || 0),
+      quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+      unit_price: roundMoney(Number(item.product_price || item.unit_price || item.price) || 0),
     }))
 
     // Dados do pagador no additional_info
@@ -806,10 +856,12 @@ async function handler(request: NextRequest) {
       hasPaymentToken: Boolean(paymentFormData?.token),
     })
 
-    // SEGURANÃ‡A: Idempotency key determinística (protege contra double-click)
-    const idempotencyKey = useUnifiedCart
-      ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
-      : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
+    // SEGURANÇA: Idempotency key determinística (protege contra double-click)
+    const idempotencyKey = existingOrderId
+      ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData.payment_method_id}_${Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
+      : useUnifiedCart
+        ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
+        : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
 
     // Fazer requisição Ã  API do Mercado Pago
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -983,25 +1035,38 @@ async function handler(request: NextRequest) {
     let newOrder: any
     let orderError: any
     
-    if (existingOrderId) {
-      // Buscar pedido existente
-      const { data: existingOrder, error: fetchError } = await adminClient
-        .from("orders")
-        .select("*")
-        .eq("id", existingOrderId)
-        .single()
-      
-      if (fetchError || !existingOrder) {
-        SecureLogger.error("Failed to fetch existing order", { orderId: existingOrderId, error: fetchError?.message })
-        return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
-      }
-      
-      // Validar que o pedido pertence ao comprador
-      if (existingOrder.buyer_id !== buyerId) {
-        SecureLogger.warn("Order ID mismatch attempt", { orderId: existingOrderId, buyerId, userId: buyerId })
-        return NextResponse.json({ error: "Acesso negado ao pedido" }, { status: 403 })
-      }
-      
+    if (existingOrderId && existingOrder) {
+      const existingBreakdown = Array.isArray(existingOrder.payment_breakdown) ? existingOrder.payment_breakdown : []
+      const nonMpBreakdown = existingBreakdown.filter((b: any) => b.method === "store_credit")
+      const updatedBreakdown = [
+        ...nonMpBreakdown,
+        {
+          method: paymentMethodDisplayName,
+          amount: chargeAmount,
+          effectiveAmount: chargeAmount,
+          amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
+          provider: "Mercado Pago",
+          adjustmentType: "none",
+          checkoutPricing: checkoutPricing || existingOrder.payment_breakdown?.[0]?.checkoutPricing || {
+            subtotal: (existingOrder.order_items || []).reduce((sum: number, item: any) => sum + Number(item.subtotal || 0), 0) || (fullOrderTotal - deliveryFee),
+            couponDiscount: couponDiscountAmount,
+            paymentMethodDiscount: paymentMethodDiscountAmount,
+            paymentMethodInterest: 0,
+            paymentMethodFee: paymentMethodExtraAmount,
+            deliveryFee,
+            finalTotal: fullOrderTotal,
+          },
+        },
+      ]
+
+      const totalPaidAmount = paymentStatus === "approved"
+        ? Number((Number(existingOrder.store_credit_amount || 0) + chargeAmount).toFixed(2))
+        : Number(existingOrder.paid_amount || 0)
+
+      const updatedSituation = paymentStatus === "approved"
+        ? resolveSituationFromPaid(totalPaidAmount, fullOrderTotal)
+        : (paymentStatus === "in_process" ? "in_process" : (paymentStatus === "rejected" ? "cancelled" : existingOrder.situation))
+
       // Atualizar pedido existente com dados do pagamento
       const { data: updatedOrder, error: updateError } = await adminClient
         .from("orders")
@@ -1009,32 +1074,17 @@ async function handler(request: NextRequest) {
           payment_provider: "Mercado Pago",
           mp_payment_id: mpPaymentId.toString(),
           payment_status: paymentStatus,
-          payment_breakdown: [{
-            method: paymentMethodDisplayName,
-            amount: chargeAmount,
-            effectiveAmount: chargeAmount,
-            amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
-            provider: "Mercado Pago",
-            adjustmentType: "none",
-            checkoutPricing: checkoutPricing || {
-              subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
-              couponDiscount: couponDiscountAmount,
-              paymentMethodDiscount: paymentMethodDiscountAmount,
-              paymentMethodInterest: 0,
-              paymentMethodFee: paymentMethodExtraAmount,
-              deliveryFee,
-              finalTotal: fullOrderTotal,
-            },
-          }],
-          paid_amount: approvedPaidAmount,
-          amount_paid: approvedPaidAmount,
-          paid_at: paymentStatus === "approved" ? new Date().toISOString() : null,
+          situation: updatedSituation,
+          payment_breakdown: updatedBreakdown,
+          paid_amount: totalPaidAmount,
+          amount_paid: totalPaidAmount,
+          paid_at: paymentStatus === "approved" ? new Date().toISOString() : existingOrder.paid_at,
           payment_expires_at: paymentExpiresAt,
         })
         .eq("id", existingOrderId)
         .select()
         .single()
-      
+
       newOrder = updatedOrder
       orderError = updateError
     } else {
@@ -1100,7 +1150,7 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Erro ao processar pedido" }, { status: 500 })
     }
 
-    if (couponIdToSave) {
+    if (!existingOrderId && couponIdToSave) {
       await adminClient.from("coupon_usages").upsert(
         {
           coupon_id: couponIdToSave,
@@ -1113,30 +1163,32 @@ async function handler(request: NextRequest) {
       })
     }
 
-    if (isDev) console.log("Order created successfully:", newOrder.id)
+    if (isDev) console.log(existingOrderId ? "Order updated successfully:" : "Order created successfully:", newOrder.id)
 
-    const itemsWithSubtotal = mapOrderItemsForPaymentInsert(newOrder.id, orderItemsForInsert)
+    if (!existingOrderId) {
+      const itemsWithSubtotal = mapOrderItemsForPaymentInsert(newOrder.id, orderItemsForInsert)
 
-    const { error: itemsError } = await adminClient.from("order_items").insert(itemsWithSubtotal)
+      const { error: itemsError } = await adminClient.from("order_items").insert(itemsWithSubtotal)
 
-    if (itemsError) {
-      SecureLogger.error("Failed to insert order items", { orderId: newOrder.id, error: itemsError, errorCode: itemsError?.code, errorMessage: itemsError?.message })
-      return NextResponse.json({ error: "Erro ao criar itens do pedido" }, { status: 500 })
-    }
+      if (itemsError) {
+        SecureLogger.error("Failed to insert order items", { orderId: newOrder.id, error: itemsError, errorCode: itemsError?.code, errorMessage: itemsError?.message })
+        return NextResponse.json({ error: "Erro ao criar itens do pedido" }, { status: 500 })
+      }
 
-    const reserveResult = reserveItems.length > 0
-      ? await reserveOrderInventory({
-          client: adminClient,
-          partnerId,
-          orderId: newOrder.id,
-          items: reserveItems,
-        })
-      : { success: true as const }
+      const reserveResult = reserveItems.length > 0
+        ? await reserveOrderInventory({
+            client: adminClient,
+            partnerId,
+            orderId: newOrder.id,
+            items: reserveItems,
+          })
+        : { success: true as const }
 
-    if ("error" in reserveResult) {
-      await adminClient.from("order_items").delete().eq("order_id", newOrder.id)
-      await adminClient.from("orders").delete().eq("id", newOrder.id)
-      return NextResponse.json({ error: reserveResult.error }, { status: 400 })
+      if ("error" in reserveResult) {
+        await adminClient.from("order_items").delete().eq("order_id", newOrder.id)
+        await adminClient.from("orders").delete().eq("id", newOrder.id)
+        return NextResponse.json({ error: reserveResult.error }, { status: 400 })
+      }
     }
 
     // NOTA: O decrement_stock agora é feito automaticamente pelo trigger no banco
@@ -1176,7 +1228,7 @@ async function handler(request: NextRequest) {
     }
     revalidateMarketplace()
 
-    if (cartItemIds && cartItemIds.length > 0) {
+    if (!existingOrderId && cartItemIds && cartItemIds.length > 0) {
       const { error: deleteError } = await adminClient.from("cart_items").delete().in("id", cartItemIds).eq("user_id", buyerId)
 
       if (deleteError) {

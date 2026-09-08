@@ -479,27 +479,17 @@ export default function ServicesPage({
     }, [openEntity])
 
     const handleDeleteService = useCallback((service: any) => {
-        setSelection((s) => ({ ...s, delete: service }))
-        setConfirmations((c) => ({ ...c, delete: true }))
-    }, [])
+        const deleteId = service.id
 
-    const confirmDelete = () => {
-        if (!selection.delete) return
-        const serviceToDelete = selection.delete
-        const deleteId = serviceToDelete.id
-
-        setConfirmations((p) => ({ ...p, delete: false }))
-        setSelection((s) => ({ ...s, delete: null }))
-
-        // Optimistically remove from state
+        // Optimistically remove from state immediately (instant modern UX, no blocking modal)
         setServices((p) => p.filter((prod) => prod.id !== deleteId))
 
         undoManager.schedule({
             id: `service-delete-${deleteId}`,
-            title: `Excluindo serviço "${serviceToDelete.name}"...`,
+            title: `Excluindo serviço "${service.name}"...`,
             description: "Você tem 10 segundos para desfazer.",
             itemCount: 1,
-            payload: serviceToDelete,
+            payload: service,
             onExecute: async (srv: any) => {
                 const result = await deleteServiceAction(srv.id)
                 if (!result.success) {
@@ -522,14 +512,14 @@ export default function ServicesPage({
             },
             onError: (err: any) => {
                 setServices((prev) => {
-                    if (prev.some((p) => p.id === serviceToDelete.id)) return prev
-                    return [serviceToDelete, ...prev]
+                    if (prev.some((p) => p.id === service.id)) return prev
+                    return [service, ...prev]
                 })
                 toast({ title: "Erro", description: err?.message || "Erro ao excluir serviço", variant: "destructive" })
                 afterMutation()
             },
         })
-    }
+    }, [undoManager, afterMutation, cache])
 
     const handleArchiveService = async (service: any) => {
         setServices((p) => p.map((prod) => prod.id === service.id ? { ...prod, status: "archived" } : prod))
@@ -1045,16 +1035,6 @@ export default function ServicesPage({
                 </FloatingActionBar>
             )}
 
-            <AlertModal
-                isOpen={confirmations.delete}
-                onClose={() => setConfirmations(p => ({ ...p, delete: false }))}
-                onConfirm={confirmDelete}
-                title="Excluir Serviço"
-                description="O item será excluído permanentemente."
-                confirmText="Excluir"
-                cancelText="Cancelar"
-                variant="danger"
-            />
 
             <AlertModal
                 isOpen={confirmations.bulkDelete}
