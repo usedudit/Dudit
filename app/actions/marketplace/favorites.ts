@@ -170,9 +170,6 @@ export async function getUserFavoritesAction(params?: {
 
         const admin = getAdminClient()
         const type = params?.type || "todos"
-        const page = params?.page || 1
-        const pageSize = params?.pageSize || 24
-        const offset = (page - 1) * pageSize
 
         // Build query for favorites
         let query = admin
@@ -187,7 +184,13 @@ export async function getUserFavoritesAction(params?: {
             query = query.eq("item_type", "servico")
         }
 
-        query = query.range(offset, offset + pageSize - 1)
+        // Only apply range when explicit pagination params are provided
+        if (params?.page && params?.pageSize) {
+            const page = params.page
+            const pageSize = params.pageSize
+            const offset = (page - 1) * pageSize
+            query = query.range(offset, offset + pageSize - 1)
+        }
 
         const { data: favorites, error, count } = await query
 

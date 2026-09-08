@@ -780,10 +780,9 @@ const Header: React.FC<HeaderProps> = ({
                             ) : isProductDetail && storeSearchPlaceholder ? (
                                 onShare ? (
                                     <Button
-                                        variant="filled"
+                                        variant={isTransparentHeader ? "filled" : "ghost"}
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                                         size="icon"
-                                        className={`${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                     >
                                         <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                     </Button>
@@ -792,10 +791,9 @@ const Header: React.FC<HeaderProps> = ({
                                 <>
                                     {onShare && (
                                         <Button
-                                            variant="filled"
+                                            variant={isTransparentHeader ? "filled" : "ghost"}
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                                             size="icon"
-                                            className={`${isTransparentHeader ? "" : "bg-transparent shadow-none"}`}
                                         >
                                             <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                         </Button>

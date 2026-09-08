@@ -1198,14 +1198,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
             await supabase.from("appointments").update({ order_item_id: insertedItems[0].id }).eq("id", appointmentId).eq("partner_id", partnerId)
           }
         }
-        if (unused.length > 0) {
-          const { error: deleteError } = await supabase
-            .from("order_items")
-            .delete()
-            .in("id", unused.map((item: any) => item.id))
-            .eq("order_id", updated.marketplace_order_id)
-          if (deleteError) throw deleteError
-        }
       }
     }
 

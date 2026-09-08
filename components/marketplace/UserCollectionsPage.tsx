@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useTransition, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { CollectionCard } from "@/components/marketplace/CollectionCard"
@@ -10,6 +10,8 @@ import { Button, DefaultModal, Input, FormTextarea, IconPlaceholder } from "@/co
 import Pagination from "@/components/reusable/Pagination"
 import { PlusIcon } from "@/lib/icons"
 import { getCollectionUrl } from "@/lib/utils/url-generator"
+
+const COLLECTIONS_PER_PAGE = 20
 
 interface Collection {
     id: string
@@ -27,24 +29,27 @@ interface Collection {
 
 interface UserCollectionsPageProps {
     collections: Collection[]
-    currentPage?: number
-    totalPages?: number
 }
 
-export function UserCollectionsPage({ collections: initialCollections, currentPage = 1, totalPages = 1 }: UserCollectionsPageProps) {
+export function UserCollectionsPage({ collections: initialCollections }: UserCollectionsPageProps) {
     const router = useRouter()
-    const searchParams = useSearchParams()
-    const [collections, setCollections] = useState(initialCollections)
+    const [collections] = useState(initialCollections)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [name, setName] = useState("")
     const [description, setDescription] = useState("")
     const [error, setError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [currentPage, setCurrentPage] = useState(1)
+
+    // Client-side pagination
+    const totalPages = Math.max(1, Math.ceil(collections.length / COLLECTIONS_PER_PAGE))
+    const paginatedCollections = useMemo(() => {
+        const start = (currentPage - 1) * COLLECTIONS_PER_PAGE
+        return collections.slice(start, start + COLLECTIONS_PER_PAGE)
+    }, [collections, currentPage])
 
     const handlePageChange = (page: number) => {
-        const params = new URLSearchParams(searchParams.toString())
-        params.set('page', String(page))
-        router.push(`/colecoes?${params.toString()}`)
+        setCurrentPage(page)
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
@@ -126,7 +131,7 @@ export function UserCollectionsPage({ collections: initialCollections, currentPa
                     ) : (
                         <>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
-                                {initialCollections.map((collection) => (
+                                {paginatedCollections.map((collection) => (
                                     <CollectionCard key={collection.id} collection={collection} className="w-full" />
                                 ))}
                             </div>

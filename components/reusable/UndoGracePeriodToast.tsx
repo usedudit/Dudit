@@ -1,9 +1,10 @@
 "use client"
 
-import React from "react"
+import React, { useContext } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, ThreeDotsLoader } from "@/components/reusable"
 import { CheckCircleIcon, XIcon } from "@/lib/icons"
+import { SidebarContext } from "@/lib/sidebar-context"
 import { cn } from "@/lib/utils"
 
 interface UndoGracePeriodToastProps {
@@ -27,8 +28,16 @@ export const UndoGracePeriodToast: React.FC<UndoGracePeriodToastProps> = ({
   onUndo,
   onConfirmNow,
 }) => {
+  const sidebar = useContext(SidebarContext)
+  const isExpanded = sidebar ? sidebar.isExpanded : false
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] flex flex-col items-center pt-4 px-4 pointer-events-none">
+    <div
+      className={cn(
+        "fixed top-0 right-0 z-[9999] flex flex-col items-center pt-4 px-4 pointer-events-none transition-[left] duration-300 ease-in-out",
+        isExpanded ? "left-0 md:left-64" : "left-0 md:left-[68px]"
+      )}
+    >
       <div className="w-full max-w-2xl space-y-2">
         <AnimatePresence>
           {isOpen && (

@@ -2113,14 +2113,14 @@ export const AppointmentSheet = ({
                                                 <p className="font-semibold text-brand-dark dark:text-dark-heading">-</p>
                                             )}
                                         </div>
-                                        {appointment.needsReschedule && (
-                                            <InfoCard
-                                                color="orange"
-                                                title="Reagendamento necessário"
-                                                message="O horário original não está mais disponível."
-                                            />
-                                        )}
                                     </div>
+                                )}
+                                {appointment?.needsReschedule && (
+                                    <InfoCard
+                                        color="orange"
+                                        title="Reagendamento necessário"
+                                        message="O horário original não está mais disponível."
+                                    />
                                 )}
 
                                 {/* Client Section */}

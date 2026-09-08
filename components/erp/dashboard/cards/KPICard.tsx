@@ -43,20 +43,11 @@ export function KPICard({ title, value, trend, className }: KPICardProps) {
                 )}
             </div>
 
-            {/* Bottom Row: Value -> Subtext */}
-            <div className="flex items-end justify-between gap-4 min-w-0">
+            {/* Bottom Row: Value */}
+            <div className="flex items-end gap-4 min-w-0">
                 <span className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading leading-none truncate">
                     {value}
                 </span>
-                
-                {trendLabel && (
-                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-body mb-0.5 text-right leading-tight">
-                        <span className={cn(
-                            "font-bold",
-                            trendPositive ? "text-brand-dark dark:text-dark-heading" : trendNegative ? "text-brand-dark dark:text-dark-heading" : "text-brand-inactive-text dark:text-dark-body/60"
-                        )}>{trendValue}</span> {trendLabel}
-                    </span>
-                )}
             </div>
         </div>
     )

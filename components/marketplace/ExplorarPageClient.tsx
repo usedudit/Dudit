@@ -344,7 +344,12 @@ export function ExplorarPageClient({
             targetUrl = `/explorar${queryPart}`
         }
 
-        router.push(targetUrl)
+        if (typeof window !== "undefined") {
+            const currentRel = `${window.location.pathname}${window.location.search}`
+            if (targetUrl !== currentRel) {
+                window.history.pushState(window.history.state, "", targetUrl)
+            }
+        }
     }
 
     // Handles browser Back/Forward navigation syncing path params and searchParams back to component state
@@ -1136,7 +1141,7 @@ export function ExplorarPageClient({
     const handleInvite = useCallback(() => {
         const cityNameOnly = selectedCitySlug ? formatCitySlug(selectedCitySlug).split(" - ")[0] : ""
         const term = query || (selectedCategories.length > 0 ? selectedCategories[0] : "") || "produtos e serviços"
-        const text = `Oi! Procurei por "${term}" na Dudit em ${cityNameOnly} e ainda não encontrei vendedores. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/invite`
+        const text = `Oi! Procurei por "${term}" na Dudit em ${cityNameOnly} e ainda não encontrei vendedores. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/auth/login?mode=partner`
         const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
         window.open(url, "_blank")
     }, [selectedCitySlug, query, selectedCategories])

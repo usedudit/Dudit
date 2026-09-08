@@ -417,6 +417,13 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
         await requireStorePermission(storeId, partnerId, "stores", "delete")
 
         const supabase = await getSupabaseServerClient()
+
+        const { data: store } = await supabase
+            .from("stores")
+            .select("slug")
+            .eq("id", storeId)
+            .maybeSingle()
+
         const { error } = await supabase
             .from("stores")
             .delete()
@@ -431,6 +438,8 @@ export async function deleteStoreAction(storeId: string, partnerId: string): Pro
         })
 
         await safeRevalidateTag(TAGS.partner(partnerId))
+        await safeRevalidateTag(TAGS.storeProfile(storeId))
+        if (store?.slug) await safeRevalidateTag(`store-${store.slug}`)
         revalidatePath("/erp/lojas")
         return { success: true, data: undefined }
     } catch (error) {

@@ -32,7 +32,7 @@ export async function RevenueChartWidget({ partnerId }: { partnerId: string }) {
                                     "text-[15px] font-bold",
                                     trendPositive ? "text-brand-green" : "text-brand-red"
                                 )}>
-                                    {trend} <span className="text-brand-inactive-text font-medium text-[13px]">vs mês passado</span>
+                                    {trend}
                                 </span>
                             )}
                         </div>

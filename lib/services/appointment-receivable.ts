@@ -12,6 +12,7 @@ export type SyncAppointmentReceivableParams = {
   remaining: number
   paidAmount: number
   paymentMethod?: string | null
+  financeAccountId?: string | null
 }
 
 /**
@@ -21,7 +22,7 @@ export type SyncAppointmentReceivableParams = {
 export async function syncAppointmentReceivable(
   params: SyncAppointmentReceivableParams,
 ): Promise<string | null> {
-  const { supabase, partnerId, appointmentId, customerId, serviceName, startDate, remaining, paidAmount, paymentMethod } =
+  const { supabase, partnerId, appointmentId, customerId, serviceName, startDate, remaining, paidAmount, paymentMethod, financeAccountId: preResolvedFinanceAccountId } =
     params
 
   if (remaining <= 0.009) {
@@ -40,7 +41,7 @@ export async function syncAppointmentReceivable(
   }
 
   const ref = `appointment:${appointmentId}:receivable`
-  const financeAccountId = await resolveMarketplaceOrderFinanceAccountId(supabase as any, partnerId, false)
+  const financeAccountId = preResolvedFinanceAccountId || await resolveMarketplaceOrderFinanceAccountId(supabase as any, partnerId, false)
 
   const { data: existing } = await supabase
     .from("transactions")

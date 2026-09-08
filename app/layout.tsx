@@ -19,6 +19,9 @@ import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnou
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
     display: "swap",
+    // The font is loaded on demand. Preloading it on every route was
+    // generating warnings on routes whose first paint does not use it.
+    preload: false,
     variable: "--font-sans",
 })
 
@@ -26,6 +29,9 @@ const libreBarcode = Libre_Barcode_128_Text({
     weight: "400",
     subsets: ["latin"],
     display: "swap",
+    // Barcode text is only needed by print/label views, never during the
+    // initial render of the application shell.
+    preload: false,
     variable: "--font-barcode",
 })
 

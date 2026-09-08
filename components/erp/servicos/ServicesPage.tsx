@@ -31,9 +31,10 @@ import {
     batchUpdateServicesAction,
     getServiceWithDetailsAction,
 } from "@/app/actions/erp/servicos"
+import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 
 // Components
-import { Button, IconPlaceholder, Checkbox, SelectionBanner } from "@/components/reusable"
+import { Button, IconPlaceholder, Checkbox, SelectionBanner, UndoGracePeriodToast } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import { BulkEditActionsModal, BulkActionPayload } from "@/components/reusable/BulkEditActionsModal"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -279,6 +280,7 @@ export default function ServicesPage({
         bulkDelete: false,
         bulkInactive: false
     })
+    const undoManager = useUndoGracePeriod(10000)
 
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
@@ -481,43 +483,82 @@ export default function ServicesPage({
         setConfirmations((c) => ({ ...c, delete: true }))
     }, [])
 
-    const confirmDelete = async () => {
-        if (selection.delete) {
-            const deleteId = selection.delete.id
-            setActionModal({ open: true, text: "Excluindo serviço..." })
-            const result = await deleteServiceAction(deleteId)
-            setActionModal({ open: false, text: "" })
-            if (result.success) {
+    const confirmDelete = () => {
+        if (!selection.delete) return
+        const serviceToDelete = selection.delete
+        const deleteId = serviceToDelete.id
+
+        setConfirmations((p) => ({ ...p, delete: false }))
+        setSelection((s) => ({ ...s, delete: null }))
+
+        // Optimistically remove from state
+        setServices((p) => p.filter((prod) => prod.id !== deleteId))
+
+        undoManager.schedule({
+            id: `service-delete-${deleteId}`,
+            title: `Excluindo serviço "${serviceToDelete.name}"...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: 1,
+            payload: serviceToDelete,
+            onExecute: async (srv: any) => {
+                const result = await deleteServiceAction(srv.id)
+                if (!result.success) {
+                    throw new Error(result.error || "Erro ao excluir serviço")
+                }
+                return result
+            },
+            onUndo: (srv: any) => {
+                setServices((prev) => {
+                    if (prev.some((p) => p.id === srv.id)) return prev
+                    return [srv, ...prev]
+                })
+                toast({ title: "Ação desfeita", description: "O serviço foi restaurado." })
+                afterMutation()
+            },
+            onSuccess: () => {
                 afterMutation(deleteId, true)
                 cache.removeItemFromListCache(deleteId)
-                setServices((p) => p.filter((prod) => prod.id !== deleteId))
-                toast({ title: "Excluído" })
-            } else {
-                toast({
-                    title: "Erro",
-                    description: result.error || "Erro ao excluir serviço",
-                    variant: "destructive",
+                toast({ title: "Excluído", description: "Serviço excluído com sucesso." })
+            },
+            onError: (err: any) => {
+                setServices((prev) => {
+                    if (prev.some((p) => p.id === serviceToDelete.id)) return prev
+                    return [serviceToDelete, ...prev]
                 })
-            }
-            setConfirmations((p) => ({ ...p, delete: false }))
-        }
+                toast({ title: "Erro", description: err?.message || "Erro ao excluir serviço", variant: "destructive" })
+                afterMutation()
+            },
+        })
     }
 
     const handleArchiveService = async (service: any) => {
-        try {
-            setActionModal({ open: true, text: "Arquivando serviço..." })
-            const res = await archiveServiceAction(service.id)
-            if (!res.success) {
-                toast({ title: "Erro ao arquivar", description: (res as any).error, variant: "destructive" })
-            } else {
+        setServices((p) => p.map((prod) => prod.id === service.id ? { ...prod, status: "archived" } : prod))
+        undoManager.schedule({
+            id: `service-archive-${service.id}`,
+            title: `Arquivando serviço "${service.name}"...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: 1,
+            payload: service,
+            onExecute: async (srv: any) => {
+                const res = await archiveServiceAction(srv.id)
+                if (!res.success) throw new Error((res as any).error || "Erro ao arquivar")
+                return res
+            },
+            onUndo: (srv: any) => {
+                setServices((prev) => prev.map((p) => p.id === srv.id ? { ...p, status: srv.status } : p))
+                toast({ title: "Ação desfeita", description: "O serviço não foi arquivado." })
+                afterMutation()
+            },
+            onSuccess: () => {
+                afterMutation()
                 toast({ title: "Serviço arquivado" })
+            },
+            onError: (err: any) => {
+                setServices((prev) => prev.map((p) => p.id === service.id ? { ...p, status: service.status } : p))
+                toast({ title: "Erro ao arquivar", description: err?.message || "Erro ao arquivar", variant: "destructive" })
                 afterMutation()
             }
-        } catch (e: any) {
-            toast({ title: "Erro", description: e.message || "Erro ao arquivar", variant: "destructive" })
-        } finally {
-            setActionModal({ open: false, text: "" })
-        }
+        })
     }
 
     const handleUnarchiveService = async (service: any) => {
@@ -543,65 +584,117 @@ export default function ServicesPage({
         }
     }
 
-    const confirmBulk = async (action: "delete" | "inactive") => {
+    const confirmBulk = (action: "delete" | "inactive") => {
         const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
         if (action === "delete") {
-            setActionModal({ open: true, text: "Excluir serviços..." })
-            const result = await deleteServicesInBatchAction(ids)
-            setActionModal({ open: false, text: "" })
-            if ((result as any).error) {
-                toast({
-                    title: "Erro",
-                    description: (result as any).error,
-                    variant: "destructive",
-                })
-            } else {
-                afterMutation()
-                ids.forEach(id => cache.removeItemFromListCache(id))
-                const idSet = new Set(ids)
-                setServices((p) => p.filter((prod) => !idSet.has(prod.id)))
-                toast({ title: "Excluídos" })
-            }
-            setConfirmations((p) => ({ ...p, bulkDelete: false }))
-        } else {
-            setActionModal({ open: true, text: "Atualizando status..." })
-            const allInactive = services.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
-            await toggleServicesStatusAction(ids, allInactive)
-            afterMutation()
-            setActionModal({ open: false, text: "" })
+            const servicesToDelete = services.filter((s) => selection.ids.has(s.id))
             const idSet = new Set(ids)
-            setServices((p) =>
-                p.map((prod) =>
-                    idSet.has(prod.id) ? { ...prod, is_active: allInactive } : prod
-                ),
-            )
+
+            setConfirmations((p) => ({ ...p, bulkDelete: false }))
+            setBulkEditModal({ isOpen: false })
+            setSelection((p) => ({ ...p, ids: new Set() }))
+
+            // Optimistic update
+            setServices((p) => p.filter((prod) => !idSet.has(prod.id)))
+
+            undoManager.schedule({
+                id: `services-bulk-delete-${Date.now()}`,
+                title: `Excluindo ${ids.length} serviço(s)...`,
+                description: "Você tem 10 segundos para desfazer.",
+                itemCount: ids.length,
+                payload: { ids, servicesToDelete },
+                onExecute: async ({ ids }: { ids: string[] }) => {
+                    const result = await deleteServicesInBatchAction(ids)
+                    if (!result.success && (result as any).error) {
+                        throw new Error((result as any).error)
+                    }
+                    return result
+                },
+                onUndo: ({ servicesToDelete }: { servicesToDelete: any[] }) => {
+                    setServices((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id))
+                        const toRestore = servicesToDelete.filter((p) => !existingIds.has(p.id))
+                        return [...toRestore, ...prev]
+                    })
+                    toast({ title: "Ação desfeita", description: "Nenhum serviço foi excluído." })
+                    afterMutation()
+                },
+                onSuccess: () => {
+                    afterMutation()
+                    ids.forEach((id) => cache.removeItemFromListCache(id))
+                    toast({ title: "Excluídos", description: `${ids.length} serviço(s) excluído(s) com sucesso.` })
+                },
+                onError: (err: any) => {
+                    setServices((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id))
+                        const toRestore = servicesToDelete.filter((p) => !existingIds.has(p.id))
+                        return [...toRestore, ...prev]
+                    })
+                    toast({ title: "Erro", description: err?.message || "Erro ao excluir serviços", variant: "destructive" })
+                    afterMutation()
+                },
+            })
+        } else {
+            const allInactive = services.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
+            const previousStates = new Map(services.filter((p) => selection.ids.has(p.id)).map((p) => [p.id, p.is_active]))
+
             setConfirmations((p) => ({ ...p, bulkInactive: false }))
-            toast({ title: "Atualizado" })
+            setBulkEditModal({ isOpen: false })
+            setSelection((p) => ({ ...p, ids: new Set() }))
+
+            const idSet = new Set(ids)
+            setServices((p) => p.map((prod) => idSet.has(prod.id) ? { ...prod, is_active: allInactive } : prod))
+
+            undoManager.schedule({
+                id: `services-bulk-status-${Date.now()}`,
+                title: `Atualizando status de ${ids.length} serviço(s)...`,
+                description: "Você tem 10 segundos para desfazer.",
+                itemCount: ids.length,
+                payload: { ids, allInactive, previousStates },
+                onExecute: async ({ ids, allInactive }: any) => {
+                    const result = await toggleServicesStatusAction(ids, allInactive)
+                    return result
+                },
+                onUndo: ({ previousStates }: any) => {
+                    setServices((prev) =>
+                        prev.map((prod) =>
+                            previousStates.has(prod.id) ? { ...prod, is_active: previousStates.get(prod.id) ?? prod.is_active } : prod
+                        )
+                    )
+                    toast({ title: "Ação desfeita", description: "Status dos serviços restaurado." })
+                    afterMutation()
+                },
+                onSuccess: () => {
+                    afterMutation()
+                    toast({ title: "Atualizado", description: "Status dos serviços atualizado com sucesso." })
+                },
+                onError: (err: any) => {
+                    setServices((prev) =>
+                        prev.map((prod) =>
+                            previousStates.has(prod.id) ? { ...prod, is_active: previousStates.get(prod.id) ?? prod.is_active } : prod
+                        )
+                    )
+                    toast({ title: "Erro", description: err?.message || "Erro ao atualizar status dos serviços", variant: "destructive" })
+                    afterMutation()
+                },
+            })
         }
-        setSelection((p) => ({ ...p, ids: new Set() }))
     }
 
     const handleBulkEditApply = async (payload: BulkActionPayload) => {
         const ids = Array.from(selection.ids)
         if (ids.length === 0) return
 
+        if (payload.type === 'delete') {
+            confirmBulk("delete")
+            return
+        }
+
         setActionModal({ open: true, text: "Aplicando alterações..." })
 
         try {
-            if (payload.type === 'delete') {
-                const result = await deleteServicesInBatchAction(ids)
-                if (result.success) {
-                    afterMutation()
-                    setServices(p => p.filter(service => !selection.ids.has(service.id)))
-                    setSelection(p => ({ ...p, ids: new Set() }))
-                    toast({ title: "Sucesso", description: `${ids.length} serviços excluídos` })
-                    setBulkEditModal({ isOpen: false })
-                } else {
-                    toast({ title: "Erro", description: (result as any).error || "Erro ao excluir", variant: "destructive" })
-                }
-                return
-            }
-
             let uploadedImageUrl: string | undefined = undefined
             if (payload.type === 'image' && payload.imageFile) {
                 const formData = new FormData()
@@ -1028,6 +1121,17 @@ export default function ServicesPage({
                 onExportSelected={handleExportSelected}
                 onExportAll={handleExportAll}
                 onClose={closeSelectionModal}
+            />
+
+            <UndoGracePeriodToast
+                isOpen={Boolean(undoManager.pendingAction)}
+                title={undoManager.pendingAction?.title || ""}
+                description={undoManager.pendingAction?.description}
+                remainingSeconds={undoManager.remainingSeconds}
+                progressPct={undoManager.progressPct}
+                isExecuting={undoManager.isExecuting}
+                onUndo={undoManager.undo}
+                onConfirmNow={undoManager.flush}
             />
         </>
     )

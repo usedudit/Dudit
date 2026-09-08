@@ -108,8 +108,8 @@ export function MarketplaceLandingView({
     const handleInvite = () => {
         const cityNameOnly = effectiveCityName || ""
         const text = cityNameOnly
-            ? `Oi! Procurei por produtos e serviços na Dudit em ${cityNameOnly} e ainda não encontrei vendedores. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/invite`
-            : `Oi! Procurei por produtos e serviços na Dudit e ainda não encontrei vendedores na nossa região. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/invite`
+            ? `Oi! Procurei por produtos e serviços na Dudit em ${cityNameOnly} e ainda não encontrei vendedores. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/auth/login?mode=partner`
+            : `Oi! Procurei por produtos e serviços na Dudit e ainda não encontrei vendedores na nossa região. Que tal começar a vender na Dudit? É 100% gratuito e sem taxas: https://dudit.com.br/auth/login?mode=partner`
         const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
         window.open(url, "_blank")
     }

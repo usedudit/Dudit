@@ -38,6 +38,7 @@ export async function createOrderAction(data: {
   payWithAmount?: number
   payDepositOnly?: boolean
   checkoutPricingSnapshot?: MarketplaceCheckoutPricingSnapshot | null
+  useMercadoPago?: boolean
 }) {
   const user = await requireUser()
   if (!user) return { error: "Não autenticado" }
@@ -94,7 +95,7 @@ export async function createOrderAction(data: {
     data.installments,
     data.notes,
     data.couponCode,
-    false,
+    data.useMercadoPago ?? (data.paymentMethod === "mercadopago"),
     data.csrf_token,
     data.wantsChange,
     data.payWithAmount,
@@ -287,7 +288,7 @@ export async function confirmOrderFulfillmentAction(orderId: string) {
     .select("id, status, start_date, start_time, end_date, end_time")
     .eq("marketplace_order_id", orderId)
 
-  if (hasServices && appointments && appointments.length > 0) {
+  if (!hasProducts && hasServices && appointments && appointments.length > 0) {
     let latestCompletionTime = 0
     let latestAppt: any = null
     for (const appt of appointments) {

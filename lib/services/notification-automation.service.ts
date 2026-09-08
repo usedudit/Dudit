@@ -452,6 +452,24 @@ export async function onAppointmentRescheduled(
     time: String(appointment.start_time).slice(0, 5),
   }
 
+  let customerPhone: string | null = null
+  if (appointment.marketplace_order_id) {
+    const { data: order } = await admin
+      .from("orders")
+      .select("buyer_phone")
+      .eq("id", String(appointment.marketplace_order_id))
+      .maybeSingle()
+    customerPhone = order?.buyer_phone || null
+  }
+  if (!customerPhone && appointment.customer_id) {
+    const { data: customer } = await admin
+      .from("customers")
+      .select("phone")
+      .eq("id", String(appointment.customer_id))
+      .maybeSingle()
+    customerPhone = customer?.phone || null
+  }
+
   const userId = await resolveCustomerUserId({
     customerId: appointment.customer_id as string | null,
     marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
@@ -465,6 +483,7 @@ export async function onAppointmentRescheduled(
       entityId: appointmentId,
       partnerId,
       customerId: appointment.customer_id as string | null | undefined,
+      phone: customerPhone,
       ctx,
       origin,
     })
@@ -481,7 +500,6 @@ export async function onAppointmentRescheduled(
     origin,
   })
 
-  // Schedule new reminders
   await scheduleNotificationAppointmentReminders({
     partnerId,
     appointmentId,

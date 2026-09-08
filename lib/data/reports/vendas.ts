@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import { getDateRangeWithPrevious } from "@/lib/period-types"
+import { getDateComponents } from "@/lib/date/convert"
 import { money, brl } from "@/lib/data/dashboard"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
@@ -257,23 +258,23 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         .slice(0, 8)
         .map(([label, d]) => ({ id: label, label, value: d.revenue, count: d.count }))
 
-      // ─── Orders by hour ───
+      // ─── Orders by hour (timezone-aware) ───
       const hourBuckets = new Array(24).fill(0)
       for (const o of periodOrders) {
-        const h = new Date(o.created_at).getHours()
-        hourBuckets[h]++
+        const { hour } = getDateComponents(o.created_at)
+        hourBuckets[hour]++
       }
       const ordersByHour = hourBuckets.map((count, h) => ({
         label: `${String(h).padStart(2, "0")}h`,
         value: count,
       }))
 
-      // ─── Orders by day of week ───
+      // ─── Orders by day of week (timezone-aware) ───
       const dowNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
       const dowBuckets = new Array(7).fill(0)
       for (const o of periodOrders) {
-        const dow = new Date(o.created_at).getDay()
-        dowBuckets[dow]++
+        const { dayOfWeek } = getDateComponents(o.created_at)
+        dowBuckets[dayOfWeek]++
       }
       const ordersByDayOfWeek = dowBuckets.map((count, i) => ({
         label: dowNames[i],

@@ -59,6 +59,7 @@ export default function Error({
                             alt="Dudit"
                             width={140}
                             height={40}
+                            loading="lazy"
                             className="h-10 w-auto object-contain"
                         />
                     </a>
@@ -70,6 +71,7 @@ export default function Error({
                     <img
                         src="https://img.dudit.com.br/static/mascots/Ops.png"
                         alt="Erro"
+                        loading="lazy"
                         className="w-72 h-72 mb-4 object-contain"
                     />
 

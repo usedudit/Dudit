@@ -483,6 +483,7 @@ export function ERPSidebar() {
                             <img
                                 src="https://img.dudit.com.br/static/Icon.png"
                                 alt="Dudit"
+                                loading="lazy"
                                 className="h-8 w-auto object-contain transition-all duration-300"
                             />
                         </div>
@@ -495,6 +496,7 @@ export function ERPSidebar() {
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit Logo"
+                                loading="lazy"
                                 className="h-8 w-auto object-contain"
                             />
                         </div>
@@ -814,12 +816,14 @@ export function ERPSidebar() {
                                     <img
                                         src="https://img.dudit.com.br/static/Icon.png"
                                         alt="Dudit"
+                                        loading="lazy"
                                         className="h-7 w-auto object-contain transition-transform group-hover:scale-105"
                                     />
                                 </div>
                                 <img
                                     src="https://img.dudit.com.br/static/Logo.png"
                                     alt="Dudit Logo"
+                                    loading="lazy"
                                     className="h-6 w-auto object-contain"
                                 />
                             </Link>

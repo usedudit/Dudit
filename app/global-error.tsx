@@ -61,6 +61,7 @@ export default function GlobalError({
                     <img
                         src="https://img.dudit.com.br/static/mascots/Ops.png"
                         alt="Ops"
+                        loading="lazy"
                         style={styles.mascot}
                     />
 

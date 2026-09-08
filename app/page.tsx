@@ -207,14 +207,6 @@ export default async function HomePage() {
 
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
-            <link
-                rel="preload"
-                as="image"
-                href="https://img.dudit.com.br/cdn-cgi/image/width=750,format=auto,quality=80/static/banners/Banner-1.png"
-                imageSrcSet="https://img.dudit.com.br/cdn-cgi/image/width=750,format=auto,quality=80/static/banners/Banner-1.png 750w, https://img.dudit.com.br/cdn-cgi/image/width=1400,format=auto,quality=85/static/banners/Banner-1.png 1400w"
-                imageSizes="(max-width: 768px) 100vw, 1400px"
-                fetchPriority="high"
-            />
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
             <Suspense fallback={<HomeFeedSkeleton />}>

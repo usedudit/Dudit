@@ -21,7 +21,8 @@ import {
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
     ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
     ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon, ExportFileIcon,
-    AlertCircleIcon,
+    AlertCircleIcon, RotateIcon, HistoryIcon, ShoppingCartIcon,
+    CheckCircleIcon, StarIcon, RepeatIcon,
 } from "@/lib/icons"
 import { ReportTableCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
@@ -178,7 +179,7 @@ export function ReportsPage(props: ReportsPageProps) {
                 ))}
             </TabsList>
             <TabsContent value="vendas"><SalesSection {...props} /></TabsContent>
-            {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} /></TabsContent>}
+            {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} salesData={props.salesData} /></TabsContent>}
             {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
             {props.deliveryData && <TabsContent value="entregas"><DeliveriesSection {...props} /></TabsContent>}
             {props.serviceOrdersData && <TabsContent value="ordens-servico"><ServiceOrdersSection {...props} /></TabsContent>}
@@ -214,10 +215,10 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
     const kpis = useMemo(() => {
         if (!salesData) return []
         return [
-            { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend },
-            { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend },
-            { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend },
-            { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "" },
+            { title: "Receita", value: salesData.metrics.revenueFormatted, trend: salesData.metrics.revenueTrend, icon: MoneyIcon },
+            { title: "Ticket Médio", value: salesData.metrics.ticketFormatted, trend: salesData.metrics.ticketTrend, icon: CreditCardIcon },
+            { title: "Pedidos", value: String(salesData.metrics.orderCount), trend: salesData.metrics.orderTrend, icon: ShoppingCartIcon },
+            { title: "Itens Vendidos", value: String(salesData.metrics.itemsSold), trend: "", icon: PackageIcon },
         ]
     }, [salesData])
 
@@ -335,7 +336,7 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
 // ─────────────────────────────────────────────────────────────
 // 2. ABA DE PRODUTOS
 // ─────────────────────────────────────────────────────────────
-function ProductsSection({ productsData, stockValue, returnsData }: { productsData: ProductsDashboardData | null; stockValue: number; returnsData: ReturnsReportData | null }) {
+function ProductsSection({ productsData, stockValue, returnsData, salesData }: { productsData: ProductsDashboardData | null; stockValue: number; returnsData: ReturnsReportData | null; salesData: SalesReportData | null }) {
     const { setExportHandler } = useDashboard()
     const insights = useMemo(() => {
         if (!productsData) return []
@@ -358,8 +359,13 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
     const kpis = useMemo(() => {
         if (!productsData) return []
         return [
-            ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "" }] : []),
-            ...productsData.metrics.slice(3, 6).map((m: any) => ({ title: m.title, value: m.value, trend: m.detail || "" })),
+            ...(stockValue > 0 ? [{ title: "Valor em Estoque", value: brl(stockValue), trend: "", icon: MoneyIcon }] : []),
+            ...productsData.metrics.slice(3, 6).map((m: any) => ({
+                title: m.title,
+                value: m.value,
+                trend: m.detail || "",
+                icon: m.title.includes("estoque") ? AlertCircleIcon : PackageIcon,
+            })),
         ]
     }, [stockValue, productsData])
 
@@ -377,7 +383,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
     const catData = (productsData.categorySales || []).map(c => ({ label: c.label, value: Number(c.value) }))
     const evoData = (productsData.salesEvolution || []).map(e => ({ label: e.label, value: Number(e.value), secondary: Number(e.secondary || 0) }))
     const returnEvoData = (returnsData?.returnEvolution || []).map(r => ({ label: r.label, value: r.value }))
-    const idleData = (productsData.idleProducts || []).map(p => ({ id: p.id, label: p.title, value: Number(String(p.value).replace(/[^\d]/g, "")) || 0 }))
+    const idleData = (productsData.idleProducts || []).map(p => ({ id: p.id, label: p.title, value: p.value || "R$ 0,00", subtitle: p.subtitle || "Sem categoria" }))
 
     const allLabels = [...new Set([...evoData.map(e => e.label), ...returnEvoData.map(r => r.label)])]
     const mergedEvolution = allLabels.map(label => {
@@ -414,7 +420,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                             title="Evolução de Vendas e Devoluções"
                             legendItems={[{ label: "Produtos Vendidos", color: "#059669" }, { label: "Produtos Devolvidos", color: "#ef4444" }]}
                         />
-                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} />
+                        <DashboardLineChart data={mergedEvolution} colors={["#059669", "#ef4444"]} format="currency" />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -458,7 +464,7 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-4">
                     <ReportRankingCard
-                        title="Produtos Parados"
+                        title="Produtos Parados (sem venda)"
                         items={idleData.slice(0, 6)}
                         variant="compact"
                         icon={AlertCircleIcon}
@@ -476,14 +482,14 @@ function ProductsSection({ productsData, stockValue, returnsData }: { productsDa
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TrendingUpIcon} title="Giro de Estoque" />
+                        <CardHeader icon={RotateIcon} title="Giro de Estoque" />
                         <div className="my-auto text-center py-4">
                             <p className="text-[44px] font-extrabold text-brand-green dark:text-dark-heading leading-none">
-                                {productsData.metrics.find((m: any) => m.title.includes("ativos"))?.value || 0}
+                                {salesData?.productTurnover || 0}
                             </p>
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">produtos ativos</p>
+                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">unidades/produto/mês</p>
                             <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">
-                                {productsData.metrics.find((m: any) => m.title.includes("sem estoque"))?.value || 0} sem estoque · {productsData.metrics.find((m: any) => m.title.includes("baixo"))?.value || 0} estoque baixo
+                                Média de rotatividade no período
                             </p>
                         </div>
                     </div>
@@ -643,6 +649,7 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
 // 4. ABA DE ENTREGAS
 // ─────────────────────────────────────────────────────────────
 function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
+    const router = useRouter()
     const { setExportHandler } = useDashboard()
 
     const insights = useMemo(() => {
@@ -662,10 +669,10 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
     const kpis = useMemo(() => {
         if (!deliveryData) return []
         return [
-            { title: "Total", value: String(deliveryData.metrics.total), trend: "" },
-            { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "" },
-            { title: "Atrasadas", value: String(deliveryData.metrics.late), trend: "" },
-            { title: "No Prazo", value: `${deliveryData.metrics.onTimeRate}%`, trend: "" },
+            { title: "Total", value: String(deliveryData.metrics.total), trend: "", icon: TruckIcon },
+            { title: "Pendentes", value: String(deliveryData.metrics.pending), trend: "", icon: ClockIcon },
+            { title: "Atrasadas", value: String(deliveryData.metrics.late), trend: "", icon: AlertCircleIcon },
+            { title: "No Prazo", value: `${deliveryData.metrics.onTimeRate}%`, trend: "", icon: CheckCircleIcon },
         ]
     }, [deliveryData])
 
@@ -723,14 +730,21 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                     <ReportTableCard
                         title="Últimas Entregas"
                         columns={[
-                            { key: "id", header: "ID", render: (v: string) => v.slice(0, 8) },
+                            { key: "orderId", header: "Pedido", render: (v: string) => (
+                                <div className="flex items-center gap-2">
+                                    <TruckIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                    <span className="font-bold">{v}</span>
+                                </div>
+                            )},
                             { key: "status", header: "Status" },
                             { key: "deliveryPerson", header: "Entregador" },
                             { key: "date", header: "Data" },
                             { key: "duration", header: "Duração" },
                         ]}
                         data={deliveryData.recentDeliveries}
+                        onRowClick={(row) => router.push(`/erp/entregas?highlight=${row.id}`)}
                         icon={TruckIcon}
+                        pageSize={4}
                         className="h-full"
                     />
                 </div>
@@ -774,14 +788,28 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={ListIcon} title="Resumo de Status" />
-                        <div className="space-y-3 my-auto">
-                            {statusData.slice(0, 5).map((s, i) => (
-                                <div key={i} className="flex items-center justify-between">
-                                    <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">{s.label}</span>
-                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{s.value}</span>
+                        <CardHeader icon={HistoryIcon} title="Comparativo de Período" />
+                        <div className="space-y-4 my-auto">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Este período</span>
+                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{deliveryData.metrics.total} entregas</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Período anterior</span>
+                                <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">{deliveryData.metrics.previousAvgTimeMinutes > 0 ? `${deliveryData.metrics.previousAvgTimeMinutes} min médio` : "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Tempo médio atual</span>
+                                <span className="text-[15px] font-bold text-brand-green">{deliveryData.metrics.avgTimeMinutes} min</span>
+                            </div>
+                            {deliveryData.metrics.previousAvgTimeMinutes > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Variação</span>
+                                    <span className={`text-[15px] font-bold ${deliveryData.metrics.avgTimeMinutes <= deliveryData.metrics.previousAvgTimeMinutes ? "text-brand-green" : "text-brand-red"}`}>
+                                        {deliveryData.metrics.avgTimeMinutes <= deliveryData.metrics.previousAvgTimeMinutes ? "↓" : "↑"} {Math.abs(deliveryData.metrics.avgTimeMinutes - deliveryData.metrics.previousAvgTimeMinutes)} min
+                                    </span>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
                 </div>
@@ -800,12 +828,12 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
     const kpis = useMemo(() => {
         if (!serviceOrdersData) return []
         return [
-            { title: "Total OS", value: String(serviceOrdersData.metrics.total), trend: "" },
-            { title: "Abertas", value: String(serviceOrdersData.metrics.open), trend: "" },
-            { title: "Em Andamento", value: String(serviceOrdersData.metrics.inProgress), trend: "" },
-            { title: "Concluídas", value: String(serviceOrdersData.metrics.completed), trend: "" },
-            { title: "Canceladas", value: String(serviceOrdersData.metrics.cancelled), trend: "" },
-            { title: "Receita", value: serviceOrdersData.metrics.totalRevenueFormatted, trend: "" },
+            { title: "Total OS", value: String(serviceOrdersData.metrics.total), trend: "", icon: FileTextIcon },
+            { title: "Abertas", value: String(serviceOrdersData.metrics.open), trend: "", icon: ClockIcon },
+            { title: "Em Andamento", value: String(serviceOrdersData.metrics.inProgress), trend: "", icon: WrenchIcon },
+            { title: "Concluídas", value: String(serviceOrdersData.metrics.completed), trend: "", icon: CheckCircleIcon },
+            { title: "Canceladas", value: String(serviceOrdersData.metrics.cancelled), trend: "", icon: AlertCircleIcon },
+            { title: "Receita", value: serviceOrdersData.metrics.totalRevenueFormatted, trend: "", icon: MoneyIcon },
         ]
     }, [serviceOrdersData])
 
@@ -861,15 +889,21 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                     <ReportTableCard
                         title="Últimas Ordens de Serviço"
                         columns={[
-                            { key: "orderNumber", header: "Número" },
+                            { key: "orderNumber", header: "Número", render: (v: string) => (
+                                <div className="flex items-center gap-2">
+                                    <WrenchIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                    <span className="font-bold">{v}</span>
+                                </div>
+                            )},
                             { key: "title", header: "Título" },
                             { key: "status", header: "Status" },
                             { key: "total", header: "Total" },
                             { key: "date", header: "Data" },
                         ]}
                         data={serviceOrdersData.recentOrders}
-                        onRowClick={() => router.push("/erp/ordens-de-servico")}
-                        icon={ListIcon}
+                        onRowClick={(row) => router.push(`/erp/ordens-de-servico?highlight=${row.id}`)}
+                        icon={FileTextIcon}
+                        pageSize={4}
                         className="h-full"
                     />
                 </div>
@@ -902,14 +936,28 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Resumo de Status" />
+                        <CardHeader icon={TagIcon} title="Receita por Status" />
                         <div className="space-y-3 my-auto">
-                            {statusData.slice(0, 5).map((s, i) => (
-                                <div key={i} className="flex items-center justify-between">
-                                    <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">{s.label}</span>
-                                    <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{s.value}</span>
-                                </div>
-                            ))}
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Abertas</span>
+                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{serviceOrdersData.metrics.open}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Em Andamento</span>
+                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{serviceOrdersData.metrics.inProgress}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Concluídas</span>
+                                <span className="text-[13px] font-bold text-brand-green">{serviceOrdersData.metrics.completed}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">Canceladas</span>
+                                <span className="text-[13px] font-bold text-brand-red">{serviceOrdersData.metrics.cancelled}</span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-brand-border dark:border-dark-border pt-2">
+                                <span className="text-[13px] font-semibold text-brand-dark dark:text-dark-heading">Receita Total</span>
+                                <span className="text-[13px] font-bold text-brand-green">{serviceOrdersData.metrics.totalRevenueFormatted}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1147,12 +1195,12 @@ function CustomersSection({ customerData }: { customerData: CustomerReportData |
     const kpis = useMemo(() => {
         if (!customerData) return []
         return [
-            { title: "Total", value: String(customerData.totalCustomers), trend: "" },
-            { title: "Ativos", value: String(customerData.activeCustomers), trend: "" },
-            { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "" },
-            { title: "Novos", value: String(customerData.newCustomers), trend: "" },
-            { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "" },
-            { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "" },
+            { title: "Total", value: String(customerData.totalCustomers), trend: "", icon: Users },
+            { title: "Ativos", value: String(customerData.activeCustomers), trend: "", icon: CheckCircleIcon },
+            { title: "Recorrentes", value: String(customerData.recurringCustomers), trend: "", icon: RepeatIcon },
+            { title: "Novos", value: String(customerData.newCustomers), trend: "", icon: TrendingUpIcon },
+            { title: "Inativos 90d", value: String(customerData.inactiveCustomers), trend: "", icon: AlertCircleIcon },
+            { title: "Ticket Médio", value: customerData.avgTicketFormatted, trend: "", icon: CreditCardIcon },
         ]
     }, [customerData])
 
@@ -1301,11 +1349,11 @@ function MarketingSection({ marketingData }: { marketingData: MarketingReportDat
     const kpis = useMemo(() => {
         if (!marketingData) return []
         return [
-            { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "" },
-            { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total` },
-            { title: "Cupons", value: String(marketingData.couponStats.total), trend: "" },
-            { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "" },
-            ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}` }] : []),
+            { title: "Faturamento", value: marketingData.totalRevenueFormatted, trend: "", icon: MoneyIcon },
+            { title: "Top Canal", value: marketingData.topSource, trend: `${marketingData.topSourcePercent}% do total`, icon: TagIcon },
+            { title: "Cupons", value: String(marketingData.couponStats.total), trend: "", icon: CreditCardIcon },
+            { title: "Uso Cupons", value: `${marketingData.couponStats.usageRate}%`, trend: "", icon: CheckCircleIcon },
+            ...(marketingData.campaigns.length > 0 ? [{ title: "Campanhas", value: String(marketingData.campaigns.filter(c => c.isActive).length), trend: `de ${marketingData.campaigns.length}`, icon: MegaphoneIcon }] : []),
         ]
     }, [marketingData])
 
@@ -1465,12 +1513,12 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
     const kpis = useMemo(() => {
         if (!productivityData) return []
         return [
-            { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "" },
-            { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "" },
-            { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "" },
-            { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "" },
-            { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "" },
-            ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%` }] : []),
+            { title: "Atendimentos", value: String(productivityData.metrics.totalAppointments), trend: "", icon: CalendarIcon },
+            { title: "Receita", value: productivityData.metrics.totalRevenueFormatted, trend: "", icon: MoneyIcon },
+            { title: "Ticket Médio", value: brl(productivityData.metrics.avgTicketPerStaff), trend: "", icon: CreditCardIcon },
+            { title: "Tempo Médio", value: `${productivityData.metrics.avgDuration}min`, trend: "", icon: ClockIcon },
+            { title: "Comparecimento", value: `${productivityData.metrics.attendanceRate}%`, trend: "", icon: CheckCircleIcon },
+            ...(goalData && goalData.totalCount > 0 ? [{ title: "Metas", value: `${goalData.achievedCount}/${goalData.totalCount}`, trend: `${goalData.overallProgress}%`, icon: TargetIcon }] : []),
         ]
     }, [productivityData, goalData])
 
@@ -1485,7 +1533,7 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
 
     if (!productivityData) return <SectionPlaceholder title="Produtividade" description="Ative o módulo de serviços." />
 
-    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos, secondary: d.receita }))
+    const evoData = productivityData.dailyEvolution.map(d => ({ label: d.label, value: d.atendimentos }))
     const staffPieData = productivityData.staffRanking.map(s => ({ label: s.label, value: s.appointments }))
 
     return (
@@ -1504,9 +1552,9 @@ function ProductivitySection({ productivityData, goalData }: { productivityData:
                         <CardHeader
                             icon={TrendingUpIcon}
                             title="Atendimentos por Dia"
-                            legendItems={[{ label: "Atendimentos", color: "#059669" }, { label: "Receita", color: "#2563eb" }]}
+                            legendItems={[{ label: "Atendimentos", color: "#059669" }]}
                         />
-                        <DashboardLineChart data={evoData} colors={["#059669", "#2563eb"]} />
+                        <DashboardLineChart data={evoData} colors={["#059669"]} />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -1634,6 +1682,7 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
             { title: "Total Devoluções", value: String(returnsData.returnCount), trend: "" },
             { title: "Taxa Devolução", value: `${returnsData.returnRate}%`, trend: "" },
             { title: "Reembolsado", value: returnsData.totalRefundedFormatted, trend: "" },
+            { title: "Ticket Médio", value: brl(returnsData.returnCount > 0 ? returnsData.totalRefunded / returnsData.returnCount : 0), trend: "" },
         ]
     }, [returnsData])
 
@@ -1690,15 +1739,22 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                     <ReportTableCard
                         title="Últimas Devoluções"
                         columns={[
+                            { key: "id", header: "#", render: (v: string) => (
+                                <div className="flex items-center gap-2">
+                                    <ReturnIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                    <span className="font-bold">{v.slice(0, 8)}</span>
+                                </div>
+                            )},
                             { key: "customer", header: "Cliente" },
                             { key: "reason", header: "Motivo" },
                             { key: "amount", header: "Valor" },
                             { key: "status", header: "Status" },
                             { key: "date", header: "Data" },
                         ]}
-                        data={returnsData.recentReturns}
+                        data={returnsData.recentReturns.slice(0, 4)}
                         onRowClick={() => router.push("/erp/devolucoes")}
                         icon={ReturnIcon}
+                        pageSize={4}
                         className="h-full"
                     />
                 </div>

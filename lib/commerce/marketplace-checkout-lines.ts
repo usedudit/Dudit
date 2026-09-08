@@ -57,6 +57,7 @@ export type MarketplaceCheckoutDisplayLine = {
     optionName: string
     price: number
   }> | null
+  unit?: string | null
 }
 
 export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): MarketplaceCheckoutDisplayLine[] {
@@ -84,6 +85,7 @@ export function mapDisplayLinesFromResolved(lines: ResolvedCartLine[]): Marketpl
       bookingMetadata: line.bookingMetadata,
       serviceId: line.serviceId,
       selectedAddons: line.selectedAddons || null,
+      unit: line.unit || null,
     }
   })
 }

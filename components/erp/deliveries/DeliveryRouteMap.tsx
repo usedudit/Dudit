@@ -67,6 +67,7 @@ export function DeliveryRouteMap({
     let cancelled = false
     let resizeObserver: ResizeObserver | null = null
     let resizeTimers: ReturnType<typeof setTimeout>[] = []
+    let styleElement: HTMLStyleElement | null = null
 
     const init = async () => {
       if (cancelled || !mapContainerRef.current || !token) return
@@ -107,7 +108,45 @@ export function DeliveryRouteMap({
           zoom: 12,
           attributionControl: false,
         })
-        map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right")
+        
+        // Custom navigation controls styling
+        const navControl = new mapboxgl.NavigationControl({
+          showCompass: false,
+          visualizePitch: false,
+        })
+        map.addControl(navControl, "top-right")
+        
+        // Add custom styles for navigation buttons
+        styleElement = document.createElement("style")
+        styleElement.textContent = `
+          .mapboxgl-ctrl-group {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+            backdrop-filter: blur(8px) !important;
+          }
+          .mapboxgl-ctrl-group button {
+            background: transparent !important;
+            border-color: #e5e7eb !important;
+            width: 36px !important;
+            height: 36px !important;
+          }
+          .mapboxgl-ctrl-group button:hover {
+            background: #f3f4f6 !important;
+          }
+          .mapboxgl-ctrl-group button + button {
+            border-top: 1px solid #e5e7eb !important;
+          }
+          .mapboxgl-ctrl-zoom-in, .mapboxgl-ctrl-zoom-out {
+            width: 36px !important;
+            height: 36px !important;
+          }
+          .mapboxgl-ctrl-icon {
+            filter: invert(0.3) !important;
+          }
+        `
+        document.head.appendChild(styleElement)
         mapRef.current = map
 
         // Container pode inicializar durante animações (FadeIn / DefaultModal scale).
@@ -127,7 +166,7 @@ export function DeliveryRouteMap({
         }
 
         resizeTimers = []
-        for (const ms of [200, 600, 1500]) {
+        for (const ms of [100, 200, 400, 600, 1000, 1500]) {
           resizeTimers.push(setTimeout(resizeMap, ms))
         }
 
@@ -163,6 +202,9 @@ export function DeliveryRouteMap({
       readyRef.current = false
       resizeObserver?.disconnect()
       for (const t of resizeTimers) clearTimeout(t)
+      if (styleElement && styleElement.parentNode) {
+        styleElement.parentNode.removeChild(styleElement)
+      }
       if (mapRef.current) {
         mapRef.current.remove()
         mapRef.current = null
@@ -280,6 +322,11 @@ export function DeliveryRouteMap({
 
       const applyLayers = () => {
         try {
+          // Ensure map is properly sized before adding layers
+          try {
+            map.resize()
+          } catch {}
+          
           const geojson: any = {
             type: "Feature",
             properties: {},
@@ -336,6 +383,14 @@ export function DeliveryRouteMap({
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 15, duration: 600 })
           }
+          
+          // Force multiple resize calls after rendering
+          setTimeout(() => {
+            try { map.resize() } catch {}
+          }, 100)
+          setTimeout(() => {
+            try { map.resize() } catch {}
+          }, 500)
         } catch (layerErr) {
           console.warn("[DeliveryRouteMap] renderRoute error:", layerErr)
         }

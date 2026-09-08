@@ -65,12 +65,6 @@ export function ReportMetricCard({ data, className }: ReportMetricCardProps) {
           </span>
         )}
       </div>
-
-      {data.trendLabel && (
-        <span className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body mt-2">
-          {data.trendLabel}
-        </span>
-      )}
     </div>
   )
 }

@@ -9,15 +9,15 @@ import { ItemCard } from "./shared-components"
 import { Button, IconPlaceholder, DefaultModal, SkeletonLoader, Input, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import { RadioButton } from "@/components/reusable/RadioButton"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
+
+const ITEMS_PER_PAGE = 24
 
 interface FavoritesPageClientProps {
     userProfile: any
     cartCount: number
     initialItems?: any[]
     initialCounts?: { total: number; produtos: number; servicos: number }
-    currentPage?: number
-    totalPages?: number
 }
 
 type TabType = "todos" | "produtos" | "servicos"
@@ -41,12 +41,9 @@ export function FavoritesPageClient({
     cartCount,
     initialItems,
     initialCounts,
-    currentPage = 1,
-    totalPages = 1,
 }: FavoritesPageClientProps) {
     const { user } = useSupabase()
     const router = useRouter()
-    const searchParams = useSearchParams()
     const { favoriteKeys, isLoaded: isFavoritesLoaded } = useFavorites()
     const userId = user?.id
 
@@ -60,13 +57,12 @@ export function FavoritesPageClient({
         initialCounts ?? { total: 0, produtos: 0, servicos: 0 }
     )
     const [isSortModalOpen, setIsSortModalOpen] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
     const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
     const hasLoadedOnce = useRef(!!initialItems)
 
     const handlePageChange = (page: number) => {
-        const params = new URLSearchParams(searchParams.toString())
-        params.set('page', String(page))
-        router.push(`/favoritos?${params.toString()}`)
+        setCurrentPage(page)
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
@@ -173,8 +169,16 @@ export function FavoritesPageClient({
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         searchTimeoutRef.current = setTimeout(() => {
             setSearchQuery(value)
+            setCurrentPage(1)
         }, 300)
     }, [])
+
+    // Client-side pagination
+    const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE))
+    const paginatedItems = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE
+        return filteredItems.slice(start, start + ITEMS_PER_PAGE)
+    }, [filteredItems, currentPage])
 
     const tabCount = (tab: TabType) => {
         switch (tab) {
@@ -200,7 +204,7 @@ export function FavoritesPageClient({
                 </div>
 
                 {/* Tabs */}
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as TabType); setCurrentPage(1) }}>
                     <TabsList className="bg-transparent px-0 md:px-0 mb-6">
                         {TAB_OPTIONS.map((tab) => (
                             <TabsTrigger
@@ -256,7 +260,7 @@ export function FavoritesPageClient({
                     ) : (
                         <>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
-                                {filteredItems.map((item) => (
+                                {paginatedItems.map((item) => (
                                     <ItemCard
                                         key={`${item.itemType}-${item.id}`}
                                         product={item}

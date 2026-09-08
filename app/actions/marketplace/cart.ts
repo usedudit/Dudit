@@ -818,6 +818,10 @@ export async function checkoutCartAction(
   storeId?: string,
   useStoreCredit?: boolean,
 ) {
+  if (paymentMethod === "mercadopago" || paymentMethod === "mp") {
+    useMercadoPago = true
+  }
+
   await requireRateLimit(RateLimitCategory.ORDER_CREATE)
 
   // Validação CSRF

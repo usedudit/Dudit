@@ -22,6 +22,8 @@ import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
 
+import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
+
 // Actions
 import {
     createProductComprehensiveAction,
@@ -39,7 +41,7 @@ import {
 import { createBatchStockMovementAction } from "@/app/actions/erp/stock-movements"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, SelectionBanner, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, SelectionBanner, ThreeDotsLoader, UndoGracePeriodToast } from "@/components/reusable"
 import { playBeepSound, vibrateMobile } from "@/lib/utils/barcode"
 import Dropdown from "../../reusable/Dropdown"
 import DropdownItem from "@/components/reusable/DropdownItem"
@@ -355,6 +357,7 @@ export default function ProductsPage({
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm, selectionModal, closeSelectionModal, handleExportSelected, handleExportAll } = useErpExport(planSlug)
     const [bulkEditModal, setBulkEditModal] = useState({ isOpen: false })
     const [isCameraOpen, setIsCameraOpen] = useState(false)
+    const undoManager = useUndoGracePeriod(10000)
 
     const effectiveViewMode = isTabletOrMobile ? "grid" : viewMode
     const itemsPerPage = 8
@@ -647,40 +650,83 @@ export default function ProductsPage({
         }
     }
 
-    const confirmDelete = async () => {
-        if (selection.delete) {
-            const deleteId = selection.delete.id
-            setActionModal({ open: true, text: "Excluindo produto..." })
-            const result = await deleteProductAction(deleteId)
-            setActionModal({ open: false, text: "" })
-            if (result.success) {
+    const confirmDelete = () => {
+        if (!selection.delete) return
+        const productToDelete = selection.delete
+        const deleteId = productToDelete.id
+
+        setConfirmations((p) => ({ ...p, delete: false }))
+        setSelection((s) => ({ ...s, delete: null }))
+
+        // Optimistically remove from state
+        setProducts((p) => p.filter((prod) => prod.id !== deleteId))
+
+        undoManager.schedule({
+            id: `product-delete-${deleteId}`,
+            title: `Excluindo produto "${productToDelete.name}"...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: 1,
+            payload: productToDelete,
+            onExecute: async (prod: Product) => {
+                const result = await deleteProductAction(prod.id)
+                if (!result.success) {
+                    throw new Error(result.error || "Erro ao excluir produto")
+                }
+                return result
+            },
+            onUndo: (prod: Product) => {
+                setProducts((prev) => {
+                    if (prev.some((p) => p.id === prod.id)) return prev
+                    return [prod, ...prev]
+                })
+                notifySuccess("Ação desfeita", "O produto foi restaurado.")
+                afterMutation()
+            },
+            onSuccess: () => {
                 afterMutation(deleteId, true)
                 cache.removeItemFromListCache(deleteId)
-                setProducts((p) => p.filter((prod) => prod.id !== deleteId))
-                notifySuccess("Excluído")
-            } else {
-                const isPermission = result.error?.includes("permissão")
-                notifyError(isPermission ? "Sem permissão" : "Erro", result.error || "Erro ao excluir produto")
-            }
-            setConfirmations((p) => ({ ...p, delete: false }))
-        }
+                notifySuccess("Excluído", "Produto excluído com sucesso.")
+            },
+            onError: (err: any) => {
+                setProducts((prev) => {
+                    if (prev.some((p) => p.id === productToDelete.id)) return prev
+                    return [productToDelete, ...prev]
+                })
+                const isPermission = err?.message?.includes("permissão")
+                notifyError(isPermission ? "Sem permissão" : "Erro", err?.message || "Erro ao excluir produto")
+                afterMutation()
+            },
+        })
     }
 
     const handleArchiveProduct = async (product: Product) => {
-        try {
-            setActionModal({ open: true, text: "Arquivando produto..." })
-            const res = await archiveProductAction(product.id)
-            if (res.error) {
-                notifyError("Erro ao arquivar", res.error)
-            } else {
+        setProducts((p) => p.map((prod) => prod.id === product.id ? { ...prod, status: "archived" } : prod))
+        undoManager.schedule({
+            id: `product-archive-${product.id}`,
+            title: `Arquivando produto "${product.name}"...`,
+            description: "Você tem 10 segundos para desfazer.",
+            itemCount: 1,
+            payload: product,
+            onExecute: async (prod: Product) => {
+                const res = await archiveProductAction(prod.id)
+                if (res.error) throw new Error(res.error)
+                return res
+            },
+            onUndo: (prod: Product) => {
+                setProducts((prev) => prev.map((p) => p.id === prod.id ? { ...p, status: prod.status } : p))
+                notifySuccess("Ação desfeita", "O produto não foi arquivado.")
+                afterMutation()
+            },
+            onSuccess: () => {
+                afterMutation()
                 notifySuccess("Produto arquivado", `O produto "${product.name}" foi arquivado.`)
+            },
+            onError: (err: any) => {
+                setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status: product.status } : p))
+                notifyError("Erro ao arquivar", err?.message || "Erro ao arquivar")
                 afterMutation()
             }
-        } catch (e: any) {
-            notifyError("Erro", e.message || "Erro ao arquivar")
-        } finally {
-            setActionModal({ open: false, text: "" })
-        }
+        })
     }
 
     const handleUnarchiveProduct = async (product: Product) => {
@@ -705,59 +751,119 @@ export default function ProductsPage({
         }
     }
 
-    const confirmBulk = async (action: "delete" | "inactive") => {
+    const confirmBulk = (action: "delete" | "inactive") => {
         const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
         if (action === "delete") {
-            setActionModal({ open: true, text: "Excluir produtos..." })
-            const result = await deleteProductsInBatchAction(ids)
-            setActionModal({ open: false, text: "" })
-            if (result.error) {
-                const isPermission = result.error?.includes("permissão")
-                notifyError(isPermission ? "Sem permissão" : "Erro", result.error)
-            } else {
-                afterMutation()
-                ids.forEach(id => cache.removeItemFromListCache(id))
-                const idSet = new Set(ids)
-                setProducts((p) => p.filter((prod) => !idSet.has(prod.id)))
-                notifySuccess("Excluído")
-            }
+            const productsToDelete = products.filter((p) => selection.ids.has(p.id))
+            const idSet = new Set(ids)
+
             setConfirmations((p) => ({ ...p, bulkDelete: false }))
+            setBulkEditModal({ isOpen: false })
+            setSelection((p) => ({ ...p, ids: new Set() }))
+
+            // Optimistic update
+            setProducts((p) => p.filter((prod) => !idSet.has(prod.id)))
+
+            undoManager.schedule({
+                id: `products-bulk-delete-${Date.now()}`,
+                title: `Excluindo ${ids.length} produto(s)...`,
+                description: "Você tem 10 segundos para desfazer.",
+                itemCount: ids.length,
+                payload: { ids, productsToDelete },
+                onExecute: async ({ ids }: { ids: string[] }) => {
+                    const result = await deleteProductsInBatchAction(ids)
+                    if (!result.success && result.error) {
+                        throw new Error(result.error)
+                    }
+                    return result
+                },
+                onUndo: ({ productsToDelete }: { productsToDelete: Product[] }) => {
+                    setProducts((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id))
+                        const toRestore = productsToDelete.filter((p) => !existingIds.has(p.id))
+                        return [...toRestore, ...prev]
+                    })
+                    notifySuccess("Ação desfeita", "Nenhum produto foi excluído.")
+                    afterMutation()
+                },
+                onSuccess: () => {
+                    afterMutation()
+                    ids.forEach((id) => cache.removeItemFromListCache(id))
+                    notifySuccess("Excluído", `${ids.length} produto(s) excluído(s) com sucesso.`)
+                },
+                onError: (err: any) => {
+                    setProducts((prev) => {
+                        const existingIds = new Set(prev.map((p) => p.id))
+                        const toRestore = productsToDelete.filter((p) => !existingIds.has(p.id))
+                        return [...toRestore, ...prev]
+                    })
+                    const isPermission = err?.message?.includes("permissão")
+                    notifyError(isPermission ? "Sem permissão" : "Erro", err?.message || "Erro ao excluir produtos")
+                    afterMutation()
+                },
+            })
         } else {
-            setActionModal({ open: true, text: "Atualizando status..." })
             const allInactive = products.filter((p) => selection.ids.has(p.id)).every((p) => !p.is_active)
-            await toggleProductsStatusAction(ids, allInactive)
-            afterMutation()
-            setActionModal({ open: false, text: "" })
+            const previousStates = new Map(products.filter((p) => selection.ids.has(p.id)).map((p) => [p.id, p.is_active]))
+
+            setConfirmations((p) => ({ ...p, bulkInactive: false }))
+            setBulkEditModal({ isOpen: false })
+            setSelection((p) => ({ ...p, ids: new Set() }))
+
             const idSet = new Set(ids)
             setProducts((p) => p.map((prod) => idSet.has(prod.id) ? { ...prod, is_active: allInactive } : prod))
-            setConfirmations((p) => ({ ...p, bulkInactive: false }))
-            notifySuccess("Atualizado")
+
+            undoManager.schedule({
+                id: `products-bulk-status-${Date.now()}`,
+                title: `Atualizando status de ${ids.length} produto(s)...`,
+                description: "Você tem 10 segundos para desfazer.",
+                itemCount: ids.length,
+                payload: { ids, allInactive, previousStates },
+                onExecute: async ({ ids, allInactive }: any) => {
+                    const result = await toggleProductsStatusAction(ids, allInactive)
+                    return result
+                },
+                onUndo: ({ previousStates }: any) => {
+                    setProducts((prev) =>
+                        prev.map((prod) =>
+                            previousStates.has(prod.id) ? { ...prod, is_active: previousStates.get(prod.id) ?? prod.is_active } : prod
+                        )
+                    )
+                    notifySuccess("Ação desfeita", "Status dos produtos restaurado.")
+                    afterMutation()
+                },
+                onSuccess: () => {
+                    afterMutation()
+                    notifySuccess("Atualizado", "Status dos produtos atualizado com sucesso.")
+                },
+                onError: (err: any) => {
+                    setProducts((prev) =>
+                        prev.map((prod) =>
+                            previousStates.has(prod.id) ? { ...prod, is_active: previousStates.get(prod.id) ?? prod.is_active } : prod
+                        )
+                    )
+                    notifyError("Erro", err?.message || "Erro ao atualizar status dos produtos")
+                    afterMutation()
+                },
+            })
         }
-        setSelection((p) => ({ ...p, ids: new Set() }))
     }
 
     const handleBulkEditApply = async (payload: BulkActionPayload) => {
         const ids = Array.from(selection.ids)
         if (ids.length === 0) return
 
+        // 1. Delete Bulk handled by payload.type === 'delete'
+        if (payload.type === 'delete') {
+            confirmBulk("delete")
+            return
+        }
+
         setActionModal({ open: true, text: "Aplicando alterações..." })
 
         try {
-            // 1. Delete Bulk handled by payload.type === 'delete'
-            if (payload.type === 'delete') {
-                const result = await deleteProductsInBatchAction(ids)
-                if (result.success) {
-                    afterMutation()
-                    setProducts(p => p.filter(prod => !selection.ids.has(prod.id)))
-                    setSelection(p => ({ ...p, ids: new Set() }))
-                    notifySuccess("Sucesso", `${ids.length} produtos excluídos`)
-                    setBulkEditModal({ isOpen: false })
-                } else {
-                    notifyError("Erro", result.error)
-                }
-                return
-            }
-
             // 2. Image Upload if needed
             let uploadedImageUrl: string | undefined = undefined
             if (payload.type === 'image' && payload.imageFile) {
@@ -1362,6 +1468,17 @@ export default function ProductsPage({
                 onExportSelected={handleExportSelected}
                 onExportAll={handleExportAll}
                 onClose={closeSelectionModal}
+            />
+
+            <UndoGracePeriodToast
+                isOpen={Boolean(undoManager.pendingAction)}
+                title={undoManager.pendingAction?.title || ""}
+                description={undoManager.pendingAction?.description}
+                remainingSeconds={undoManager.remainingSeconds}
+                progressPct={undoManager.progressPct}
+                isExecuting={undoManager.isExecuting}
+                onUndo={undoManager.undo}
+                onConfirmNow={undoManager.flush}
             />
         </>
     )

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useRouter, useSearchParams, usePathname } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,10 +46,10 @@ function stateFromCurrentUrl(): EntityState {
  *
  * Architecture:
  *   1. Local useState updates SYNCHRONOUSLY on open/close (UI responds in <1ms)
- *   2. URL syncs through the Next router so the URL and rendered route share
- *      the same source of truth
- *   3. On browser back/forward, popstate → local state syncs
- *   4. Closing uses replaceState to clean action params WITHOUT popping previous pages
+ *   2. URL syncs INSTANTLY (0ms) via window.history.pushState/replaceState
+ *      preserving window.history.state so Next.js router remains in sync
+ *   3. On browser back/forward, popstate → local state syncs instantly
+ *   4. Closing uses safe history handling without accidental double-backs
  *
  * URL patterns:
  *   /erp/produtos              → list (no action)
@@ -59,7 +59,6 @@ function stateFromCurrentUrl(): EntityState {
  *   /erp/produtos?duplicate=123 → duplicating entity 123
  */
 export function useEntityState() {
-    const router = useRouter()
     const searchParams = useSearchParams()
     const pathname = usePathname()
 
@@ -71,6 +70,9 @@ export function useEntityState() {
     // Keep a ref with the current localState for safe comparison inside effects
     const localStateRef = useRef(localState)
     localStateRef.current = localState
+
+    // Track whether a history entry was pushed for this modal in this component session
+    const pushedHistoryRef = useRef(false)
 
     // ── SECONDARY: Sync from URL on external navigation ──────────────────
     useEffect(() => {
@@ -84,6 +86,7 @@ export function useEntityState() {
             return
         }
         // External navigation detected (link click, router navigation, etc.)
+        localStateRef.current = urlState
         setLocalState(urlState)
     }, [searchParams, pathname])
 
@@ -93,13 +96,15 @@ export function useEntityState() {
             if (window.location.pathname !== pathname) return
             const urlState = stateFromCurrentUrl()
             localStateRef.current = urlState
+            // History was popped by the browser navigation itself
+            pushedHistoryRef.current = false
             setLocalState(urlState)
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
     }, [pathname])
 
-    // ── Open: instant local state + instant URL sync ─────────────────────
+    // ── Open: instant local state + instant URL sync (0ms) ───────────────
 
     const open = useCallback(
         (action: EntityAction, id?: string, entityType?: string) => {
@@ -122,14 +127,10 @@ export function useEntityState() {
             // 1. INSTANT: Update local state synchronously
             const wasOpen = localStateRef.current.isOpen
             const nextState: EntityState = { action, entityId, isOpen: true, entityType }
-            // Keep the ref in lockstep as well. This matters when two actions
-            // happen before React commits the first state update.
             localStateRef.current = nextState
             setLocalState(nextState)
 
-            // 2. Keep Next's navigation state in sync with the browser URL.
-            // Direct history calls only update the address bar; they do not
-            // notify Next's useSearchParams/usePathname subscribers.
+            // 2. INSTANT: Sync URL via pushState / replaceState (0ms, no server RSC roundtrip)
             if (typeof window !== "undefined") {
                 const url = new URL(window.location.href)
                 for (const a of ACTION_PARAMS) {
@@ -141,36 +142,51 @@ export function useEntityState() {
 
                 const newRelative = `${url.pathname}${url.search}${url.hash}`
                 if (wasOpen) {
-                    router.replace(newRelative, { scroll: false })
+                    // Modal was already open (e.g. view -> edit): replace state so we don't pollute history
+                    window.history.replaceState(window.history.state, "", newRelative)
                 } else {
-                    router.push(newRelative, { scroll: false })
+                    // First time opening the modal: push state so browser Back returns to list
+                    pushedHistoryRef.current = true
+                    window.history.pushState(window.history.state, "", newRelative)
                 }
             }
         },
-        [pathname, router],
+        [pathname],
     )
 
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
-        // Guard: if it's already closed, do nothing.
+        // Guard: if it's already closed, do nothing (prevents duplicate history operations)
         if (!localStateRef.current.isOpen) return
-        localStateRef.current = CLOSED_STATE
 
         // 1. INSTANT: Clear local state synchronously
+        localStateRef.current = CLOSED_STATE
         setLocalState(CLOSED_STATE)
 
-        // 2. Clean action parameters without adding a stale history entry.
-        if (typeof window !== "undefined" && window.location.pathname === pathname) {
+        if (typeof window === "undefined") return
+
+        // Safety: if pathname differs, navigation already occurred. Do not touch history!
+        if (window.location.pathname !== pathname) {
+            pushedHistoryRef.current = false
+            return
+        }
+
+        // 2. INSTANT: Clean URL / history
+        if (pushedHistoryRef.current) {
+            pushedHistoryRef.current = false
+            window.history.back()
+        } else {
+            // Opened directly via URL (?view=123) or reloaded: use replaceState to avoid exiting the page
             const url = new URL(window.location.href)
             for (const a of ACTION_PARAMS) {
                 url.searchParams.delete(a)
             }
             url.searchParams.delete("type")
             const newRelative = `${url.pathname}${url.search}${url.hash}`
-            router.replace(newRelative, { scroll: false })
+            window.history.replaceState(window.history.state, "", newRelative)
         }
-    }, [pathname, router])
+    }, [pathname])
 
     // ── Auto-reset on erp-sidebar-reset ──────────────────────────────────
     useEffect(() => {

@@ -46,6 +46,9 @@ export const TAGS = {
   partner: (partnerId: string) => `partner-${partnerId}`,
   partnerStatus: 'partner-status',
 
+  // Store profile (marketplace)
+  storeProfile: (storeId: string) => `store-${storeId}`,
+
   // Auth / Permissions
   userAccess: (userId: string) => `user-access-${userId}`,
 

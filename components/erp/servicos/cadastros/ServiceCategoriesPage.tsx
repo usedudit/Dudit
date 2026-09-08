@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
 import { motion, AnimatePresence } from "framer-motion"
 import { useNotification } from "@/hooks/use-notification"
@@ -36,7 +36,6 @@ interface ServiceCategoriesPageProps {
 
 export default function ServiceCategoriesPage({ initialMetadata, partnerId, planGate }: ServiceCategoriesPageProps) {
     const { success, error } = useNotification()
-    const router = useRouter()
     const searchParams = useSearchParams()
     const { openPlanUpgrade } = usePlanUpgrade()
     // State
@@ -140,7 +139,7 @@ export default function ServiceCategoriesPage({ initialMetadata, partnerId, plan
             } else {
                 url.searchParams.set("tab", tab)
             }
-            router.push(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
+            window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
         }
     }
 

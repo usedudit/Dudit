@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 import confetti from "canvas-confetti"
-import { CopyIcon, BoxIcon, MapPinIcon, CheckCircleIcon, PrinterIcon } from "@/lib/icons"
+import { CopyIcon, BoxIcon, CheckCircleIcon, PrinterIcon, CalendarIcon } from "@/lib/icons"
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -14,7 +14,6 @@ import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
-// @ts-ignore
 import QRCode from "qrcode"
 
 interface OrderDetailItem {
@@ -24,6 +23,14 @@ interface OrderDetailItem {
     price: number
     image?: string
     variant_id?: string
+    variant_name?: string
+    unit?: string | null
+    itemType?: string | null
+    bookingDate?: string | null
+    bookingTime?: string | null
+    staffName?: string | null
+    bookingSummary?: string | null
+    fulfillmentMode?: string | null
 }
 
 interface PixPaymentWrapperProps {
@@ -43,6 +50,8 @@ interface PixPaymentWrapperProps {
         items: OrderDetailItem[]
         deliveryAddress?: string
         deliveryType: "delivery" | "pickup"
+        storeAddress?: string | null
+        partnerAddress?: string | null
         notes?: string
         cartItemIds?: string[]
         couponCode?: string | null
@@ -79,6 +88,72 @@ interface PixPaymentWrapperProps {
     pixKey?: string | null
     pixKeyType?: string | null
     payDepositOnly?: boolean
+}
+
+function isValidOrderNumber(num?: string | null): boolean {
+    if (!num) return false
+    const clean = String(num).trim()
+    if (!clean || clean.startsWith("temp-") || clean.startsWith("temp_")) return false
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) return false
+    return true
+}
+
+function formatItemQuantityUnit(quantity: number, rawUnit?: string | null): string {
+    const clean = (rawUnit || "un").trim().toUpperCase().replace(/[.\s]/g, "")
+    let unit = "un"
+    switch (clean) {
+        case "PC":
+        case "PECA":
+        case "PEÇA":
+            unit = "pc"
+            break
+        case "UN":
+        case "UNIDADE":
+        case "UND":
+            unit = "un"
+            break
+        case "KG":
+        case "QUILO":
+            unit = "kg"
+            break
+        case "LT":
+        case "L":
+        case "LITRO":
+            unit = "L"
+            break
+        case "MT":
+        case "M":
+        case "METRO":
+            unit = "m"
+            break
+        case "CX":
+        case "CAIXA":
+            unit = "cx"
+            break
+        case "PT":
+        case "PCT":
+        case "PACOTE":
+            unit = "pct"
+            break
+        case "DZ":
+        case "DUZIA":
+        case "DÚZIA":
+            unit = "dz"
+            break
+        default:
+            unit = rawUnit ? rawUnit.trim().toLowerCase() : "un"
+    }
+    return `${quantity}${unit}`
+}
+
+function formatBookingDisplayDate(dateStr?: string | null): string {
+    if (!dateStr) return ""
+    if (dateStr.includes("/")) return dateStr
+    const [year, month, day] = dateStr.split("-")
+    if (year && month && day) {
+        return `${day}/${month}/${year}`
+    }
+    return dateStr
 }
 
 export function PaymentWrapper({
@@ -122,6 +197,31 @@ export function PaymentWrapper({
     const brickInitializedRef = useRef(false)
     const [manualPixQrCode, setManualPixQrCode] = useState<string | null>(null)
     const [manualPixPayload, setManualPixPayload] = useState<string | null>(null)
+
+    const resolvedOrderNumber = useMemo(() => {
+        if (isValidOrderNumber(actualOrderNumber)) return String(actualOrderNumber).replace(/^#/, "")
+        if (isValidOrderNumber(orderNumber)) return String(orderNumber).replace(/^#/, "")
+        if (actualOrderId && !actualOrderId.startsWith("temp-")) return actualOrderId.slice(0, 8).toUpperCase()
+        if (orderId && !orderId.startsWith("temp-")) return orderId.slice(0, 8).toUpperCase()
+        return ""
+    }, [actualOrderNumber, orderNumber, actualOrderId, orderId])
+
+    useEffect(() => {
+        if (!actualOrderNumber && orderId && !orderId.startsWith("temp-") && (!orderNumber || !isValidOrderNumber(orderNumber))) {
+            fetch("/api/orders/sync-payment-status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId }),
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.orderNumber) {
+                        setActualOrderNumber(data.orderNumber)
+                    }
+                })
+                .catch(() => { })
+        }
+    }, [orderId, orderNumber, actualOrderNumber])
 
     const handleClose = () => {
         setIsClosing(true)
@@ -527,7 +627,7 @@ export function PaymentWrapper({
             className="fixed inset-0 z-[100] bg-white dark:bg-dark-surface overflow-y-auto custom-scrollbar flex flex-col"
         >
             <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
-                <div className="w-full h-[68px] flex items-center justify-between max-w-[1300px] px-2 mx-auto gap-4">
+                <div className="w-full h-[68px] flex items-center justify-center max-w-[1300px] px-2 mx-auto gap-4">
                     <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/static/Logo.png"
@@ -537,15 +637,6 @@ export function PaymentWrapper({
                             className="h-10 w-auto object-contain"
                         />
                     </a>
-                    {!paymentConfirmed && (
-                        <div className="flex items-center text-sm font-medium text-white tracking-wide">
-                            {(actualOrderNumber || orderNumber) && !(actualOrderNumber || orderNumber)?.includes('temp') ? (
-                                <>Pedido #{actualOrderNumber || orderNumber}</>
-                            ) : (
-                                <>Pedido em {sellerName || "Loja"}</>
-                            )}
-                        </div>
-                    )}
                 </div>
             </header>
 
@@ -897,7 +988,7 @@ export function PaymentWrapper({
                                     placeholderType="image"
                                     imageSrc="https://img.dudit.com.br/static/mascots/HappyDino.png"
                                     imageAlt="Sucesso"
-                                    title={`Pedido Confirmado! #${actualOrderNumber || actualOrderId?.slice(0, 8) || (orderNumber && !orderNumber.includes('temp') ? orderNumber : orderId.slice(0, 8))}`}
+                                    title={`Pedido Confirmado! #${resolvedOrderNumber}`}
                                     subtitle="O vendedor já foi notificado e está preparando tudo para você. Não se preocupe, o Dino te avisa quando o pedido sair para entrega!"
                                 />
                             </div>
@@ -907,41 +998,148 @@ export function PaymentWrapper({
                             <div className="space-y-6 max-w-xl mx-auto mb-10">
                                 <div>
                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
-                                        <BoxIcon size={16} className="text-brand-inactive-text" /> Itens comprados
+                                        <BoxIcon size={16} className="text-brand-inactive-text" /> Itens do pedido
                                     </h3>
-                                    <div className="space-y-4">
-                                        {orderDetails.items.map((item, idx) => (
-                                            <div key={idx} className="flex gap-4 items-center">
-                                                <div className="w-12 h-12 bg-white border border-brand-border dark:border-dark-border rounded-lg flex items-center justify-center p-1 shrink-0">
-                                                    <img src={item.image || "https://img.dudit.com.br/static/Placeholder.png"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-[4px]" />
+                                    <div className="space-y-3">
+                                        {orderDetails.items.map((item, idx) => {
+                                            const isService = item.itemType === "service" || item.itemType === "service_booking" || !!item.bookingDate || !!item.bookingSummary
+                                            const bookingDateFormatted = formatBookingDisplayDate(item.bookingDate)
+                                            return (
+                                                <div key={idx} className="flex gap-3.5 items-center justify-between py-2 border-b border-brand-border/40 dark:border-dark-border/40 last:border-b-0">
+                                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                        <div className="w-12 h-12 bg-white dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-xl flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                                                            <img
+                                                                src={item.image || "https://img.dudit.com.br/static/Placeholder.png"}
+                                                                alt={item.name}
+                                                                className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-lg"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                                {item.name}
+                                                            </h4>
+                                                            {item.variant_name && (
+                                                                <span className="text-[11px] font-medium text-brand-inactive-text dark:text-dark-body block truncate">
+                                                                    {item.variant_name}
+                                                                </span>
+                                                            )}
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body font-medium">
+                                                                {formatItemQuantityUnit(item.quantity, item.unit)} x {formatCurrency(item.price)}
+                                                            </p>
+                                                            {isService && (item.bookingSummary || (bookingDateFormatted && item.bookingTime)) && (
+                                                                <div className="flex items-center gap-1.5 text-[11px] text-brand-green font-medium mt-0.5">
+                                                                    <CalendarIcon size={12} className="shrink-0" />
+                                                                    <span className="truncate">
+                                                                        {item.bookingSummary || `Agendamento: ${bookingDateFormatted} às ${item.bookingTime}${item.staffName ? ` • ${item.staffName}` : ""}`}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0 pl-2">
+                                                        <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(item.quantity * item.price)}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">{item.name}</h4>
-                                                    <p className="text-xs text-brand-inactive-text">{item.quantity}x {formatCurrency(item.price)}</p>
-                                                </div>
-                                                {formatCurrency(item.quantity * item.price)}
-                                            </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 </div>
 
+                                {(() => {
+                                    const hasProducts = orderDetails.items.some(i => i.itemType !== "service" && i.itemType !== "service_booking" && !i.bookingDate)
+                                    const hasServices = orderDetails.items.some(i => i.itemType === "service" || i.itemType === "service_booking" || !!i.bookingDate)
+                                    const hasCustomerLocationService = orderDetails.items.some(i => (i.itemType === "service" || i.itemType === "service_booking" || !!i.bookingDate) && i.fulfillmentMode === "customer_location")
+                                    const hasOnSiteService = orderDetails.items.some(i => (i.itemType === "service" || i.itemType === "service_booking" || !!i.bookingDate) && i.fulfillmentMode !== "customer_location")
+
+                                    const storeAddr = orderDetails.storeAddress || orderDetails.partnerAddress || "No endereço do estabelecimento"
+                                    const clientAddr = orderDetails.deliveryAddress || "Endereço cadastrado"
+
+                                    const cards: Array<{ id: string; title: string; address: string }> = []
+
+                                    if (hasProducts) {
+                                        if (orderDetails.deliveryType === "pickup") {
+                                            cards.push({
+                                                id: "product-pickup",
+                                                title: "Retirada no estabelecimento",
+                                                address: storeAddr,
+                                            })
+                                        } else if (orderDetails.deliveryAddress) {
+                                            cards.push({
+                                                id: "product-delivery",
+                                                title: "Endereço de Entrega",
+                                                address: clientAddr,
+                                            })
+                                        }
+                                    } else if (orderDetails.deliveryType === "delivery" && orderDetails.deliveryAddress && !hasServices) {
+                                        cards.push({
+                                            id: "generic-delivery",
+                                            title: "Endereço de Entrega",
+                                            address: clientAddr,
+                                        })
+                                    }
+
+                                    if (hasCustomerLocationService && (!hasProducts || orderDetails.deliveryType !== "delivery")) {
+                                        cards.push({
+                                            id: "service-customer",
+                                            title: "Local do atendimento no seu endereço",
+                                            address: clientAddr,
+                                        })
+                                    }
+
+                                    if (hasOnSiteService && (!hasProducts || orderDetails.deliveryType !== "pickup")) {
+                                        cards.push({
+                                            id: "service-onsite",
+                                            title: "Local do atendimento no estabelecimento",
+                                            address: storeAddr,
+                                        })
+                                    }
+
+                                    if (cards.length === 0 && orderDetails.deliveryAddress) {
+                                        cards.push({
+                                            id: "fallback-delivery",
+                                            title: orderDetails.deliveryType === "pickup" ? "Local de Retirada" : "Endereço de Entrega",
+                                            address: orderDetails.deliveryType === "pickup" ? storeAddr : clientAddr,
+                                        })
+                                    }
+
+                                    if (cards.length === 0) return null
+
+                                    return (
+                                        <>
+                                            <Separator />
+                                            <div className="space-y-3">
+                                                {cards.map(card => (
+                                                    <div
+                                                        key={card.id}
+                                                        className="flex items-center gap-3 p-3.5 bg-brand-gray/30 dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border"
+                                                    >
+                                                        <img
+                                                            src="https://img.dudit.com.br/static/Map.png"
+                                                            alt={card.title}
+                                                            className="w-11 h-11 object-cover rounded-xl shrink-0"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading leading-tight">
+                                                                {card.title}
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 leading-snug">
+                                                                {card.address}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )
+                                })()}
+
                                 <Separator />
-
-                                {orderDetails.deliveryType === "delivery" && orderDetails.deliveryAddress && (
-                                    <>
-                                        <div>
-                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-2">
-                                                <MapPinIcon size={16} className="text-brand-inactive-text" /> Endereço de Entrega
-                                            </h3>
-                                            <p className="text-sm text-brand-inactive-text leading-relaxed bg-brand-gray/30 dark:bg-dark-surface p-3 rounded-xl border border-brand-border dark:border-dark-border">
-                                                {orderDetails.deliveryAddress}
-                                            </p>
-                                        </div>
-                                        <Separator />
-                                    </>
-                                )}
-
-                                <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                <div className="flex items-center justify-between py-1">
+                                    <span className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">Total pago</span>
+                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                </div>
                             </div>
 
                             <div className="flex justify-center">

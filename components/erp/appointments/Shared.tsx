@@ -1,31 +1,49 @@
 
 
-import { useState } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button, DatePicker, FormDropdown } from '../../reusable';
 import { HistoryTimeline } from '../shared/HistoryTimeline';
+import { SidebarContext } from '@/lib/sidebar-context';
+import { cn } from '@/lib/utils';
 
 export const TopSelectionBar = ({ onClose, onViewSheet }: { onClose: () => void, onViewSheet: () => void }) => {
-    return (
+    const sidebar = useContext(SidebarContext);
+    const isExpanded = sidebar ? sidebar.isExpanded : false;
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return null;
+
+    return createPortal(
         <motion.div
-            initial={{ y: -50, opacity: 0 }}
+            initial={{ y: -56, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="top-0 left-0 w-full fixed h-[60px] bg-brand-dark z-50 flex items-center justify-between px-6 shadow-md"
+            exit={{ y: -56, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className={cn(
+                "top-0 right-0 fixed h-14 bg-brand-dark dark:bg-dark-surface z-40 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-md transition-[left] duration-300 ease-in-out",
+                isExpanded ? "left-0 md:left-64" : "left-0 md:left-[68px]"
+            )}
         >
             <div className="flex gap-3">
-                <button onClick={onViewSheet} className="px-4 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors">
+                <button onClick={onViewSheet} className="px-4 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold hover:bg-white/30 transition-colors cursor-pointer">
                     Ver horários disponíveis
                 </button>
-                <button onClick={onClose} className="px-4 py-1.5 rounded-full bg-white text-brand-dark text-xs font-bold hover:bg-gray-100 transition-colors">
+                <button onClick={onClose} className="px-4 py-1.5 rounded-full bg-white text-brand-dark dark:text-dark-heading text-xs font-bold hover:bg-gray-100 transition-colors cursor-pointer">
                     Fechar
                 </button>
             </div>
 
             <h3 className="text-white font-bold text-sm hidden sm:block">Selecione um horário para reservar</h3>
-        </motion.div>
-    )
+        </motion.div>,
+        document.body
+    );
 }
 
 interface RecurrenceViewProps {

@@ -7,7 +7,8 @@ import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon, BoxIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon, BoxIcon, TruckIcon } from "@/lib/icons"
+import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
@@ -21,6 +22,7 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "../orders/CreateOrder"
 import PaymentStatusModal from "../orders/PaymentStatusModal"
 import DuditDriverDetailsModal from "./DuditDriverDetailsModal"
+import type { DuditPlatformDriver } from "./types"
 
 const CHANGE_STATUS_REASONS = [
     { value: "operational_error", label: "Erro operacional / Clique acidental" },
@@ -91,10 +93,13 @@ export default function DeliveryDetailPage({
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+    const [isOrderPaymentModalOpen, setIsOrderPaymentModalOpen] = useState(false)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
     const [selectedNewStatus, setSelectedNewStatus] = useState<string>("")
     const [simpleConfirmModal, setSimpleConfirmModal] = useState<{ isOpen: boolean; orderId: string; nextStatus: string } | null>(null)
+    const [orderStatusModal, setOrderStatusModal] = useState<{ isOpen: boolean; orderId: string; currentStatus: string } | null>(null)
+    const [orderNewStatus, setOrderNewStatus] = useState<string>("")
     const [activeTab, setActiveTab] = useState<string>("dados_gerais")
     const isMobile = useMediaQuery("(max-width: 768px)")
     const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -304,6 +309,14 @@ export default function DeliveryDetailPage({
         }
     }
 
+    const handleOrderStatusChange = async () => {
+        if (!orderStatusModal || !orderNewStatus) return
+        const { orderId } = orderStatusModal
+        setOrderStatusModal(null)
+        await handleOrderDeliveryStatusChange(orderId, orderNewStatus, undefined, true)
+        setOrderNewStatus("")
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
@@ -346,34 +359,14 @@ export default function DeliveryDetailPage({
     const totalDeliveryFee = links.reduce((sum: number, link: any) => sum + Number(link.orders?.delivery_fee || 0), 0)
 
     const isPlatformDriver = Boolean(delivery.platform_driver || delivery.is_platform_driver || delivery.delivery_person_id?.startsWith?.("platform:"))
-    const platformDriver = delivery.platform_driver || null
+    const platformDriver: DuditPlatformDriver | null = delivery.platform_driver || null
     const driverName = platformDriver?.fullName || delivery.delivery_person_name || delivery.partner_users?.user_profiles?.full_name || (delivery.delivery_person_id ? "Entregador" : "Entrega própria")
 
     const linkedOrdersCard = (
         <div className="overflow-hidden rounded-2xl border border-brand-border dark:border-dark-border">
-            <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50 flex items-center justify-between gap-4">
-                <div className="text-left shrink-0">
-                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Pedidos Vinculados ({links.length})</span>
-                    <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">Valor total da entrega: {formatCurrency(totalDeliveryFee)}</p>
-                </div>
-                <div className="text-right shrink-0">
-                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Entregador</span>
-                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                        {isPlatformDriver && (
-                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-4 h-4 object-contain shrink-0" />
-                        )}
-                        <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">{driverName}</p>
-                    </div>
-                    {platformDriver && !platformDriver.isPendingAcceptance && (
-                        <Button
-                            onClick={() => setIsDriverModalOpen(true)}
-                            variant="link"
-                            className="text-sm block mt-0.5 ml-auto"
-                        >
-                            Ver detalhes do entregador
-                        </Button>
-                    )}
-                </div>
+            <div className="border-b border-brand-border bg-brand-gray p-6 dark:border-dark-border dark:bg-dark-border/50">
+                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Pedidos Vinculados ({links.length})</span>
+                <p className="font-bold text-brand-dark dark:text-dark-heading text-[16px]">Valor total da entrega: {formatCurrency(totalDeliveryFee)}</p>
             </div>
             <div className="bg-white dark:bg-dark-surface divide-y divide-brand-border dark:divide-dark-border">
                 {links.length === 0 ? (
@@ -415,6 +408,34 @@ export default function DeliveryDetailPage({
                     })
                 )}
             </div>
+            {isPlatformDriver && platformDriver && !platformDriver.isPendingAcceptance && (
+                <>
+                    <div className="border-t border-brand-border dark:border-dark-border" />
+                    <div className="p-4 bg-white dark:bg-dark-surface">
+                        <ListItem
+                            icon={TruckIcon}
+                            title={
+                                <div>
+                                    <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{driverName}</p>
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                        <TruckIcon className="w-3 h-3 text-brand-green" />
+                                        <span className="text-xs text-brand-green font-medium">Rede Dudit</span>
+                                    </div>
+                                </div>
+                            }
+                            left={
+                                <UserProfileImage
+                                    fullName={driverName}
+                                    imageUrl={platformDriver?.avatarUrl}
+                                    className="w-10 h-10"
+                                />
+                            }
+                            onClick={() => setIsDriverModalOpen(true)}
+                            className="border-0 bg-transparent hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 px-0"
+                        />
+                    </div>
+                </>
+            )}
         </div>
     )
 
@@ -469,7 +490,7 @@ export default function DeliveryDetailPage({
                     <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-0.5 truncate flex items-center gap-1.5">
                         <span>Criado em {formatDateTime(delivery.created_at)} • </span>
                         {isPlatformDriver && (
-                            <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain inline-block shrink-0" />
+                            <TruckIcon className="w-3.5 h-3.5 text-brand-green inline-block shrink-0" />
                         )}
                         <span>{driverName}</span>
                     </p>
@@ -528,7 +549,6 @@ export default function DeliveryDetailPage({
                             <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                 <TabsTrigger value="dados_gerais">
                                     Dados Gerais
-                                    <RouteIcon className="w-4 h-4" />
                                 </TabsTrigger>
                                 <TabsTrigger value="mapa_rota">
                                     Mapa da Rota
@@ -561,8 +581,9 @@ export default function DeliveryDetailPage({
                         onEdit={canEdit && onEdit ? () => onEdit(delivery.id) : undefined}
                         onCancel={delivery?.status !== "cancelled" ? handleCancelDelivery : undefined}
                         cancelLabel="Cancelar entrega"
+                        className="!w-full"
                         trigger={
-                            <Button variant="outline" className="flex-1 h-12" leftIcon={<ThreeDotsIcon className="w-5 h-5" />}>
+                            <Button variant="outline" className="flex-1 w-full h-12" leftIcon={<ThreeDotsIcon className="w-5 h-5" />}>
                                 Opções
                             </Button>
                         }
@@ -695,6 +716,58 @@ export default function DeliveryDetailPage({
                 order={activeLink?.orders}
                 partnerId={partnerId}
             />
+
+            <PaymentStatusModal
+                isOpen={isOrderPaymentModalOpen}
+                onClose={() => setIsOrderPaymentModalOpen(false)}
+                order={selectedLink?.orders}
+                partnerId={partnerId}
+                onSuccess={() => {
+                    loadDeliveryDetails()
+                    setIsOrderPaymentModalOpen(false)
+                }}
+            />
+
+            {orderStatusModal && (
+                <DefaultModal
+                    isOpen={orderStatusModal.isOpen}
+                    onClose={() => { setOrderStatusModal(null); setOrderNewStatus("") }}
+                    title="Alterar Status da Entrega"
+                    maxWidth="md"
+                    footer={
+                        <div className="flex justify-end gap-3 w-full">
+                            <Button variant="outline" onClick={() => { setOrderStatusModal(null); setOrderNewStatus("") }}>Cancelar</Button>
+                            <Button
+                                onClick={() => void handleOrderStatusChange()}
+                                disabled={!orderNewStatus || orderNewStatus === orderStatusModal.currentStatus}
+                            >
+                                Salvar
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Selecione o novo status de entrega para este pedido.
+                        </p>
+                        <FormDropdown
+                            label="Status"
+                            value={orderNewStatus}
+                            setValue={setOrderNewStatus}
+                            options={[
+                                { value: 'pending', label: 'Pendente' },
+                                { value: 'not_sent', label: 'Não Enviado' },
+                                { value: 'preparing', label: 'Preparando' },
+                                { value: 'pickup_available', label: 'Disponível para Retirada' },
+                                { value: 'sent', label: 'Enviado' },
+                                { value: 'delivered', label: 'Entregue' },
+                                { value: 'delivery_failed', label: 'Falha na Entrega' },
+                                { value: 'cancelled', label: 'Cancelado' }
+                            ]}
+                        />
+                    </div>
+                </DefaultModal>
+            )}
 
             {simpleConfirmModal && (
                 <AlertModal
@@ -897,20 +970,34 @@ export default function DeliveryDetailPage({
                                         Marcar como Entregue
                                     </Button>
                                 )}
-                                {selectedLink?.status !== "received" && (
+                                {selectedLink?.status !== "delivered" && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         className="flex-1 h-12"
                                         onClick={() => {
-                                            setSimpleConfirmModal({
-                                                isOpen: true,
-                                                orderId: order.id,
-                                                nextStatus: "received"
-                                            })
+                                            setActiveLink(selectedLink)
+                                            setIsOrderPaymentModalOpen(true)
                                         }}
                                     >
-                                        Marcar como Recebido
+                                        Receber Pagamento
+                                    </Button>
+                                )}
+                                {selectedLink?.status !== "delivered" && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={() => {
+                                            setOrderStatusModal({
+                                                isOpen: true,
+                                                orderId: order.id,
+                                                currentStatus: selectedLink?.status || order.delivery_status || "not_sent"
+                                            })
+                                            setOrderNewStatus("")
+                                        }}
+                                    >
+                                        Alterar Status
                                     </Button>
                                 )}
                                 <Button type="button" variant="filled" className="flex-1 h-12" onClick={handleClose}>

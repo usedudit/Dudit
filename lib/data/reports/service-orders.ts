@@ -148,7 +148,7 @@ const getCachedServiceOrdersData = cache(async (partnerId: string, period: Perio
             count: data.count,
             revenue: data.revenue,
           })),
-        recentOrders: periodData.slice(0, 8).map((o: any) => ({
+        recentOrders: periodData.slice(0, 4).map((o: any) => ({
           id: o.id,
           orderNumber: o.order_number || "-",
           title: o.title || "Sem título",

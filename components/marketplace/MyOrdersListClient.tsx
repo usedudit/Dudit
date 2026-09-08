@@ -16,6 +16,8 @@ import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-genera
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images";
 import { formatCurrency, formatFullDate, formatQuantityWithUnit, formatUnitPriceWithUnit, isStoreDeleted } from "@/lib/utils";
 
+const ORDERS_PER_PAGE = 10
+
 const getStatusConfig = (status: string) => {
     switch (status) {
         case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
@@ -52,11 +54,12 @@ function calculateDiscountedPrice(item: any, order: any) {
     return { discountedPrice: Math.round(basePrice * itemDiscountRatio * 100) / 100, hasItemDiscount: true, basePrice }
 }
 
-export function MyOrdersListClient({ orders, reviewedItemsArray, userId, currentPage = 1, totalPages = 1 }: { orders: any[], reviewedItemsArray: any[], userId: string, currentPage?: number, totalPages?: number }) {
+export function MyOrdersListClient({ orders, reviewedItemsArray, userId }: { orders: any[], reviewedItemsArray: any[], userId: string }) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<string>("todos");
+    const [currentPage, setCurrentPage] = useState(1);
 
     const reviewedItemsSet = useMemo(() => {
         return new Set((reviewedItemsArray || []).map(r => `${r.order_id}:${r.product_id || r.service_id}`));
@@ -120,9 +123,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
     };
 
     const handlePageChange = (page: number) => {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set('page', String(page));
-        router.push(`/pedidos?${params.toString()}`);
+        setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -169,6 +170,13 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
         });
     }, [orders, activeTab]);
 
+    // Client-side pagination
+    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+    const paginatedOrders = useMemo(() => {
+        const start = (currentPage - 1) * ORDERS_PER_PAGE;
+        return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
+    }, [filteredOrders, currentPage]);
+
     return (
         <div className="flex-1 flex flex-col container mx-auto px-4 max-w-[1400px] w-full md:pt-10 pb-20 mt-[78px] lg:mt-[108px] relative overflow-hidden">
             <AnimatePresence mode="wait">
@@ -195,7 +203,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
 
                         {/* Tabs */}
                         <div className="mb-6">
-                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1); }} className="w-full">
                                 <TabsList className="mb-6">
                                     <TabsTrigger value="todos">
                                         Todos <span className="ml-1.5 text-xs font-normal">({tabCounts.todos})</span>
@@ -217,10 +225,10 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
                         </div>
 
                         <div className="flex-1">
-                            {filteredOrders && filteredOrders.length > 0 ? (
+                            {paginatedOrders && paginatedOrders.length > 0 ? (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full">
                                     <BatchOrderStatusSyncOnLoad orders={orders} />
-                                    {filteredOrders.map((order: any) => {
+                                    {paginatedOrders.map((order: any) => {
                                         const statusConfig = getStatusConfig(order.situation);
                                         const StatusIcon = statusConfig.icon;
                                         const storeObj = Array.isArray(order.stores) ? order.stores[0] : order.stores;
@@ -458,6 +466,7 @@ export function MyOrdersListClient({ orders, reviewedItemsArray, userId, current
                                                                         amount={order.total_amount}
                                                                         status={order.situation}
                                                                         paymentProvider={order.payment_provider}
+                                                                        orderNumber={order.order_number}
                                                                     />
                                                                 </div>
                                                             )}

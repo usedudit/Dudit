@@ -48,7 +48,22 @@ export async function resolveMarketplaceOrderFinanceAccountId(
       .ilike("name", "%Mercado Pago%")
       .limit(1)
       .maybeSingle()
-    return byName?.id ?? null
+    if (byName?.id) return byName.id
+
+    // Auto-heal: reactivate existing MP account if it was deactivated
+    const { data: inactiveMp } = await supabase
+      .from("finance_accounts")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .or("integration_source.eq.mercadopago,name.ilike.%Mercado Pago%")
+      .limit(1)
+      .maybeSingle()
+    if (inactiveMp?.id) {
+      await supabase.from("finance_accounts").update({ is_active: true }).eq("id", inactiveMp.id)
+      return inactiveMp.id
+    }
+
+    return null
   }
 
   // PERF: Single query replaces 4 sequential queries (bank default → any bank → cash default → any cash).

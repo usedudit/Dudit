@@ -705,6 +705,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                 image: getItemImage(item),
                 availabilityValue: Number(item.products?.availability_value || 0),
                 availabilityUnit: item.products?.availability_unit || "Minutos",
+                unit: item.products?.unit || item.unit || null,
                 selectedAddons: item.booking_metadata?.selectedAddons || undefined,
             }))
 

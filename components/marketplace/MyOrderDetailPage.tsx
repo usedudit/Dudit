@@ -620,21 +620,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const returnHistoryCount = Array.isArray(order.return_requests) ? order.return_requests.length : 0;
 
     const showConfirmReceiptButton = !isCancelled && hasProducts && ["sent", "shipped", "out_for_delivery"].includes(order.delivery_status || "");
-    const showConfirmExecutionButton = !isCancelled && hasAnyService && order.delivery_status !== "delivered";
 
     const renderFulfillmentButtons = () => {
-        if (showConfirmReceiptButton && showConfirmExecutionButton) {
-            return (
-                <Button
-                    variant="outline"
-                    className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
-                    onClick={handleConfirmFulfillment}
-                    disabled={isConfirming}
-                >
-                    {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Recebimento e Execução"}
-                </Button>
-            );
-        }
         if (showConfirmReceiptButton) {
             return (
                 <Button
@@ -644,18 +631,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     disabled={isConfirming}
                 >
                     {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Recebimento"}
-                </Button>
-            );
-        }
-        if (showConfirmExecutionButton) {
-            return (
-                <Button
-                    variant="outline"
-                    className="w-full h-12 font-bold border-brand-green text-brand-green hover:bg-brand-green/10"
-                    onClick={handleConfirmFulfillment}
-                    disabled={isConfirming}
-                >
-                    {isConfirming ? <Spinner size={16} className="text-brand-green mr-2" /> : "Confirmar Execução"}
                 </Button>
             );
         }
@@ -712,11 +687,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         : getPaymentTypeLabel();
     const isMercadoPago = order.payment_provider === "Mercado Pago" || (isExchangeOrder && hasMercadoPagoOnline);
     const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
-    const canRetryPixPayment = order.situation === "pending" && (
-        (isMercadoPago && isPixPayment) ||
-        (hasMercadoPagoOnline && isPendingExchangeShortfall) ||
-        (hasMercadoPagoOnline && !order.payment_provider)
-    );
+    const canRetryPixPayment = order.situation === "pending" && isMercadoPago && isPixPayment;
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         if (isMercadoPago) {
@@ -1570,7 +1541,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
                                         <FormSection title="Locais de atendimento">
-                                            <div className="space-y-4">
+                                            <div className="space-y-6">
                                                 {(order.order_items || [])
                                                     .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
                                                     .map((item: any) => {
@@ -1588,8 +1559,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         const isSub = !!item.recurring_plan_id || item.line_type === "subscription";
                                                         const bookingDate = fulfillmentLine?.bookingMetadata?.date || null;
                                                         const bookingTime = fulfillmentLine?.bookingMetadata?.time || null;
-                                                        const addressTitle = isCustomerAddress && addressTypeLabel
-                                                            ? addressTypeLabel
+                                                        const addressTitle = isCustomerAddress
+                                                            ? "Seu endereço"
                                                             : "Endereço do estabelecimento";
                                                         return (
                                                             <div key={`service-fulfillment-${item.id}`} className="flex items-stretch gap-3">
@@ -2007,6 +1978,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         orderId={order.id}
                         amount={chargedAmount || (isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : Number(totalAmount))}
                         orderDetails={pixOrderDetails}
+                        orderNumber={order.order_number}
+                        sellerName={store?.name}
                     />
                 )}
 

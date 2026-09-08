@@ -2245,7 +2245,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     }
 
     const nextStatus = normalizeDeliveryStatus(params.status)
-    const allowed = new Set<DeliveryStatusValue>(["pending", "preparing", "sent", "delivered", "cancelled"])
+    const allowed = new Set<DeliveryStatusValue>(["pending", "not_sent", "preparing", "pickup_available", "sent", "delivered", "cancelled", "delivery_failed"])
     if (!allowed.has(nextStatus)) {
       return { success: false as const, error: "Status de entrega inválido." }
     }
@@ -2753,7 +2753,7 @@ export async function updateERPSingleOrderDeliveryStatusAction(params: {
   }
 
   const nextStatus = normalizeDeliveryStatus(params.status)
-  const allowed = new Set<DeliveryStatusValue>(["pending", "preparing", "sent", "delivered", "cancelled", "delivery_failed"])
+  const allowed = new Set<DeliveryStatusValue>(["pending", "not_sent", "preparing", "pickup_available", "sent", "delivered", "cancelled", "delivery_failed"])
   if (!allowed.has(nextStatus)) {
     return { success: false as const, error: "Status de entrega inválido." }
   }

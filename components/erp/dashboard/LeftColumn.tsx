@@ -11,14 +11,25 @@ import {
   PackageIcon,
   CalendarIcon,
   TruckIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  RepeatIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  WrenchIcon,
+  FileTextIcon,
+  TrendingUpIcon,
+  TargetIcon,
+  MegaphoneIcon,
+  ReturnIcon,
+  RotateIcon,
+  StarIcon,
 } from "@/lib/icons";
 import { formatCurrency as brl } from "@/lib/utils";
 import { Button, IconPlaceholder } from "@/components/reusable";
 import { useRouter } from "next/navigation";
 
 export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], variant?: "grid" | "horizontal" }) {
-  const icons = [MoneyIcon, SalesIcon, TagIcon, Users];
+  const defaultIcons = [MoneyIcon, SalesIcon, TagIcon, Users];
 
   const parseTrend = (trendStr: string) => {
     if (!trendStr) return { percent: "↑ 0 %", isPositive: true, change: "0%", vsText: "período anterior" };
@@ -46,7 +57,7 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] border border-brand-border dark:border-dark-border grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-brand-border dark:divide-dark-border w-full">
         {metrics.slice(0, 4).map((metric, i) => {
-          const CardIcon = icons[i % icons.length];
+          const CardIcon = metric.icon || defaultIcons[i % defaultIcons.length];
           const { percent, isPositive, change, vsText } = parseTrend(metric.trend);
 
           return (
@@ -68,11 +79,8 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
                 </span>
               </div>
 
-              <div className="flex items-baseline space-x-2 mt-2 min-w-0">
+              <div className="flex items-baseline mt-2 min-w-0">
                 <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{metric.value}</h2>
-                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                  <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
-                </span>
               </div>
             </div>
           );
@@ -84,7 +92,7 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full h-full">
       {metrics.slice(0, 4).map((metric, i) => {
-        const CardIcon = icons[i % icons.length];
+        const CardIcon = metric.icon || defaultIcons[i % defaultIcons.length];
         const { percent, isPositive, change, vsText } = parseTrend(metric.trend);
 
         return (
@@ -106,11 +114,8 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
               </span>
             </div>
 
-            <div className="flex items-baseline space-x-2 mt-2 min-w-0">
+            <div className="flex items-baseline mt-2 min-w-0">
               <h2 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{metric.value}</h2>
-                <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                <span className="text-brand-dark dark:text-dark-heading">{change}</span> vs {vsText}
-              </span>
             </div>
           </div>
         );

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { listStoreProducts } from "@/lib/store-products"
 import { listStoreServices } from "@/lib/store-services"
 import { isUuid } from "@/lib/utils/short-id"
+import { TAGS } from "@/lib/utils/revalidation-tags"
 
 const storeBySlugCacheMap = new Map<string, any>()
 const storeByIdCacheMap = new Map<string, any>()
@@ -110,7 +111,7 @@ export const getCachedStoreById = async (storeId: string) => {
                 return data
             },
             [`store-profile-${storeId}`],
-            { tags: ["store-profile", `store-${storeId}`], revalidate: 30 }
+            { tags: ["store-profile", TAGS.storeProfile(storeId)], revalidate: 30 }
         )
         storeByIdCacheMap.set(storeId, fn)
     }

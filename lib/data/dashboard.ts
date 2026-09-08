@@ -845,7 +845,7 @@ async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: 
           metrics: [
             { title: "Desempenho de Vendas", value: brl(revenue), trend: `${percentTrend(revenue, previousRevenue)} vs período anterior`, tone: "green" as const },
             { title: "Vendas Totais", value: String(periodOrders.length), trend: `${percentTrend(periodOrders.length, previousOrders.length)} vs período anterior`, tone: "blue" as const },
-            { title: "Pedido Médio", value: brl(ticket), trend: "0% vs período anterior", tone: "default" as const },
+            { title: "Ticket Médio", value: brl(ticket), trend: "0% vs período anterior", tone: "default" as const },
             { title: "Clientes Atendidos", value: String(uniqueCustomers.size), trend: "0% vs período anterior", tone: "default" as const },
           ],
         }

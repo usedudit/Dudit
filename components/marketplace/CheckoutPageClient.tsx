@@ -46,6 +46,7 @@ interface ProductItem {
     variant?: string
     availabilityValue?: number
     availabilityUnit?: string
+    unit?: string | null
 }
 
 const AVAILABLE_BRANDS = [
@@ -2165,7 +2166,53 @@ export function CheckoutPageClient() {
                     router.push("/minhas-compras")
                 }
                 return
-            } else if (paymentOption === "mercadopago") {
+            }
+
+            const buildOrderDetailsItems = () => {
+                if (sessionData?.source === "cart" && checkoutContext?.lines?.length) {
+                    return checkoutContext.lines.map((line) => ({
+                        id: line.lineId,
+                        name: line.displayName,
+                        price: line.unitPrice,
+                        quantity: line.quantity,
+                        image: line.imageUrl || "",
+                        variant_id: undefined,
+                        variant_name: line.variantName || undefined,
+                        unit: (line as any).unit || null,
+                        itemType: line.lineKind,
+                        bookingDate: line.bookingMetadata?.date || null,
+                        bookingTime: line.bookingMetadata?.time || null,
+                        staffName: line.bookingMetadata?.staffName || null,
+                        bookingSummary: line.bookingSummary || null,
+                        fulfillmentMode: line.fulfillmentMode || (formData.deliveryType === "delivery" ? "delivery" : "pickup"),
+                    }))
+                }
+                return products.map((p) => {
+                    const matchedLine = checkoutContext?.lines?.find(
+                        (l) => l.lineId === p.id || (p as any).cartItemId === l.lineId,
+                    )
+                    return {
+                        id: p.id,
+                        name: p.name,
+                        price: p.price,
+                        quantity: quantities[p.id] || p.quantity,
+                        image: p.image || matchedLine?.imageUrl || "",
+                        variant_id: p.variant || "",
+                        variant_name: matchedLine?.variantName || undefined,
+                        unit: p.unit || (matchedLine as any)?.unit || null,
+                        itemType: matchedLine?.lineKind || sessionData?.itemType || "product",
+                        bookingDate: matchedLine?.bookingMetadata?.date || null,
+                        bookingTime: matchedLine?.bookingMetadata?.time || null,
+                        staffName: matchedLine?.bookingMetadata?.staffName || null,
+                        bookingSummary: matchedLine?.bookingSummary || null,
+                        fulfillmentMode:
+                            matchedLine?.fulfillmentMode ||
+                            (formData.deliveryType === "delivery" ? "delivery" : "pickup"),
+                    }
+                })
+            }
+
+            if (paymentOption === "mercadopago") {
                 const isPickupPayment = false
                 const token = csrfToken || await fetchCSRFTokenSingleton() || ""
                 let orderId, orderNumber
@@ -2191,7 +2238,7 @@ export function CheckoutPageClient() {
                         1,
                         formData.notes,
                         couponCode || null,
-                        false,
+                        true,
                         token,
                         wantsChange || false,
                         payWithAmount || undefined,
@@ -2223,6 +2270,7 @@ export function CheckoutPageClient() {
                         wantsChange: wantsChange || false,
                         payWithAmount: payWithAmount || undefined,
                         checkoutPricingSnapshot,
+                        useMercadoPago: true,
                     })
                     if ('error' in result && result.error) throw new Error(result.error)
                     const successResult = result as any
@@ -2237,16 +2285,10 @@ export function CheckoutPageClient() {
                     orderNumber: orderNumber,
                     amount,
                     orderDetails: {
-                        items: products.map(p => ({
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            quantity: quantities[p.id] || p.quantity,
-                            image: p.image || "",
-                            variant_id: p.variant || ""
-                        })),
+                        items: buildOrderDetailsItems(),
                         deliveryType: formData.deliveryType,
                         deliveryAddress: formData.deliveryAddress,
+                        storeAddress: partnerAddressLabel,
                         notes: formData.notes,
                         couponCode: couponCode || null,
                         couponDiscount: couponDiscount,
@@ -2330,16 +2372,10 @@ export function CheckoutPageClient() {
                         orderNumber: (result as any).orderNumber,
                         amount: checkoutTotalToCharge,
                         orderDetails: {
-                            items: products.map(p => ({
-                                id: p.id,
-                                name: p.name,
-                                price: p.price,
-                                quantity: quantities[p.id] || p.quantity,
-                                image: p.image || "",
-                                variant_id: p.variant || ""
-                            })),
+                            items: buildOrderDetailsItems(),
                             deliveryType: formData.deliveryType,
                             deliveryAddress: formData.deliveryAddress,
+                            storeAddress: partnerAddressLabel,
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
@@ -2385,16 +2421,10 @@ export function CheckoutPageClient() {
                         orderNumber: successResult.orderNumber,
                         amount: checkoutTotalToCharge,
                         orderDetails: {
-                            items: products.map(p => ({
-                                id: p.id,
-                                name: p.name,
-                                price: p.price,
-                                quantity: quantities[p.id] || p.quantity,
-                                image: p.image || "",
-                                variant_id: p.variant || ""
-                            })),
+                            items: buildOrderDetailsItems(),
                             deliveryType: formData.deliveryType,
                             deliveryAddress: formData.deliveryAddress,
+                            storeAddress: partnerAddressLabel,
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
@@ -2462,6 +2492,7 @@ export function CheckoutPageClient() {
 
         bypassSubmitRef.current = true
         setPaymentOption("mercadopago")
+        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
         setPayDepositOnly(true)
     }
 
@@ -2479,7 +2510,7 @@ export function CheckoutPageClient() {
                 {/* Desktop Header */}
                 <header className="hidden lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
                     <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
-                        <Link href="/" prefetch={true} className="cursor-pointer shrink-0 z-[110] pt-1">
+                        <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
@@ -2670,13 +2701,19 @@ export function CheckoutPageClient() {
                                                         return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
                                                     })()}
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                    onClick={() => setPaymentOption("mercadopago")}
+                                                    onClick={() => {
+                                                        setPaymentOption("mercadopago")
+                                                        setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                    }}
                                                     right={
                                                         <RadioButton
                                                             name="paymentOptionDesktop"
                                                             value="mercadopago"
                                                             checked={paymentOption === "mercadopago"}
-                                                            onChange={() => setPaymentOption("mercadopago")}
+                                                            onChange={() => {
+                                                                setPaymentOption("mercadopago")
+                                                                setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                            }}
                                                         />
                                                     }
                                                 />
@@ -2713,13 +2750,23 @@ export function CheckoutPageClient() {
                                                                 : "Pague na entrega ou retirada."
                                                         }
                                                         className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
-                                                        onClick={() => setPaymentOption("traditional")}
+                                                        onClick={() => {
+                                                            setPaymentOption("traditional")
+                                                            if (formData.paymentMethod === "mercadopago") {
+                                                                setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                            }
+                                                        }}
                                                         right={
                                                             <RadioButton
                                                                 name="paymentOptionDesktop"
                                                                 value="traditional"
                                                                 checked={paymentOption === "traditional"}
-                                                                onChange={() => setPaymentOption("traditional")}
+                                                                onChange={() => {
+                                                                    setPaymentOption("traditional")
+                                                                    if (formData.paymentMethod === "mercadopago") {
+                                                                        setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                                    }
+                                                                }}
                                                             />
                                                         }
                                                     />
@@ -3096,13 +3143,19 @@ export function CheckoutPageClient() {
                                                     return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
                                                 })()}
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
-                                                onClick={() => setPaymentOption("mercadopago")}
+                                                onClick={() => {
+                                                    setPaymentOption("mercadopago")
+                                                    setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                }}
                                                 right={
                                                     <RadioButton
                                                         name="paymentOptionMobile"
                                                         value="mercadopago"
                                                         checked={paymentOption === "mercadopago"}
-                                                        onChange={() => setPaymentOption("mercadopago")}
+                                                        onChange={() => {
+                                                            setPaymentOption("mercadopago")
+                                                            setFormData(prev => ({ ...prev, paymentMethod: "mercadopago", installments: 1 }))
+                                                        }}
                                                     />
                                                 }
                                             />
@@ -3139,13 +3192,23 @@ export function CheckoutPageClient() {
                                                             : "Pague ao receber ou retirar."
                                                     }
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
-                                                    onClick={() => setPaymentOption("traditional")}
+                                                    onClick={() => {
+                                                        setPaymentOption("traditional")
+                                                        if (formData.paymentMethod === "mercadopago") {
+                                                            setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                        }
+                                                    }}
                                                     right={
                                                         <RadioButton
                                                             name="paymentOptionMobile"
                                                             value="traditional"
                                                             checked={paymentOption === "traditional"}
-                                                            onChange={() => setPaymentOption("traditional")}
+                                                            onChange={() => {
+                                                                setPaymentOption("traditional")
+                                                                if (formData.paymentMethod === "mercadopago") {
+                                                                    setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
+                                                                }
+                                                            }}
                                                         />
                                                     }
                                                 />
@@ -3755,10 +3818,11 @@ export function CheckoutPageClient() {
                     open={showPixModal}
                     onClose={() => { setShowPixModal(false); setPixPaymentData(null) }}
                     pixData={pixPaymentData.pixData}
+                    boletoData={pixPaymentData.boletoData}
                     orderId={pixPaymentData.orderId}
                     amount={pixPaymentData.amount}
                     orderDetails={pixPaymentData.orderDetails}
-                    orderNumber={pixPaymentData.orderId}
+                    orderNumber={pixPaymentData.orderNumber || pixPaymentData.orderId}
                     sellerName={partnerInfo.storeName || partnerInfo.store_name}
                     useMercadoPago={pixPaymentData.useMercadoPago}
                     partnerId={pixPaymentData.partnerId}
@@ -3767,6 +3831,10 @@ export function CheckoutPageClient() {
                     userName={pixPaymentData.userName}
                     buyerId={userId!}
                     mpAcceptedPaymentMethods={mpAcceptedPaymentMethods}
+                    partnerPhone={pixPaymentData.partnerPhone}
+                    pixKey={pixPaymentData.pixKey}
+                    pixKeyType={pixPaymentData.pixKeyType}
+                    payDepositOnly={pixPaymentData.payDepositOnly}
                 />
             )}
 

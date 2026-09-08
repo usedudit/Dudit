@@ -76,12 +76,6 @@ export function HorizontalKPICard({ items, className }: HorizontalKPICardProps) 
                         <div className="min-w-0">
                             <h2 className="text-[22px] sm:text-[26px] lg:text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none truncate">{item.value}</h2>
                         </div>
-
-                        {item.subtext && (
-                            <div className="mt-2 sm:mt-3 text-[11px] sm:text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body truncate">
-                                {item.subtext}
-                            </div>
-                        )}
                     </div>
                 )
             })}

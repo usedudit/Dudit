@@ -21,7 +21,7 @@ interface SidebarContextType {
   setSidebarCard: (card: React.ReactNode | null) => void
 }
 
-const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
+export const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
 export function SidebarProvider({
   children,

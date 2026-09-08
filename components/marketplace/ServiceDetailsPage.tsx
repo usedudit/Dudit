@@ -1473,19 +1473,22 @@ export function ServiceDetailsPageClient({
                                 <span>Não especificado</span>
                             </div>
                         )}
-                        {service.fulfillment_modes?.includes("on_site") && (
-                            <ListItem
-                                icon={StoreIcon}
-                                title="No estabelecimento/local do vendedor"
-                                className="border-0 px-0 py-0"
-                            />
-                        )}
-                        {service.fulfillment_modes?.includes("customer_location") && (
-                            <ListItem
-                                icon={MapPinIcon}
-                                title="No endereço do cliente"
-                            />
-                        )}
+                        <div className="space-y-4">
+                            {service.fulfillment_modes?.includes("on_site") && (
+                                <ListItem
+                                    icon={StoreIcon}
+                                    title="No estabelecimento/local do vendedor"
+                                    className="border-0 px-0 py-0"
+                                />
+                            )}
+                            {service.fulfillment_modes?.includes("customer_location") && (
+                                <ListItem
+                                    icon={MapPinIcon}
+                                    title="No endereço do cliente"
+                                    className="border-0 px-0 py-0"
+                                />
+                            )}
+                        </div>
                     </div>
                 </FormSection>
             )}
@@ -2163,26 +2166,33 @@ export function ServiceDetailsPageClient({
                                             </div>
                                         </div>
 
-                                        {/* Desktop Next Button + Actions Column */}
+                                        {/* Desktop Actions Column (top) + Next Button */}
                                         <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
-                                            {(() => {
-                                                const isFavService = isFav(service.id, "servico")
-                                                return (
-                                                    <Button variant="outline" size="icon" className="w-10 h-10"
-                                                        onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
-                                                        title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                                                        <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                                                    </Button>
-                                                )
-                                            })()}
+                                            {/* Action buttons at top */}
+                                            <div className="flex flex-col items-center gap-2">
+                                                {(() => {
+                                                    const isFavService = isFav(service.id, "servico")
+                                                    return (
+                                                        <Button variant="outline" size="icon" className="w-10 h-10"
+                                                            onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                                                            title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                                            <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                                        </Button>
+                                                    )
+                                                })()}
 
-                                            <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
-                                                <ShareIcon size={18} className="text-brand-green" />
-                                            </Button>
-                                            <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
-                                                <PlusIcon size={18} className="text-brand-green" />
-                                            </Button>
+                                                <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                                                    <ShareIcon size={18} className="text-brand-green" />
+                                                </Button>
+                                                <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
+                                                    <PlusIcon size={18} className="text-brand-green" />
+                                                </Button>
+                                            </div>
 
+                                            {/* Spacer to push Next button to middle */}
+                                            <div className="flex-1" />
+
+                                            {/* Next Button centered */}
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                     <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />

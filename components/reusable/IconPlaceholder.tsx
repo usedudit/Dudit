@@ -142,6 +142,7 @@ export default function IconPlaceholder({
         <img
           src={imageSrc}
           alt={imageAlt}
+          loading="lazy"
           className={imageClass || defaultImageClass}
         />
       ) : Icon ? (
