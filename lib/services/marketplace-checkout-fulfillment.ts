@@ -81,7 +81,7 @@ function groupServiceBookingLines(
     unitPrice: number
     quantity: number
     payDepositOnly?: boolean
-    depositAmount?: number
+    depositAmount?: number | null
   }>,
 ): ServiceGroup[] {
   const groups = new Map<string, ServiceGroup>()
