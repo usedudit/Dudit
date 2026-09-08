@@ -837,9 +837,9 @@ export const HorizontalCarousel = ({
                 <div className="flex items-center gap-3 shrink-0">
                     {onSeeAll && (
                         <Button
-                            variant="ghost"
+                            variant="link"
                             onClick={onSeeAll}
-                            className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                            className="text-[13px] px-2 py-1 select-none"
                         >
                             Ver tudo
                         </Button>

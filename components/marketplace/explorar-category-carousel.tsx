@@ -59,9 +59,9 @@ export const CategoryCarousel = ({
                 <h2 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading">Categorias</h2>
                 <div className="flex items-center gap-3">
                     <Button
-                        variant="ghost"
+                        variant="link"
                         onClick={onSeeAllCategories}
-                        className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                        className="text-[13px] px-2 py-1 select-none"
                     >
                         Ver tudo
                     </Button>

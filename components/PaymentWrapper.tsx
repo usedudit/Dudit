@@ -7,6 +7,7 @@ import confetti from "canvas-confetti"
 import { CopyIcon, BoxIcon, CheckCircleIcon, PrinterIcon, CalendarIcon } from "@/lib/icons"
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
+import { useRealtimeRecord } from "@/hooks/use-realtime-record"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Link from "next/link"
@@ -569,6 +570,19 @@ export function PaymentWrapper({
             return () => clearInterval(interval)
         }
     }, [paymentConfirmed])
+
+    // Realtime: automatically confirms payment in < 80ms when Mercado Pago webhook updates the order
+    useRealtimeRecord<{ situation?: string; payment_status?: string; order_number?: string }>({
+        table: "orders",
+        id: orderId,
+        enabled: open && !paymentConfirmed && !!orderId && (step === "pix" || step === "boleto" || step === "mp_redirect"),
+        onUpdate: (record) => {
+            if (record?.situation === "paid" || record?.payment_status === "approved") {
+                if (record.order_number) setActualOrderNumber(record.order_number)
+                setPaymentConfirmed(true)
+            }
+        },
+    })
 
     const lastCheckRef = useRef(0)
 

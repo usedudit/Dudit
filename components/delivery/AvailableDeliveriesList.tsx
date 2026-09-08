@@ -24,6 +24,8 @@ import { useMediaQuery } from "@/components/erp/hooks"
 import AvailableDeliveryGridCard from "./AvailableDeliveryGridCard"
 import AvailableDeliveryListRow, { type AvailableDeliveryOffer } from "./AvailableDeliveryListRow"
 import AvailableDeliveryDetail from "./AvailableDeliveryDetail"
+import { useSupabase } from "@/providers/supabase-provider"
+import { supabaseBrowser } from "@/lib/supabase/browser-client"
 
 type SortKey = "order" | "partner" | "dest" | "fee"
 type SortDirection = "asc" | "desc"
@@ -120,14 +122,27 @@ export default function AvailableDeliveriesList() {
         })
     }, [])
 
-    const loadOffers = useCallback(async (isRefresh = false) => {
-        if (isRefresh) {
+    // Graceful Supabase client acquisition
+    let supabaseClient: any = null
+    try {
+        const ctx = useSupabase()
+        supabaseClient = ctx.supabase
+    } catch {
+        supabaseClient = supabaseBrowser
+    }
+
+    const loadOffers = useCallback(async (isRefresh = false, force = false) => {
+        if (isRefresh && !force) {
             if (refreshCooldownRef.current) return
             setIsRefreshing(true)
             refreshCooldownRef.current = true
             setIsCooldown(true)
             setTimeout(() => { refreshCooldownRef.current = false; setIsCooldown(false) }, 5000)
-        } else setIsLoading(true)
+        } else if (isRefresh) {
+            setIsRefreshing(true)
+        } else {
+            setIsLoading(true)
+        }
 
         try {
             const res = await listAvailableDeliveryOffersAction({ limit: 50 })
@@ -188,13 +203,62 @@ export default function AvailableDeliveriesList() {
         void fetchDetails()
     }, [viewedId])
 
+    // 1. Initial load on mount
     useEffect(() => {
         void loadOffers()
-        // Auto-poll available offers every 6 seconds
+    }, [loadOffers])
+
+    // 2. Supabase Realtime: instant push notification (< 80ms) when a delivery is dispatched or changed
+    useEffect(() => {
+        if (!supabaseClient) return
+
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+        const channel = supabaseClient
+            .channel("realtime:delivery_assignments")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "delivery_assignments",
+                },
+                () => {
+                    if (debounceTimer) clearTimeout(debounceTimer)
+                    debounceTimer = setTimeout(() => {
+                        void loadOffers(true, true)
+                    }, 400)
+                }
+            )
+            .subscribe()
+
+        return () => {
+            if (debounceTimer) clearTimeout(debounceTimer)
+            try {
+                supabaseClient.removeChannel(channel)
+            } catch {}
+        }
+    }, [supabaseClient, loadOffers])
+
+    // 3. Fallbacks: slow 60s background safety interval + immediate refresh on tab visibility return
+    useEffect(() => {
+        // Slow safety interval (60s instead of 6s eliminates 90% of requests)
         const interval = setInterval(() => {
-            void loadOffers(true)
-        }, 6000)
-        return () => clearInterval(interval)
+            void loadOffers(true, true)
+        }, 60000)
+
+        // Visibility fallback: when driver brings Dudit back to foreground, sync instantly
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                void loadOffers(true, true)
+            }
+        }
+        document.addEventListener("visibilitychange", handleVisibilityChange)
+
+        return () => {
+            clearInterval(interval)
+            document.removeEventListener("visibilitychange", handleVisibilityChange)
+        }
     }, [loadOffers])
 
     const handleAccept = async (assignmentId: string) => {

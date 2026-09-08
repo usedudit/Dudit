@@ -8,7 +8,7 @@ import { MailIcon } from "@/lib/icons"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { generateNameFromEmail, getEmailProvider } from "@/lib/utils"
-import { Button, EmailInput, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner } from "@/components/reusable"
+import { Button, EmailInput, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner, Turnstile, type TurnstileRef } from "@/components/reusable"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
@@ -59,6 +59,8 @@ export default function AuthView({
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+    const turnstileRef = useRef<TurnstileRef>(null)
 
     // Timer states
     const [resendTimer, setResendTimer] = useState(60)
@@ -66,6 +68,12 @@ export default function AuthView({
     const [retryCount, setRetryCount] = useState(0)
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
     const isSubmittingRef = useRef(false)
+
+    // Limpar token e resetar Turnstile ao mudar de modo
+    useEffect(() => {
+        setTurnstileToken(null)
+        turnstileRef.current?.reset()
+    }, [mode])
 
     // Update mode if initialMode prop changes (e.g. from query params)
     useEffect(() => {
@@ -155,14 +163,22 @@ export default function AuthView({
                 const { data, error } = await supabase.auth.signUp({
                     email: cleanEmail,
                     password,
-                    options: { data: { full_name: generateNameFromEmail(cleanEmail) }, emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}` },
+                    options: {
+                        data: { full_name: generateNameFromEmail(cleanEmail) },
+                        emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(getSafeNext(nextParam))}`,
+                        captchaToken: turnstileToken || undefined,
+                    },
                 })
                 if (error) {
                     console.error("[AUTH SIGNUP ERROR]", error)
+                    setTurnstileToken(null)
+                    turnstileRef.current?.reset()
                     throw error
                 }
 
                 if (data.user && data.user.identities && data.user.identities.length === 0) {
+                    setTurnstileToken(null)
+                    turnstileRef.current?.reset()
                     throw new Error("Este email já está cadastrado.")
                 }
 
@@ -186,6 +202,8 @@ export default function AuthView({
                     const preCheck = await preCheckLogin(cleanEmail)
                     if (!preCheck.allowed) {
                         setError(preCheck.error || "Acesso temporariamente bloqueado.")
+                        setTurnstileToken(null)
+                        turnstileRef.current?.reset()
                         setIsLoading(false)
                         return
                     }
@@ -196,10 +214,15 @@ export default function AuthView({
                 const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
                     email: cleanEmail,
                     password,
+                    options: {
+                        captchaToken: turnstileToken || undefined,
+                    },
                 })
 
                 if (signInError) {
                     console.error("[AUTH LOGIN ERROR]", signInError)
+                    setTurnstileToken(null)
+                    turnstileRef.current?.reset()
                     try {
                         const lockoutRes = await handleLoginResult(cleanEmail, false)
                         if (lockoutRes?.error) {
@@ -230,6 +253,8 @@ export default function AuthView({
                         if (delStatus.isDeleting) {
                             await supabase.auth.signOut()
                             setError("Esta conta está em processo de exclusão definitiva e o acesso foi desativado.")
+                            setTurnstileToken(null)
+                            turnstileRef.current?.reset()
                             setIsLoading(false)
                             return
                         }
@@ -250,6 +275,8 @@ export default function AuthView({
         } catch (e: any) {
             console.error("[AUTH SUBMIT EXCEPTION]", e)
             setError(getErrorMessage(e))
+            setTurnstileToken(null)
+            turnstileRef.current?.reset()
         } finally {
             isSubmittingRef.current = false
             setIsLoading(false)
@@ -270,9 +297,12 @@ export default function AuthView({
 
             const { error } = await recoveryClient.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
                 redirectTo: `${origin}/auth/update-password`,
+                captchaToken: turnstileToken || undefined,
             })
             if (error) {
                 console.error("[AUTH RESET PASSWORD ERROR]", error)
+                setTurnstileToken(null)
+                turnstileRef.current?.reset()
                 throw error
             }
             setVerifyContext("recovery")
@@ -280,6 +310,8 @@ export default function AuthView({
         } catch (e: any) {
             console.error("[AUTH RESET PASSWORD EXCEPTION]", e)
             setError(getErrorMessage(e))
+            setTurnstileToken(null)
+            turnstileRef.current?.reset()
         } finally {
             isSubmittingRef.current = false
             setIsLoading(false)
@@ -419,6 +451,14 @@ export default function AuthView({
 
                                     {error && <InfoCard message={error} color="red" />}
 
+                                    <Turnstile
+                                        ref={turnstileRef}
+                                        action="forgot-password"
+                                        onSuccess={(token) => setTurnstileToken(token)}
+                                        onExpire={() => setTurnstileToken(null)}
+                                        onError={() => setTurnstileToken(null)}
+                                    />
+
                                     <div className="flex items-center justify-between pt-2 gap-2">
                                         <Button
                                             variant="outlinered"
@@ -526,6 +566,15 @@ export default function AuthView({
                                         )}
 
                                         {error && <InfoCard message={error} color="red" />}
+
+                                        <Turnstile
+                                            key={mode}
+                                            ref={turnstileRef}
+                                            action={mode === "login" ? "login" : "signup"}
+                                            onSuccess={(token) => setTurnstileToken(token)}
+                                            onExpire={() => setTurnstileToken(null)}
+                                            onError={() => setTurnstileToken(null)}
+                                        />
 
                                         <Button type="submit" disabled={isLoading || (mode === "signup" && !acceptedTerms)} className="w-full h-[44px] text-[15px] font-bold mt-2">
                                             {isLoading ? <Spinner size={18} color="white" /> : mode === "login" ? "Entrar" : "Criar Conta"}

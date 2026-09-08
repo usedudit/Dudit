@@ -39,6 +39,7 @@
     "node_modules",
     "scripts",
     "trigger",
-    "trigger.config.ts"
+    "trigger.config.ts",
+    "supabase/functions"
   ]
 }

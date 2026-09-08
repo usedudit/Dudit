@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Input from "@/components/reusable/Input"
 import NumberInputWithCheckbox from "@/components/ui/number-input-with-checkbox"
 import { Checkbox } from "@/components/reusable/Checkbox"
-import { Button, PhoneInput, EmailInput, Spinner, InfoCard, ListItem, RadioButton } from "@/components/reusable"
+import { Button, PhoneInput, EmailInput, Spinner, InfoCard, ListItem, RadioButton, Turnstile, type TurnstileRef } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import PartnerCategoryModal from "@/components/erp/settings/PartnerCategoryModal"
 import { CepInput, PasswordInput, StateComboBox, PasswordStrengthMeter } from "@/components/reusable"
@@ -85,6 +85,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+    const turnstileRef = useRef<TurnstileRef>(null)
     const [error, setError] = useState<string | null>(null)
     const [partnerData, setPartnerData] = useState(initialPartnerData)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -353,10 +355,17 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                     options: {
                         data: { full_name: sellerName },
                         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+                        captchaToken: turnstileToken || undefined,
                     },
                 })
-                if (signErr) throw signErr
+                if (signErr) {
+                    setTurnstileToken(null)
+                    turnstileRef.current?.reset()
+                    throw signErr
+                }
                 if (signUp.user && signUp.user.identities && signUp.user.identities.length === 0) {
+                    setTurnstileToken(null)
+                    turnstileRef.current?.reset()
                     throw new Error("Este email já está cadastrado.")
                 }
                 userId = signUp.user!.id
@@ -426,6 +435,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
         } catch (e: any) {
             console.error("[PARTNER-WIZARD SUBMIT ERROR]", e)
             setError(getErrorMessage(e))
+            setTurnstileToken(null)
+            turnstileRef.current?.reset()
         } finally {
             isSubmittingRef.current = false
             setIsSubmitting(false)
@@ -525,6 +536,13 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         </label>
                                     </div>
                                 </div>
+                                <Turnstile
+                                    ref={turnstileRef}
+                                    action="partner-signup"
+                                    onSuccess={(token) => setTurnstileToken(token)}
+                                    onExpire={() => setTurnstileToken(null)}
+                                    onError={() => setTurnstileToken(null)}
+                                />
                                 <div className="pt-2 border-t border-brand-border dark:border-dark-border">
                                     <Button variant="outline" onClick={handleGoogleAuth} disabled={isLoading} className="w-full gap-3 pl-4 bg-transparent">
                                         <svg width="20" height="20" viewBox="0 0 18 18" fill="none" className="shrink-0">

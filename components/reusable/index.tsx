@@ -56,4 +56,6 @@ export { Barcode } from "./Barcode"
 export { QuantitySelector } from "./QuantitySelector"
 export { BarcodeScannerInput } from "./BarcodeScannerInput"
 export { UndoGracePeriodToast } from "./UndoGracePeriodToast"
+export { Turnstile } from "./Turnstile"
+export type { TurnstileRef, TurnstileProps } from "./Turnstile"
 

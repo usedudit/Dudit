@@ -55,7 +55,7 @@ type GroupedService = {
   notes?: string | null
   storeId?: string
   payDepositOnly?: boolean
-  depositAmount?: number
+  depositAmount?: number | null
   unitPrice: number
   quantity: number
 }
@@ -116,7 +116,7 @@ function groupServiceBookingLines(
       notes: meta.notes,
       storeId: meta.storeId,
       payDepositOnly: line.payDepositOnly,
-      depositAmount: line.depositAmount,
+      depositAmount: line.depositAmount ?? undefined,
       unitPrice: line.unitPrice,
       quantity: line.quantity,
     })

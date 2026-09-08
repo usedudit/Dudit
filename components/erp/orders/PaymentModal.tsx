@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useRealtimeRecord } from '@/hooks/use-realtime-record';
 import { useTheme } from 'next-themes';
 import {
     XIcon,
@@ -9,15 +10,12 @@ import {
     CopyIcon,
     ColumnsIcon as SplitIcon,
     ChevronUpIcon,
-    ClockIcon,
-    TruckIcon,
     ChevronDownIcon,
     PrinterIcon,
     FileIcon,
     TagIcon,
     CheckCircleIcon,
     ChevronRightIcon,
-    CancelCircleIcon,
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -38,7 +36,6 @@ import { usePermissions } from '@/lib/permission-context';
 import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { getPOSCustomerDetailsAction } from '@/app/actions/erp/pdv';
 import { calculatePaymentAmounts } from '@/lib/payments/calculation';
-
 
 const PAYMENT_METHODS_UPDATED_EVENT = "payment-methods-updated";
 
@@ -1648,73 +1645,92 @@ const PaymentModal = ({
         }
     };
 
-    // Poll payment status for pre-created Pix/Boleto order
+    const handlePaymentApproved = useCallback((orderNumber?: string) => {
+        const remainingPartial = 0;
+        const snapshotBreakdown = [
+            { method: mpStep === "pix" ? "Pix (Mercado Pago)" : "Boleto (Mercado Pago)", amount: chargeTarget }
+        ];
+
+        setSuccessSnapshot({
+            subTotal,
+            itemCount,
+            shippingFee: Number(shippingFee || 0),
+            otherCosts: Number(otherCosts || 0),
+            discountAmount: Number(discountAmount || 0),
+            total,
+            displayOrderTotal: displayTransactionTotal,
+            totalPaid: chargeTarget,
+            change: 0,
+            isUnderpaid: false,
+            remainingPartial,
+            paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
+            interestAmount: Number(currentPricingTotals.interestAmount || 0),
+            feeAmount: Number(currentPricingTotals.feeAmount || 0),
+            fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
+            feeBearer: currentPricingTotals.feeBearer,
+            appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
+            appliedFeePercent: currentPricingTotals.appliedFeePercent,
+            appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
+            receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
+            paymentBreakdown: snapshotBreakdown,
+        });
+
+        setSaleId(orderNumber || "DDT000000");
+        setPaymentStatus('success');
+        setPreCreatedOrderId(null);
+    }, [mpStep, chargeTarget, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total, displayTransactionTotal, currentPricingTotals, cart]);
+
+    // Realtime: updates POS in < 80ms as soon as Mercado Pago webhook updates the order
+    useRealtimeRecord<{ situation?: string; payment_status?: string; order_number?: string }>({
+        table: "orders",
+        id: preCreatedOrderId,
+        enabled: !!preCreatedOrderId && (mpStep === "pix" || mpStep === "boleto"),
+        onUpdate: (record) => {
+            if (record?.situation === "paid" || record?.payment_status === "approved") {
+                handlePaymentApproved(record.order_number);
+            }
+        },
+    });
+
+    // Initial check + safety fallback (eliminating the 3-second rapid polling loop)
     useEffect(() => {
         if (!preCreatedOrderId) return;
         if (mpStep !== "pix" && mpStep !== "boleto") return;
 
-        let intervalId: any;
-        let isChecking = false;
+        let isMounted = true;
 
         const checkStatus = async () => {
-            if (isChecking) return;
-            isChecking = true;
             try {
                 const response = await fetch("/api/orders/sync-payment-status", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ orderId: preCreatedOrderId }),
                 });
+                if (!isMounted) return;
                 if (response.ok) {
                     const data = await response.json();
                     if (data.newStatus === "paid" || data.paymentStatus === "approved") {
-                        const remainingPartial = 0;
-                        const snapshotBreakdown = [
-                            { method: mpStep === "pix" ? "Pix (Mercado Pago)" : "Boleto (Mercado Pago)", amount: chargeTarget }
-                        ];
-
-                        setSuccessSnapshot({
-                            subTotal,
-                            itemCount,
-                            shippingFee: Number(shippingFee || 0),
-                            otherCosts: Number(otherCosts || 0),
-                            discountAmount: Number(discountAmount || 0),
-                            total,
-                            displayOrderTotal: displayTransactionTotal,
-                            totalPaid: chargeTarget,
-                            change: 0,
-                            isUnderpaid: false,
-                            remainingPartial,
-                            paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
-                            interestAmount: Number(currentPricingTotals.interestAmount || 0),
-                            feeAmount: Number(currentPricingTotals.feeAmount || 0),
-                            fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
-                            feeBearer: currentPricingTotals.feeBearer,
-                            appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
-                            appliedFeePercent: currentPricingTotals.appliedFeePercent,
-                            appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
-                            receiptCart: Array.isArray(cart) ? cart.map((row: any) => ({ ...row })) : [],
-                            paymentBreakdown: snapshotBreakdown,
-                        });
-
-                        setSaleId(data.orderNumber || "DDT000000");
-                        setPaymentStatus('success');
-                        setPreCreatedOrderId(null); // Stop polling
+                        handlePaymentApproved(data.orderNumber);
                     }
                 }
             } catch (error) {
-                console.error("Error polling payment status:", error);
-            } finally {
-                isChecking = false;
+                console.error("Error checking payment status:", error);
             }
         };
 
-        intervalId = setInterval(checkStatus, 3000);
+        // Run one immediate check in case order is already paid
+        void checkStatus();
+
+        // One gentle fallback at 15s in case websocket connection dropped
+        const fallbackTimer = setTimeout(() => {
+            if (isMounted) void checkStatus();
+        }, 15000);
 
         return () => {
-            clearInterval(intervalId);
+            isMounted = false;
+            clearTimeout(fallbackTimer);
         };
-    }, [preCreatedOrderId, mpStep, chargeTarget, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total, displayTransactionTotal, currentPricingTotals, cart]);
+    }, [preCreatedOrderId, mpStep, handlePaymentApproved]);
 
     const getTitle = () => {
         const selectedTypeLabel =

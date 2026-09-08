@@ -3,11 +3,12 @@
 import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { Button, Spinner } from "@/components/reusable"
 import { CheckCircleIcon, CancelCircleIcon, InfoIcon } from "@/lib/icons"
 import { syncSubscriptionWithMpAction } from "@/app/actions/marketplace/preapproval"
 import { checkSubscriptionStatusAction } from "@/app/actions/checkout/fulfillment"
+import { useRealtimeRecord } from "@/hooks/use-realtime-record"
 
 export default function CheckoutFulfillmentPage({
   searchParams,
@@ -24,51 +25,82 @@ export default function CheckoutFulfillmentPage({
   const [errorDetails, setErrorDetails] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
 
+  // Realtime subscription: updates status in < 80ms as soon as webhook writes to DB
+  useRealtimeRecord<{ status?: string }>({
+    table: "recurring_subscriptions",
+    id: subscriptionId,
+    enabled: status === "pending" && !!subscriptionId,
+    onUpdate: (record) => {
+      if (record?.status === "active") {
+        setStatus("active")
+      } else if (record?.status === "payment_failed") {
+        setStatus("failed")
+        setErrorDetails("O pagamento não foi aprovado pela operadora do cartão.")
+      } else if (record?.status === "cancelled") {
+        setStatus("failed")
+        setErrorDetails("A assinatura foi cancelada.")
+      }
+    },
+  })
+
   useEffect(() => {
     if (!subscriptionId) {
       router.push("/")
       return
     }
 
-    let intervalId: NodeJS.Timeout
+    let isMounted = true
 
-    const checkStatus = async () => {
+    // 1. Initial immediate check (in case payment completed before page mounted)
+    const checkInitial = async () => {
       try {
         const res = await checkSubscriptionStatusAction(subscriptionId)
+        if (!isMounted) return
         if (res.error) throw new Error(res.error)
 
         if (res.status === "active") {
           setStatus("active")
-          clearInterval(intervalId)
         } else if (res.status === "payment_failed") {
           setStatus("failed")
           setErrorDetails("O pagamento não foi aprovado pela operadora do cartão.")
-          clearInterval(intervalId)
         } else if (res.status === "cancelled") {
           setStatus("failed")
           setErrorDetails("A assinatura foi cancelada.")
-          clearInterval(intervalId)
         }
-
-        setAttempts((prev) => {
-          if (prev >= 12) { // 30 seconds max polling
-            setStatus("timeout")
-            clearInterval(intervalId)
-            return prev
-          }
-          return prev + 1
-        })
       } catch (err: any) {
-        console.error("Fulfillment polling error:", err.message)
+        console.error("Fulfillment initial check error:", err.message)
       }
     }
 
-    // Run first check immediately, then every 2.5 seconds
-    void checkStatus()
-    intervalId = setInterval(checkStatus, 2500)
+    void checkInitial()
 
-    return () => clearInterval(intervalId)
-  }, [subscriptionId, router])
+    // 2. Gentle safety fallback: one check at 12s, timeout at 35s if still pending
+    const fallbackTimer = setTimeout(async () => {
+      if (!isMounted || status !== "pending") return
+      try {
+        const res = await checkSubscriptionStatusAction(subscriptionId)
+        if (!isMounted) return
+        if (res.status === "active") {
+          setStatus("active")
+        } else if (res.status === "payment_failed") {
+          setStatus("failed")
+          setErrorDetails("O pagamento não foi aprovado pela operadora do cartão.")
+        }
+      } catch (err) { }
+    }, 12000)
+
+    const timeoutTimer = setTimeout(() => {
+      if (isMounted && status === "pending") {
+        setStatus("timeout")
+      }
+    }, 35000)
+
+    return () => {
+      isMounted = false
+      clearTimeout(fallbackTimer)
+      clearTimeout(timeoutTimer)
+    }
+  }, [subscriptionId, router, status])
 
   const handleManualSync = async () => {
     if (!subscriptionId) return

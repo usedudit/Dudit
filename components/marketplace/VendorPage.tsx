@@ -1373,9 +1373,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
                                                     <div className="flex items-center gap-4 flex-wrap">
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="link"
                                                             onClick={() => openCategory(`campaign-${promo.id}`)}
-                                                            className="text-[13px] font-bold text-brand-green hover:underline cursor-pointer px-2 py-1 select-none"
+                                                            className="text-[13px] px-2 py-1 select-none"
                                                         >
                                                             Ver tudo
                                                         </Button>
