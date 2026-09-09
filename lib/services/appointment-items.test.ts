@@ -126,4 +126,48 @@ describe("Appointment Items & Stock Control", () => {
         expect(items[0].quantity).toBe(2)
         expect(items[0].productId).toBe("prod-shampoo")
     })
+
+    it("returns empty items when service has no resources configured (e.g. Troca de Óleo)", () => {
+        const services = [
+            {
+                id: "svc-oil-change",
+                name: "Troca de Óleo",
+                resources: []
+            }
+        ]
+
+        const items = resolveResourcesFromServices(services)
+        expect(items).toHaveLength(0)
+    })
+
+    it("only includes resources from services that have them, ignoring services without resources", () => {
+        const services = [
+            {
+                id: "svc-oil-change",
+                name: "Troca de Óleo",
+                resources: []
+            },
+            {
+                id: "svc-alignment",
+                name: "Alinhamento",
+                resources: [
+                    {
+                        product_id: "prod-peso",
+                        name: "Chumbo de Balanceamento",
+                        quantity: 4,
+                        usage_type: "consumed",
+                    }
+                ]
+            }
+        ]
+
+        const items = resolveResourcesFromServices(services)
+        expect(items).toHaveLength(1)
+        expect(items[0].name).toBe("Chumbo de Balanceamento")
+        expect(items[0].quantity).toBe(4)
+        expect(items[0].productId).toBe("prod-peso")
+        // Troca de Óleo must NEVER be added as an item
+        expect(items.some(i => i.name === "Troca de Óleo")).toBe(false)
+    })
 })
+

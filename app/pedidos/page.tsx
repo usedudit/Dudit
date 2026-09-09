@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/server"
-import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { requireUser } from "@/lib/auth/authorization"
 import { getUserSessionData } from "@/lib/data/user"
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 
 const MAX_ORDERS = 200
 
-export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string }> }) {
+export default async function MyOrdersPage({ searchParams }: { searchParams?: Promise<{ tab?: string; order_number?: string; order?: string; view?: string }> }) {
   const resolvedParams = await searchParams
   const user = await requireUser()
   const adminClient = await createAdminClient()
@@ -226,18 +225,19 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
     : null
 
   const cartCount = sessionData?.cartCount || 0
-
-  const isDetails = resolvedParams?.tab === 'details'
-  const headerTitle = isDetails ? "Detalhes do pedido" : "Meus pedidos"
+  const initialOrderNumber = resolvedParams?.order_number || resolvedParams?.order || resolvedParams?.view
+  const initialTab = resolvedParams?.tab
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
-      <MarketplaceHeader simpleTitle={headerTitle} userProfile={userProfile} cartCount={cartCount} />
-
       <MyOrdersListClient
         orders={orders}
         reviewedItemsArray={reviewedItemsArray}
         userId={user.id}
+        initialOrderNumber={initialOrderNumber}
+        initialTab={initialTab}
+        userProfile={userProfile}
+        cartCount={cartCount}
       />
 
       <MarketplaceFooter />

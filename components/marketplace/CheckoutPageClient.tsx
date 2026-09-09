@@ -2170,22 +2170,29 @@ export function CheckoutPageClient() {
 
             const buildOrderDetailsItems = () => {
                 if (sessionData?.source === "cart" && checkoutContext?.lines?.length) {
-                    return checkoutContext.lines.map((line) => ({
-                        id: line.lineId,
-                        name: line.displayName,
-                        price: line.unitPrice,
-                        quantity: line.quantity,
-                        image: line.imageUrl || "",
-                        variant_id: undefined,
-                        variant_name: line.variantName || undefined,
-                        unit: (line as any).unit || null,
-                        itemType: line.lineKind,
-                        bookingDate: line.bookingMetadata?.date || null,
-                        bookingTime: line.bookingMetadata?.time || null,
-                        staffName: line.bookingMetadata?.staffName || null,
-                        bookingSummary: line.bookingSummary || null,
-                        fulfillmentMode: line.fulfillmentMode || (formData.deliveryType === "delivery" ? "delivery" : "pickup"),
-                    }))
+                    return checkoutContext.lines.map((line) => {
+                        const matchedCartItem = sessionData?.cartItems?.find((ci) => ci.cartItemId === line.lineId)
+                        const resolvedProductId = line.productId || matchedCartItem?.productId || line.serviceId || matchedCartItem?.serviceId || line.lineId
+                        const resolvedVariantId = line.variantId || matchedCartItem?.variantId || undefined
+                        const resolvedServiceId = line.serviceId || matchedCartItem?.serviceId || undefined
+                        return {
+                            id: resolvedProductId,
+                            name: line.displayName,
+                            price: line.unitPrice,
+                            quantity: line.quantity,
+                            image: line.imageUrl || "",
+                            variant_id: resolvedVariantId,
+                            variant_name: line.variantName || undefined,
+                            service_id: resolvedServiceId,
+                            unit: (line as any).unit || null,
+                            itemType: line.lineKind,
+                            bookingDate: line.bookingMetadata?.date || null,
+                            bookingTime: line.bookingMetadata?.time || null,
+                            staffName: line.bookingMetadata?.staffName || null,
+                            bookingSummary: line.bookingSummary || null,
+                            fulfillmentMode: line.fulfillmentMode || (formData.deliveryType === "delivery" ? "delivery" : "pickup"),
+                        }
+                    })
                 }
                 return products.map((p) => {
                     const matchedLine = checkoutContext?.lines?.find(
@@ -2197,8 +2204,9 @@ export function CheckoutPageClient() {
                         price: p.price,
                         quantity: quantities[p.id] || p.quantity,
                         image: p.image || matchedLine?.imageUrl || "",
-                        variant_id: p.variant || "",
+                        variant_id: p.variant || matchedLine?.variantId || "",
                         variant_name: matchedLine?.variantName || undefined,
+                        service_id: matchedLine?.serviceId || undefined,
                         unit: p.unit || (matchedLine as any)?.unit || null,
                         itemType: matchedLine?.lineKind || sessionData?.itemType || "product",
                         bookingDate: matchedLine?.bookingMetadata?.date || null,

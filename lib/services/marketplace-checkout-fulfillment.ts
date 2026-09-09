@@ -127,6 +127,97 @@ function groupServiceBookingLines(
   return Array.from(groups.values())
 }
 
+async function resolveAppointmentItemsFromServices(
+  supabase: SupabaseClient,
+  partnerId: string,
+  appointmentId: string,
+  services: Array<{
+    serviceName: string
+    serviceId?: string | null
+    quantity?: number
+  }>,
+): Promise<Array<{
+  appointment_id: string
+  service_id: string | null
+  product_id: string | null
+  variant_id: string | null
+  name: string
+  quantity: number
+  usage_type: "consumed" | "returnable" | "reference"
+}>> {
+  if (!services || services.length === 0) return []
+
+  const serviceIds = Array.from(new Set(services.map((s) => s.serviceId).filter(Boolean) as string[]))
+  const serviceNames = Array.from(new Set(services.map((s) => s.serviceName).filter(Boolean)))
+
+  const dbServices: Array<{ id: string; name: string; resources: any }> = []
+
+  if (serviceIds.length > 0) {
+    const { data: byIds, error: byIdsErr } = await supabase
+      .from("services")
+      .select("id, name, resources")
+      .eq("partner_id", partnerId)
+      .in("id", serviceIds)
+    if (!byIdsErr && byIds) dbServices.push(...byIds)
+  }
+
+  const unmatchedNames = serviceNames.filter(
+    (name) => !dbServices.some((s) => s.name?.trim().toLowerCase() === name.trim().toLowerCase())
+  )
+
+  if (unmatchedNames.length > 0) {
+    const { data: byNames, error: byNamesErr } = await supabase
+      .from("services")
+      .select("id, name, resources")
+      .eq("partner_id", partnerId)
+      .in("name", unmatchedNames)
+    if (!byNamesErr && byNames) dbServices.push(...byNames)
+  }
+
+  const items: Array<{
+    appointment_id: string
+    service_id: string | null
+    product_id: string | null
+    variant_id: string | null
+    name: string
+    quantity: number
+    usage_type: "consumed" | "returnable" | "reference"
+  }> = []
+
+  for (const svc of services) {
+    const dbSvc = dbServices.find(
+      (s) =>
+        (svc.serviceId && s.id === svc.serviceId) ||
+        (s.name && s.name.trim().toLowerCase() === svc.serviceName.trim().toLowerCase())
+    )
+    if (!dbSvc || !Array.isArray(dbSvc.resources) || dbSvc.resources.length === 0) {
+      // Service has no items/resources configured -> do not create any appointment_items!
+      continue
+    }
+
+    const svcQty = Math.max(1, Number(svc.quantity || 1))
+    for (const res of dbSvc.resources) {
+      if (!res || !res.name || typeof res.name !== "string" || !res.name.trim()) continue
+
+      const itemQty = Math.max(1, Number(res.quantity || 1) * svcQty)
+      const usageType: "consumed" | "returnable" | "reference" =
+        res.usage_type === "returnable" || res.usage_type === "reference" ? res.usage_type : "consumed"
+
+      items.push({
+        appointment_id: appointmentId,
+        service_id: dbSvc.id || svc.serviceId || null,
+        product_id: res.product_id || null,
+        variant_id: res.variant_id || null,
+        name: res.name.trim(),
+        quantity: itemQty,
+        usage_type: usageType,
+      })
+    }
+  }
+
+  return items
+}
+
 async function createBookingFromMetadata(
   supabase: SupabaseClient,
   params: {
@@ -214,6 +305,21 @@ async function createBookingFromMetadata(
       .update(updatePayload)
       .eq("id", existing.id)
 
+    const resolvedItems = await resolveAppointmentItemsFromServices(
+      supabase,
+      params.partnerId,
+      existing.id as string,
+      [{
+        serviceName: params.meta.serviceName,
+        serviceId: (params.meta as any).serviceId || null,
+        quantity: 1,
+      }],
+    )
+    await supabase.from("appointment_items").delete().eq("appointment_id", existing.id)
+    if (resolvedItems.length > 0) {
+      await supabase.from("appointment_items").insert(resolvedItems)
+    }
+
     return { appointmentId: existing.id as string, needsReschedule }
   }
 
@@ -254,6 +360,20 @@ async function createBookingFromMetadata(
 
   if (error) throw error
   const appointmentId = appointment.id as string
+
+  const items = await resolveAppointmentItemsFromServices(
+    supabase,
+    params.partnerId,
+    appointmentId,
+    [{
+      serviceName: params.meta.serviceName,
+      serviceId: (params.meta as any).serviceId || null,
+      quantity: 1,
+    }],
+  )
+  if (items.length > 0) {
+    await supabase.from("appointment_items").insert(items)
+  }
 
   const remaining = Math.max(0, params.fullPrice - params.paidAmount)
   const receivableId = await syncAppointmentReceivable({
@@ -367,27 +487,17 @@ async function createGroupedBookingFromMetadata(
       .update(updatePayload)
       .eq("id", existing.id)
 
-    const { data: existingItems } = await supabase
-      .from("appointment_items")
-      .select("id, service_id, name")
-      .eq("appointment_id", existing.id)
+    const resolvedItems = await resolveAppointmentItemsFromServices(
+      supabase,
+      params.partnerId,
+      existing.id as string,
+      params.group.services,
+    )
 
-    const existingServiceIds = new Set((existingItems || []).map((i: any) => i.service_id).filter(Boolean))
-    const newServiceIds = params.group.services.map((s) => s.serviceId).filter(Boolean)
-
-    const needsItemSync = newServiceIds.some((id) => !existingServiceIds.has(id)) ||
-      (existingItems || []).length !== params.group.services.length
-
-    if (needsItemSync) {
-      await supabase.from("appointment_items").delete().eq("appointment_id", existing.id)
-      const items = params.group.services.map((s) => ({
-        appointment_id: existing.id,
-        service_id: s.serviceId || null,
-        name: s.serviceName,
-        quantity: 1,
-        usage_type: "reference",
-      }))
-      await supabase.from("appointment_items").insert(items)
+    // Sync appointment items: delete old items and only insert if the services have actual configured resources
+    await supabase.from("appointment_items").delete().eq("appointment_id", existing.id)
+    if (resolvedItems.length > 0) {
+      await supabase.from("appointment_items").insert(resolvedItems)
     }
 
     return { appointmentId: existing.id as string, needsReschedule }
@@ -431,14 +541,38 @@ async function createGroupedBookingFromMetadata(
   if (error) throw error
   const appointmentId = appointment.id as string
 
-  const items = params.group.services.map((s) => ({
-    appointment_id: appointmentId,
-    service_id: s.serviceId || null,
-    name: s.serviceName,
-    quantity: 1,
-    usage_type: "reference",
-  }))
-  await supabase.from("appointment_items").insert(items)
+  const items = await resolveAppointmentItemsFromServices(
+    supabase,
+    params.partnerId,
+    appointmentId,
+    params.group.services,
+  )
+  if (items.length > 0) {
+    await supabase.from("appointment_items").insert(items)
+
+    if (items.some((i) => i.product_id)) {
+      try {
+        const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
+        await handleAppointmentItemsStockMovement({
+          appointmentId,
+          partnerId: params.partnerId,
+          oldStatus: null,
+          newStatus: !slotOk
+            ? "Reservado"
+            : (params.paymentStatus === "paid" || params.paymentStatus === "partially_paid")
+              ? "Confirmado"
+              : "Reservado",
+          userId: params.buyerId,
+          storeId: params.group.services[0]?.storeId || null,
+          paymentStatus: params.paymentStatus,
+          paidAmount: params.paidAmount,
+          price: params.group.totalPrice,
+        })
+      } catch (stockErr) {
+        console.error("[marketplace fulfillment] stock movement error:", stockErr)
+      }
+    }
+  }
 
   const remaining = Math.max(0, params.group.totalPrice - params.paidAmount)
   const receivableId = await syncAppointmentReceivable({

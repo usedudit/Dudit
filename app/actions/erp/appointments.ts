@@ -1617,7 +1617,7 @@ export async function getAppointmentDetailsDataAction(params: {
     const supabase = createAdminClient()
 
     // Run all database fetches in parallel on the server
-    const [partnerPlanRes, appointmentItemsRes, orderDataRes] = await Promise.all([
+    const [partnerPlanRes, appointmentItemsRes, orderDataRes, appointmentRowRes] = await Promise.all([
       // The plan is only needed by the item editor. Avoid this query when a
       // read-only appointment is opened.
       includePlan ? supabase
@@ -1652,7 +1652,14 @@ export async function getAppointmentDetailsDataAction(params: {
           .select("id, line_type, product_name, product_price, quantity, subtotal, service_id, is_gift, original_price")
           .eq("order_id", linkedOrderId)
           .order("created_at", { ascending: true })
-      ]) : Promise.resolve([null, null])
+      ]) : Promise.resolve([null, null]),
+
+      // 5. Appointment row (to identify marketplace appointments)
+      appointmentId ? supabase
+        .from("appointments")
+        .select("id, marketplace_order_id, service_name")
+        .eq("id", appointmentId)
+        .maybeSingle() : Promise.resolve({ data: null, error: null })
     ])
 
     // Process Partner Plan
@@ -1669,6 +1676,9 @@ export async function getAppointmentDetailsDataAction(params: {
     // Enrich appointment items only when there are actual product/service IDs.
     let appointmentItems = []
     if (appointmentItemsRes.data) {
+      const isMarketplaceApt = Boolean(appointmentRowRes?.data?.marketplace_order_id)
+      const aptServiceName = appointmentRowRes?.data?.service_name || ''
+
       const productIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.product_id).filter(Boolean))]
       const serviceIds = [...new Set(appointmentItemsRes.data.map((item: any) => item.service_id).filter(Boolean))]
       const [productsRes, servicesRes] = await Promise.all([
@@ -1676,12 +1686,46 @@ export async function getAppointmentDetailsDataAction(params: {
           ? supabase.from("products").select("id, name, sku, stock_available, images").in("id", productIds)
           : Promise.resolve({ data: [] }),
         serviceIds.length > 0
-          ? supabase.from("services").select("id, name").in("id", serviceIds)
+          ? supabase.from("services").select("id, name, resources").in("id", serviceIds)
           : Promise.resolve({ data: [] }),
       ])
       const productsMap = new Map<string, any>((productsRes.data || []).map((product: any) => [String(product.id), product]))
       const servicesMap = new Map<string, any>((servicesRes.data || []).map((service: any) => [String(service.id), service]))
-      appointmentItems = appointmentItemsRes.data.map((item: any) => {
+
+      // Filter out and remove ghost items inserted by the previous marketplace bug:
+      // (no product_id, usage_type is reference, name matches service name, but service has no such resource configured)
+      const ghostItemIds: string[] = []
+      const validRawItems = appointmentItemsRes.data.filter((item: any) => {
+        if (isMarketplaceApt && !item.product_id && item.usage_type === "reference") {
+          const s = item.service_id ? servicesMap.get(String(item.service_id)) : null
+          const svcResources = Array.isArray(s?.resources) ? s.resources : []
+          const hasResourceInSvc = svcResources.some(
+            (r: any) => r?.name?.trim().toLowerCase() === item.name?.trim().toLowerCase()
+          )
+          if (!hasResourceInSvc) {
+            const isMatchingServiceName =
+              (s?.name && s.name.trim().toLowerCase() === item.name?.trim().toLowerCase()) ||
+              (aptServiceName && aptServiceName.toLowerCase().includes(item.name?.trim().toLowerCase()))
+            if (isMatchingServiceName) {
+              ghostItemIds.push(item.id)
+              return false
+            }
+          }
+        }
+        return true
+      })
+
+      if (ghostItemIds.length > 0) {
+        supabase
+          .from("appointment_items")
+          .delete()
+          .in("id", ghostItemIds)
+          .then(({ error }: any) => {
+            if (error) console.error("Error cleaning up ghost appointment items:", error)
+          })
+      }
+
+      appointmentItems = validRawItems.map((item: any) => {
         const p = item.product_id ? productsMap.get(String(item.product_id)) : null
         const s = item.service_id ? servicesMap.get(String(item.service_id)) : null
         return {

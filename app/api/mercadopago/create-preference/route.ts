@@ -30,6 +30,8 @@ interface PreferenceRequest {
   partnerId?: string
   storeId?: string
   buyerId?: string
+  existingOrderId?: string
+  orderId?: string
   couponCode?: string | null
   deliveryFee?: number
   deliveryType?: "delivery" | "pickup"
@@ -75,12 +77,36 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Nenhum produto fornecido" }, { status: 400 })
     }
 
-    // O partnerId do client Ã© apenas uma alegação. Resolva o parceiro real
-    // diretamente no carrinho/produtos antes de consultar configuração/token MP.
-    let partnerId: string | undefined
-    const useUnifiedCart = Boolean(body.cartItemIds && body.cartItemIds.length > 0)
+    const existingOrderId = body.existingOrderId || body.orderId
+    let existingOrder: any = null
+    if (existingOrderId) {
+      const { data: fetchedOrder, error: fetchError } = await adminClient
+        .from("orders")
+        .select("*, order_items(*)")
+        .eq("id", existingOrderId)
+        .single()
 
-    if (useUnifiedCart) {
+      if (fetchError || !fetchedOrder) {
+        SecureLogger.error("Failed to fetch existing order in create-preference", { orderId: existingOrderId, error: fetchError?.message })
+        return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
+      }
+
+      if (fetchedOrder.buyer_id !== user.id) {
+        SecureLogger.warn("Order ID mismatch attempt in create-preference", { orderId: existingOrderId, buyerId: fetchedOrder.buyer_id, userId: user.id })
+        return NextResponse.json({ error: "Acesso negado ao pedido" }, { status: 403 })
+      }
+
+      existingOrder = fetchedOrder
+    }
+
+    // O partnerId do client é apenas uma alegação. Resolva o parceiro real
+    // diretamente no carrinho/produtos/pedido antes de consultar configuração/token MP.
+    let partnerId: string | undefined
+    const useUnifiedCart = Boolean(!existingOrder && body.cartItemIds && body.cartItemIds.length > 0)
+
+    if (existingOrder) {
+      partnerId = existingOrder.partner_id
+    } else if (useUnifiedCart) {
       const resolved = await resolveCheckoutCartLinesFresh(adminClient, user.id, body.cartItemIds!)
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
@@ -102,10 +128,18 @@ async function handler(request: NextRequest) {
         const variant = item.variant_id ? variantsMap.get(item.variant_id) : variantsMap.get(item.id)
         return variant?.products?.partner_id || productsMap.get(item.id)?.partner_id || (item.service_id ? servicesMap.get(item.service_id)?.partner_id : undefined)
       })
-      if (resolvedPartnerIds.some(id => !id) || new Set(resolvedPartnerIds).size !== 1) {
+
+      const uniquePartners = new Set(resolvedPartnerIds.filter(Boolean))
+      if (uniquePartners.size > 1) {
         return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
       }
-      partnerId = resolvedPartnerIds[0]
+      if (uniquePartners.size === 1) {
+        partnerId = Array.from(uniquePartners)[0]
+      } else if (body.partnerId) {
+        partnerId = body.partnerId
+      } else {
+        return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
+      }
     }
 
     if (!partnerId) {
@@ -174,7 +208,51 @@ async function handler(request: NextRequest) {
     let deliveryFee = 0
     let deliveryStoreId: string | null = body.storeId || null
 
-    if (useUnifiedCart) {
+    if (existingOrder) {
+      deliveryStoreId = existingOrder.store_id || deliveryStoreId
+      const storeCredit = Number(existingOrder.store_credit_amount || 0)
+      const remainingToPay = Math.max(
+        0,
+        Number((Number(existingOrder.total_amount || 0) - storeCredit - Number(existingOrder.paid_amount || 0)).toFixed(2))
+      )
+      totalAmount = remainingToPay
+
+      const orderItems = existingOrder.order_items || []
+      const itemsSum = orderItems.reduce((acc: number, oi: any) => acc + Number(oi.unit_price || oi.price || 0) * Number(oi.quantity || 1), 0)
+      const deliveryFee = Number(existingOrder.delivery_fee || 0)
+
+      if (orderItems.length > 0 && Math.abs((itemsSum + deliveryFee) - remainingToPay) <= 0.01) {
+        for (const oi of orderItems) {
+          const itemPrice = Number(oi.unit_price || oi.price || 0)
+          const itemQty = Number(oi.quantity || 1)
+          preferenceItems.push({
+            title: oi.product_name || oi.service_name || "Item",
+            description: `Item: ${oi.product_name || oi.service_name || "Item"}`,
+            unit_price: itemPrice,
+            quantity: itemQty,
+            currency_id: "BRL",
+          })
+        }
+        if (deliveryFee > 0) {
+          preferenceItems.push({
+            title: "Taxa de entrega",
+            unit_price: deliveryFee,
+            quantity: 1,
+            currency_id: "BRL",
+          })
+        }
+      } else {
+        const orderLabel = existingOrder.order_number ? `Pedido #${existingOrder.order_number}` : `Pedido ${existingOrder.id.slice(0, 8)}`
+        preferenceItems.push({
+          id: existingOrder.id,
+          title: orderLabel,
+          description: `Pagamento do ${orderLabel}`,
+          unit_price: remainingToPay,
+          quantity: 1,
+          currency_id: "BRL",
+        })
+      }
+    } else if (useUnifiedCart) {
       // Update pay_deposit_only in DB
       await adminClient
         .from("cart_items")
@@ -281,6 +359,11 @@ async function handler(request: NextRequest) {
             resolvedPartnerId = product.partner_id
             resolvedName = product.name
             deliveryStoreId = deliveryStoreId || product.store_id || null
+          } else if (item.price && item.name) {
+            resolvedPrice = Number(item.price)
+            resolvedStock = 9999
+            resolvedPartnerId = partnerId
+            resolvedName = item.name
           } else {
             return NextResponse.json({ error: `Produto/Variante ${item.id} não encontrado` }, { status: 400 })
           }
@@ -308,92 +391,104 @@ async function handler(request: NextRequest) {
     }
 
     // ── Central pricing engine (única fonte de verdade) ──────────────────────
-    if (body.deliveryType === "delivery") {
-      if (!body.deliveryAddress?.trim()) {
-        return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
+    if (!existingOrder) {
+      if (body.deliveryType === "delivery") {
+        if (!body.deliveryAddress?.trim()) {
+          return NextResponse.json({ error: "Endereço de entrega não informado" }, { status: 400 })
+        }
+        const deliveryQuote = await quoteDeliveryFeeAction({
+          partnerId,
+          storeId: deliveryStoreId,
+          destinationAddress: body.deliveryAddress,
+          orderSubtotal: totalAmount,
+        })
+        if (!deliveryQuote.success) {
+          return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
+        }
+        deliveryFee = Number(deliveryQuote.fee || 0)
       }
-      const deliveryQuote = await quoteDeliveryFeeAction({
-        partnerId,
-        storeId: deliveryStoreId,
-        destinationAddress: body.deliveryAddress,
-        orderSubtotal: totalAmount,
-      })
-      if (!deliveryQuote.success) {
-        return NextResponse.json({ error: deliveryQuote.error }, { status: 400 })
-      }
-      deliveryFee = Number(deliveryQuote.fee || 0)
-    }
 
-    // Build pricing items from already-resolved preference items
-    type PricingItem = import("@/lib/services/pricing-engine").PricingItem
-    type PricingCoupon = import("@/lib/services/pricing-engine").PricingCoupon
-    const pricingItems: PricingItem[] = preferenceItems
-      .filter((p: any) => p.unit_price > 0)
-      .map((p: any) => ({
-        unitPrice: p.unit_price,
-        quantity: p.quantity,
-      }))
+      // Build pricing items from already-resolved preference items
+      type PricingItem = import("@/lib/services/pricing-engine").PricingItem
+      type PricingCoupon = import("@/lib/services/pricing-engine").PricingCoupon
+      const pricingItems: PricingItem[] = preferenceItems
+        .filter((p: any) => p.unit_price > 0)
+        .map((p: any) => ({
+          unitPrice: p.unit_price,
+          quantity: p.quantity,
+        }))
 
-    // Coupon validation
-    let couponPricingData: PricingCoupon | null = null
-    let couponDiscount = 0
-    if (body.couponCode) {
-      const itemsSubtotal = pricingItems.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0)
-      const couponResult = await validateCoupon({
-        partnerId,
-        code: body.couponCode,
-        customerId: user.id,
-        subtotal: itemsSubtotal,
-        shippingCost: deliveryFee,
-        items: couponItems,
-      }, adminClient)
-
-      if (couponResult.valid) {
-        couponDiscount = couponResult.discountAmount
-        couponPricingData = {
-          id: couponResult.couponId || "",
+      // Coupon validation
+      let couponPricingData: PricingCoupon | null = null
+      let couponDiscount = 0
+      if (body.couponCode) {
+        const itemsSubtotal = pricingItems.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0)
+        const couponResult = await validateCoupon({
+          partnerId,
           code: body.couponCode,
-          discountType: "fixed",
-          discountValue: couponDiscount,
-          maxDiscountValue: null,
-          freeShipping: false,
-          allowCombination: true,
-        }
+          customerId: user.id,
+          subtotal: itemsSubtotal,
+          shippingCost: deliveryFee,
+          items: couponItems,
+        }, adminClient)
 
-        if (couponDiscount > 0) {
-          preferenceItems.push({
-            title: `Desconto: ${body.couponCode}`,
-            unit_price: -couponDiscount,
-            quantity: 1,
-            currency_id: "BRL",
-          })
+        if (couponResult.valid) {
+          couponDiscount = couponResult.discountAmount
+          couponPricingData = {
+            id: couponResult.couponId || "",
+            code: body.couponCode,
+            discountType: "fixed",
+            discountValue: couponDiscount,
+            maxDiscountValue: null,
+            freeShipping: false,
+            allowCombination: true,
+          }
+
+          // Don't add negative unit_price items as Mercado Pago API strictly rejects them
         }
       }
-    }
 
-    // Delivery fee item for MP display
-    if (deliveryFee > 0) {
-      preferenceItems.push({
-        title: "Taxa de entrega",
-        unit_price: deliveryFee,
-        quantity: 1,
-        currency_id: "BRL",
+      // Delivery fee item for MP display
+      if (deliveryFee > 0) {
+        preferenceItems.push({
+          title: "Taxa de entrega",
+          unit_price: deliveryFee,
+          quantity: 1,
+          currency_id: "BRL",
+        })
+      }
+
+      // Run central pricing for authoritative total
+      const pricingResult = calculateOrderPricing({
+        items: pricingItems,
+        shippingCost: deliveryFee,
+        coupon: couponPricingData,
       })
-    }
+      totalAmount = pricingResult.finalTotal
 
-    // Run central pricing for authoritative total
-    const pricingResult = calculateOrderPricing({
-      items: pricingItems,
-      shippingCost: deliveryFee,
-      coupon: couponPricingData,
-    })
-    totalAmount = pricingResult.finalTotal
+      const prefSum = preferenceItems.reduce((acc: number, i: any) => acc + Number(i.unit_price || 0) * Number(i.quantity || 1), 0)
+      if (totalAmount > 0 && Math.abs(prefSum - totalAmount) > 0.01) {
+        preferenceItems.length = 0
+        preferenceItems.push({
+          title: "Compra no Dudit",
+          description: "Pedido no Marketplace Dudit",
+          unit_price: totalAmount,
+          quantity: 1,
+          currency_id: "BRL",
+        })
+      }
+    }
 
     // SEGURANÇA: Validar total usando o snapshot do checkout quando disponível
     const checkoutPricing = body.checkoutPricing
     if (checkoutPricing) {
       const snapshotFinalTotal = Number(checkoutPricing.finalTotal || 0)
-      if (snapshotFinalTotal > 0 && Math.abs(snapshotFinalTotal - totalAmount) > 0.01) {
+      const tolerance = 0.05
+      const matches =
+        Math.abs(snapshotFinalTotal - totalAmount) <= tolerance ||
+        (existingOrder && Math.abs(snapshotFinalTotal - Number(existingOrder.total_amount || 0)) <= tolerance)
+
+      if (!matches && snapshotFinalTotal > 0) {
         const snapshotSubtotal = Number(checkoutPricing.subtotal || 0)
         const snapshotDeliveryFee = Number(checkoutPricing.deliveryFee || 0)
         const snapshotCouponDiscount = Number(checkoutPricing.couponDiscount || 0)
@@ -435,7 +530,7 @@ async function handler(request: NextRequest) {
         name: "Cliente",
         email: user.email,
       },
-      external_reference: `${partnerId}-${Date.now()}`,
+      external_reference: existingOrderId || `${partnerId}-${Date.now()}`,
       notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
       back_urls: {
         success: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,

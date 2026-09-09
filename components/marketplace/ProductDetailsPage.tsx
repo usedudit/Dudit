@@ -1622,10 +1622,7 @@ export function ProductDetailsPageClient({
                             {(deliveryConfig?.settings?.isDeliveryEnabled !== false || deliveryFee !== null) ? (
                                 <>
                                     {(() => {
-                                        const freeThreshold = Number(deliveryConfig?.settings?.freeDeliveryThreshold ?? deliveryConfig?.settings?.free_delivery_threshold ?? 0)
-                                        const currentPrice = pricing.total || Number(product.price || 0)
-                                        const isFreeByThreshold = freeThreshold > 0 && currentPrice >= freeThreshold
-                                        const diffFree = freeThreshold > 0 && currentPrice < freeThreshold ? freeThreshold - currentPrice : 0
+                                        const isFreeByThreshold = (deliveryConfig?.settings?.freeDeliveryThreshold ?? deliveryConfig?.settings?.free_delivery_threshold ?? 0) > 0 && (pricing.total || Number(product.price || 0)) >= (deliveryConfig?.settings?.freeDeliveryThreshold ?? deliveryConfig?.settings?.free_delivery_threshold ?? 0)
                                         const isEstimate = Boolean(deliveryBreakdown?.isEstimate)
                                         const baseFee = Number(deliveryConfig?.settings?.baseFee ?? deliveryConfig?.settings?.base_fee ?? 0)
                                         const isTechnicalError = deliveryError && (
@@ -1645,31 +1642,16 @@ export function ProductDetailsPageClient({
                                                     ) : calculatedAddress ? (
                                                         <div>
                                                             <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
-                                                            {isEstimate && (
-                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    Valor final a combinar com a loja
-                                                                </p>
-                                                            )}
-                                                            {diffFree > 0 && (
-                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
-                                                                </p>
-                                                            )}
-                                                            {isFreeByThreshold && (
-                                                                <p className="text-[11px] text-brand-green font-semibold mt-0.5">
-                                                                    Entrega grátis ativada para esta compra
-                                                                </p>
-                                                            )}
+                                                             {isEstimate && (
+                                                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                     Valor final a combinar com a loja
+                                                                 </p>
+                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <div>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Informe seu CEP para calcular</p>
-                                                            {diffFree > 0 && (
-                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    Falta <strong className="text-brand-green">{formatMoney(diffFree)}</strong> para entrega grátis nesta loja
-                                                                </p>
-                                                            )}
-                                                        </div>
+                                                         <div>
+                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Informe seu CEP para calcular</p>
+                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="text-right">

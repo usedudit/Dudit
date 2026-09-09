@@ -11,6 +11,7 @@ import { useRealtimeRecord } from "@/hooks/use-realtime-record"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
@@ -166,6 +167,7 @@ export function PaymentWrapper({
 }: PixPaymentWrapperProps) {
     const { theme } = useTheme()
     const isDark = theme === "dark"
+    const router = useRouter()
     const [copied, setCopied] = useState(false)
     const [isChecking, setIsChecking] = useState(false)
     const [paymentConfirmed, setPaymentConfirmed] = useState(false)
@@ -233,7 +235,8 @@ export function PaymentWrapper({
             const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect"].includes(step)
 
             if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
-                window.location.href = "/pedidos"
+                onClose()
+                router.replace("/pedidos")
             } else {
                 onClose()
             }
@@ -343,7 +346,7 @@ export function PaymentWrapper({
                     method: "POST",
                     body: {
                         products: orderDetails.items.map(p => ({
-                            id: p.id, name: p.name, price: p.price, quantity: p.quantity, variant_id: p.variant_id,
+                            id: p.id, name: p.name, price: p.price, quantity: p.quantity, variant_id: p.variant_id, service_id: (p as any).service_id,
                         })),
                         partnerId,
                         buyerId,
@@ -354,6 +357,7 @@ export function PaymentWrapper({
                         cartItemIds: orderDetails.cartItemIds,
                         payDepositOnly,
                         checkoutPricing: orderDetails.checkoutPricing,
+                        existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
                     },
                 })
             } catch (err: any) {

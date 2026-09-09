@@ -26,7 +26,7 @@ const isDev = process.env.NODE_ENV === "development"
 
 interface ProcessPaymentRequest {
   paymentFormData: any
-  items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string }>
+  items: Array<{ id: string; name: string; price: number; quantity: number; variant_id?: string; service_id?: string }>
   partnerId: string
   buyerId: string
   storeId?: string
@@ -178,21 +178,26 @@ async function handler(request: NextRequest) {
       }
       canonicalPartnerId = resolved.partnerId
     } else {
-      const productIds = items.filter(item => !item.variant_id).map(item => item.id)
-      const variantIds = items.filter(item => Boolean(item.variant_id)).map(item => item.variant_id!)
-      const [productsRes, variantsRes] = await Promise.all([
+      const productIds = items.filter(item => !item.variant_id && !item.service_id).map(item => item.id).filter(Boolean)
+      const serviceIds = items.map(item => item.service_id).filter(Boolean) as string[]
+      const variantIds = items.map(item => item.variant_id || item.id).filter(Boolean) as string[]
+      const [productsRes, variantsRes, servicesRes] = await Promise.all([
         adminClient.from("products").select("id, partner_id").in("id", productIds),
         variantIds.length > 0
           ? adminClient.from("product_variants").select("id, products!inner(partner_id)").in("id", variantIds)
           : Promise.resolve({ data: [], error: null }),
+        serviceIds.length > 0
+          ? adminClient.from("services").select("id, partner_id").in("id", serviceIds)
+          : Promise.resolve({ data: [], error: null }),
       ])
 
-      if (productsRes.error || variantsRes.error) {
+      if (productsRes.error || variantsRes.error || servicesRes.error) {
         SecureLogger.error("Failed to resolve canonical checkout partner", {
           productError: productsRes.error?.message,
           variantError: variantsRes.error?.message,
+          serviceError: servicesRes.error?.message,
         })
-        return NextResponse.json({ error: "NÃ£o foi possÃ­vel validar os itens do checkout" }, { status: 400 })
+        return NextResponse.json({ error: "Não foi possível validar os itens do checkout" }, { status: 400 })
       }
 
       const productsMap = new Map<string, { partner_id: string }>(
@@ -201,20 +206,33 @@ async function handler(request: NextRequest) {
       const variantsMap = new Map<string, any>(
         (variantsRes.data || []).map((variant: any) => [variant.id, variant]),
       )
-      const resolvedPartnerIds = items.map(item =>
-        item.variant_id
-          ? variantsMap.get(item.variant_id)?.products?.partner_id
-          : productsMap.get(item.id)?.partner_id,
+      const servicesMap = new Map<string, any>(
+        (servicesRes.data || []).map((service: any) => [service.id, service]),
       )
+      const resolvedPartnerIds = items.map(item => {
+        const variant = item.variant_id ? variantsMap.get(item.variant_id) : variantsMap.get(item.id)
+        return (
+          variant?.products?.partner_id ||
+          productsMap.get(item.id)?.partner_id ||
+          (item.service_id ? servicesMap.get(item.service_id)?.partner_id : undefined)
+        )
+      })
 
-      if (resolvedPartnerIds.some(id => !id) || new Set(resolvedPartnerIds).size !== 1) {
-        return NextResponse.json({ error: "Itens de vendedores diferentes ou invÃ¡lidos" }, { status: 400 })
+      const uniquePartners = new Set(resolvedPartnerIds.filter(Boolean))
+      if (uniquePartners.size > 1) {
+        return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
       }
-      canonicalPartnerId = resolvedPartnerIds[0]
+      if (uniquePartners.size === 1) {
+        canonicalPartnerId = Array.from(uniquePartners)[0]
+      } else if (claimedPartnerId) {
+        canonicalPartnerId = claimedPartnerId
+      } else {
+        return NextResponse.json({ error: "Itens de vendedores diferentes ou inválidos" }, { status: 400 })
+      }
     }
 
     if (!canonicalPartnerId) {
-      return NextResponse.json({ error: "Vendedor nÃ£o identificado" }, { status: 400 })
+      return NextResponse.json({ error: "Vendedor não identificado" }, { status: 400 })
     }
 
     if (claimedPartnerId !== canonicalPartnerId) {
@@ -222,7 +240,7 @@ async function handler(request: NextRequest) {
         claimedPartnerId,
         canonicalPartnerId,
       })
-      return NextResponse.json({ error: "Vendedor invÃ¡lido para os itens informados" }, { status: 400 })
+      return NextResponse.json({ error: "Vendedor inválido para os itens informados" }, { status: 400 })
     }
 
     const partnerId = canonicalPartnerId
