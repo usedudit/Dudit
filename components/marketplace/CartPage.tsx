@@ -920,14 +920,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                         ? []
                                                                         : [
                                                                             <div key={`${storeKey}-${section.title}-hdr`} className="flex items-center justify-between mb-3 mt-2 first:mt-0">
-                                                                                <h4 className="text-xs font-bold uppercase tracking-wide text-brand-inactive-text dark:text-dark-body">{section.title}</h4>
-                                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                                                                    {section.items.filter((i: any) => getItemSelected(i)).length} itens · {formatCurrency(
-                                                                                        section.items
-                                                                                            .filter((i: any) => getItemSelected(i))
-                                                                                            .reduce((s: number, i: any) => s + getItemBestPrice(i, partnerPromos) * getItemQuantity(i), 0),
-                                                                                    )}
-                                                                                </span>
+                                                                                <h4 className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">{section.title}</h4>
                                                                             </div>,
                                                                             ...section.items,
                                                                         ],
@@ -1082,35 +1075,35 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             >
                                                                                                                 Remover
                                                                                                             </button>
-                                                                                                         </div>
-                                                                                                     )}
+                                                                                                        </div>
+                                                                                                    )}
 
-                                                                                                     {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                                                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <Link
-                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
-                                                                                                                 className="font-semibold text-brand-green hover:underline"
-                                                                                                             >
-                                                                                                                 Remarcar
-                                                                                                             </Link>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <button
-                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                                 className="font-semibold text-brand-red hover:underline"
-                                                                                                             >
-                                                                                                                 Remover
-                                                                                                             </button>
-                                                                                                         </div>
-                                                                                                     )}
-                                                                                                 </div>
-                                                                                             </div>
-                                                                                         </div>
+                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                            <span>Conflito de horário com outro serviço na sacola</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <Link
+                                                                                                                href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                                className="font-semibold text-brand-green hover:underline"
+                                                                                                            >
+                                                                                                                Remarcar
+                                                                                                            </Link>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <button
+                                                                                                                onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                                                className="font-semibold text-brand-red hover:underline"
+                                                                                                            >
+                                                                                                                Remover
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
 
-                                                                                         {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
-                                                                                             <div className="mt-3 pl-8 md:hidden">
+                                                                                        {isOutOfStock && item.available_alternatives && item.available_alternatives.length > 0 && (
+                                                                                            <div className="mt-3 pl-8 md:hidden">
                                                                                                 <div className="bg-brand-gray/30 dark:bg-zinc-800/40 p-3 rounded-xl border border-brand-border dark:border-dark-border text-xs">
                                                                                                     <p className="font-semibold text-brand-dark dark:text-dark-heading mb-2 flex items-center gap-1.5">
                                                                                                         <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
@@ -1221,51 +1214,51 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         )
                                                                                                     })()}
 
-                                                                                                     {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
-                                                                                                         <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                                                                                             <span>Este horário não está mais disponível</span>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <Link
-                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                    {serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available && (
+                                                                                                        <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                            <span>Este horário não está mais disponível</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <Link
+                                                                                                                href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
 
-                                                                                                                 className="font-semibold text-brand-green hover:underline"
-                                                                                                             >
-                                                                                                                 Remarcar
-                                                                                                             </Link>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <button
-                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                                 className="font-semibold text-brand-red hover:underline"
-                                                                                                             >
-                                                                                                                 Remover
-                                                                                                             </button>
-                                                                                                         </div>
-                                                                                                     )}
+                                                                                                                className="font-semibold text-brand-green hover:underline"
+                                                                                                            >
+                                                                                                                Remarcar
+                                                                                                            </Link>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <button
+                                                                                                                onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                                                className="font-semibold text-brand-red hover:underline"
+                                                                                                            >
+                                                                                                                Remover
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    )}
 
-                                                                                                     {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                                                         <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <Link
-                                                                                                                 href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
-                                                                                                                 className="font-semibold text-brand-green hover:underline"
-                                                                                                             >
-                                                                                                                 Remarcar
-                                                                                                             </Link>
-                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                                                                                             <button
-                                                                                                                 onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                                 className="font-semibold text-brand-red hover:underline"
-                                                                                                             >
-                                                                                                                 Remover
-                                                                                                             </button>
-                                                                                                         </div>
-                                                                                                     )}
-                                                                                                 </div>
+                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                                                        <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
+                                                                                                            <span>Conflito de horário com outro serviço na sacola</span>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <Link
+                                                                                                                href={getServiceUrl({ id: item.service_id, short_id: item.services?.short_id, name: item.services?.name || item.booking_metadata?.serviceName }, data.partner)}
+                                                                                                                className="font-semibold text-brand-green hover:underline"
+                                                                                                            >
+                                                                                                                Remarcar
+                                                                                                            </Link>
+                                                                                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
+                                                                                                            <button
+                                                                                                                onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
+                                                                                                                className="font-semibold text-brand-red hover:underline"
+                                                                                                            >
+                                                                                                                Remover
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
 
-                                                                                                 <div className="flex items-center justify-end gap-4">
+                                                                                                <div className="flex items-center justify-end gap-4">
                                                                                                     {isOutOfStock ? (
                                                                                                         <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
                                                                                                             Esgotado

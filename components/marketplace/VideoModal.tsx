@@ -6,10 +6,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { recordVideoClick } from "@/app/actions/marketplace/community-videos"
 import { getLinkedItemData, type LinkedItemData } from "@/app/actions/marketplace/video-linked-item"
 import Link from "next/link"
-import { XIcon, StarIcon, ChevronDownIcon } from "@/lib/icons"
+import { XIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { ShoppingBag } from "lucide-react"
 
 interface VideoData {
   id: string
@@ -39,7 +38,6 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
   const [linkedItem, setLinkedItem] = useState<LinkedItemData | null>(null)
   const [linkedItemLoading, setLinkedItemLoading] = useState(false)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
-  const [isCardMinimized, setIsCardMinimized] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -75,7 +73,6 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
 
   useEffect(() => {
     setDescriptionExpanded(false)
-    setIsCardMinimized(false)
     if (!video?.linked_item_type || !video?.linked_item_id) {
       setLinkedItem(null)
       return
@@ -114,70 +111,17 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
           className="fixed inset-0 z-[9999] bg-black select-none overflow-hidden"
           onClick={onClose}
         >
-          {/* Top Bar Header Overlay */}
-          <div
-            className="absolute top-0 left-0 right-0 z-30 p-3 sm:p-5 flex items-start justify-between gap-3 pointer-events-none"
+          {/* Close Button (Top Right) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose()
+            }}
+            className="absolute top-3 right-3 sm:top-5 sm:right-5 z-30 w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
+            aria-label="Fechar vídeo"
           >
-            {/* Store & Video Title Badge */}
-            <div
-              className="pointer-events-auto max-w-[calc(100%-60px)] sm:max-w-md bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-white/15 transition-colors shadow-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-2.5">
-                {storeLogo ? (
-                  <img
-                    src={storeLogo}
-                    alt={storeName}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shrink-0 border border-white/20"
-                  />
-                ) : (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-brand-green/80 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                    {storeName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm font-bold text-white leading-tight truncate">
-                    {storeName}
-                  </p>
-                  {video.title && (
-                    <p className="text-[11px] sm:text-xs text-white/80 leading-tight truncate mt-0.5 font-medium">
-                      {video.title}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Expandable description if present */}
-              {description && (
-                <div className="mt-2 pt-2 border-t border-white/10 text-[11px] sm:text-xs text-white/90">
-                  <p className={!descriptionExpanded ? "line-clamp-2" : "whitespace-pre-wrap max-h-32 overflow-y-auto"}>
-                    {description}
-                  </p>
-                  {shouldTruncate && (
-                    <button
-                      onClick={() => setDescriptionExpanded(!descriptionExpanded)}
-                      className="flex items-center gap-0.5 text-brand-green font-bold text-[10px] mt-1 hover:underline cursor-pointer"
-                    >
-                      {descriptionExpanded ? "Ver menos" : "Ver mais"}
-                      <ChevronDownIcon size={12} className={`transition-transform duration-200 ${descriptionExpanded ? "rotate-180" : ""}`} />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Close Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onClose()
-              }}
-              className="pointer-events-auto w-10 h-10 sm:w-11 sm:h-11 bg-white/15 hover:bg-white/25 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
-              aria-label="Fechar vídeo"
-            >
-              <XIcon size={20} />
-            </button>
-          </div>
+            <XIcon size={20} />
+          </button>
 
           {/* Fullscreen Video Player */}
           <div
@@ -197,133 +141,114 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
             </video>
           </div>
 
-          {/* Shopee-style Floating Product / Service / Collection Card (Bottom Left, Elevated above Video Controls) */}
-          <div className="absolute bottom-16 sm:bottom-20 left-3 sm:left-6 z-30 pointer-events-auto">
-            {/* Loading Skeleton for Linked Item */}
-            {linkedItemLoading && (
+          {/* Bottom Left: Store Info + Description + Linked Item */}
+          <div className="absolute bottom-16 sm:bottom-20 left-3 sm:left-6 z-30 pointer-events-auto max-w-[calc(100vw-120px)] sm:max-w-[400px]">
+            <div
+              className="flex items-center gap-2.5 mb-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Store Logo */}
+              {storeLogo ? (
+                <img
+                  src={storeLogo}
+                  alt={storeName}
+                  className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-white/30"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-brand-green/80 flex items-center justify-center text-white font-bold text-sm shrink-0 border-2 border-white/30">
+                  {storeName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {/* Store Name */}
+              <p className="text-sm font-bold text-white drop-shadow-lg truncate">
+                {storeName}
+              </p>
+            </div>
+
+            {/* Description */}
+            {description && (
               <div
-                className="bg-white/90 dark:bg-dark-surface/90 backdrop-blur-md p-2.5 rounded-2xl shadow-2xl border border-white/20 dark:border-dark-border/40 flex items-center gap-3 w-[260px] animate-pulse"
+                className="mb-2 text-xs sm:text-sm text-white/95 drop-shadow-md max-h-24 overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-dark-border/50 shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-gray-200 dark:bg-dark-border/50 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 dark:bg-dark-border/50 rounded w-1/2" />
+                <p className={!descriptionExpanded ? "line-clamp-2" : "whitespace-pre-wrap"}>
+                  {description}
+                </p>
+                {shouldTruncate && (
+                  <button
+                    onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+                    className="flex items-center gap-0.5 text-white font-bold text-[11px] mt-1 hover:underline cursor-pointer"
+                  >
+                    {descriptionExpanded ? "menos" : "mais"}
+                    <ChevronDownIcon size={12} className={`transition-transform duration-200 ${descriptionExpanded ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Linked Item (TikTok style) */}
+            {linkedItemLoading && (
+              <div
+                className="flex items-center gap-2.5 animate-pulse"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-10 h-10 rounded-lg bg-white/20 shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-3 bg-white/20 rounded w-24" />
+                  <div className="h-3 bg-white/20 rounded w-16" />
                 </div>
               </div>
             )}
 
-            {/* Linked Item Full Card */}
-            {linkedItem && !linkedItemLoading && !isCardMinimized && (
+            {linkedItem && !linkedItemLoading && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="relative bg-white/95 dark:bg-[#18181b]/95 backdrop-blur-md p-2.5 sm:p-3 rounded-2xl shadow-2xl border border-white/30 dark:border-dark-border/60 max-w-[330px] sm:max-w-[370px] w-[calc(100vw-32px)] sm:w-[360px]"
+                className="flex items-center gap-2.5"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Minimize / Hide button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsCardMinimized(true)
-                  }}
-                  className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-brand-dark/80 hover:bg-brand-dark text-white rounded-full flex items-center justify-center shadow-md transition-colors cursor-pointer border border-white/20"
-                  title="Ocultar item"
-                  aria-label="Ocultar item"
+                {/* Item Thumbnail */}
+                <Link
+                  href={linkedItem.url}
+                  onClick={handleLinkedClick}
+                  className="shrink-0 block"
                 >
-                  <XIcon size={12} />
-                </button>
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 shrink-0 border border-white/20">
+                    <img
+                      src={linkedItem.imageUrl}
+                      alt={linkedItem.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </Link>
 
-                <div className="flex items-center gap-3">
-                  {/* Thumbnail */}
+                {/* Item Info */}
+                <div className="min-w-0 flex-1">
                   <Link
                     href={linkedItem.url}
                     onClick={handleLinkedClick}
-                    className="shrink-0 block group"
+                    className="hover:no-underline block"
                   >
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-gray-100 dark:bg-dark-border/40 shrink-0 border border-black/5 dark:border-white/10 relative">
-                      <img
-                        src={linkedItem.imageUrl}
-                        alt={linkedItem.name}
-                        className="w-full h-full object-cover transition-transform duration-200"
-                      />
-                    </div>
-                  </Link>
-
-                  {/* Info details */}
-                  <Link
-                    href={linkedItem.url}
-                    onClick={handleLinkedClick}
-                    className="flex-1 min-w-0 flex flex-col justify-between hover:no-underline group"
-                  >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {(linkedItem.rating ?? 0) > 0 && (
-                        <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-500">
-                          <StarIcon size={11} className="fill-amber-500 text-amber-500" />
-                          {Number(linkedItem.rating).toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className="font-bold text-xs sm:text-sm text-brand-dark dark:text-dark-heading line-clamp-1 leading-snug group-hover:text-brand-green transition-colors">
+                    <h4 className="font-bold text-xs sm:text-sm text-white drop-shadow-lg line-clamp-1 leading-snug hover:underline">
                       {linkedItem.name}
                     </h4>
-
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      {linkedItem.type === "collection" ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                          {linkedItem.itemsCount} {linkedItem.itemsCount === 1 ? "item" : "itens"}
-                        </span>
-                      ) : linkedItem.showPrice !== false ? (
-                        <>
-                          <span className="text-xs sm:text-sm font-black text-brand-green">
-                            {formatCurrency(linkedItem.displayPrice || 0)}
-                          </span>
-                          {linkedItem.referencePrice && linkedItem.hasDiscount && (
-                            <span className="text-[10px] sm:text-[11px] text-gray-400 line-through">
-                              {formatCurrency(linkedItem.referencePrice)}
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
-                          Preço sob consulta
-                        </span>
-                      )}
-                    </div>
                   </Link>
-
-                  {/* Direct Action CTA Button */}
-                  <Link
-                    href={linkedItem.url}
-                    onClick={handleLinkedClick}
-                    className="shrink-0 px-3 py-2 rounded-xl bg-brand-green hover:bg-[#047857] text-white text-xs font-bold transition-colors shadow-sm flex items-center justify-center hover:no-underline"
-                  >
-                    Ver
-                  </Link>
+                  {linkedItem.type === "collection" ? (
+                    <span className="text-[11px] text-white/80 font-medium">
+                      {linkedItem.itemsCount} {linkedItem.itemsCount === 1 ? "item" : "itens"}
+                    </span>
+                  ) : linkedItem.showPrice !== false ? (
+                    <span className="text-xs font-bold text-white drop-shadow-lg">
+                      {formatCurrency(linkedItem.displayPrice || 0)}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold text-white/80">
+                      Preço sob consulta
+                    </span>
+                  )}
                 </div>
               </motion.div>
-            )}
-
-            {/* Minimized Pill (Shopee style toggle) */}
-            {linkedItem && !linkedItemLoading && isCardMinimized && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsCardMinimized(false)
-                }}
-                className="bg-white/95 dark:bg-[#18181b]/95 hover:bg-white dark:hover:bg-dark-surface backdrop-blur-md px-3.5 py-2 rounded-full shadow-2xl border border-white/30 dark:border-dark-border/60 text-xs font-bold text-brand-dark dark:text-dark-heading flex items-center gap-2 transition-colors cursor-pointer"
-                title="Ver item linkado"
-                aria-label="Ver item linkado"
-              >
-                <ShoppingBag size={14} className="text-brand-green" />
-                <span>Ver {linkedItem.type === "product" ? "produto" : linkedItem.type === "service" ? "serviço" : "coleção"}</span>
-              </motion.button>
             )}
           </div>
         </motion.div>

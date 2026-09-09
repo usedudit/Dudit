@@ -317,12 +317,19 @@ export function CheckoutPageClient() {
         [sessionData?.cartItems],
     )
 
-    const { checkoutContext, contextLoading, contextError, patchContext } = useMarketplaceCheckoutContext({
+    const [removedCartItems, setRemovedCartItems] = useState<Set<string>>(new Set())
+
+    const activeCartItemIds = useMemo(
+        () => cartItemIds.filter((id) => !removedCartItems.has(id)),
+        [cartItemIds, removedCartItems],
+    )
+
+    const { checkoutContext, contextLoading, contextError } = useMarketplaceCheckoutContext({
         partnerId,
-        cartItemIds,
+        cartItemIds: activeCartItemIds,
         storeId,
         mpConnected: Boolean(partnerInfo?.mpConnected),
-        enabled: Boolean(partnerId && cartItemIds.length > 0),
+        enabled: Boolean(partnerId && activeCartItemIds.length > 0),
         refreshTrigger,
     })
 
@@ -356,30 +363,7 @@ export function CheckoutPageClient() {
             const token = csrfToken || await fetchCSRFTokenSingleton() || ""
             const result = await bulkUpdateFulfillmentModesAction(changes, token)
             if (result.success) {
-                if (checkoutContext?.lines) {
-                    const updatedLines = checkoutContext.lines.map((line) => {
-                        const change = changes.find((c) => c.cartItemId === line.lineId)
-                        if (change) {
-                            return { ...line, fulfillmentMode: change.mode }
-                        }
-                        return line
-                    })
-                    const hasCustomerLocation = updatedLines.some(
-                        (l) => l.lineKind === "service_booking" && l.fulfillmentMode === "customer_location"
-                    )
-                    const hasOnSite = updatedLines.some(
-                        (l) => l.lineKind === "service_booking" && (l.fulfillmentMode === "on_site" || !l.fulfillmentMode)
-                    )
-                    const updatedRequirements = {
-                        ...checkoutContext.requirements,
-                        showCustomerAddressSection: hasCustomerLocation,
-                        showPartnerLocation: hasOnSite,
-                    }
-                    patchContext({
-                        lines: updatedLines,
-                        requirements: updatedRequirements,
-                    })
-                }
+                setRefreshTrigger(prev => prev + 1)
             } else {
                 notifyError("Erro", result.error || "Não foi possível salvar as formas de atendimento.")
             }
@@ -919,6 +903,7 @@ export function CheckoutPageClient() {
 
     const renderFreeDeliveryProgressCard = () => {
         if (!deliverySettings || formData.deliveryType !== "delivery") return null
+        if (!requirements?.hasProductLines) return null
 
         const threshold = deliverySettings.freeDeliveryThreshold != null ? Number(deliverySettings.freeDeliveryThreshold) : 0
         if (threshold <= 0) return null
@@ -1040,12 +1025,12 @@ export function CheckoutPageClient() {
                 : undefined
 
             // Checkout amounts (includes delivery fee calculation)
-            if (cartItemIds.length && checkoutContext) {
+            if (activeCartItemIds.length && checkoutContext) {
                 setCheckoutAmountsLoading(true)
                 setDeliveryQuoteLoading(true)
                 try {
                     const result = await getMarketplaceCheckoutAmountsAction({
-                        cartItemIds,
+                        cartItemIds: activeCartItemIds,
                         deliveryType: formData.deliveryType === "pickup" ? "pickup" : "delivery",
                         deliveryAddress: formData.deliveryAddress || "",
                         destinationCoords,
@@ -1131,7 +1116,7 @@ export function CheckoutPageClient() {
         hasFreeDeliveryCoupon,
         productDeliveryQuoteActive,
         orderSubtotal,
-        cartItemIds,
+        activeCartItemIds,
         checkoutContext,
         formData.deliveryType,
         couponCode,
@@ -1466,7 +1451,7 @@ export function CheckoutPageClient() {
                                             <button
                                                 onClick={async () => {
                                                     await deleteCartItemsAction([line.lineId])
-                                                    window.location.reload()
+                                                    setRemovedCartItems((prev) => new Set(prev).add(line.lineId))
                                                 }}
                                                 className="font-semibold text-brand-red hover:underline"
                                             >
@@ -1950,7 +1935,7 @@ export function CheckoutPageClient() {
         }
         bypassDepositModalRef.current = false
 
-        if (cartItemIds.length > 0 && !checkoutAmountsReady) {
+        if (activeCartItemIds.length > 0 && !checkoutAmountsReady) {
             notifyError("Aguarde", "Calculando valores do checkout. Tente novamente em instantes.")
             setIsLoading(false)
             return
@@ -2065,8 +2050,8 @@ export function CheckoutPageClient() {
                     return
                 }
 
-                if (sessionData?.source === "cart" && cartItemIds.length > 0) {
-                    await deleteCartItemsAction(cartItemIds)
+                if (sessionData?.source === "cart" && activeCartItemIds.length > 0) {
+                    await deleteCartItemsAction(activeCartItemIds)
                 }
 
                 sessionStorage.removeItem("checkout_session")
@@ -2779,6 +2764,10 @@ export function CheckoutPageClient() {
                                                         }
                                                         className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                         onClick={() => {
+                                                            if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                return
+                                                            }
                                                             setPaymentOption("traditional")
                                                             if (formData.paymentMethod === "mercadopago") {
                                                                 setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
@@ -2790,6 +2779,10 @@ export function CheckoutPageClient() {
                                                                 value="traditional"
                                                                 checked={paymentOption === "traditional"}
                                                                 onChange={() => {
+                                                                    if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                        setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                        return
+                                                                    }
                                                                     setPaymentOption("traditional")
                                                                     if (formData.paymentMethod === "mercadopago") {
                                                                         setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
@@ -3221,6 +3214,10 @@ export function CheckoutPageClient() {
                                                     }
                                                     className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                     onClick={() => {
+                                                        if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                            setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                            return
+                                                        }
                                                         setPaymentOption("traditional")
                                                         if (formData.paymentMethod === "mercadopago") {
                                                             setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))
@@ -3232,6 +3229,10 @@ export function CheckoutPageClient() {
                                                             value="traditional"
                                                             checked={paymentOption === "traditional"}
                                                             onChange={() => {
+                                                                if (requirements?.showCustomerAddressSection && !formData.deliveryAddress?.trim()) {
+                                                                    setDeliveryError("Selecione ou cadastre um endereço para continuar.")
+                                                                    return
+                                                                }
                                                                 setPaymentOption("traditional")
                                                                 if (formData.paymentMethod === "mercadopago") {
                                                                     setFormData(prev => ({ ...prev, paymentMethod: "", installments: 1 }))

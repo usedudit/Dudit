@@ -1,12 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState } from "react"
 import {
   getMarketplaceCheckoutContextAction,
   type MarketplaceCheckoutContextResult,
 } from "@/app/actions/marketplace/checkout-context"
-
-type CheckoutContextData = Extract<MarketplaceCheckoutContextResult, { success: true }>
 
 export function useMarketplaceCheckoutContext(params: {
   partnerId: string
@@ -16,11 +14,11 @@ export function useMarketplaceCheckoutContext(params: {
   enabled?: boolean
   refreshTrigger?: number
 }) {
-  const [serverData, setServerData] = useState<CheckoutContextData | null>(null)
+  const [data, setData] = useState<Extract<MarketplaceCheckoutContextResult, { success: true }> | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const overridesRef = useRef<Partial<CheckoutContextData> | null>(null)
-  const [, forceRender] = useState(0)
 
   const cartKey = params.cartItemIds.join(",")
 
@@ -44,10 +42,9 @@ export function useMarketplaceCheckoutContext(params: {
         if (!active) return
         if (!result.success) {
           setError(result.error)
-          setServerData(null)
+          setData(null)
         } else {
-          overridesRef.current = null
-          setServerData(result)
+          setData(result)
           setError(null)
         }
       })
@@ -64,14 +61,5 @@ export function useMarketplaceCheckoutContext(params: {
     }
   }, [params.partnerId, cartKey, params.mpConnected, params.storeId, params.enabled, params.refreshTrigger])
 
-  const patchContext = useCallback((patch: Partial<CheckoutContextData>) => {
-    overridesRef.current = { ...overridesRef.current, ...patch }
-    forceRender((n) => n + 1)
-  }, [])
-
-  const checkoutContext = serverData
-    ? { ...serverData, ...overridesRef.current } as CheckoutContextData
-    : null
-
-  return { checkoutContext, contextError: error, contextLoading: loading, patchContext }
+  return { checkoutContext: data, contextError: error, contextLoading: loading }
 }

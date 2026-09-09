@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton } from "@/components/reusable"
-import { MapPinIcon, SaveIcon } from "@/lib/icons"
+import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton, ListItem, DefaultModal } from "@/components/reusable"
+import { MapPinIcon } from "@/lib/icons"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
 import { IconPlaceholder } from "@/components/reusable"
@@ -123,43 +123,62 @@ export function CheckoutFulfillmentPanel({
   const showProductsSection = hasProducts && hasAnyFulfillmentOption
   const showServicesSection = hasServices
 
-  const needsAddressForProductDelivery =
-    requirements.showProductFulfillmentOptions && !isPickup && requirements.showDeliverySection
+  const [pendingModes, setPendingModes] = useState<Record<string, "on_site" | "customer_location">>({})
 
-  const [pendingModes, setPendingModes] = useState<Record<string, "on_site" | "customer_location">>(() => {
-    const initial: Record<string, "on_site" | "customer_location"> = {}
+  useEffect(() => {
+    const next: Record<string, "on_site" | "customer_location"> = {}
     for (const line of serviceLines) {
-      initial[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+      next[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
     }
-    return initial
-  })
+    setPendingModes(next)
+  }, [serviceLines])
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalLineId, setModalLineId] = useState<string | null>(null)
+  const [modalDraft, setModalDraft] = useState<"on_site" | "customer_location">("on_site")
   const [saving, setSaving] = useState(false)
 
-  const serviceLinesSupportingSome = serviceLines
+  const serviceLinesSupportingBoth = useMemo(
+    () => serviceLines.filter((l) => {
+      const allowed = l.allowedFulfillmentModes || ["on_site"]
+      return allowed.includes("on_site") && allowed.includes("customer_location")
+    }),
+    [serviceLines]
+  )
 
   const hasPendingChanges = useMemo(() => {
-    return serviceLinesSupportingSome.some((line) => {
+    return serviceLines.some((line) => {
       const allowed = line.allowedFulfillmentModes || ["on_site"]
       if (allowed.length <= 1) return false
       return pendingModes[line.lineId] !== ((line.fulfillmentMode as "on_site" | "customer_location") || "on_site")
     })
-  }, [pendingModes, serviceLinesSupportingSome])
+  }, [pendingModes, serviceLines])
 
   const anyServiceRequiresCustomerAddress = serviceLines.some(
-    (l) => pendingModes[l.lineId] === "customer_location"
+    (l) => (pendingModes[l.lineId] || l.fulfillmentMode) === "customer_location"
   )
   const anyServiceRequiresOnSite = serviceLines.some(
-    (l) => pendingModes[l.lineId] === "on_site" || !pendingModes[l.lineId]
+    (l) => (pendingModes[l.lineId] || l.fulfillmentMode || "on_site") === "on_site"
   )
 
-  const handleModeChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
-    setPendingModes((prev) => ({ ...prev, [lineId]: mode }))
-  }, [])
+  const openModal = useCallback((lineId: string) => {
+    setModalLineId(lineId)
+    setModalDraft(pendingModes[lineId] || "on_site")
+    setModalOpen(true)
+  }, [pendingModes])
 
-  const handleSave = useCallback(async () => {
+  const handleModalSave = useCallback(() => {
+    if (modalLineId) {
+      setPendingModes((prev) => ({ ...prev, [modalLineId]: modalDraft }))
+    }
+    setModalOpen(false)
+    setModalLineId(null)
+  }, [modalLineId, modalDraft])
+
+  const handleBulkSave = useCallback(async () => {
     if (!onFulfillmentModesSave) return
     const changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }> = []
-    for (const line of serviceLinesSupportingSome) {
+    for (const line of serviceLines) {
       const allowed = line.allowedFulfillmentModes || ["on_site"]
       if (allowed.length <= 1) continue
       const pending = pendingModes[line.lineId]
@@ -175,7 +194,16 @@ export function CheckoutFulfillmentPanel({
     } finally {
       setSaving(false)
     }
-  }, [onFulfillmentModesSave, pendingModes, serviceLinesSupportingSome])
+  }, [onFulfillmentModesSave, pendingModes, serviceLines])
+
+  const modalLine = modalLineId ? serviceLines.find((l) => l.lineId === modalLineId) : null
+  const modalAllowed = modalLine ? (modalLine.allowedFulfillmentModes || ["on_site"]) : ["on_site"]
+  const modalSupportsBoth = modalAllowed.includes("on_site") && modalAllowed.includes("customer_location")
+
+  const getModeLabel = (mode: string) => {
+    if (mode === "customer_location") return "No meu endereço"
+    return "No estabelecimento"
+  }
 
   const renderProductsFulfillment = () => {
     if (!hasProducts) return null
@@ -249,62 +277,31 @@ export function CheckoutFulfillmentPanel({
           {serviceLines.map((line) => {
             const allowed = line.allowedFulfillmentModes || ["on_site"]
             const supportsBoth = allowed.includes("on_site") && allowed.includes("customer_location")
-            const currentPending = pendingModes[line.lineId] || "on_site"
-            const hasChanges = supportsBoth && pendingModes[line.lineId] !== ((line.fulfillmentMode as "on_site" | "customer_location") || "on_site")
+            const currentMode = pendingModes[line.lineId] || (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
 
             return (
-              <div
+              <ListItem
                 key={line.lineId}
-                className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
-                    {line.bookingSummary && (
-                      <p className="text-sm text-brand-inactive-text mt-0.5">{line.bookingSummary}</p>
-                    )}
-                    {hasChanges && (
-                      <p className="text-xs text-brand-green mt-1 font-medium">Alteração pendente</p>
-                    )}
-                  </div>
-
-                  {supportsBoth ? (
-                    <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-                      <RadioButton
-                        name={`fulfillment-${line.lineId}`}
-                        value="customer_location"
-                        checked={currentPending === "customer_location"}
-                        onChange={() => handleModeChange(line.lineId, "customer_location")}
-                        label="No meu endereço"
-                      />
-                      <RadioButton
-                        name={`fulfillment-${line.lineId}`}
-                        value="on_site"
-                        checked={currentPending === "on_site"}
-                        onChange={() => handleModeChange(line.lineId, "on_site")}
-                        label="No estabelecimento"
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl shrink-0">
-                      {allowed.includes("customer_location")
-                        ? "No meu endereço"
-                        : "No estabelecimento"}
-                    </div>
-                  )}
-                </div>
-              </div>
+                title={line.displayName}
+                description={
+                  <span className="flex flex-col gap-0.5">
+                    {line.bookingSummary && <span>{line.bookingSummary}</span>}
+                    <span className="text-xs font-semibold text-brand-green">{getModeLabel(currentMode)}</span>
+                  </span>
+                }
+                onClick={supportsBoth ? () => openModal(line.lineId) : undefined}
+                showChevron={supportsBoth}
+              />
             )
           })}
 
-          {serviceLinesSupportingSome.length > 0 && (
+          {serviceLines.length > 0 && hasPendingChanges && (
             <div className="flex justify-end pt-2">
               <Button
                 variant="default"
-                onClick={handleSave}
-                disabled={saving || !hasPendingChanges}
+                onClick={handleBulkSave}
+                disabled={saving}
                 isLoading={saving}
-                leftIcon={<SaveIcon className="w-4 h-4" />}
               >
                 Salvar
               </Button>
@@ -342,6 +339,58 @@ export function CheckoutFulfillmentPanel({
       {renderProductsFulfillment()}
       {renderServicesFulfillment()}
       {deliveryError && <InfoCard message={deliveryError} color="red" />}
+
+      <DefaultModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Forma de Atendimento"
+        footer={
+          modalSupportsBoth ? (
+            <Button variant="default" onClick={handleModalSave} className="flex-1">
+              Salvar
+            </Button>
+          ) : undefined
+        }
+      >
+        {modalLine && (
+          <div className="space-y-4">
+            <div>
+              <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{modalLine.displayName}</p>
+              {modalLine.bookingSummary && (
+                <p className="text-sm text-brand-inactive-text mt-1">{modalLine.bookingSummary}</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider mb-3">
+                Onde será realizado?
+              </p>
+              {modalSupportsBoth ? (
+                <div className="flex gap-6">
+                  <RadioButton
+                    name={`modal-fulfillment-${modalLineId}`}
+                    value="on_site"
+                    checked={modalDraft === "on_site"}
+                    onChange={() => setModalDraft("on_site")}
+                    label="No estabelecimento"
+                  />
+                  <RadioButton
+                    name={`modal-fulfillment-${modalLineId}`}
+                    value="customer_location"
+                    checked={modalDraft === "customer_location"}
+                    onChange={() => setModalDraft("customer_location")}
+                    label="No meu endereço"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-brand-inactive-text">
+                  {getModeLabel(modalAllowed[0] || "on_site")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </DefaultModal>
     </div>
   )
 }
