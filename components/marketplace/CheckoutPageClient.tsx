@@ -2201,7 +2201,7 @@ export function CheckoutPageClient() {
                     return {
                         id: p.id,
                         name: p.name,
-                        price: p.price,
+                        price: Number(p.price || matchedLine?.unitPrice || 0),
                         quantity: quantities[p.id] || p.quantity,
                         image: p.image || matchedLine?.imageUrl || "",
                         variant_id: p.variant || matchedLine?.variantId || "",

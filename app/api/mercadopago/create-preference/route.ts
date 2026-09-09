@@ -211,47 +211,26 @@ async function handler(request: NextRequest) {
     if (existingOrder) {
       deliveryStoreId = existingOrder.store_id || deliveryStoreId
       const storeCredit = Number(existingOrder.store_credit_amount || 0)
-      const remainingToPay = Math.max(
-        0,
-        Number((Number(existingOrder.total_amount || 0) - storeCredit - Number(existingOrder.paid_amount || 0)).toFixed(2))
-      )
-      totalAmount = remainingToPay
+      const paidAmount = Number(existingOrder.paid_amount || 0)
+      const orderTotal = Number(existingOrder.total_amount || 0)
+      const remainingToPay = Math.round((orderTotal - storeCredit - paidAmount + Number.EPSILON) * 100) / 100
 
-      const orderItems = existingOrder.order_items || []
-      const itemsSum = orderItems.reduce((acc: number, oi: any) => acc + Number(oi.unit_price || oi.price || 0) * Number(oi.quantity || 1), 0)
-      const deliveryFee = Number(existingOrder.delivery_fee || 0)
-
-      if (orderItems.length > 0 && Math.abs((itemsSum + deliveryFee) - remainingToPay) <= 0.01) {
-        for (const oi of orderItems) {
-          const itemPrice = Number(oi.unit_price || oi.price || 0)
-          const itemQty = Number(oi.quantity || 1)
-          preferenceItems.push({
-            title: oi.product_name || oi.service_name || "Item",
-            description: `Item: ${oi.product_name || oi.service_name || "Item"}`,
-            unit_price: itemPrice,
-            quantity: itemQty,
-            currency_id: "BRL",
-          })
-        }
-        if (deliveryFee > 0) {
-          preferenceItems.push({
-            title: "Taxa de entrega",
-            unit_price: deliveryFee,
-            quantity: 1,
-            currency_id: "BRL",
-          })
-        }
-      } else {
-        const orderLabel = existingOrder.order_number ? `Pedido #${existingOrder.order_number}` : `Pedido ${existingOrder.id.slice(0, 8)}`
-        preferenceItems.push({
-          id: existingOrder.id,
-          title: orderLabel,
-          description: `Pagamento do ${orderLabel}`,
-          unit_price: remainingToPay,
-          quantity: 1,
-          currency_id: "BRL",
-        })
+      if (remainingToPay <= 0) {
+        return NextResponse.json({ error: "Este pedido já foi quitado ou possui saldo zero." }, { status: 400 })
       }
+
+      totalAmount = remainingToPay
+      const orderLabel = existingOrder.order_number ? `Pedido #${existingOrder.order_number}` : `Pedido ${existingOrder.id.slice(0, 8)}`
+
+      preferenceItems.length = 0
+      preferenceItems.push({
+        id: String(existingOrder.id),
+        title: orderLabel,
+        description: `Pagamento do ${orderLabel}`,
+        unit_price: remainingToPay,
+        quantity: 1,
+        currency_id: "BRL",
+      })
     } else if (useUnifiedCart) {
       // Update pay_deposit_only in DB
       await adminClient
@@ -508,24 +487,61 @@ async function handler(request: NextRequest) {
       }
     }
 
-    if (totalAmount <= 0 || totalAmount > 999999) {
-      SecureLogger.error("Invalid preference total amount", { totalAmount })
+    const cleanTotalAmount = Math.round((Number(totalAmount) + Number.EPSILON) * 100) / 100
+
+    if (!Number.isFinite(cleanTotalAmount) || cleanTotalAmount <= 0 || cleanTotalAmount > 999999) {
+      SecureLogger.error("Invalid preference total amount", { totalAmount, cleanTotalAmount })
       return NextResponse.json({ error: "Valor total inválido" }, { status: 400 })
     }
 
     const paymentQuote = issuePaymentQuote({
       userId: user.id,
       partnerId,
-      maxAmount: totalAmount,
+      maxAmount: cleanTotalAmount,
     })
 
     if (body.quoteOnly) {
       return NextResponse.json({ success: true, payment_quote: paymentQuote })
     }
 
+    // Sanitize and validate every item for Mercado Pago Preferences API:
+    // Every item MUST have unit_price > 0 (strictly positive number with max 2 decimals) and integer quantity >= 1
+    const validItems = preferenceItems
+      .filter((item: any) => {
+        const price = Number(item.unit_price)
+        const qty = Number(item.quantity)
+        return Number.isFinite(price) && price > 0 && Number.isFinite(qty) && qty >= 1
+      })
+      .map((item: any) => ({
+        id: item.id ? String(item.id).slice(0, 64) : undefined,
+        title: String(item.title || "Item").slice(0, 128),
+        description: item.description ? String(item.description).slice(0, 256) : undefined,
+        quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+        unit_price: Math.round((Number(item.unit_price) + Number.EPSILON) * 100) / 100,
+        currency_id: "BRL",
+      }))
+
+    const itemsSum = Math.round((validItems.reduce((acc: number, item: any) => acc + item.unit_price * item.quantity, 0) + Number.EPSILON) * 100) / 100
+
+    // If valid items match cleanTotalAmount within 1 cent and no existingOrder (which prefers a consolidated order item), use them.
+    // Otherwise, send a single clean item matching cleanTotalAmount exactly to prevent MP from failing with unit_price invalid.
+    const finalPreferenceItems = (!existingOrder && validItems.length > 0 && Math.abs(itemsSum - cleanTotalAmount) <= 0.01)
+      ? validItems
+      : [
+          {
+            title: existingOrder?.order_number
+              ? `Pedido #${existingOrder.order_number}`
+              : (existingOrder ? `Pedido ${existingOrder.id.slice(0, 8)}` : "Compra no Dudit"),
+            description: "Pagamento do pedido",
+            unit_price: cleanTotalAmount,
+            quantity: 1,
+            currency_id: "BRL",
+          },
+        ]
+
     // Criar preferência no Mercado Pago
     const preferencePayload: Record<string, any> = {
-      items: preferenceItems,
+      items: finalPreferenceItems,
       payer: {
         name: "Cliente",
         email: user.email,
@@ -576,8 +592,12 @@ async function handler(request: NextRequest) {
       try {
         mpErrorData = await mpResponse.json()
 
+        const causeDesc = Array.isArray(mpErrorData?.cause) && mpErrorData.cause.length > 0
+          ? mpErrorData.cause.map((c: any) => c.description || c.code).join(", ")
+          : null
+
         if (mpErrorData?.message) {
-          errorMessage = mpErrorData.message
+          errorMessage = causeDesc ? `${mpErrorData.message} (${causeDesc})` : mpErrorData.message
         } else if (mpErrorData?.error?.message) {
           errorMessage = mpErrorData.error.message
         } else if (mpErrorData?.errors?.[0]?.message) {
@@ -591,8 +611,9 @@ async function handler(request: NextRequest) {
       SecureLogger.error("Mercado Pago preference creation failed", {
         status: mpResponse.status,
         errorMessage,
-        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
-        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
+        errorData: mpErrorData,
+        payloadItems: preferencePayload.items,
+        partnerId,
       })
       return NextResponse.json(
         { error: errorMessage },
@@ -608,6 +629,7 @@ async function handler(request: NextRequest) {
       preferenceId: preference.id,
       initPoint: preference.init_point,
       init_point: preference.init_point,
+      total_amount: cleanTotalAmount,
     })
   } catch (error: any) {
     console.error("API Error:", error)

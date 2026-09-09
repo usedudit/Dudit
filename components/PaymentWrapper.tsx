@@ -366,9 +366,10 @@ export function PaymentWrapper({
             }
 
             const nameParts = (userName || "").split(" ")
+            const brickAmount = Math.round((Number(preferenceData.total_amount || amount) + Number.EPSILON) * 100) / 100
             const brickController = await bricksBuilder.create("payment", "paymentBrick_modal_container", {
                 initialization: {
-                    amount: amount,
+                    amount: brickAmount,
                     preferenceId: preferenceData.preference_id,
                     payer: {
                         firstName: nameParts[0] || "",

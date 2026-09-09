@@ -79,11 +79,6 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
                                 disabled={!isEditing}
                                 name="all_staff"
                             />
-                            {assignedStaff.all && (
-                                <p className="text-brand-inactive-text text-xs mt-1 ml-6">
-                                    Entregadores ficam de fora por padrão
-                                </p>
-                            )}
                         </div>
 
                         {!assignedStaff.all && (
@@ -101,8 +96,8 @@ export const ServiceStaffTab: React.FC<ServiceStaffTabProps> = ({
                                                     title={staff.fullName || staff.email || "Sem Nome"}
                                                     description={
                                                         staff.isOwner ? "Proprietário" :
-                                                        staff.role === "DELIVERY" ? "Entregador" :
-                                                        "Membro da equipe"
+                                                            staff.role === "DELIVERY" ? "Entregador" :
+                                                                "Membro da equipe"
                                                     }
                                                     className="p-4"
                                                     left={
