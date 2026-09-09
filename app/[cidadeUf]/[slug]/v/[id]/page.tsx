@@ -56,8 +56,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
-export default async function VendorPage({ params }: { params: Promise<{ slug: string; cidadeUf: string; id: string }> }) {
+export default async function VendorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string; cidadeUf: string; id: string }>
+  searchParams?: Promise<{ categoria?: string }>
+}) {
   const { id, slug: currentSlug, cidadeUf: currentCidadeUf } = await params
+  const resolvedSearchParams = await searchParams
+  const initialCategory = resolvedSearchParams?.categoria
 
   const store = await getCachedStoreById(id)
 
@@ -244,7 +252,7 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
     banner_url: store.banner_url || null,
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
-    isShowcaseActive: store.is_showcase_active ?? true,
+    isShowcaseActive: store.is_showcase_active ?? partner?.is_showcase_active ?? true,
   }
 
   return (
@@ -273,6 +281,8 @@ export default async function VendorPage({ params }: { params: Promise<{ slug: s
           serviceCategories={serviceCategories}
           userProfile={userProfile}
           cartCount={cartCount}
+          isShowcaseActive={partnerData.isShowcaseActive}
+          initialCategory={initialCategory}
         />
       </main>
       <MarketplaceFooter />

@@ -244,8 +244,10 @@ export function ServiceDetailsPageClient({
         const realPartnerId = p?.id || service.partner_id || "1"
         const storeId = store?.id || p?.store_id || service.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
+        const isShowcaseActive = (store?.is_showcase_active ?? p?.is_showcase_active ?? true) !== false
 
         return {
+            isShowcaseActive,
             id: realPartnerId,
             short_id: store?.short_id || p?.short_id || service.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
@@ -717,8 +719,10 @@ export function ServiceDetailsPageClient({
     )
 
     const displayRating = useMemo(() => {
-        return reviews.length >= 3 ? avgRating.toFixed(1) : "-";
-    }, [reviews, avgRating])
+        if (reviews.length >= 3) return avgRating.toFixed(1)
+        if (partner.rating > 0) return Number(partner.rating).toFixed(1)
+        return "-"
+    }, [reviews, avgRating, partner.rating])
 
     const formattedJoinedDate = useMemo(() => {
         if (!partner.created_at) return "Recente"
@@ -842,6 +846,11 @@ export function ServiceDetailsPageClient({
     }, [selectedStaffId, selectedStaff, selectedDate, selectedTime, service, partner, pricing.bestPrice, durationMinutes])
 
     const handleBookNowCheckout = useCallback(async () => {
+        if (partner.isShowcaseActive === false) {
+            notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+
         if (!userId) {
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
             return
@@ -916,6 +925,11 @@ export function ServiceDetailsPageClient({
     }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, notifyError])
 
     const handleAddBookingToCart = useCallback(async () => {
+        if (partner.isShowcaseActive === false) {
+            notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+
         if (!userId) {
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
             return
@@ -946,7 +960,7 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, notifySuccess, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, partner.isShowcaseActive, notifySuccess, notifyError])
 
     const handleRequestQuoteClick = useCallback(() => {
         if (isProductOwner) return
@@ -1394,7 +1408,7 @@ export function ServiceDetailsPageClient({
             )}
 
             {/* ── CTA Buttons ── */}
-            {isProductOwner ? (
+            {isProductOwner && (
                 <InfoCard
                     message={canBuyState.reason || (canBuyState.isOwner
                         ? "Você não pode agendar ou comprar seus próprios serviços."
@@ -1402,66 +1416,79 @@ export function ServiceDetailsPageClient({
                     color="orange"
                     className="mb-8"
                 />
-            ) : !showPrice ? (
-                <div className="hidden lg:block mb-4">
-                    {(() => {
-                        const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
-                        const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                        const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber o preço.`)
-                        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
-                        return (
-                            <a
-                                href={whatsappUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
-                            >
-                                <WhatsappIcon size={20} className="fill-white" />
-                                Consultar preço
-                            </a>
-                        )
-                    })()}
-                </div>
-            ) : isStartingAt ? (
-                <div className="hidden lg:block space-y-2.5 mb-4">
-                    <Button
-                        onClick={handleRequestQuoteClick}
-                        className="w-full h-[46px]"
-                    >
-                        <span className="flex items-center gap-2">
-                            <FileTextIcon size={18} />
-                            Solicitar orçamento
-                        </span>
-                    </Button>
-                </div>
-            ) : (
-                <div className="hidden lg:block space-y-2 mb-4">
-                    <Button
-                        disabled={!selectedTime || isBooking}
-                        onClick={handleBookNowCheckout}
-                        className="w-full h-[46px]"
-                    >
-                        {isBooking ? (
+            )}
+            {!isProductOwner && partner.isShowcaseActive === false && (
+                <InfoCard
+                    title="Vitrine Inativa"
+                    message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
+            {!isProductOwner && (
+                !showPrice ? (
+                    <div className="hidden lg:block mb-4">
+                        {(() => {
+                            const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
+                            const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
+                            const whatsappMsg = encodeURIComponent(`Olá! Vi o serviço "${service.name}" na Dudit e gostaria de saber o preço.`)
+                            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
+                            return (
+                                <a
+                                    href={whatsappUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
+                                >
+                                    <WhatsappIcon size={20} className="fill-white" />
+                                    Consultar preço
+                                </a>
+                            )
+                        })()}
+                    </div>
+                ) : isStartingAt ? (
+                    <div className="hidden lg:block space-y-2.5 mb-4">
+                        <Button
+                            onClick={handleRequestQuoteClick}
+                            className="w-full h-[46px]"
+                        >
                             <span className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Redirecionando...
+                                <FileTextIcon size={18} />
+                                Solicitar orçamento
                             </span>
-                        ) : (
-                            <span className="flex items-center gap-2">
-                                <CalendarIcon size={18} />
-                                Reservar agora
-                            </span>
-                        )}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        disabled={!selectedTime || isBooking}
-                        onClick={handleAddBookingToCart}
-                        className="w-full h-[46px]"
-                    >
-                        Adicionar à sacola
-                    </Button>
-                </div>
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="hidden lg:block space-y-2 mb-4">
+                        <Button
+                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                            onClick={handleBookNowCheckout}
+                            className="w-full h-[46px]"
+                        >
+                            {partner.isShowcaseActive === false ? (
+                                "Vitrine Inativa"
+                            ) : isBooking ? (
+                                <span className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Redirecionando...
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                    <CalendarIcon size={18} />
+                                    Reservar agora
+                                </span>
+                            )}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                            onClick={handleAddBookingToCart}
+                            className="w-full h-[46px]"
+                        >
+                            Adicionar à sacola
+                        </Button>
+                    </div>
+                )
             )}
 
             {/* Realization Location */}
@@ -2294,17 +2321,17 @@ export function ServiceDetailsPageClient({
                                     <Button
                                         variant="outline"
                                         className="rounded-full px-3"
-                                        disabled={!selectedTime || isBooking}
+                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
                                         onClick={handleAddBookingToCart}
                                     >
                                         Sacola
                                     </Button>
                                     <Button
                                         className="flex-1 rounded-full min-w-[120px]"
-                                        disabled={!selectedTime || isBooking}
+                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
                                         onClick={handleBookNowCheckout}
                                     >
-                                        {isBooking ? "..." : "Reservar"}
+                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isBooking ? "..." : "Reservar"}
                                     </Button>
                                 </>
                             </>

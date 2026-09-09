@@ -213,8 +213,10 @@ export function ProductDetailsPageClient({
         const realPartnerId = product.partner_id || p?.id || p?.partner_id || "1"
         const storeId = store?.id || p?.store_id || product.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Vendedor da Dudit"
+        const isShowcaseActive = (store?.is_showcase_active ?? p?.is_showcase_active ?? true) !== false
 
         return {
+            isShowcaseActive,
             id: realPartnerId,
             short_id: store?.short_id || p?.short_id || product.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
@@ -844,8 +846,10 @@ export function ProductDetailsPageClient({
     )
 
     const displayRating = useMemo(() => {
-        return reviews.length >= 3 ? avgRating.toFixed(1) : "-";
-    }, [reviews, avgRating])
+        if (reviews.length >= 3) return avgRating.toFixed(1)
+        if (partner.rating > 0) return Number(partner.rating).toFixed(1)
+        return "-"
+    }, [reviews, avgRating, partner.rating])
 
     const formattedJoinedDate = useMemo(() => {
         if (!partner.created_at) return "Recente"
@@ -946,6 +950,10 @@ export function ProductDetailsPageClient({
     }, [])
 
     const handleAddToCart = useCallback(async () => {
+        if (partner.isShowcaseActive === false) {
+            notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
 
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
@@ -968,9 +976,14 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, notifySuccess, notifyError])
+    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, partner.isShowcaseActive, notifySuccess, notifyError])
 
     const handleBuyNow = useCallback(async () => {
+        if (partner.isShowcaseActive === false) {
+            notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
         if (productAddons.length > 0 && !validateAddons()) return
@@ -1535,16 +1548,25 @@ export function ProductDetailsPageClient({
                 </div>
             )}
 
-            {
-                isProductOwner ? (
-                    <InfoCard
-                        message={isTeamMember
-                            ? "Você não pode comprar produtos de um negócio do qual faz parte da equipe."
-                            : "Você não pode comprar seus próprios produtos."}
-                        color="orange"
-                        className="mb-8"
-                    />
-                ) : !showPrice ? (
+            {isProductOwner && (
+                <InfoCard
+                    message={isTeamMember
+                        ? "Você não pode comprar produtos de um negócio do qual faz parte da equipe."
+                        : "Você não pode comprar seus próprios produtos."}
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
+            {!isProductOwner && partner.isShowcaseActive === false && (
+                <InfoCard
+                    title="Vitrine Inativa"
+                    message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
+            {!isProductOwner && (
+                !showPrice ? (
                     <div className="hidden lg:block">
                         {(() => {
                             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
@@ -1566,16 +1588,16 @@ export function ProductDetailsPageClient({
                     </div>
                 ) : (
                     <div className="hidden lg:block">
-                        <Button disabled={isOutOfStock || loading} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
-                            {isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                        <Button disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
+                            {partner.isShowcaseActive === false ? "Vitrine Inativa" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
                         </Button>
                         <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
-                            disabled={isOutOfStock || loading} onClick={handleAddToCart}>
+                            disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleAddToCart}>
                             {loading ? "Adicionando..." : "Adicionar à sacola"}
                         </Button>
                     </div>
                 )
-            }
+            )}
 
             {/* Shipping */}
             {
@@ -2635,11 +2657,11 @@ export function ProductDetailsPageClient({
                             ) : (
                                 <>
                                     <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
-                                        disabled={isOutOfStock || loading} onClick={handleAddToCart}>
+                                        disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleAddToCart}>
                                         <ShoppingCartIcon size={20} />
                                     </Button>
-                                    <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading} onClick={handleBuyNow}>
-                                        {isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                                    <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleBuyNow}>
+                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
                                     </Button>
                                 </>
                             )}

@@ -9,6 +9,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { isUuid } from "@/lib/utils/short-id"
+import { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -56,6 +57,11 @@ export async function subscribeToRecurringPlanAction(input: {
 
     const user = await requireUser()
     const admin = getAdminClient()
+
+    const showcaseActive = await isStoreShowcaseActive(admin, { partnerId: input.partnerId })
+    if (!showcaseActive) {
+      return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+    }
 
     // Block owner or team member from subscribing
     const { data: partner } = await admin
@@ -341,11 +347,12 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
           user_id,
           mp_user_id,
           mp_public_key,
+          is_showcase_active,
           created_at,
           addresses (id, street, number, neighborhood, city, state, zip_code),
           payment_methods (*)
         ),
-        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais),
+        stores(id, short_id, name, slug, logo_url, banner_url, rating, vendas_totais, is_showcase_active),
         recurring_plan_items(
           id, item_type, product_id, variant_id, service_id, quantity, unit_price,
           products:product_id(id, short_id, name, price, images),
@@ -397,8 +404,10 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
 
     const rawPartner = data.partners || {}
     const rawStore = Array.isArray(data.stores) ? data.stores[0] : data.stores
+    const isShowcaseActive = (rawStore?.is_showcase_active ?? rawPartner?.is_showcase_active ?? true) !== false
     const partner = rawPartner ? {
       ...rawPartner,
+      is_showcase_active: isShowcaseActive,
       store_id: rawStore?.id,
       store_name: rawStore?.name,
       store_image_url: rawStore?.logo_url,
@@ -413,9 +422,11 @@ export async function getMarketplaceRecurringPlanAction(planId: string) {
 
     return {
       ...mapPlanRow(data as Record<string, unknown>),
+      is_showcase_active: isShowcaseActive,
       frequencyLabel: getRecurringFrequencyLabel(data.frequency_type, data.frequency_interval),
       items: data.recurring_plan_items || [],
       partners: partner,
+      stores: rawStore,
       price: computedPrice,
       images: planImages,
     }

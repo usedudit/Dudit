@@ -17,7 +17,7 @@ import { formatCurrency } from "@/lib/utils"
 import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction } from "@/app/actions/shared/coupons"
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
-import { checkoutCartAction, updateCartItemFulfillmentModeAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
+import { checkoutCartAction, bulkUpdateFulfillmentModesAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
@@ -317,7 +317,7 @@ export function CheckoutPageClient() {
         [sessionData?.cartItems],
     )
 
-    const { checkoutContext, contextLoading, contextError } = useMarketplaceCheckoutContext({
+    const { checkoutContext, contextLoading, contextError, patchContext } = useMarketplaceCheckoutContext({
         partnerId,
         cartItemIds,
         storeId,
@@ -351,17 +351,40 @@ export function CheckoutPageClient() {
     const bypassDepositModalRef = useRef(false)
     const bypassSubmitRef = useRef(false)
 
-    const handleFulfillmentModeChange = async (cartItemId: string, mode: "on_site" | "customer_location") => {
+    const handleBulkFulfillmentModesSave = async (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => {
         try {
             const token = csrfToken || await fetchCSRFTokenSingleton() || ""
-            const result = await updateCartItemFulfillmentModeAction(cartItemId, mode, token)
+            const result = await bulkUpdateFulfillmentModesAction(changes, token)
             if (result.success) {
-                setRefreshTrigger(prev => prev + 1)
+                if (checkoutContext?.lines) {
+                    const updatedLines = checkoutContext.lines.map((line) => {
+                        const change = changes.find((c) => c.cartItemId === line.lineId)
+                        if (change) {
+                            return { ...line, fulfillmentMode: change.mode }
+                        }
+                        return line
+                    })
+                    const hasCustomerLocation = updatedLines.some(
+                        (l) => l.lineKind === "service_booking" && l.fulfillmentMode === "customer_location"
+                    )
+                    const hasOnSite = updatedLines.some(
+                        (l) => l.lineKind === "service_booking" && (l.fulfillmentMode === "on_site" || !l.fulfillmentMode)
+                    )
+                    const updatedRequirements = {
+                        ...checkoutContext.requirements,
+                        showCustomerAddressSection: hasCustomerLocation,
+                        showPartnerLocation: hasOnSite,
+                    }
+                    patchContext({
+                        lines: updatedLines,
+                        requirements: updatedRequirements,
+                    })
+                }
             } else {
-                notifyError("Erro", result.error || "Não foi possível alterar a forma de atendimento.")
+                notifyError("Erro", result.error || "Não foi possível salvar as formas de atendimento.")
             }
         } catch (err) {
-            notifyError("Erro", "Erro ao atualizar forma de atendimento.")
+            notifyError("Erro", "Erro ao salvar formas de atendimento.")
         }
     }
     const storeImageRaw = checkoutContext?.store?.logo_url || partnerInfo?.store_avatar || partnerInfo?.store_image_url || "https://img.dudit.com.br/static/Placeholder.png"
@@ -2607,7 +2630,7 @@ export function CheckoutPageClient() {
                                     deliveryError={deliveryError}
                                     schedulingLines={schedulingLines}
                                     lines={checkoutContext?.lines || []}
-                                    onFulfillmentModeChange={handleFulfillmentModeChange}
+                                    onFulfillmentModesSave={handleBulkFulfillmentModesSave}
                                     addressProps={{
                                         loadingAddresses,
                                         userAddresses,
@@ -3047,7 +3070,7 @@ export function CheckoutPageClient() {
                                             deliveryError={deliveryError}
                                             schedulingLines={schedulingLines}
                                             lines={checkoutContext?.lines || []}
-                                            onFulfillmentModeChange={handleFulfillmentModeChange}
+                                            onFulfillmentModesSave={handleBulkFulfillmentModesSave}
                                             addressProps={{
                                                 loadingAddresses,
                                                 userAddresses,

@@ -591,14 +591,14 @@ export function PaymentWrapper({
 
     const lastCheckRef = useRef(0)
 
-    const checkPaymentStatus = async () => {
+    const checkPaymentStatus = async (silent: boolean = false) => {
         const now = Date.now()
 
-        if (now - lastCheckRef.current < 3000) return // trava 3s
+        if (now - lastCheckRef.current < 2500) return // trava 2.5s
         lastCheckRef.current = now
 
         if (isChecking) return
-        setIsChecking(true)
+        if (!silent) setIsChecking(true)
         try {
             const response = await fetch("/api/orders/sync-payment-status", {
                 method: "POST",
@@ -612,20 +612,48 @@ export function PaymentWrapper({
                 if (data.newStatus === "paid" || data.paymentStatus === "approved") {
                     if (data.orderNumber) setActualOrderNumber(data.orderNumber)
                     setPaymentConfirmed(true)
-                } else {
+                } else if (!silent) {
                     // Notifica que ainda está pendente
                     notification.info("Aguardando Aprovação", "Seu pagamento ainda não foi confirmado pelo banco. Se você já pagou, aguarde uns instantes e tente novamente.")
                 }
-            } else {
+            } else if (!silent) {
                 notification.error("Erro ao verificar", "Não conseguimos verificar o status do pagamento. Tente novamente em instantes.")
             }
         } catch (error) {
             console.error("Error checking payment status:", error)
-            notification.error("Erro de conexão", "Falha ao se comunicar com o servidor. Verifique sua rede e tente novamente.")
+            if (!silent) {
+                notification.error("Erro de conexão", "Falha ao se comunicar com o servidor. Verifique sua rede e tente novamente.")
+            }
         } finally {
-            setIsChecking(false)
+            if (!silent) setIsChecking(false)
         }
     }
+
+    // Auto-polling & Tab focus listener while waiting for Pix payment
+    useEffect(() => {
+        if (!open || paymentConfirmed || !orderId || step !== "pix") return
+
+        // 1. Gentle background poll every 3.5 seconds
+        const pollInterval = setInterval(() => {
+            void checkPaymentStatus(true)
+        }, 3500)
+
+        // 2. Check immediately when returning to tab (e.g. customer paid in banking app and returned)
+        const handleVisibilityOrFocus = () => {
+            if (document.visibilityState === "visible") {
+                void checkPaymentStatus(true)
+            }
+        }
+
+        document.addEventListener("visibilitychange", handleVisibilityOrFocus)
+        window.addEventListener("focus", handleVisibilityOrFocus)
+
+        return () => {
+            clearInterval(pollInterval)
+            document.removeEventListener("visibilitychange", handleVisibilityOrFocus)
+            window.removeEventListener("focus", handleVisibilityOrFocus)
+        }
+    }, [open, paymentConfirmed, orderId, step])
 
     const handleCopyQrCode = () => {
         if (pixData?.qrCode) {
@@ -775,7 +803,7 @@ export function PaymentWrapper({
                                 />
 
                                 <Button
-                                    onClick={checkPaymentStatus}
+                                    onClick={() => checkPaymentStatus(false)}
                                     disabled={isChecking}
                                     className="w-full my-6 h-12 flex items-center justify-center gap-2"
                                 >
@@ -1017,7 +1045,7 @@ export function PaymentWrapper({
                             <div className="space-y-6 max-w-xl mx-auto mb-10">
                                 <div>
                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4 flex items-center gap-2">
-                                        <BoxIcon size={16} className="text-brand-inactive-text" /> Itens do pedido
+                                        Itens do pedido
                                     </h3>
                                     <div className="space-y-3">
                                         {orderDetails.items.map((item, idx) => {
@@ -1132,7 +1160,7 @@ export function PaymentWrapper({
                                                 {cards.map(card => (
                                                     <div
                                                         key={card.id}
-                                                        className="flex items-center gap-3 p-3.5 bg-brand-gray/30 dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border"
+                                                        className="flex items-center gap-3"
                                                     >
                                                         <img
                                                             src="https://img.dudit.com.br/static/Map.png"

@@ -3,7 +3,6 @@ import { cache } from "react"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { searchMarketplaceDirect, searchMarketplaceDirectFull } from "@/app/actions/marketplace/search"
 import { applySellerDiversity, sortByTrendingScore } from "@/lib/marketplace/ranking"
-
 import { MarketplaceSearchType } from "@/lib/types/marketplace"
 import { resolveProduct } from "@/lib/store-products"
 import { filterMarketplaceVisibleProducts } from "@/lib/resolve-marketplace-visibility"
@@ -42,7 +41,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, user_id, created_at, mp_user_id, mp_public_key,
+        id, user_id, created_at, mp_user_id, mp_public_key, is_showcase_active,
         addresses(city, state),
         payment_methods(*)
       ),
@@ -132,6 +131,10 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       p.business_info = store.business_info || p.business_info
       p.gallery = store.gallery || p.gallery
       p.is_showcase_active = store.is_showcase_active !== false
+      p.rating = store.rating ?? p.rating ?? 0
+      p.vendas_totais = store.vendas_totais ?? p.vendas_totais ?? 0
+    } else if (p) {
+      p.is_showcase_active = p.is_showcase_active !== false
     }
 
     if (!p) {
@@ -367,9 +370,9 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
         stores(id, name, logo_url, banner_url, phone, addresses!store_id!left(city, state)),
         product_variants(variant_options, price_adjustment, is_active)
       `)
-      .eq("status", "ativo")
-      .eq("show_in_marketplace", true)
-      .eq("partner_id", partnerId)
+        .eq("status", "ativo")
+        .eq("show_in_marketplace", true)
+        .eq("partner_id", partnerId)
       if (storeId) q = q.eq("store_id", storeId)
       const result = await q.order("created_at", { ascending: false }).limit(10)
 
@@ -389,6 +392,8 @@ export const getCachedRelatedProducts = async (partnerId: string, currentProduct
           store_name: rawStore?.name,
           store_image_url: rawStore?.logo_url,
           store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+          rating: rawStore?.rating ?? rawPartner?.rating ?? 0,
+          vendas_totais: rawStore?.vendas_totais ?? rawPartner?.vendas_totais ?? 0,
           city: rawStore?.addresses?.[0]?.city || null,
           state: rawStore?.addresses?.[0]?.state || null
         } : {
@@ -544,16 +549,16 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
   const filteredStores = stateOnly
     ? rawStores
     : rawStores.filter((item: any) => {
-        const addr = item.addresses?.[0] || item.addresses
-        if (!addr || !addr.city) return false
-        const itemCitySlug = addr.city
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "")
-        return itemCitySlug === targetCitySlug
-      })
+      const addr = item.addresses?.[0] || item.addresses
+      if (!addr || !addr.city) return false
+      const itemCitySlug = addr.city
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+      return itemCitySlug === targetCitySlug
+    })
 
   const partnerIds = [...new Set(filteredStores.map((s: any) => s.partner_id))]
 
@@ -621,6 +626,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       phone: rawStore?.phone,
       opening_hours: rawStore?.opening_hours,
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      rating: rawStore?.rating ?? rawPartner?.rating ?? 0,
+      vendas_totais: rawStore?.vendas_totais ?? rawPartner?.vendas_totais ?? 0,
       latitude: rawStore?.addresses?.[0]?.latitude || null,
       longitude: rawStore?.addresses?.[0]?.longitude || null,
       city: rawStore?.addresses?.[0]?.city || null,
@@ -655,6 +662,8 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       phone: rawStore?.phone,
       opening_hours: rawStore?.opening_hours,
       store_avatar: rawStore?.logo_url || "https://img.dudit.com.br/static/Placeholder.png",
+      rating: rawStore?.rating ?? rawPartner?.rating ?? 0,
+      vendas_totais: rawStore?.vendas_totais ?? rawPartner?.vendas_totais ?? 0,
       latitude: rawStore?.addresses?.[0]?.latitude || null,
       longitude: rawStore?.addresses?.[0]?.longitude || null,
       city: rawStore?.addresses?.[0]?.city || null,
@@ -668,7 +677,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       for (const planItem of item.recurring_plan_items) {
         const qty = Number(planItem.quantity || 1)
         let itemPrice = Number(planItem.unit_price || 0)
-        
+
         if (itemPrice <= 0) {
           if (planItem.item_type === 'product' && planItem.products) {
             itemPrice = Number(planItem.products.price || 0)
@@ -707,7 +716,7 @@ export async function getHomeDataByCity(city: string, state: string, stateOnly?:
       rating: item.rating,
       itemType: 'loja',
       category: 'Loja Parceira',
-partners: {
+      partners: {
         id: item.partner_id,
         short_id: item.short_id || null,
         store_name: item.name,

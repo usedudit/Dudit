@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { MarketplaceFooter } from "./MarketplaceFooter"
 import { updateCartQuantityAction, removeFromCartAction, toggleCartSelectionAction, toggleCartPartnerSelectionAction, switchCartItemVariantAction } from "@/app/actions/marketplace/cart"
-import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal, Badge, Input, CepInput, StateComboBox, NumberInputWithCheckbox, Spinner, RadioButton } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, AlertModal, DefaultModal, Badge, Input, CepInput, StateComboBox, NumberInputWithCheckbox, Spinner, RadioButton, InfoCard } from "@/components/reusable"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useNotification } from "@/hooks/use-notification"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -585,6 +585,11 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         if (!userId) { router.push("/auth/login?next=/cart"); return }
 
         const partnerData = itemsByPartner[storeKey]
+        if (partnerData?.isShowcaseActive === false) {
+            notifyError("Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+
         const hasSelected = partnerData?.items.some((item: any) => getItemSelected(item))
 
         if (!hasSelected) {
@@ -898,6 +903,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                             className="overflow-hidden"
                                                         >
                                                             <div className="pt-2 pb-6">
+                                                                {data.isShowcaseActive === false && (
+                                                                    <InfoCard
+                                                                        title="Vitrine Inativa"
+                                                                        message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos."
+                                                                        color="orange"
+                                                                        className="mb-4"
+                                                                    />
+                                                                )}
                                                                 {[
                                                                     { title: "Produtos", items: data.products?.length ? data.products : data.items.filter((i: any) => (i.item_type || "product") === "product") },
                                                                     { title: "Serviços", items: data.services || [] },
@@ -1357,9 +1370,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     <Button
                                                                         onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full"
-                                                                        disabled={partnerItemsTotal === 0}
+                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false}
                                                                     >
-                                                                        Finalizar pedido
+                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : "Finalizar pedido"}
                                                                     </Button>
                                                                 </div>
                                                             </div>
@@ -1420,9 +1433,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     <Button
                                                                         onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full h-[46px]"
-                                                                        disabled={partnerItemsTotal === 0}
+                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false}
                                                                     >
-                                                                        Finalizar Pedido
+                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : "Finalizar Pedido"}
                                                                     </Button>
                                                                 </div>
                                                             </motion.div>

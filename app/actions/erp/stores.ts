@@ -397,14 +397,22 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
 
         if (error) throw new Error(error.message)
 
+        if (input.is_showcase_active !== undefined) {
+            await admin
+                .from("partners")
+                .update({ is_showcase_active: input.is_showcase_active })
+                .eq("id", input.partnerId)
+        }
+
         logAudit("store.updated", {
             partnerId: input.partnerId,
             storeId: input.storeId,
             changes: Object.keys(updateData),
         })
 
-        await safeRevalidateTag(TAGS.partner(input.partnerId))
-        revalidatePath("/erp/lojas")
+        const { invalidateStoreCache } = await import("@/lib/cache/invalidation")
+        await invalidateStoreCache(input.storeId, input.partnerId, input.slug)
+
         return { success: true, data: undefined }
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : "Erro ao atualizar loja" }

@@ -27,9 +27,12 @@ function validateWebhookSignature(
   resourceId: string,
 ): boolean {
   try {
-    const webhookSecret = process.env.MP_WEBHOOK_SECRET
+    const secrets = [
+      process.env.MP_WEBHOOK_SECRET,
+      process.env.MP_SUBSCRIPTION_WEBHOOK_SECRET,
+    ].filter(Boolean) as string[]
 
-    if (!webhookSecret) {
+    if (secrets.length === 0) {
       SecureLogger.error("[WEBHOOK] MP_WEBHOOK_SECRET not configured - rejecting request")
       return false
     }
@@ -60,14 +63,35 @@ function validateWebhookSignature(
       return false
     }
 
-    // Mercado Pago signature template: id:...;request-id:...;ts:...
-    const requestSignature = `id:${resourceId};request-id:${requestId};ts:${timestamp}`
-    const computedHmac = createHmac("sha256", webhookSecret)
-      .update(requestSignature)
-      .digest("hex")
+    const idStr = String(resourceId).trim()
+    const idLower = idStr.toLowerCase()
 
-    if (computedHmac.length !== receivedSignature.length) return false
-    return timingSafeEqual(Buffer.from(computedHmac), Buffer.from(receivedSignature))
+    // Mercado Pago official SDK specification: id:[data.id];request-id:[x-request-id];ts:[ts];
+    // We check all standard variations (lowercase/original case, with/without trailing semicolon)
+    const candidateTemplates = [
+      `id:${idLower};request-id:${requestId};ts:${timestamp};`,
+      `id:${idStr};request-id:${requestId};ts:${timestamp};`,
+      `id:${idLower};request-id:${requestId};ts:${timestamp}`,
+      `id:${idStr};request-id:${requestId};ts:${timestamp}`,
+    ]
+
+    for (const secret of secrets) {
+      for (const tmpl of candidateTemplates) {
+        const computedHmac = createHmac("sha256", secret)
+          .update(tmpl)
+          .digest("hex")
+
+        if (computedHmac.length === receivedSignature.length && timingSafeEqual(Buffer.from(computedHmac), Buffer.from(receivedSignature))) {
+          return true
+        }
+      }
+    }
+
+    SecureLogger.warn("[WEBHOOK] Signature mismatch for resource", {
+      resourceId,
+      requestId,
+    })
+    return false
   } catch (error: any) {
     SecureLogger.error("[WEBHOOK] Signature validation error", { error: error.message })
     return false
@@ -99,17 +123,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 401 })
     }
 
-    // ── Step 2: Parse body ──
-    const body = await request.json()
+    // ── Step 2: Parse body and search params ──
+    const searchParams = request.nextUrl.searchParams
+    const queryDataId = searchParams.get("data.id") || searchParams.get("id")
+    const queryType = searchParams.get("type") || searchParams.get("topic")
+
+    let body: any = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Body may be empty on query-string only notifications
+    }
+
+    const paymentId = body?.data?.id || body?.id || queryDataId
+    const eventType = body?.type || queryType
+    const eventAction = body?.action || (eventType === "payment" ? "payment.updated" : undefined)
 
     SecureLogger.info("[WEBHOOK] Event received", {
-      type: body.type,
-      action: body.action,
-      paymentId: body.data?.id,
+      type: eventType,
+      action: eventAction,
+      paymentId: paymentId ? String(paymentId) : undefined,
     })
 
-    if (!body?.data?.id) {
-      console.error("[WEBHOOK] Rejected: missing payment ID in body")
+    if (!paymentId) {
+      if (body?.action === "test" || searchParams.has("test")) {
+        console.log("[WEBHOOK] Ping/test webhook acknowledged successfully")
+        return NextResponse.json({ received: true }, { status: 200 })
+      }
+      console.error("[WEBHOOK] Rejected: missing payment ID in body and query parameters")
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
@@ -117,13 +158,13 @@ export async function POST(request: NextRequest) {
     const isValid = validateWebhookSignature(
       signature,
       requestId,
-      body.data.id.toString(),
+      paymentId.toString(),
     )
 
     if (!isValid) {
       SecureLogger.error("[WEBHOOK] Rejected: invalid signature", {
         requestId,
-        paymentId: body.data.id,
+        paymentId: paymentId.toString(),
       })
       return NextResponse.json({ error: "Invalid request" }, { status: 401 })
     }
@@ -133,12 +174,22 @@ export async function POST(request: NextRequest) {
     // ── Step 4: ACK immediately, process async ──
     const response = NextResponse.json({ received: true }, { status: 200 })
 
-    processWebhookWithRetry(body, requestId).catch((error) => {
+    const normalizedBody = {
+      ...body,
+      type: eventType,
+      action: eventAction,
+      data: {
+        ...(body?.data || {}),
+        id: paymentId,
+      },
+    }
+
+    processWebhookWithRetry(normalizedBody, requestId).catch((error) => {
       captureError(error, {
         module: "payments",
         action: "mercadopago_webhook_async",
         route: "/api/mercadopago/webhook",
-        entityId: typeof body?.data?.id === "string" || typeof body?.data?.id === "number" ? String(body.data.id) : undefined,
+        entityId: typeof paymentId === "string" || typeof paymentId === "number" ? String(paymentId) : undefined,
       })
       SecureLogger.error("[WEBHOOK] Async processing failed", { error: error.message })
     })

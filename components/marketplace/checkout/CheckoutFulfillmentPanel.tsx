@@ -1,8 +1,9 @@
 "use client"
 
+import { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger } from "@/components/reusable"
-import { MapPinIcon } from "@/lib/icons"
+import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton } from "@/components/reusable"
+import { MapPinIcon, SaveIcon } from "@/lib/icons"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
 import { IconPlaceholder } from "@/components/reusable"
@@ -85,7 +86,7 @@ export type CheckoutFulfillmentPanelProps = {
   addressProps: AddressBlockProps
   schedulingLines: Array<{ name: string; summary: string | null }>
   lines?: MarketplaceCheckoutDisplayLine[]
-  onFulfillmentModeChange?: (cartItemId: string, mode: "on_site" | "customer_location") => void
+  onFulfillmentModesSave?: (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => Promise<void>
 }
 
 export function CheckoutFulfillmentPanel({
@@ -101,7 +102,7 @@ export function CheckoutFulfillmentPanel({
   addressProps,
   schedulingLines,
   lines = [],
-  onFulfillmentModeChange,
+  onFulfillmentModesSave,
 }: CheckoutFulfillmentPanelProps) {
   const isPickup = deliveryType === "pickup"
   const canShowProductDelivery =
@@ -125,12 +126,56 @@ export function CheckoutFulfillmentPanel({
   const needsAddressForProductDelivery =
     requirements.showProductFulfillmentOptions && !isPickup && requirements.showDeliverySection
 
+  const [pendingModes, setPendingModes] = useState<Record<string, "on_site" | "customer_location">>(() => {
+    const initial: Record<string, "on_site" | "customer_location"> = {}
+    for (const line of serviceLines) {
+      initial[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+    }
+    return initial
+  })
+  const [saving, setSaving] = useState(false)
+
+  const serviceLinesSupportingSome = serviceLines
+
+  const hasPendingChanges = useMemo(() => {
+    return serviceLinesSupportingSome.some((line) => {
+      const allowed = line.allowedFulfillmentModes || ["on_site"]
+      if (allowed.length <= 1) return false
+      return pendingModes[line.lineId] !== ((line.fulfillmentMode as "on_site" | "customer_location") || "on_site")
+    })
+  }, [pendingModes, serviceLinesSupportingSome])
+
   const anyServiceRequiresCustomerAddress = serviceLines.some(
-    (l) => l.fulfillmentMode === "customer_location"
+    (l) => pendingModes[l.lineId] === "customer_location"
   )
   const anyServiceRequiresOnSite = serviceLines.some(
-    (l) => l.fulfillmentMode === "on_site" || !l.fulfillmentMode
+    (l) => pendingModes[l.lineId] === "on_site" || !pendingModes[l.lineId]
   )
+
+  const handleModeChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
+    setPendingModes((prev) => ({ ...prev, [lineId]: mode }))
+  }, [])
+
+  const handleSave = useCallback(async () => {
+    if (!onFulfillmentModesSave) return
+    const changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }> = []
+    for (const line of serviceLinesSupportingSome) {
+      const allowed = line.allowedFulfillmentModes || ["on_site"]
+      if (allowed.length <= 1) continue
+      const pending = pendingModes[line.lineId]
+      const current = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+      if (pending !== current) {
+        changes.push({ cartItemId: line.lineId, mode: pending })
+      }
+    }
+    if (changes.length === 0) return
+    setSaving(true)
+    try {
+      await onFulfillmentModesSave(changes)
+    } finally {
+      setSaving(false)
+    }
+  }, [onFulfillmentModesSave, pendingModes, serviceLinesSupportingSome])
 
   const renderProductsFulfillment = () => {
     if (!hasProducts) return null
@@ -200,48 +245,71 @@ export function CheckoutFulfillmentPanel({
     if (!showServicesSection) return null
     return (
       <FormSection title="Serviços">
-        <div className="space-y-6">
+        <div className="space-y-3">
           {serviceLines.map((line) => {
             const allowed = line.allowedFulfillmentModes || ["on_site"]
             const supportsBoth = allowed.includes("on_site") && allowed.includes("customer_location")
-            const currentMode = line.fulfillmentMode || "on_site"
+            const currentPending = pendingModes[line.lineId] || "on_site"
+            const hasChanges = supportsBoth && pendingModes[line.lineId] !== ((line.fulfillmentMode as "on_site" | "customer_location") || "on_site")
 
             return (
               <div
                 key={line.lineId}
-                className="rounded-2xl border border-brand-border dark:border-dark-border p-5 bg-white dark:bg-dark-surface space-y-4"
+                className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
               >
-                <div>
-                  <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
-                  {line.bookingSummary && (
-                    <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
+                    {line.bookingSummary && (
+                      <p className="text-sm text-brand-inactive-text mt-0.5">{line.bookingSummary}</p>
+                    )}
+                    {hasChanges && (
+                      <p className="text-xs text-brand-green mt-1 font-medium">Alteração pendente</p>
+                    )}
+                  </div>
+
+                  {supportsBoth ? (
+                    <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
+                      <RadioButton
+                        name={`fulfillment-${line.lineId}`}
+                        value="customer_location"
+                        checked={currentPending === "customer_location"}
+                        onChange={() => handleModeChange(line.lineId, "customer_location")}
+                        label="No meu endereço"
+                      />
+                      <RadioButton
+                        name={`fulfillment-${line.lineId}`}
+                        value="on_site"
+                        checked={currentPending === "on_site"}
+                        onChange={() => handleModeChange(line.lineId, "on_site")}
+                        label="No estabelecimento"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl shrink-0">
+                      {allowed.includes("customer_location")
+                        ? "No meu endereço"
+                        : "No estabelecimento"}
+                    </div>
                   )}
                 </div>
-
-                {supportsBoth ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider">Forma de Atendimento</p>
-                    <Tabs
-                      value={currentMode}
-                      onValueChange={(val) => onFulfillmentModeChange?.(line.lineId, val as "on_site" | "customer_location")}
-                      className="w-full"
-                    >
-                      <TabsList className="mb-0">
-                        <TabsTrigger value="customer_location">No meu endereço</TabsTrigger>
-                        <TabsTrigger value="on_site">No estabelecimento</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-                ) : (
-                  <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit">
-                    {allowed.includes("customer_location")
-                      ? "Realizado no endereço do cliente"
-                      : "Realizado no estabelecimento do parceiro"}
-                  </div>
-                )}
               </div>
             )
           })}
+
+          {serviceLinesSupportingSome.length > 0 && (
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="default"
+                onClick={handleSave}
+                disabled={saving || !hasPendingChanges}
+                isLoading={saving}
+                leftIcon={<SaveIcon className="w-4 h-4" />}
+              >
+                Salvar
+              </Button>
+            </div>
+          )}
 
           {anyServiceRequiresCustomerAddress && (
             <div className="pt-2">

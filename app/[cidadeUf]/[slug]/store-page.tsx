@@ -57,7 +57,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
         banner_url: storeData.banner_url || null,
         gallery: storeData.gallery || [],
         planSlug: "free",
-        isShowcaseActive: storeData.is_showcase_active ?? true,
+        isShowcaseActive: storeData.is_showcase_active ?? partner?.is_showcase_active ?? true,
     }
 
     const storeStats = {
@@ -84,6 +84,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
                     ratingDistribution={ratingDistribution}
                     productCategories={productCategories}
                     serviceCategories={serviceCategories}
+                    isShowcaseActive={partnerData.isShowcaseActive}
                 />
             </main>
             <MarketplaceFooter />

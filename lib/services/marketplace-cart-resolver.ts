@@ -130,6 +130,22 @@ export async function resolveCheckoutCartLines(
   let hasProducts = false
   let hasDeliveryLines = false
 
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const rowStoreIds = [...new Set(rows.map((r: any) => r.store_id).filter(Boolean))] as string[]
+  if (rowStoreIds.length > 0) {
+    for (const sId of rowStoreIds) {
+      const active = await isStoreShowcaseActive(supabase, { storeId: sId, partnerId })
+      if (!active) {
+        return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+      }
+    }
+  } else {
+    const active = await isStoreShowcaseActive(supabase, { partnerId })
+    if (!active) {
+      return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+    }
+  }
+
   const { data: partner } = await supabase
     .from("partners")
     .select("service_deposit_enabled, service_deposit_percentage")

@@ -26,7 +26,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                        partners!inner(id, business_info, created_at, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
@@ -48,7 +48,7 @@ export async function getStoreBySlug(slug: string) {
         .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                        partners!inner(id, business_info, created_at, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
@@ -69,7 +69,7 @@ export const getCachedStoreById = async (storeId: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                        partners!left(id, business_info, created_at, payment_methods(*))
+                        partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                     `)
 
                 if (isIdentifierUuid) {
@@ -87,7 +87,7 @@ export const getCachedStoreById = async (storeId: string) => {
                             .select(`
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                                partners!left(id, business_info, created_at, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                             `)
                             .eq("partner_id", storeId)
                             .maybeSingle()
@@ -98,7 +98,7 @@ export const getCachedStoreById = async (storeId: string) => {
                             .select(`
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
-                                partners!left(id, business_info, created_at, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                             `)
                             .eq("slug", storeId)
                             .maybeSingle()

@@ -131,14 +131,14 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, is_showcase_active, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
     targetStoreId
       ? admin
           .from("stores")
-          .select("id, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, is_showcase_active, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .eq("id", targetStoreId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -175,7 +175,11 @@ export async function getMarketplaceCheckoutContextAction(input: {
         .order("priority", { ascending: false })
         .order("discount_percent", { ascending: false })
     })(),
-    getCachedAddresses(user.id, "user"),
+    admin
+      .from("addresses")
+      .select("id, zip_code, street, number, complement, neighborhood, city, state, is_default")
+      .eq("user_id", user.id)
+      .order("is_default", { ascending: false }),
     (() => {
       let q = admin
         .from("products")
@@ -191,6 +195,12 @@ export async function getMarketplaceCheckoutContextAction(input: {
       return q
     })(),
   ])
+
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const isShowcaseActive = await isStoreShowcaseActive(admin, { storeId: targetStoreId, partnerId: resolved.partnerId })
+  if (!isShowcaseActive) {
+    return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+  }
 
   const partnerPromotions = promosMap?.[resolved.partnerId] || []
 

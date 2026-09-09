@@ -51,7 +51,16 @@ async function validateMpSignature(
     const timestampMs = parseInt(timestamp, 10) * 1000
     if (Date.now() - timestampMs > MAX_WEBHOOK_AGE_MS) return false
 
-    const manifest = `id:${resourceId};request-id:${requestId};ts:${timestamp}`
+    const idStr = String(resourceId).trim()
+    const idLower = idStr.toLowerCase()
+
+    const candidateTemplates = [
+      `id:${idLower};request-id:${requestId};ts:${timestamp};`,
+      `id:${idStr};request-id:${requestId};ts:${timestamp};`,
+      `id:${idLower};request-id:${requestId};ts:${timestamp}`,
+      `id:${idStr};request-id:${requestId};ts:${timestamp}`,
+    ]
+
     const encoder = new TextEncoder()
     const key = await crypto.subtle.importKey(
       "raw",
@@ -61,12 +70,18 @@ async function validateMpSignature(
       ["sign"]
     )
 
-    const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(manifest))
-    const computedHex = Array.from(new Uint8Array(signatureBuffer))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
+    for (const manifest of candidateTemplates) {
+      const signatureBuffer = await crypto.subtle.sign("HMAC", key, encoder.encode(manifest))
+      const computedHex = Array.from(new Uint8Array(signatureBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
 
-    return constantTimeEquals(computedHex, receivedSignature)
+      if (constantTimeEquals(computedHex, receivedSignature)) {
+        return true
+      }
+    }
+
+    return false
   } catch (err) {
     console.error("[Edge Function] Signature validation error:", err)
     return false

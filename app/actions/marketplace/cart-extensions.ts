@@ -142,6 +142,10 @@ export async function addServiceBookingToCartAction(
   const guard = await assertCanBuyFromStore(user.id, canonicalPartnerId, effectiveStoreId)
   if (guard.error) return { error: guard.error }
 
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const showcaseActive = await isStoreShowcaseActive(admin, { storeId: effectiveStoreId, partnerId: canonicalPartnerId })
+  if (!showcaseActive) return { error: INACTIVE_SHOWCASE_ERROR }
+
   if (
     service.deleted_at ||
     service.status === "archived" ||
@@ -346,7 +350,10 @@ export async function addSubscriptionToCartAction(
   const guard = await assertCanBuyFromStore(user.id, input.partnerId)
   if (guard.error) return { error: guard.error }
 
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
   const admin = getAdminClient()
+  const showcaseActive = await isStoreShowcaseActive(admin, { partnerId: input.partnerId })
+  if (!showcaseActive) return { error: INACTIVE_SHOWCASE_ERROR }
   const { data: plan } = await admin
     .from("recurring_plans")
     .select("id, status, show_in_marketplace, partner_id")
@@ -429,6 +436,10 @@ export async function addPurchasableServiceToCartAction(
 
   const guard = await assertCanBuyFromStore(user.id, canonicalPartnerId, effectiveStoreId)
   if (guard.error) return { error: guard.error }
+
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const showcaseActive = await isStoreShowcaseActive(admin, { storeId: effectiveStoreId, partnerId: canonicalPartnerId })
+  if (!showcaseActive) return { error: INACTIVE_SHOWCASE_ERROR }
 
   if (
     service.deleted_at ||

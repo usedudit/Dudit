@@ -18,14 +18,14 @@ import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection } from "@/components/reusable"
+import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
 import { getProductDisplayImages } from "@/lib/utils/product-display-images"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { PromotionType, DiscountType } from "@/lib/types/promotion"
@@ -46,6 +46,7 @@ interface VendorPageClientProps {
     userProfile?: any
     cartCount?: number
     isShowcaseActive?: boolean
+    initialCategory?: string
 }
 
 const getImageUrl = (path?: string | null) => getR2ImageUrl(path)
@@ -652,7 +653,10 @@ function pickBestSection(sections: any[], seed: string | number): any | null {
     return bestDiscount || bestBenefit
 }
 
-export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount, isShowcaseActive = true }: VendorPageClientProps) {
+export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount, isShowcaseActive: propIsShowcaseActive, initialCategory }: VendorPageClientProps) {
+    const isShowcaseActive = propIsShowcaseActive !== undefined
+        ? propIsShowcaseActive
+        : (partner?.isShowcaseActive ?? partner?.is_showcase_active ?? true)
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
         if (calculatedReviewsCount === 0) return 0
@@ -665,11 +669,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const displayReviewsCount = hasEnoughReviews ? calculatedReviewsCount : 0
 
     const pathname = usePathname()
-    const router = useRouter()
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
-    const [categoryView, setCategoryView] = useState<string | null>(null)
+    const [categoryView, setCategoryView] = useState<string | null>(() => {
+        if (initialCategory) return initialCategory
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            return params.get("categoria")
+        }
+        return null
+    })
+    const categoryViewRef = useRef<string | null>(categoryView)
+    categoryViewRef.current = categoryView
+    const pushedHistoryRef = useRef(false)
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
@@ -808,16 +821,36 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         [categoryView, isCampaignView, activeCampaignPromo, groupedItems]
     )
 
+    // ── Instant 0ms popstate synchronization for browser Back / Forward ─────
+    useEffect(() => {
+        const handlePopState = () => {
+            if (typeof window === "undefined") return
+            const params = new URLSearchParams(window.location.search)
+            const cat = params.get("categoria")
+            categoryViewRef.current = cat
+            setCategoryView(cat)
+            setActiveTag(cat || "todos")
+            if (cat) {
+                setActiveSection("products")
+                setTimeout(scrollToProducts, 0)
+            }
+            pushedHistoryRef.current = false
+        }
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
-        const category = params.get("categoria")
+        const category = initialCategory || params.get("categoria")
         if (category) {
+            categoryViewRef.current = category
             setCategoryView(category)
             setActiveTag(category)
             setActiveSection("products")
             setTimeout(scrollToProducts, 0)
         }
-    }, [])
+    }, [initialCategory])
 
     useEffect(() => {
         let ticking = false
@@ -872,13 +905,24 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [updateTabsScrollState, allTabs.length])
 
     const handleWhatsApp = useCallback(() => openWhatsApp(partner.phone, partner.storeName), [partner.phone, partner.storeName])
-    const updateCategoryUrl = useCallback((tag: string | null) => {
+    const updateCategoryUrl = useCallback((tag: string | null, push: boolean = true) => {
+        if (typeof window === "undefined") return
         const params = new URLSearchParams(window.location.search)
         if (tag) params.set("categoria", tag)
         else params.delete("categoria")
         const query = params.toString()
-        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false })
-    }, [pathname, router])
+        const targetUrl = query ? `${pathname}?${query}` : pathname
+        const currentUrl = `${window.location.pathname}${window.location.search}`
+
+        if (targetUrl === currentUrl) return
+
+        if (push) {
+            pushedHistoryRef.current = true
+            window.history.pushState(window.history.state, "", targetUrl)
+        } else {
+            window.history.replaceState(window.history.state, "", targetUrl)
+        }
+    }, [pathname])
     const scrollToProducts = () => document.getElementById("vendor-products")?.scrollIntoView({ behavior: "smooth", block: "start" })
 
     useEffect(() => {
@@ -895,9 +939,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [categoryView, pendingScrollId])
 
-    const openCategory = (tag: string | null) => {
+    const openCategory = useCallback((tag: string | null) => {
         setActiveSection("products")
-        setCategoryView(tag)
         setCategorySearchValue("")
         setIsCategorySearchOpen(false)
         setCategorySortBy("relevancia")
@@ -906,14 +949,40 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         setCategoryPromoOn(false)
         setCategorySelectedBrands([])
         setActiveTag(tag || "todos")
-        updateCategoryUrl(tag)
-        setTimeout(scrollToProducts, 0)
-    }
-    const selectTab = (tag: string) => {
-        setActiveSection("products")
-        if (categoryView) {
+
+        if (tag) {
+            categoryViewRef.current = tag
+            setCategoryView(tag)
+            updateCategoryUrl(tag, true)
+            setTimeout(scrollToProducts, 0)
+        } else {
+            // Fechando visualização de categoria
+            categoryViewRef.current = null
             setCategoryView(null)
-            updateCategoryUrl(null)
+            if (typeof window !== "undefined") {
+                if (pushedHistoryRef.current) {
+                    pushedHistoryRef.current = false
+                    window.history.back()
+                } else {
+                    updateCategoryUrl(null, false)
+                }
+            }
+        }
+    }, [updateCategoryUrl])
+
+    const selectTab = useCallback((tag: string) => {
+        setActiveSection("products")
+        if (categoryViewRef.current) {
+            categoryViewRef.current = null
+            setCategoryView(null)
+            if (typeof window !== "undefined") {
+                if (pushedHistoryRef.current) {
+                    pushedHistoryRef.current = false
+                    window.history.back()
+                } else {
+                    updateCategoryUrl(null, false)
+                }
+            }
             setPendingScrollId(tag)
         } else {
             if (tag === "todos") {
@@ -926,7 +995,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             }
         }
         setActiveTag(tag)
-    }
+    }, [updateCategoryUrl])
 
     const categoryItems = useMemo(() => {
         if (!categoryView) return []
@@ -1030,19 +1099,14 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
                 <div className="w-full max-w-[1400px] mx-auto">
-                    <div className="relative w-full aspect-[1400/300] md:rounded-2xl overflow-hidden bg-gray-100 dark:bg-dark-border/50 lg:mb-4 shadow-xs">
+                    <div className="relative w-full aspect-[1400/300] md:rounded-2xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 lg:mb-4">
                         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                     </div>
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
                     {!isShowcaseActive && (
-                        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center gap-3">
-                            <span className="text-amber-600 shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                            </span>
-                            <p className="text-[14px] text-amber-800 font-medium">Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.</p>
-                        </div>
+                        <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" className="mb-4" />
                     )}
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
@@ -1051,12 +1115,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
                                     <h1 className="text-[24px] font-semibold text-brand-dark dark:text-dark-heading leading-tight truncate">{partner.storeName}</h1>
-                                    {displayReviewsCount > 0 && (
-                                        <div className="flex items-center gap-1 text-[12px] text-brand-green bg-[#ecfdf5] dark:bg-brand-dark/10 border border-brand-green/20 px-2 py-0.5 rounded-full shrink-0">
-                                            <StarIcon size={11} className="fill-brand-green text-brand-green" />
-                                            <span className="font-bold">{formatNumber(displayRating || 0, 1, 1)}</span>
-                                        </div>
-                                    )}
                                     <button onClick={() => setShowShareModal(true)} className="flex w-[26px] h-[26px] rounded-full border border-brand-border items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-brand-green hover:border-brand-green transition-colors">
                                         <ShareIcon size={14} />
                                     </button>
@@ -1318,6 +1376,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </aside>
 
                 <main id="vendor-products" className="flex-1 min-w-0 w-full lg:w-auto px-5 lg:px-0 scroll-mt-[170px]">
+                    {!isShowcaseActive && categoryView && (
+                        <div className="mb-4 lg:hidden">
+                            <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" />
+                        </div>
+                    )}
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
                             {categoryView ? (

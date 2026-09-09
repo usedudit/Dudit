@@ -91,8 +91,10 @@ export function PlanDetailsPageClient({
         const address = store?.addresses?.[0] || p.addresses?.[0] || {}
         const storeId = store?.id || p.store_id || plan.store_id || p.id || plan.partner_id || "1"
         const storeName = store?.name || p?.name || p?.storeName || "Vendedor da Dudit"
+        const isShowcaseActive = (store?.is_showcase_active ?? p.is_showcase_active ?? plan.is_showcase_active ?? true) !== false
 
         return {
+            isShowcaseActive,
             id: storeId,
             short_id: store?.short_id || p.short_id || plan.store_short_id || p?.store?.short_id,
             slug: store?.slug || p.slug,
@@ -256,6 +258,11 @@ export function PlanDetailsPageClient({
         `${a.street}, ${a.number}${a.complement ? `, ${a.complement}` : ""} - ${a.neighborhood}, ${a.city} - ${a.state}, ${a.zip_code}`
 
     const handleSubscribe = async () => {
+        if (partner.isShowcaseActive === false) {
+            notifyError("Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+
         if (!userId) {
             router.push(`/auth/login?next=${encodeURIComponent(window.location.pathname)}`)
             return
@@ -421,7 +428,7 @@ export function PlanDetailsPageClient({
                 </span>
             </div>
 
-            {isPlanOwner ? (
+            {isPlanOwner && (
                 <InfoCard
                     message={canBuyState.reason || (isTeamMember
                         ? "Você não pode assinar planos de um negócio do qual faz parte da equipe."
@@ -429,7 +436,16 @@ export function PlanDetailsPageClient({
                     color="orange"
                     className="mb-8"
                 />
-            ) : (
+            )}
+            {!isPlanOwner && partner.isShowcaseActive === false && (
+                <InfoCard
+                    title="Vitrine Inativa"
+                    message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
+            {!isPlanOwner && (
                 <>
                     {/* Delivery Options */}
                     <div className="mb-6">
@@ -586,10 +602,12 @@ export function PlanDetailsPageClient({
                     {/* Subscribe button */}
                     <button
                         onClick={handleSubscribe}
-                        disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm)}
+                        disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false}
                         className="w-full py-4 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-[15px]"
                     >
-                        {submitting ? (
+                        {partner.isShowcaseActive === false ? (
+                            "Vitrine Inativa"
+                        ) : submitting ? (
                             <>
                                 <Spinner size={16} className="text-white" />
                                 Processando assinatura...
@@ -1028,10 +1046,12 @@ export function PlanDetailsPageClient({
                         </div>
                         <button
                             onClick={handleSubscribe}
-                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm)}
+                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false}
                             className="px-6 py-3.5 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm shrink-0"
                         >
-                            {submitting ? (
+                            {partner.isShowcaseActive === false ? (
+                                "Vitrine Inativa"
+                            ) : submitting ? (
                                 <>
                                     <Spinner size={14} className="text-white animate-spin" />
                                     Assinando...

@@ -128,7 +128,8 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         id,
         user_id,
         mp_user_id,
-        mp_public_key
+        mp_public_key,
+        is_showcase_active
       )
     `)
       .eq("user_id", userId)
@@ -179,9 +180,10 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
   let partnerDeliverySettings: Record<string, any> = {}
   let partnerPromotions: Record<string, any[]> = {}
   let storesMap: Record<string, any> = {}
+  let partnerStoresMap: Record<string, any> = {}
 
   try {
-    const [pmResult, addrResult, delResult, promosBatch, storesResult] = await Promise.all([
+    const [pmResult, addrResult, delResult, promosBatch, storesResult, partnerStoresResult] = await Promise.all([
       supabase
         .from("payment_methods")
         .select("partner_id, store_id, payment_type, type, is_active")
@@ -199,8 +201,14 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       storeIds.length > 0
         ? supabase
           .from("stores")
-          .select("id, partner_id, name, slug, logo_url, opening_hours, phone, description, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, partner_id, name, slug, logo_url, opening_hours, phone, description, is_showcase_active, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .in("id", storeIds)
+        : Promise.resolve({ data: [] as any[] }),
+      partnerIds.length > 0
+        ? supabase
+          .from("stores")
+          .select("id, partner_id, is_showcase_active")
+          .in("partner_id", partnerIds)
         : Promise.resolve({ data: [] as any[] }),
     ])
 
@@ -210,6 +218,13 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
     if (storesResult.data) {
       storesMap = storesResult.data.reduce((acc: any, s: any) => {
         if (s?.id) acc[s.id] = s
+        return acc
+      }, {})
+    }
+
+    if (partnerStoresResult?.data) {
+      partnerStoresMap = partnerStoresResult.data.reduce((acc: any, s: any) => {
+        if (s?.partner_id && !acc[s.partner_id]) acc[s.partner_id] = s
         return acc
       }, {})
     }
@@ -255,12 +270,19 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       const rawPm = paymentMethods || []
       const storePms = storeId ? rawPm.filter((pm: any) => pm.store_id === storeId) : []
       const effectivePms = storePms.length > 0 ? storePms : rawPm.filter((pm: any) => pm.partner_id === partnerId)
+      const partnerStore = partnerStoresMap[partnerId] || null
+      const isShowcaseActive = store?.is_showcase_active !== undefined
+        ? store.is_showcase_active
+        : (partnerStore?.is_showcase_active !== undefined
+          ? partnerStore.is_showcase_active
+          : (partner?.is_showcase_active ?? true))
 
       acc[storeKey] = {
         storeId,
         partnerId,
         partner,
         store,
+        isShowcaseActive,
         items: [],
         products: [],
         services: [],
@@ -444,6 +466,14 @@ export async function addToCartAction(
   const canBuyGuard = await assertCanBuyFromStore(user.id, partnerId, storeId)
   if (canBuyGuard.error) {
     return { error: canBuyGuard.error }
+  }
+
+  // 3.0. Validação de Vitrine Ativa
+  const effectiveStoreId = storeId || (variantId ? (entity.products as any)?.store_id : entity.store_id)
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const showcaseActive = await isStoreShowcaseActive(adminClient, { storeId: effectiveStoreId, partnerId })
+  if (!showcaseActive) {
+    return { error: INACTIVE_SHOWCASE_ERROR }
   }
 
   // 3.1. Validação de Estoque e Status Ativo
@@ -871,6 +901,13 @@ export async function checkoutCartAction(
   if (!resolved.success) return { error: resolved.error }
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
+
+  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const checkoutStoreId = storeId || resolvedLines.find((l: any) => l.storeId)?.storeId || null
+  const isShowcaseActive = await isStoreShowcaseActive(adminClient, { storeId: checkoutStoreId, partnerId })
+  if (!isShowcaseActive) {
+    return { error: INACTIVE_SHOWCASE_ERROR }
+  }
   const capabilities = await getPartnerCapabilities(partnerId, { storeId })
   addMonitoringBreadcrumb({
     domain: "checkout",
@@ -1579,6 +1616,41 @@ export async function updateCartItemFulfillmentModeAction(cartItemId: string, mo
     .eq("id", cartItemId)
 
   if (error) return { error: error.message }
+
+  await revalidateCart(user.id)
+  return { success: true }
+}
+
+export async function bulkUpdateFulfillmentModesAction(
+  changes: Array<{ cartItemId: string; mode: string }>,
+  csrf_token?: string
+) {
+  await requireRateLimit(RateLimitCategory.CART)
+  const { requireCSRF } = await import("@/lib/security/csrf-action-wrapper")
+  const csrfValidation = await requireCSRF(csrf_token)
+  if (!csrfValidation.valid) return { error: csrfValidation.error }
+
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  const cartItemIds = changes.map((c) => c.cartItemId)
+  const { data: items } = await supabase
+    .from("cart_items")
+    .select("id, user_id")
+    .in("id", cartItemIds)
+
+  if (!items || items.length !== cartItemIds.length || items.some((i) => i.user_id !== user.id)) {
+    return { error: "Sem permissão" }
+  }
+
+  const now = new Date().toISOString()
+  for (const change of changes) {
+    const { error } = await supabase
+      .from("cart_items")
+      .update({ fulfillment_mode: change.mode, updated_at: now })
+      .eq("id", change.cartItemId)
+    if (error) return { error: error.message }
+  }
 
   await revalidateCart(user.id)
   return { success: true }

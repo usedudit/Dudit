@@ -41,6 +41,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         user_id,
         is_active,
         erp_disabled,
+        is_showcase_active,
         mp_user_id,
         mp_public_key,
         created_at,
@@ -113,6 +114,11 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
     rawPartner.longitude = addr?.longitude || rawPartner.longitude
     rawPartner.business_info = rawStore.business_info || rawPartner.business_info
     rawPartner.gallery = rawStore.gallery || rawPartner.gallery
+    rawPartner.is_showcase_active = rawStore.is_showcase_active !== false
+    rawPartner.rating = rawStore.rating ?? rawPartner.rating ?? 0
+    rawPartner.vendas_totais = rawStore.vendas_totais ?? rawPartner.vendas_totais ?? 0
+  } else if (rawPartner) {
+    rawPartner.is_showcase_active = rawPartner.is_showcase_active !== false
   }
 
   // user_id must never be serialized to a marketplace client.

@@ -82,3 +82,48 @@ export async function invalidateProductCache(
   
   console.log(`[CACHE] INVALIDATION COMPLETE product:${productId}`)
 }
+
+export async function invalidateStoreCache(
+  storeId: string,
+  partnerId: string,
+  slug?: string,
+  options?: { silent?: boolean }
+) {
+  console.log(`[CACHE] INVALIDATING store:${storeId} (partner:${partnerId}) slug:${slug}`)
+  if (!options?.silent) {
+    await incrementCacheVersion()
+  }
+
+  try {
+    const { revalidateTag, revalidatePath } = await import('next/cache')
+    const safeRevalidateTag = (tag: string) => {
+      try {
+        (revalidateTag as any)(tag, 'max')
+      } catch {
+        // Silently ignore
+      }
+    }
+
+    safeRevalidateTag(`store-${storeId}`)
+    safeRevalidateTag(TAGS.storeProfile(storeId))
+    safeRevalidateTag("store-profile")
+    safeRevalidateTag("store-products")
+    safeRevalidateTag(TAGS.partner(partnerId))
+    safeRevalidateTag(TAGS.products(partnerId))
+    safeRevalidateTag(TAGS.storeProducts(partnerId, storeId))
+
+    if (slug) {
+      safeRevalidateTag(`store-${slug}`)
+      try {
+        revalidatePath(`/${slug}`)
+      } catch {}
+    }
+
+    try {
+      revalidatePath("/sacola")
+      revalidatePath("/erp/lojas")
+    } catch {}
+  } catch (error) {
+    console.error(`[CACHE] Erro ao revalidar store cache:`, error)
+  }
+}
