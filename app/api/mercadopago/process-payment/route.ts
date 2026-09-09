@@ -1091,7 +1091,6 @@ async function handler(request: NextRequest) {
         .update({
           payment_provider: "Mercado Pago",
           mp_payment_id: mpPaymentId.toString(),
-          payment_status: paymentStatus,
           situation: updatedSituation,
           payment_breakdown: updatedBreakdown,
           paid_amount: totalPaidAmount,

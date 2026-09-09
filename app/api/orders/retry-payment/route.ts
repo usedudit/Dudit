@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
         .update({
           payment_provider: "Mercado Pago",
           mp_payment_id: paymentData.id.toString(),
-          payment_status: paymentData.status,
+          situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "cancelled" : "pending")),
           payment_expires_at: paymentData.date_of_expiration,
           updated_at: new Date().toISOString(),
         })
