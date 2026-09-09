@@ -106,7 +106,8 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId } = body
+    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId: rawExistingOrderId } = body
+    const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
     const claimedPartnerId = body.partnerId
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
     if (body.checkoutPricing && !checkoutPricing) {

@@ -5,7 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { updateProfileAction } from "@/app/actions/profile"
 import { changePasswordAction } from "@/app/actions/shared/password"
 import { useNotification } from "@/hooks/use-notification"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { formatE164ToDisplay } from "@/lib/utils/phone-utils"
 import { MarketplaceHeader } from "../marketplace/MarketplaceHeader"
 import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
@@ -20,6 +20,9 @@ import { ReviewsView } from "./ReviewsView"
 import { NotificationsView } from "./NotificationsView"
 import { AlertCircleIcon } from "@/lib/icons"
 
+const VALID_VIEWS: View[] = ["main", "informacoes-da-conta", "enderecos", "seguranca", "avaliacoes", "notificacoes"]
+const isValidView = (val: any): val is View => typeof val === "string" && VALID_VIEWS.includes(val as View)
+
 interface UserProfilePageProps {
     userId: string
     profile: any
@@ -28,25 +31,31 @@ interface UserProfilePageProps {
     email: string
     hasPassword: boolean
     authProvider: string
+    initialTab?: View
 }
 
-export function UserProfilePage({ userId, profile, addresses: initialAddresses, initialFullName, email, hasPassword, authProvider }: UserProfilePageProps) {
+export function UserProfilePage({
+    userId,
+    profile,
+    addresses: initialAddresses,
+    initialFullName,
+    email,
+    hasPassword,
+    authProvider,
+    initialTab: serverInitialTab,
+}: UserProfilePageProps) {
     const { success: notifySuccess, error: notifyError } = useNotification()
-    const router = useRouter()
     const searchParams = useSearchParams()
-    const initialTab = searchParams.get("tab") as View | null
+    const clientTab = searchParams?.get("tab")
+    const initialView: View = isValidView(serverInitialTab)
+        ? serverInitialTab
+        : isValidView(clientTab)
+            ? clientTab
+            : "main"
 
-    const [currentView, setCurrentView] = useState<View>(initialTab || "main")
-
-    useEffect(() => {
-        const handlePopState = () => {
-            const params = new URLSearchParams(window.location.search)
-            const tab = params.get("tab") as View | null
-            setCurrentView(tab || "main")
-        }
-        window.addEventListener("popstate", handlePopState)
-        return () => window.removeEventListener("popstate", handlePopState)
-    }, [])
+    const [currentView, setCurrentView] = useState<View>(initialView)
+    const currentViewRef = useRef<View>(initialView)
+    const pushedHistoryRef = useRef(false)
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -272,19 +281,69 @@ export function UserProfilePage({ userId, profile, addresses: initialAddresses, 
         setEditing(e => ({ ...e, [field]: val }))
     }
 
-    const navigate = (view: View) => {
+    const resetSubViewStates = () => {
         clearMessages()
         setEditing({ name: false, cpf: false, phone: false, password: false, address: false, secPhone: false, secEmail: false })
         setIsChangingEmail(false)
         setIsChangingSecEmail(false)
+    }
 
-        setCurrentView(view)
+    const navigate = (view: View) => {
+        resetSubViewStates()
 
-        const url = view === "main" ? "/perfil" : `/perfil?tab=${view}`
-        if (typeof window !== "undefined") {
-            router.push(url, { scroll: false })
+        if (view === currentViewRef.current) return
+
+        if (view === "main") {
+            currentViewRef.current = "main"
+            setCurrentView("main")
+            if (pushedHistoryRef.current) {
+                pushedHistoryRef.current = false
+                window.history.back()
+            } else {
+                window.history.replaceState(window.history.state, "", "/perfil")
+            }
+        } else {
+            const url = `/perfil?tab=${view}`
+            if (currentViewRef.current === "main") {
+                window.history.pushState(window.history.state, "", url)
+                pushedHistoryRef.current = true
+            } else {
+                window.history.replaceState(window.history.state, "", url)
+            }
+            currentViewRef.current = view
+            setCurrentView(view)
         }
     }
+
+    useEffect(() => {
+        const handlePopState = () => {
+            const params = new URLSearchParams(window.location.search)
+            const tabParam = params.get("tab")
+            const tab: View = isValidView(tabParam) ? tabParam : "main"
+
+            if (tab === "main") {
+                pushedHistoryRef.current = false
+            }
+            currentViewRef.current = tab
+            setCurrentView(tab)
+            resetSubViewStates()
+        }
+        window.addEventListener("popstate", handlePopState)
+        return () => window.removeEventListener("popstate", handlePopState)
+    }, [])
+
+    useEffect(() => {
+        const tabParam = searchParams?.get("tab")
+        const tab: View = isValidView(tabParam) ? tabParam : "main"
+        if (tab !== currentViewRef.current) {
+            if (tab === "main") {
+                pushedHistoryRef.current = false
+            }
+            currentViewRef.current = tab
+            setCurrentView(tab)
+            resetSubViewStates()
+        }
+    }, [searchParams])
 
     const startTimer = (
         ref: React.MutableRefObject<NodeJS.Timeout | null>,

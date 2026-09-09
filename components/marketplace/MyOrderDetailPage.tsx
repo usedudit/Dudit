@@ -1983,25 +1983,33 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     />
                 )}
 
-                <DefaultModal
-                    isOpen={isCancelModalOpen}
-                    onClose={() => setIsCancelModalOpen(false)}
-                    title="Cancelar pedido"
-                    maxWidth="lg"
-                    footer={
-                        <div className="flex justify-end gap-3 w-full">
-                            <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
-                            <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
-                                {isCanceling ? "Cancelando..." : order.situation !== "paid" ? "Confirmar cancelamento" : "Solicitar cancelamento"}
-                            </Button>
-                        </div>
-                    }
-                >
-                    {order.situation !== "paid" ? (
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Tem certeza de que deseja cancelar este pedido? O cancelamento será feito imediatamente e os itens retornarão ao estoque.
-                        </p>
-                    ) : (
+                {order.situation !== "paid" ? (
+                    <AlertModal
+                        isOpen={isCancelModalOpen}
+                        onClose={() => setIsCancelModalOpen(false)}
+                        onConfirm={handleCancelOrder}
+                        title="Cancelar pedido"
+                        description="Tem certeza de que deseja cancelar este pedido? Essa ação não pode ser desfeita."
+                        confirmText={isCanceling ? "Cancelando..." : "Sim, cancelar pedido"}
+                        cancelText="Manter pedido"
+                        variant="danger"
+                        isLoading={isCanceling}
+                    />
+                ) : (
+                    <DefaultModal
+                        isOpen={isCancelModalOpen}
+                        onClose={() => setIsCancelModalOpen(false)}
+                        title="Cancelar pedido"
+                        maxWidth="lg"
+                        footer={
+                            <div className="flex justify-end gap-3 w-full">
+                                <Button variant="outline" onClick={() => setIsCancelModalOpen(false)} disabled={isCanceling}>Voltar</Button>
+                                <Button variant="outlinered" onClick={handleCancelOrder} disabled={isCanceling}>
+                                    {isCanceling ? "Cancelando..." : "Solicitar cancelamento"}
+                                </Button>
+                            </div>
+                        }
+                    >
                         <div className="space-y-5">
                             <FormDropdown
                                 label="Motivo do cancelamento"
@@ -2026,8 +2034,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 showCharacterCount
                             />
                         </div>
-                    )}
-                </DefaultModal>
+                    </DefaultModal>
+                )}
 
                 <DefaultModal
                     isOpen={isReturnModalOpen}
@@ -2040,9 +2048,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             {!sellerReturnCapabilities.hasReturnsModule ? (
                                 <Button
                                     onClick={submitReturnRequest}
-                                    className="bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold flex items-center gap-2 border-0 shadow-sm"
+                                    leftIcon={
+                                        <WhatsappIcon size={16} />
+                                    }
                                 >
-                                    <WhatsappIcon size={18} className="fill-white" />
                                     Continuar no WhatsApp
                                 </Button>
                             ) : (
@@ -2159,12 +2168,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         )}
 
                         {returnResolution === "exchange" && hasAnyService && (
-                            <div className="rounded-xl border border-amber-300 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3 flex gap-2 items-center">
-                                <AlertCircleIcon size={18} className="text-amber-600 dark:text-amber-500 shrink-0" />
-                                <span className="text-xs text-amber-800 dark:text-amber-400 font-medium">
-                                    Serviços não permitem troca. Selecione Reembolso ou Vale-compra.
-                                </span>
-                            </div>
+                            <InfoCard title="Atenção" message="Serviços não permitem troca. Selecione Reembolso ou Vale-compra." color="orange" />
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

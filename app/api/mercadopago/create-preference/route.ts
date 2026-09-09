@@ -77,7 +77,8 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Nenhum produto fornecido" }, { status: 400 })
     }
 
-    const existingOrderId = body.existingOrderId || body.orderId
+    const rawExistingOrderId = body.existingOrderId || body.orderId
+    const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
     let existingOrder: any = null
     if (existingOrderId) {
       const { data: fetchedOrder, error: fetchError } = await adminClient

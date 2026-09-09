@@ -59,6 +59,7 @@ interface PixPaymentWrapperProps {
         couponCode?: string | null
         couponDiscount?: number
         deliveryFee?: number
+        storeId?: string | null
         checkoutPricing?: {
             subtotal: number
             couponDiscount: number
@@ -210,11 +211,12 @@ export function PaymentWrapper({
     }, [actualOrderNumber, orderNumber, actualOrderId, orderId])
 
     useEffect(() => {
-        if (!actualOrderNumber && orderId && !orderId.startsWith("temp-") && (!orderNumber || !isValidOrderNumber(orderNumber))) {
+        const targetOrderId = actualOrderId || orderId
+        if (!actualOrderNumber && targetOrderId && !targetOrderId.startsWith("temp-") && (!orderNumber || !isValidOrderNumber(orderNumber))) {
             fetch("/api/orders/sync-payment-status", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId }),
+                body: JSON.stringify({ orderId: targetOrderId }),
             })
                 .then(res => res.json())
                 .then(data => {
@@ -224,14 +226,14 @@ export function PaymentWrapper({
                 })
                 .catch(() => { })
         }
-    }, [orderId, orderNumber, actualOrderNumber])
+    }, [orderId, actualOrderId, orderNumber, actualOrderNumber])
 
     const handleClose = () => {
         setIsClosing(true)
         setTimeout(() => {
             setIsClosing(false)
-            // If we have an orderId that is not temp, or we are in a success/pending state, redirect to orders
-            const isOrderCreated = orderId && !orderId.startsWith("temp-")
+            // If we have an actual orderId (not temp), or we are in a success/pending payment state, redirect to orders
+            const isOrderCreated = Boolean((actualOrderId && !actualOrderId.startsWith("temp-")) || (orderId && !orderId.startsWith("temp-")))
             const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect"].includes(step)
 
             if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
@@ -356,6 +358,7 @@ export function PaymentWrapper({
                         deliveryAddress: orderDetails.deliveryAddress,
                         cartItemIds: orderDetails.cartItemIds,
                         payDepositOnly,
+                        storeId: orderDetails.storeId || undefined,
                         checkoutPricing: orderDetails.checkoutPricing,
                         existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
                     },
@@ -503,6 +506,7 @@ export function PaymentWrapper({
                     couponCode: orderDetails.couponCode,
                     deliveryFee: orderDetails.deliveryFee,
                     payDepositOnly,
+                    storeId: orderDetails.storeId || undefined,
                     checkoutPricing: orderDetails.checkoutPricing,
                     existingOrderId: (orderId && !orderId.startsWith("temp-")) ? orderId : undefined,
                 },
@@ -510,6 +514,14 @@ export function PaymentWrapper({
 
             if (responseData.orderId) setActualOrderId(responseData.orderId)
             if (responseData.orderNumber) setActualOrderNumber(responseData.orderNumber)
+
+            if (typeof window !== "undefined") {
+                sessionStorage.removeItem("checkout_session")
+            }
+            try {
+                const { invalidateCartCache } = await import("@/hooks/use-cart")
+                invalidateCartCache()
+            } catch { }
 
             const status = responseData.paymentStatus || responseData.status
             const paymentMethod = responseData.paymentMethod || responseData.payment_method_id
@@ -577,10 +589,11 @@ export function PaymentWrapper({
     }, [paymentConfirmed])
 
     // Realtime: automatically confirms payment in < 80ms when Mercado Pago webhook updates the order
+    const targetRealtimeId = actualOrderId || orderId
     useRealtimeRecord<{ situation?: string; payment_status?: string; order_number?: string }>({
         table: "orders",
-        id: orderId,
-        enabled: open && !paymentConfirmed && !!orderId && (step === "pix" || step === "boleto" || step === "mp_redirect"),
+        id: targetRealtimeId,
+        enabled: open && !paymentConfirmed && Boolean(targetRealtimeId && !targetRealtimeId.startsWith("temp-")) && (step === "pix" || step === "boleto" || step === "mp_redirect"),
         onUpdate: (record) => {
             if (record?.situation === "paid" || record?.payment_status === "approved") {
                 if (record.order_number) setActualOrderNumber(record.order_number)
@@ -592,6 +605,8 @@ export function PaymentWrapper({
     const lastCheckRef = useRef(0)
 
     const checkPaymentStatus = async (silent: boolean = false) => {
+        const targetOrderId = actualOrderId || orderId
+        if (!targetOrderId || targetOrderId.startsWith("temp-")) return
         const now = Date.now()
 
         if (now - lastCheckRef.current < 2500) return // trava 2.5s
@@ -603,7 +618,7 @@ export function PaymentWrapper({
             const response = await fetch("/api/orders/sync-payment-status", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId }),
+                body: JSON.stringify({ orderId: targetOrderId }),
             })
 
             if (response.ok) {
@@ -631,7 +646,8 @@ export function PaymentWrapper({
 
     // Auto-polling & Tab focus listener while waiting for Pix payment
     useEffect(() => {
-        if (!open || paymentConfirmed || !orderId || step !== "pix") return
+        const targetOrderId = actualOrderId || orderId
+        if (!open || paymentConfirmed || !targetOrderId || targetOrderId.startsWith("temp-") || step !== "pix") return
 
         // 1. Gentle background poll every 3.5 seconds
         const pollInterval = setInterval(() => {
@@ -653,7 +669,7 @@ export function PaymentWrapper({
             document.removeEventListener("visibilitychange", handleVisibilityOrFocus)
             window.removeEventListener("focus", handleVisibilityOrFocus)
         }
-    }, [open, paymentConfirmed, orderId, step])
+    }, [open, paymentConfirmed, orderId, actualOrderId, step])
 
     const handleCopyQrCode = () => {
         if (pixData?.qrCode) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton, ListItem, DefaultModal } from "@/components/reusable"
 import { MapPinIcon } from "@/lib/icons"
@@ -123,22 +123,7 @@ export function CheckoutFulfillmentPanel({
   const showProductsSection = hasProducts && hasAnyFulfillmentOption
   const showServicesSection = hasServices
 
-  const [pendingModes, setPendingModes] = useState<Record<string, "on_site" | "customer_location">>({})
-
-  useEffect(() => {
-    const next: Record<string, "on_site" | "customer_location"> = {}
-    for (const line of serviceLines) {
-      next[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
-    }
-    setPendingModes(next)
-  }, [serviceLines])
-
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalLineId, setModalLineId] = useState<string | null>(null)
-  const [modalDraft, setModalDraft] = useState<"on_site" | "customer_location">("on_site")
-  const [saving, setSaving] = useState(false)
-
-  const serviceLinesSupportingBoth = useMemo(
+  const servicesWithChoice = useMemo(
     () => serviceLines.filter((l) => {
       const allowed = l.allowedFulfillmentModes || ["on_site"]
       return allowed.includes("on_site") && allowed.includes("customer_location")
@@ -146,59 +131,61 @@ export function CheckoutFulfillmentPanel({
     [serviceLines]
   )
 
-  const hasPendingChanges = useMemo(() => {
-    return serviceLines.some((line) => {
-      const allowed = line.allowedFulfillmentModes || ["on_site"]
-      if (allowed.length <= 1) return false
-      return pendingModes[line.lineId] !== ((line.fulfillmentMode as "on_site" | "customer_location") || "on_site")
-    })
-  }, [pendingModes, serviceLines])
+  const showFulfillmentListItem = servicesWithChoice.length > 0
 
-  const anyServiceRequiresCustomerAddress = serviceLines.some(
-    (l) => (pendingModes[l.lineId] || l.fulfillmentMode) === "customer_location"
-  )
-  const anyServiceRequiresOnSite = serviceLines.some(
-    (l) => (pendingModes[l.lineId] || l.fulfillmentMode || "on_site") === "on_site"
-  )
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalDrafts, setModalDrafts] = useState<Record<string, "on_site" | "customer_location">>({})
+  const [saving, setSaving] = useState(false)
 
-  const openModal = useCallback((lineId: string) => {
-    setModalLineId(lineId)
-    setModalDraft(pendingModes[lineId] || "on_site")
-    setModalOpen(true)
-  }, [pendingModes])
-
-  const handleModalSave = useCallback(() => {
-    if (modalLineId) {
-      setPendingModes((prev) => ({ ...prev, [modalLineId]: modalDraft }))
+  const openModal = useCallback(() => {
+    const drafts: Record<string, "on_site" | "customer_location"> = {}
+    for (const line of servicesWithChoice) {
+      drafts[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
     }
-    setModalOpen(false)
-    setModalLineId(null)
-  }, [modalLineId, modalDraft])
+    setModalDrafts(drafts)
+    setModalOpen(true)
+  }, [servicesWithChoice])
 
-  const handleBulkSave = useCallback(async () => {
+  const handleDraftChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
+    setModalDrafts((prev) => ({ ...prev, [lineId]: mode }))
+  }, [])
+
+  const hasPendingChanges = useMemo(() => {
+    return servicesWithChoice.some((line) => {
+      const current = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+      return modalDrafts[line.lineId] !== current
+    })
+  }, [modalDrafts, servicesWithChoice])
+
+  const handleModalSave = useCallback(async () => {
     if (!onFulfillmentModesSave) return
     const changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }> = []
-    for (const line of serviceLines) {
-      const allowed = line.allowedFulfillmentModes || ["on_site"]
-      if (allowed.length <= 1) continue
-      const pending = pendingModes[line.lineId]
+    for (const line of servicesWithChoice) {
       const current = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
-      if (pending !== current) {
+      const pending = modalDrafts[line.lineId]
+      if (pending && pending !== current) {
         changes.push({ cartItemId: line.lineId, mode: pending })
       }
     }
-    if (changes.length === 0) return
+    if (changes.length === 0) {
+      setModalOpen(false)
+      return
+    }
     setSaving(true)
     try {
       await onFulfillmentModesSave(changes)
+      setModalOpen(false)
     } finally {
       setSaving(false)
     }
-  }, [onFulfillmentModesSave, pendingModes, serviceLines])
+  }, [onFulfillmentModesSave, modalDrafts, servicesWithChoice])
 
-  const modalLine = modalLineId ? serviceLines.find((l) => l.lineId === modalLineId) : null
-  const modalAllowed = modalLine ? (modalLine.allowedFulfillmentModes || ["on_site"]) : ["on_site"]
-  const modalSupportsBoth = modalAllowed.includes("on_site") && modalAllowed.includes("customer_location")
+  const anyServiceRequiresCustomerAddress = serviceLines.some(
+    (l) => l.fulfillmentMode === "customer_location"
+  )
+  const anyServiceRequiresOnSite = serviceLines.some(
+    (l) => l.fulfillmentMode === "on_site" || !l.fulfillmentMode
+  )
 
   const getModeLabel = (mode: string) => {
     if (mode === "customer_location") return "No meu endereço"
@@ -274,39 +261,35 @@ export function CheckoutFulfillmentPanel({
     return (
       <FormSection title="Serviços">
         <div className="space-y-3">
+          {showFulfillmentListItem && (
+            <ListItem
+              title="Forma de atendimento"
+              description="Defina onde cada serviço será realizado"
+              onClick={openModal}
+              showChevron
+            />
+          )}
+
           {serviceLines.map((line) => {
             const allowed = line.allowedFulfillmentModes || ["on_site"]
             const supportsBoth = allowed.includes("on_site") && allowed.includes("customer_location")
-            const currentMode = pendingModes[line.lineId] || (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+            if (supportsBoth) return null
 
             return (
-              <ListItem
+              <div
                 key={line.lineId}
-                title={line.displayName}
-                description={
-                  <span className="flex flex-col gap-0.5">
-                    {line.bookingSummary && <span>{line.bookingSummary}</span>}
-                    <span className="text-xs font-semibold text-brand-green">{getModeLabel(currentMode)}</span>
-                  </span>
-                }
-                onClick={supportsBoth ? () => openModal(line.lineId) : undefined}
-                showChevron={supportsBoth}
-              />
+                className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
+              >
+                <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
+                {line.bookingSummary && (
+                  <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
+                )}
+                <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit mt-2">
+                  {getModeLabel(allowed[0] || "on_site")}
+                </div>
+              </div>
             )
           })}
-
-          {serviceLines.length > 0 && hasPendingChanges && (
-            <div className="flex justify-end pt-2">
-              <Button
-                variant="default"
-                onClick={handleBulkSave}
-                disabled={saving}
-                isLoading={saving}
-              >
-                Salvar
-              </Button>
-            </div>
-          )}
 
           {anyServiceRequiresCustomerAddress && (
             <div className="pt-2">
@@ -343,53 +326,53 @@ export function CheckoutFulfillmentPanel({
       <DefaultModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Forma de Atendimento"
+        title="Forma de atendimento"
         footer={
-          modalSupportsBoth ? (
-            <Button variant="default" onClick={handleModalSave} className="flex-1">
-              Salvar
-            </Button>
-          ) : undefined
+          <Button variant="default" onClick={handleModalSave} disabled={saving} isLoading={saving} className="flex-1">
+            Salvar
+          </Button>
         }
       >
-        {modalLine && (
-          <div className="space-y-4">
-            <div>
-              <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{modalLine.displayName}</p>
-              {modalLine.bookingSummary && (
-                <p className="text-sm text-brand-inactive-text mt-1">{modalLine.bookingSummary}</p>
-              )}
-            </div>
+        <div className="w-full">
+          <div className="flex items-center gap-4 pb-3 border-b border-brand-border dark:border-dark-border mb-1">
+            <div className="flex-1" />
+            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-center">No estabelecimento</span>
+            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-center">No meu endereço</span>
+          </div>
 
-            <div>
-              <p className="text-xs font-bold text-brand-dark dark:text-dark-heading uppercase tracking-wider mb-3">
-                Onde será realizado?
-              </p>
-              {modalSupportsBoth ? (
-                <div className="flex gap-6">
+          {servicesWithChoice.map((line) => {
+            const currentDraft = modalDrafts[line.lineId] || "on_site"
+            return (
+              <div
+                key={line.lineId}
+                className="flex items-center gap-4 py-3 border-b border-brand-border/50 dark:border-dark-border/50 last:border-b-0"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{line.displayName}</p>
+                  {line.bookingSummary && (
+                    <p className="text-xs text-brand-inactive-text mt-0.5">{line.bookingSummary}</p>
+                  )}
+                </div>
+                <div className="w-28 flex justify-center">
                   <RadioButton
-                    name={`modal-fulfillment-${modalLineId}`}
+                    name={`modal-${line.lineId}`}
                     value="on_site"
-                    checked={modalDraft === "on_site"}
-                    onChange={() => setModalDraft("on_site")}
-                    label="No estabelecimento"
-                  />
-                  <RadioButton
-                    name={`modal-fulfillment-${modalLineId}`}
-                    value="customer_location"
-                    checked={modalDraft === "customer_location"}
-                    onChange={() => setModalDraft("customer_location")}
-                    label="No meu endereço"
+                    checked={currentDraft === "on_site"}
+                    onChange={() => handleDraftChange(line.lineId, "on_site")}
                   />
                 </div>
-              ) : (
-                <p className="text-sm text-brand-inactive-text">
-                  {getModeLabel(modalAllowed[0] || "on_site")}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+                <div className="w-28 flex justify-center">
+                  <RadioButton
+                    name={`modal-${line.lineId}`}
+                    value="customer_location"
+                    checked={currentDraft === "customer_location"}
+                    onChange={() => handleDraftChange(line.lineId, "customer_location")}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </DefaultModal>
     </div>
   )

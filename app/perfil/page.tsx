@@ -3,7 +3,14 @@ import { requireUser } from "@/lib/auth/authorization"
 import { getPasswordSecurityInfo } from "@/app/actions/shared/password"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>
+}) {
+  const resolvedSearchParams = await searchParams
+  const initialTab = resolvedSearchParams?.tab as any
+
   // Use cached auth layer instead of raw supabase call
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
@@ -45,6 +52,7 @@ export default async function ProfilePage() {
       email={user.email!}
       hasPassword={passwordInfo.hasPassword}
       authProvider={passwordInfo.provider}
+      initialTab={initialTab}
     />
   )
 }
