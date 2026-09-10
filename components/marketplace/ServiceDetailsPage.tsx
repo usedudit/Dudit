@@ -56,7 +56,7 @@ import {
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
-import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
+import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
@@ -378,8 +378,7 @@ export function ServiceDetailsPageClient({
     // Load user addresses if logged in
     useEffect(() => {
         if (userId && !isProductOwner) {
-            const timer = setTimeout(() => loadUserAddresses(), 1000)
-            return () => clearTimeout(timer)
+            void loadUserAddresses()
         } else {
             setUserAddresses([])
             setSelectedAddressId("")
@@ -398,8 +397,11 @@ export function ServiceDetailsPageClient({
             if (result.addresses) {
                 const list = result.addresses as any[]
                 setUserAddresses(list)
+                const storedActiveId = typeof window !== "undefined" ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY) : null
                 if (preferredId && list.some((a: any) => a.id === preferredId)) {
                     setSelectedAddressId(preferredId)
+                } else if (storedActiveId && list.some((a: any) => a.id === storedActiveId)) {
+                    setSelectedAddressId(storedActiveId)
                 } else {
                     const defaultAddress = list.find((a: any) => a.is_default)
                     if (defaultAddress) {
@@ -421,7 +423,8 @@ export function ServiceDetailsPageClient({
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
-        notifyAddressUpdated(addressId)
+        const addr = userAddresses.find(a => a.id === addressId)
+        notifyAddressUpdated(addressId, addr)
     }
 
     const handleCepBlur = async () => {
@@ -476,7 +479,7 @@ export function ServiceDetailsPageClient({
             if (result.address) {
                 setUserAddresses(prev => [...prev, result.address])
                 setSelectedAddressId(result.address.id)
-                notifyAddressUpdated(result.address.id)
+                notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
             } else {
                 await loadUserAddresses()
                 notifyAddressUpdated()
@@ -2117,6 +2120,26 @@ export function ServiceDetailsPageClient({
                         <span className="text-brand-inactive-text dark:text-dark-body truncate max-w-[300px]">{service.name}</span>
                     </div>
 
+                    {/* Desktop Action Buttons (top right) */}
+                    <div className="hidden lg:flex justify-end gap-2 mb-4">
+                        {(() => {
+                            const isFavService = isFav(service.id, "servico")
+                            return (
+                                <Button variant="outline" size="icon" className="w-10 h-10"
+                                    onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
+                                    title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                    <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                </Button>
+                            )
+                        })()}
+                        <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                            <ShareIcon size={18} className="text-brand-green" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
+                            <PlusIcon size={18} className="text-brand-green" />
+                        </Button>
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
                         {/* ── Left Column: Gallery + Description ── */}
                         <div className="lg:col-span-8">
@@ -2193,33 +2216,9 @@ export function ServiceDetailsPageClient({
                                             </div>
                                         </div>
 
-                                        {/* Desktop Actions Column (top) + Next Button */}
+                                        {/* Desktop Next Button */}
                                         <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
-                                            {/* Action buttons at top */}
-                                            <div className="flex flex-col items-center gap-2">
-                                                {(() => {
-                                                    const isFavService = isFav(service.id, "servico")
-                                                    return (
-                                                        <Button variant="outline" size="icon" className="w-10 h-10"
-                                                            onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
-                                                            title={isFavService ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                                                            <HeartIcon size={20} className={isFavService ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                                                        </Button>
-                                                    )
-                                                })()}
-
-                                                <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
-                                                    <ShareIcon size={18} className="text-brand-green" />
-                                                </Button>
-                                                <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10" title="Adicionar à coleção">
-                                                    <PlusIcon size={18} className="text-brand-green" />
-                                                </Button>
-                                            </div>
-
-                                            {/* Spacer to push Next button to middle */}
                                             <div className="flex-1" />
-
-                                            {/* Next Button centered */}
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                     <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />

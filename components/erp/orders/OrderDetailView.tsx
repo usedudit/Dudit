@@ -362,6 +362,35 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const mpFeeDetails: Array<{ type: string; amount: number; feePayer: string }> | undefined = mpLeg?.feeDetails;
     const mpNetReceivedAmount = mpLeg?.amountReceived;
 
+    const translateMpStatus = (status: string) => {
+        const map: Record<string, string> = {
+            approved: "Aprovado",
+            pending: "Pendente",
+            authorized: "Autorizado",
+            in_process: "Em processamento",
+            in_mediation: "Em mediação",
+            rejected: "Rejeitado",
+            cancelled: "Cancelado",
+            refunded: "Reembolsado",
+            charged_back: "Estornado",
+            expired: "Expirado",
+        }
+        return map[status?.toLowerCase()] || status
+    }
+
+    const translateMpStatusDetail = (detail: string) => {
+        const map: Record<string, string> = {
+            accredited: "Aprovado",
+            pending_review: "Em análise",
+            pending_capitation: "Aguardando captura",
+            credited: "Creditado",
+            already_refunded: "Já reembolsado",
+            partially_refunded: "Parcialmente reembolsado",
+            deviation: "Desvio",
+        }
+        return map[detail?.toLowerCase()] || detail
+    }
+
     const getPaymentTypeLabel = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const hasMultipleMethods = breakdown.filter((e: any) => e?.method).length > 1;
@@ -1078,19 +1107,23 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     {mpPaymentStatus && (
                                                                         <PaymentRow
                                                                             label="Status do Pagamento (MP)"
-                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{mpPaymentStatus} {mpPaymentStatusDetail ? `(${mpPaymentStatusDetail})` : ""}</span>} />
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
+                                                                                {translateMpStatus(mpPaymentStatus)}
+                                                                                {mpPaymentStatusDetail ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})` : ""}
+                                                                                {order.mp_date_approved && <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">em {formatDateTime(order.mp_date_approved)}</span>}
+                                                                            </span>} />
                                                                     )}
                                                                     {installmentCount > 1 && (
                                                                         <PaymentRow
                                                                             label="Parcelas"
                                                                             value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{installmentCount}x</span>} />
                                                                     )}
-                                                                    {mpTotalFeeAmount != null && (
+                                                                    {showFinancialBreakdown && mpTotalFeeAmount != null && (
                                                                         <PaymentRow
                                                                             label="Taxa do Mercado Pago"
                                                                             value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(mpTotalFeeAmount)}</span>} />
                                                                     )}
-                                                                    {Array.isArray(mpFeeDetails) && mpFeeDetails.length > 0 && mpFeeDetails.map((fd, i) => {
+                                                                    {showFinancialBreakdown && Array.isArray(mpFeeDetails) && mpFeeDetails.length > 0 && mpFeeDetails.map((fd, i) => {
                                                                         const feeTypeLabel = fd.type === "mercadopago_fee" ? "Taxa MP"
                                                                             : fd.type === "installment_fee" ? "Taxa de Parcelamento"
                                                                                 : fd.type === "coupon_fee" ? "Taxa de Cupom"
@@ -1103,15 +1136,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                 value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(fd.amount)}</span>} />
                                                                         )
                                                                     })}
-                                                                    {mpNetReceivedAmount != null && (
+                                                                    {showFinancialBreakdown && mpNetReceivedAmount != null && (
                                                                         <PaymentRow
                                                                             label="Valor Líquido Recebido"
                                                                             value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(mpNetReceivedAmount)}</span>} />
-                                                                    )}
-                                                                    {order.mp_date_approved && (
-                                                                        <PaymentRow
-                                                                            label="Data de Aprovação (MP)"
-                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{formatDateTime(order.mp_date_approved)}</span>} />
                                                                     )}
                                                                 </>
                                                             )}
@@ -1606,27 +1634,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 {order.mp_payment_status && (
                                                                     <PaymentRow
                                                                         label="Status do Pagamento (MP)"
-                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{order.mp_payment_status} {order.mp_payment_status_detail ? `(${order.mp_payment_status_detail})` : ""}</span>} />
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
+                                                                            {translateMpStatus(order.mp_payment_status)}
+                                                                            {order.mp_payment_status_detail ? ` (${translateMpStatusDetail(order.mp_payment_status_detail)})` : ""}
+                                                                            {order.mp_date_approved && <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">em {formatDateTime(order.mp_date_approved)}</span>}
+                                                                        </span>} />
                                                                 )}
                                                                 {order.mp_installments && order.mp_installments > 1 && (
                                                                     <PaymentRow
                                                                         label="Parcelas"
                                                                         value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{order.mp_installments}x</span>} />
                                                                 )}
-                                                                {order.mp_total_fee_amount != null && (
+                                                                {showFinancialBreakdown && order.mp_total_fee_amount != null && (
                                                                     <PaymentRow
                                                                         label="Taxa do Mercado Pago"
                                                                         value={<span className="text-brand-inactive-text dark:text-dark-body font-medium text-sm">{formatCurrency(order.mp_total_fee_amount)}</span>} />
                                                                 )}
-                                                                {order.mp_net_received_amount != null && (
+                                                                {showFinancialBreakdown && order.mp_net_received_amount != null && (
                                                                     <PaymentRow
                                                                         label="Valor Líquido Recebido"
                                                                         value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(order.mp_net_received_amount)}</span>} />
-                                                                )}
-                                                                {order.mp_date_approved && (
-                                                                    <PaymentRow
-                                                                        label="Data de Aprovação (MP)"
-                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{formatDateTime(order.mp_date_approved)}</span>} />
                                                                 )}
                                                             </>
                                                         )}

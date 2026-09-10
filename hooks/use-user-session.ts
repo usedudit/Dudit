@@ -3,6 +3,7 @@
 import useSWR from "swr"
 import { useCallback, useMemo } from "react"
 import { useSupabase } from "@/providers/supabase-provider"
+import { useAddressSync } from "@/lib/utils/address-sync"
 
 export interface UserProfileData {
   full_name: string | null
@@ -96,23 +97,25 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
 
   const key = user ? `user-session-${user.id}` : null
 
-  // HARD GUARD: Se os dados do servidor já existem (mesmo sendo null), não faça fetch no cliente
-  const shouldSkipFetch = serverData !== undefined
-  
   const { data, isLoading: isDataLoading, mutate } = useSWR<UserSessionData | null>(
-    shouldSkipFetch ? null : key, // Se tem dados do servidor, desativa o SWR para essa mount (Hard guard SWR way)
+    key,
     fetcher,
     {
       fallbackData: serverData || undefined,
-      revalidateOnMount: !shouldSkipFetch, // Fetch on mount only when no server data was provided
+      revalidateOnMount: serverData === undefined,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 60000,
+      dedupingInterval: 5000,
     }
   )
 
+  // Revalida automaticamente a sessão quando qualquer componente notificar mudança de endereço
+  useAddressSync(useCallback(() => {
+    void mutate()
+  }, [mutate]))
+
   const resolvedProfile = useMemo(() => {
-    const raw = serverData ? serverData.profile : (data?.profile || null)
+    const raw = data?.profile !== undefined ? data.profile : (serverData ? serverData.profile : null)
     if (!raw) return null
     if (raw.citySlug) return raw
 
@@ -139,20 +142,10 @@ export function useUserSession(serverData?: UserSessionData | null): UserSession
     return raw
   }, [serverData, data?.profile])
 
-  // Em fallback, se o hook foi hard-guarded pelo shouldSkipFetch, retornamos o serverData direto
-  if (serverData) {
-    return {
-      profile: resolvedProfile,
-      cartCount: serverData.cartCount,
-      isLoading: false,
-      mutate
-    }
-  }
-
   return {
     profile: resolvedProfile,
-    cartCount: data?.cartCount || 0,
-    isLoading: isAuthLoading || isDataLoading,
+    cartCount: data?.cartCount !== undefined ? data.cartCount : (serverData?.cartCount || 0),
+    isLoading: isAuthLoading || (!serverData && isDataLoading),
     mutate
   }
 }

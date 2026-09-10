@@ -7,6 +7,7 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { createMercadoPagoPayment } from "@/lib/mercadopago/payment-client"
 import { verifyPaymentQuote } from "@/lib/mercadopago/payment-quote"
 
 const isDev = process.env.NODE_ENV === "development"
@@ -18,6 +19,7 @@ interface ProcessErpPaymentRequest {
   paymentQuote?: string
   description?: string
   orderId?: string
+  deviceId?: string | null
 }
 
 /**
@@ -38,7 +40,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessErpPaymentRequest = await request.json()
-    const { paymentFormData, partnerId, amount, paymentQuote, description, orderId } = body
+    const { paymentFormData, partnerId, amount, paymentQuote, description, orderId, deviceId } = body
 
     // Validações
     if (!paymentFormData?.payment_method_id) {
@@ -197,6 +199,13 @@ async function handler(request: NextRequest) {
     const payerCity = String(rawPayerAddr?.city || "").trim()
     const payerFederalUnit = String(rawPayerAddr?.federalUnit || rawPayerAddr?.federal_unit || "").trim()
 
+    const rawPhone = String(paymentFormData.payer?.phone?.number || "").replace(/\D/g, "")
+    const cleanPhone = rawPhone.startsWith("55") && rawPhone.length > 11 ? rawPhone.slice(2) : rawPhone
+    const payerPhone = cleanPhone.length >= 10 ? {
+      area_code: cleanPhone.slice(0, 2),
+      number: cleanPhone.slice(2),
+    } : undefined
+
     const mpPaymentRequest: Record<string, any> = {
       transaction_amount: amount,
       payment_method_id: paymentFormData.payment_method_id,
@@ -208,6 +217,7 @@ async function handler(request: NextRequest) {
         email: hasCustomerEmail ? customerEmail : user.email,
         first_name: firstName,
         ...(lastName ? { last_name: lastName } : {}),
+        ...(payerPhone ? { phone: payerPhone } : {}),
         ...(identificationNumber ? {
           identification: {
             type: paymentFormData.payer?.identification?.type || (identificationNumber.length > 11 ? "CNPJ" : "CPF"),
@@ -230,7 +240,7 @@ async function handler(request: NextRequest) {
           {
             id: "venda_erp",
             title: (description || `Venda ERP - ${partnerStoreName}`).slice(0, 256),
-            description: "Venda ERP",
+            description: `Venda no valor de R$ ${amount.toFixed(2)} - Loja ${partnerStoreName}`.slice(0, 256),
             category_id: "others",
             quantity: 1,
             unit_price: amount,
@@ -240,6 +250,7 @@ async function handler(request: NextRequest) {
           first_name: firstName,
           last_name: lastName || firstName,
           registration_date: user.created_at || new Date().toISOString(),
+          ...(payerPhone ? { phone: payerPhone } : {}),
           ...(payerStreetName ? {
             address: {
               zip_code: payerZipCode || undefined,
@@ -305,35 +316,26 @@ async function handler(request: NextRequest) {
     // Idempotency key
     const idempotencyKey = generateIdempotencyKey(partnerId, amount)
 
-    // Chamar API do MP
-    const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${mpAccessToken}`,
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify(mpPaymentRequest),
+    // Processar pagamento via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
+    const paymentResult = await createMercadoPagoPayment({
+      accessToken: mpAccessToken,
+      paymentPayload: mpPaymentRequest,
+      idempotencyKey,
+      deviceId,
     })
 
-    if (!mpResponse.ok) {
-      let mpErrorData: any = null
-      try {
-        const mpErrorText = await mpResponse.text()
-        try { mpErrorData = JSON.parse(mpErrorText) } catch { }
-      } catch { }
-
-      SecureLogger.error("MP API ERP payment failed", {
-        status: mpResponse.status,
-        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
-        providerMessage: typeof mpErrorData?.message === "string" ? mpErrorData.message.slice(0, 160) : null,
-        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
-        responseWasJson: Boolean(mpErrorData),
+    if (!paymentResult.success || !paymentResult.data) {
+      SecureLogger.error("MP SDK ERP payment failed", {
+        status: paymentResult.status,
+        errorCode: paymentResult.errorCode,
+        errorMessage: paymentResult.errorMessage?.slice(0, 160),
       })
-      return NextResponse.json({ error: "Erro ao processar pagamento. Tente novamente." }, { status: 400 })
+      return NextResponse.json({
+        error: "Erro ao processar pagamento com Mercado Pago. Tente novamente."
+      }, { status: paymentResult.status >= 500 ? 500 : 400 })
     }
 
-    const mpPaymentResponse = await mpResponse.json()
+    const mpPaymentResponse = paymentResult.data
     const mpPaymentId = mpPaymentResponse.id
 
     if (!mpPaymentId) {

@@ -27,7 +27,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
-import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
+import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 import type { StorefrontPaymentMethod } from "@/app/actions/marketplace/storefront-payment-methods"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { useMarketplaceCheckoutContext } from "@/hooks/use-marketplace-checkout-context"
@@ -675,7 +675,8 @@ export function CheckoutPageClient() {
                 const list = result.addresses as UserAddress[]
                 setUserAddresses(list)
 
-                const activeId = targetSelectedId || selectedAddressId
+                const storedActiveId = typeof window !== "undefined" ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY) : null
+                const activeId = targetSelectedId || selectedAddressId || storedActiveId
                 const matchSelected = list.find((a) => a.id === activeId)
                 const defaultAddress = list.find((a) => a.is_default)
                 const chosen = matchSelected || defaultAddress || list[0]
@@ -704,8 +705,8 @@ export function CheckoutPageClient() {
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
-        notifyAddressUpdated(addressId)
         const address = userAddresses.find(a => a.id === addressId)
+        notifyAddressUpdated(addressId, address)
         if (address) setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(address) }))
     }
 
@@ -751,7 +752,7 @@ export function CheckoutPageClient() {
                 })
 
                 setSelectedAddressId(savedAddr.id)
-                notifyAddressUpdated(savedAddr.id)
+                notifyAddressUpdated(savedAddr.id, savedAddr, (result as any)?.citySlug)
                 setFormData(prev => ({ ...prev, deliveryAddress: buildAddressString(savedAddr) }))
 
                 setShowAddressForm(false)

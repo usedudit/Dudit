@@ -704,17 +704,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [activeSection, mobileModalTab, isAboutPageOpen])
 
-    useEffect(() => {
-        if (partner?.id || partner?.storeName) {
-            trackEvent("storefront_viewed", {
-                store_id: partner.id,
-                store_name: partner.storeName,
-                city: partner.city,
-                state: partner.state,
-            })
-        }
-    }, [partner?.id])
-
     const gallery: string[] = useMemo(() => partner?.gallery || [], [partner?.gallery])
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")

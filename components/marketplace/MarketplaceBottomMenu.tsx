@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
@@ -11,6 +11,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor } from "@/lib/utils/UserProfileImage"
 import { useCollectionDetailMenu } from "@/lib/collection-detail-menu"
 import { useUserSession } from "@/hooks/use-user-session"
+import { useAddressSync } from "@/lib/utils/address-sync"
 
 function MenuItem({
     label,
@@ -64,6 +65,12 @@ export function MarketplaceBottomMenu() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [citySlug, setCitySlug] = useState<string | null>(null)
     const collectionMenu = useCollectionDetailMenu()
+
+    useAddressSync(useCallback((_id, payload) => {
+        if (payload?.citySlug) {
+            setCitySlug(payload.citySlug)
+        }
+    }, []))
 
     // Detect city slug on client side for the Home and Explorar tabs
     useEffect(() => {

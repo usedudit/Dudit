@@ -804,8 +804,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                                             <div className="flex items-center justify-between mb-4">
                                                 <h4 className="text-base font-bold text-brand-dark dark:text-dark-heading">Variação {index + 1}</h4>
                                                 {variants.length > 1 && (
-                                                    <Button variant="ghost" onClick={() => handleRemoveVariantClick(variant.id, variant.type)} className="w-8 h-8 flex items-center justify-center p-0">
-                                                        <TrashIcon className="w-4 h-4 text-brand-inactive-text hover:text-brand-red" />
+                                                    <Button variant="ghostred" onClick={() => handleRemoveVariantClick(variant.id, variant.type)} className="w-8 h-8 flex items-center justify-center p-0">
+                                                        <TrashIcon className="w-4 h-4" />
                                                     </Button>
                                                 )}
                                             </div>
@@ -1031,7 +1031,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
             <div className="p-6 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border flex justify-between items-center relative z-20">
                 <div className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">
-                    Saiba mais sobre <span className="text-blue-500 cursor-pointer hover:underline">Variações</span>
+                    Saiba mais sobre <a href="https://dudit.com.br/ajuda/produtos-estoque/como-trabalhar-com-variacoes" target="_blank" rel="noopener noreferrer" className="text-brand-green cursor-pointer hover:underline">Variações</a>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="outline" onClick={onClose} disabled={isSaving} className="px-6 bg-transparent">Cancelar</Button>

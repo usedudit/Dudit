@@ -82,14 +82,6 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
     // Step 1: Conta (se não logado). Step 2: Escolha de Modo.
     const [step, setStep] = useState(isUserLoggedIn ? 2 : 1)
-
-    useEffect(() => {
-        trackEvent("partner_wizard_step", {
-            step,
-            is_user_logged_in: isUserLoggedIn,
-        })
-    }, [step, isUserLoggedIn])
-
     const [direction, setDirection] = useState(0)
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -199,7 +191,6 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     }
 
     const setMode = (mode: BusinessMode) => {
-        trackEvent("partner_mode_selected", { mode })
         const defaultResources = getDefaultResourcesForModeAndCategory(mode, partnerData.categoryName)
         setPartnerData(prev => ({
             ...prev,

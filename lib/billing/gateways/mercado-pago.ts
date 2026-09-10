@@ -31,16 +31,16 @@ class MercadoPagoGateway implements BillingGateway {
                 return { success: false, error: "Falha ao criar preapproval" }
             }
 
-            // @ts-expect-error - mercadopago module may not be installed; caught at runtime
             const { MercadoPagoConfig, Preference } = await import("mercadopago")
             const mpClient = new MercadoPagoConfig({
-                access_token: process.env.MP_SUBSCRIPTION_CLIENT_SECRET!,
+                accessToken: process.env.MP_SUBSCRIPTION_CLIENT_SECRET!,
             })
 
             const preference = await new Preference(mpClient).create({
                 body: {
                     items: [
                         {
+                            id: input.purchase_id,
                             title: metadata?.itemName || "Compra Dudit",
                             quantity: 1,
                             unit_price: input.amount,

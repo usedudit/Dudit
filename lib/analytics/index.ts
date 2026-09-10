@@ -18,6 +18,7 @@ export type MarketplaceEvent =
     | "search_performed"
     | "search_zero_results"
     | "filter_applied"
+    | "review_submitted"
 
 /**
  * Common Merchant / ERP events

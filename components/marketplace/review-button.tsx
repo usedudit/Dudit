@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Button, InfoCard, DefaultModal, FormTextarea } from "@/components/reusable"
 import { Label } from "@/components/ui/label"
 import { createReviewAction } from "@/app/actions/marketplace/reviews"
+import { trackEvent } from "@/lib/analytics"
 import { StarIcon } from "@/lib/icons"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import { useNotification } from "@/hooks/use-notification"
@@ -97,6 +98,12 @@ export function ReviewButton({
       } else {
         setOpen(false)
         success("Avaliação enviada", "Sua avaliação foi enviada com sucesso!")
+        trackEvent("review_submitted", {
+          order_id: orderId,
+          partner_id: partnerId,
+          store_id: storeId,
+          items_count: reviewableItems.length,
+        })
       }
     } catch (err) {
       setError("Erro ao enviar avaliação")

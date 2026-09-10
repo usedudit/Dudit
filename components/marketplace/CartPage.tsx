@@ -25,7 +25,7 @@ import { getAddressesAction, createAddressAction } from "@/app/actions/shared/ad
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import { MapPinIcon, PlusIcon, CheckCircleIcon, TruckIcon } from "@/lib/icons"
-import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
+import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 
 interface CartPageClientProps {
     itemsByPartner: any
@@ -54,6 +54,12 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const [userAddresses, setUserAddresses] = useState<any[]>(initialUserAddresses)
     const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
+        if (typeof window !== "undefined") {
+            const activeId = localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY)
+            if (activeId && initialUserAddresses.some((a: any) => a.id === activeId)) {
+                return activeId
+            }
+        }
         const selected = initialUserAddresses.find((address: any) => address.is_default) || initialUserAddresses[0]
         return selected?.id || ""
     })
@@ -84,8 +90,11 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             if (res.addresses && res.addresses.length > 0) {
                 const list = res.addresses as any[]
                 setUserAddresses(list)
+                const storedActiveId = typeof window !== "undefined" ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY) : null
                 if (preferredId && list.some((a: any) => a.id === preferredId)) {
                     setSelectedAddressId(preferredId)
+                } else if (storedActiveId && list.some((a: any) => a.id === storedActiveId)) {
+                    setSelectedAddressId(storedActiveId)
                 } else if (!selectedAddressId || !list.some((a: any) => a.id === selectedAddressId)) {
                     const def = list.find((a: any) => a.is_default) || list[0]
                     if (def) setSelectedAddressId(def.id)
@@ -105,7 +114,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
 
     const handleSelectAddress = (id: string) => {
         setSelectedAddressId(id)
-        notifyAddressUpdated(id)
+        const addr = userAddresses.find(a => a.id === id)
+        notifyAddressUpdated(id, addr)
         setShowAddressModal(false)
     }
 
@@ -162,7 +172,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             } else if (result.address) {
                 setUserAddresses(prev => [...prev, result.address])
                 setSelectedAddressId(result.address.id)
-                notifyAddressUpdated(result.address.id)
+                notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
                 setShowNewAddressForm(false)
                 setShowAddressModal(false)
                 setNewAddressData({ zipCode: "", street: "", number: "", complement: "", neighborhood: "", city: "", state: "", noNumber: false, latitude: null, longitude: null })

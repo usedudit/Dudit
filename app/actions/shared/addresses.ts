@@ -3,7 +3,8 @@
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 // Removed createSupabaseAdmin
 import { unstable_cache } from "next/cache"
-import { revalidateAddresses } from "@/lib/utils/revalidation"
+import { cookies } from "next/headers"
+import { revalidateAddresses, safeRevalidatePath, safeRevalidateTag } from "@/lib/utils/revalidation"
 import { requireUser, requireCustomerOwnership, requireSupplierOwnership } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
@@ -14,6 +15,42 @@ import { geocodeAddress, enrichAddressData } from "@/lib/services/location.servi
 
 // Tipos para endereços consolidados
 type AddressType = "user" | "partner" | "supplier" | "customer" | "store"
+
+function normalizeCityToSlug(city: string, state: string): string {
+  const normCity = city
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+  return `${normCity}-${state.toLowerCase()}`
+}
+
+async function syncUserAddressCookiesAndRevalidate(address: any, addressId: string): Promise<string | null> {
+  try {
+    const cookieStore = await cookies()
+    cookieStore.set("dudit_active_address_id", addressId, { path: "/", maxAge: 60 * 60 * 24 * 30 })
+
+    let citySlug: string | null = null
+    if (address?.city && address?.state) {
+      citySlug = normalizeCityToSlug(address.city, address.state)
+      cookieStore.set("dudit_city", citySlug, { path: "/", maxAge: 60 * 60 * 24 * 30 })
+    }
+
+    await safeRevalidatePath("/", "page")
+    await safeRevalidatePath("/explorar", "page")
+    await safeRevalidatePath("/sacola", "page")
+    await safeRevalidatePath("/perfil", "page")
+    await safeRevalidateTag("home-products")
+    await safeRevalidateTag("explore-products")
+    await safeRevalidateTag("marketplace-search")
+
+    return citySlug
+  } catch (err) {
+    console.error("[syncUserAddressCookiesAndRevalidate] Error:", err)
+    return null
+  }
+}
 
 // 1. Leitura Cacheada
 export const getCachedAddresses = async (
@@ -216,7 +253,12 @@ export async function createAddressAction(data: {
   // Limpa Cache
   await revalidateAddresses(data.entityType, data.entityId)
 
-  return { success: true, address }
+  let citySlug: string | null = null
+  if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
+    citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
+  }
+
+  return { success: true, address, citySlug }
 }
 
 export async function updateAddressAction(data: {
@@ -320,7 +362,12 @@ export async function updateAddressAction(data: {
 
   await revalidateAddresses(data.entityType, data.entityId)
 
-  return { success: true, address }
+  let citySlug: string | null = null
+  if (data.entityType === "user" && (data.isDefault || address?.is_default)) {
+    citySlug = await syncUserAddressCookiesAndRevalidate(address, address.id)
+  }
+
+  return { success: true, address, citySlug }
 }
 
 export async function deleteAddressAction(
@@ -353,11 +400,40 @@ export async function deleteAddressAction(
     whereClause.store_id = entityId
   }
 
+  // Check if the address to delete was default before deleting
+  let wasDefault = false
+  if (entityType === "user") {
+    const { data: targetAddr } = await supabase.from("addresses").select("is_default").eq("id", addressId).maybeSingle()
+    wasDefault = !!targetAddr?.is_default
+  }
+
   const { error } = await supabase.from("addresses").delete().match(whereClause)
 
   if (error) return { error: error.message }
 
   await revalidateAddresses(entityType, entityId)
+
+  if (entityType === "user") {
+    if (wasDefault) {
+      const { data: remaining } = await supabase
+        .from("addresses")
+        .select("*")
+        .eq("user_id", entityId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+
+      if (remaining && remaining.length > 0) {
+        await supabase.from("addresses").update({ is_default: true }).eq("id", remaining[0].id)
+        await syncUserAddressCookiesAndRevalidate(remaining[0], remaining[0].id)
+      } else {
+        try {
+          const cookieStore = await cookies()
+          cookieStore.delete("dudit_active_address_id")
+        } catch {}
+      }
+    }
+  }
+
   return { success: true }
 }
 
@@ -394,14 +470,22 @@ export async function setDefaultAddressAction(
   await supabase.from("addresses").update({ is_default: false }).match(whereClause)
 
   // Set novo default
-  const { error } = await supabase
+  const { data: updatedAddress, error } = await supabase
     .from("addresses")
     .update({ is_default: true })
     .eq("id", addressId)
+    .select("*")
+    .maybeSingle()
 
   if (error) return { error: error.message }
 
   await revalidateAddresses(entityType, entityId)
-  return { success: true }
+
+  let citySlug: string | null = null
+  if (entityType === "user" && updatedAddress) {
+    citySlug = await syncUserAddressCookiesAndRevalidate(updatedAddress, addressId)
+  }
+
+  return { success: true, address: updatedAddress, citySlug }
 }
 

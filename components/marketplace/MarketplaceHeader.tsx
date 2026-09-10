@@ -16,6 +16,7 @@ import BottomSheet from "@/components/BottomSheet"
 import { getUserInitials, getAvatarColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getSearchSuggestionsBucket, getMarketplaceAutocompleteAction } from "@/app/actions/marketplace/suggestions"
 import { useUserSession } from "@/hooks/use-user-session"
+import { useAddressSync } from "@/lib/utils/address-sync"
 import { useTransitionDirection } from "@/providers/transition-provider"
 import { useLocationRedirect } from "@/hooks/use-location-redirect"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
@@ -156,7 +157,15 @@ const Header: React.FC<HeaderProps> = ({
         return undefined
     }, [serverUserProfile, serverCartCount])
 
-    const { profile, cartCount, isLoading: isSessionLoading } = useUserSession(serverSessionData)
+    const { profile, cartCount, isLoading: isSessionLoading, mutate: mutateSession } = useUserSession(serverSessionData)
+
+    useAddressSync(useCallback((_id, payload) => {
+        if (payload?.citySlug) {
+            setCitySlug(payload.citySlug)
+        }
+        void mutateSession()
+    }, [mutateSession]))
+
     const isLoading = isSupabaseLoading || isSessionLoading
     const router = useRouter()
     const pathname = usePathname()

@@ -9,6 +9,7 @@ import { withCSRFProtection } from "@/lib/security/csrf-middleware"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { createMercadoPagoPayment } from "@/lib/mercadopago/payment-client"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { validateCoupon } from "@/lib/services/coupons"
@@ -48,6 +49,7 @@ interface ProcessPaymentRequest {
     finalTotal: number
   }
   existingOrderId?: string
+  deviceId?: string | null
 }
 
 const roundMoney = (value: number) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100
@@ -106,7 +108,7 @@ async function handler(request: NextRequest) {
     }
 
     const body: ProcessPaymentRequest = await request.json()
-    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId: rawExistingOrderId } = body
+    const { paymentFormData, items, buyerId, deliveryType, deliveryAddress, notes, cartItemIds, couponCode, payDepositOnly, storeId, existingOrderId: rawExistingOrderId, deviceId } = body
     const existingOrderId = typeof rawExistingOrderId === "string" && !rawExistingOrderId.startsWith("temp-") ? rawExistingOrderId : undefined
     const claimedPartnerId = body.partnerId
     const checkoutPricing = normalizeCheckoutPricing(body.checkoutPricing)
@@ -750,14 +752,33 @@ async function handler(request: NextRequest) {
       ? existingOrder.order_items
       : (validatedItems.length > 0 ? validatedItems : (items || []))
 
-    const additionalItems = orderItemsList.map((item: any) => ({
-      id: String(item.product_id || item.service_id || item.id || "item"),
-      title: String(item.product_name || item.name || "Item").slice(0, 256),
-      description: String(item.product_name || item.name || "Produto").slice(0, 256),
-      category_id: "others",
-      quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
-      unit_price: roundMoney(Number(item.product_price || item.unit_price || item.price) || 0),
-    }))
+    const additionalItems = orderItemsList.map((item: any) => {
+      const rawName = String(item.product_name || item.name || "Item").trim()
+      const rawDesc = String(item.description || item.product_description || "").trim()
+      // Mercado Pago exige items.description descritivo para antifraude e aprovação
+      const description = rawDesc.length >= 3 ? rawDesc : (rawName.length >= 3 ? `Produto: ${rawName}` : "Produto adquirido no Dudit")
+
+      return {
+        id: String(item.product_id || item.service_id || item.id || "item").slice(0, 64),
+        title: rawName.slice(0, 256),
+        description: description.slice(0, 256),
+        category_id: String(item.category_id || "others").slice(0, 64),
+        quantity: Math.max(1, Math.round(Number(item.quantity) || 1)),
+        unit_price: roundMoney(Number(item.product_price || item.unit_price || item.price) || 0),
+      }
+    })
+
+    // Garantir que additional_info.items NUNCA seja enviado vazio (exigência de certificação MP)
+    const finalAdditionalItems = additionalItems.length > 0
+      ? additionalItems
+      : [{
+          id: String(targetOrderId).slice(0, 32),
+          title: `Pedido ${existingOrder?.order_number ? '#' + existingOrder.order_number : 'Dudit'}`.slice(0, 256),
+          description: `Compra realizada no Dudit - ${customerName}`.slice(0, 256),
+          category_id: "others",
+          quantity: 1,
+          unit_price: chargeAmount,
+        }]
 
     // Dados do pagador no additional_info
     const additionalPayer: Record<string, any> = {
@@ -797,6 +818,7 @@ async function handler(request: NextRequest) {
         email: paymentFormData.payer?.email || user.email,
         first_name: payerFirstName,
         last_name: payerLastName,
+        ...(payerPhone ? { phone: payerPhone } : {}),
         identification: {
           type: paymentFormData.payer?.identification?.type || "CPF",
           number: paymentFormData.payer?.identification?.number,
@@ -813,7 +835,7 @@ async function handler(request: NextRequest) {
         } : {}),
       },
       additional_info: {
-        ...(additionalItems.length > 0 ? { items: additionalItems } : {}),
+        items: finalAdditionalItems,
         payer: additionalPayer,
         ...(shipmentReceiver ? { shipments: shipmentReceiver } : {}),
       },
@@ -882,51 +904,28 @@ async function handler(request: NextRequest) {
         ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
         : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
 
-    // Fazer requisição Ã  API do Mercado Pago
-    const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${mpAccessToken}`,
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify(mpPaymentRequest),
+    // Processar requisição via SDK Oficial do Mercado Pago (+5 pontos Backend SDK, +2 pontos Device ID)
+    const paymentResult = await createMercadoPagoPayment({
+      accessToken: mpAccessToken,
+      paymentPayload: mpPaymentRequest,
+      idempotencyKey,
+      deviceId,
     })
 
-    if (isDev) console.log("MP Response status:", mpResponse.status)
+    if (isDev) console.log("MP SDK Response status:", paymentResult.status)
 
-    if (!mpResponse.ok) {
-      let mpErrorData: any = null
-      let mpErrorText = ""
-
-      try {
-        mpErrorText = await mpResponse.text()
-
-        try {
-          mpErrorData = JSON.parse(mpErrorText)
-        } catch (parseErr) {
-          mpErrorData = null
-        }
-      } catch (readErr) {
-        SecureLogger.error("Failed to read MP error response", {})
-      }
-
-
-
-      // SEGURANÃ‡A: Logar detalhes internamente, retornar mensagem genérica ao frontend
-      SecureLogger.error("MP API payment creation failed", {
-        status: mpResponse.status,
-        providerErrorCode: mpErrorData?.error || mpErrorData?.code || null,
-        providerMessage: typeof mpErrorData?.message === "string" ? mpErrorData.message.slice(0, 160) : null,
-        providerCauseCount: Array.isArray(mpErrorData?.cause) ? mpErrorData.cause.length : 0,
-        responseWasJson: Boolean(mpErrorData),
+    if (!paymentResult.success || !paymentResult.data) {
+      SecureLogger.error("MP SDK payment creation failed in process-payment", {
+        status: paymentResult.status,
+        errorCode: paymentResult.errorCode,
+        errorMessage: paymentResult.errorMessage?.slice(0, 160),
       })
       return NextResponse.json({
         error: "Erro ao processar pagamento. Tente novamente."
-      }, { status: 400 })
+      }, { status: paymentResult.status >= 500 ? 500 : 400 })
     }
 
-    const mpPaymentResponse = await mpResponse.json()
+    const mpPaymentResponse = paymentResult.data
 
     // Extrair o ID do pagamento da resposta da API
     const mpPaymentId = mpPaymentResponse.id

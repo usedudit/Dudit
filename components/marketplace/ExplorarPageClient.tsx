@@ -40,6 +40,7 @@ import { CATEGORY_SLUG_MAP, COMMON_CITY_ACCENTS, FALLBACK_CATEGORIES, ESTADO_MAP
 import type { SortOption, ViewMode } from "./explorar-constants"
 import { getFilterConfig, getSortOptionsForMode, type PageMode } from "./contextual-filters"
 import { trackExplicitDemandAction } from "@/app/actions/admin/analytics"
+import { trackEvent } from "@/lib/analytics"
 
 interface ExplorarPageClientProps {
     initialResults?: any[]
@@ -1178,6 +1179,11 @@ export function ExplorarPageClient({
                 term,
                 selectedCitySlug || undefined
             )
+            trackEvent("search_zero_results", {
+                term,
+                demand_type: demandTypeLabels[selectedDemandType] || "Quero comprar",
+                city: selectedCitySlug,
+            })
             setDemandTerm("")
             setIsDemandModalOpen(false)
             setIsDemandThankYouOpen(true)

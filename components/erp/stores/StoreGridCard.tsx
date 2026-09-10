@@ -121,13 +121,12 @@ const StoreGridCard = React.memo(
                 {/* Rodapé: Acessar Loja + ActionsDropdown */}
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-between gap-2">
                     <Button
-                        variant={isCurrentStore ? "outline" : "filled"}
+                        variant={isCurrentStore ? "ghost" : "outline"}
                         size="sm"
                         onClick={(e) => {
                             e.stopPropagation()
                             onSwitchStore()
                         }}
-                        className={isCurrentStore ? "border-brand-primary text-brand-primary text-xs" : "bg-brand-primary text-white text-xs"}
                     >
                         {isCurrentStore ? "Loja Atual" : "Acessar Loja"}
                     </Button>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { MapPinIcon, TrashIcon, CheckCircleIcon, EditIcon, HomeIcon, BriefcaseIcon, PlusIcon } from "@/lib/icons"
 import { Button, Input, CepInput, StateComboBox, NumberInputWithCheckbox, DefaultModal, ActionsDropdown, DropdownItem, IconPlaceholder } from "@/components/reusable"
@@ -56,6 +57,7 @@ export const AddressView = ({
     isLoading, setIsLoading, error, setError, success, setSuccess, clearMessages,
 }: AddressViewProps) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const router = useRouter()
     const [editingId, setEditingId] = useState<string | null>(null) // null = not editing, "new" = creating
     const [form, setForm] = useState({ ...emptyForm })
 
@@ -136,7 +138,8 @@ export const AddressView = ({
                     setAddresses([...(result.address?.is_default ? addresses.map((a: any) => ({ ...a, is_default: false })) : addresses), result.address])
                     notifySuccess("Sucesso", "Endereço adicionado!")
                     setEditingId(null)
-                    notifyAddressUpdated(result.address?.id)
+                    notifyAddressUpdated(result.address?.id, result.address, (result as any)?.citySlug)
+                    router.refresh()
                 }
             } else {
                 const result = await updateAddressAction({
@@ -158,7 +161,8 @@ export const AddressView = ({
                     setAddresses(addresses.map((a: any) => a.id === editingId ? result.address : a))
                     notifySuccess("Sucesso", "Endereço atualizado!")
                     setEditingId(null)
-                    notifyAddressUpdated(result.address?.id)
+                    notifyAddressUpdated(result.address?.id, result.address, (result as any)?.citySlug)
+                    router.refresh()
                 }
             }
         } catch {
@@ -182,6 +186,7 @@ export const AddressView = ({
                 notifySuccess("Sucesso", "Endereço removido!")
                 if (editingId === addrId) setEditingId(null)
                 notifyAddressUpdated()
+                router.refresh()
             }
         } catch {
             setError("Erro ao excluir endereço.")
@@ -201,7 +206,9 @@ export const AddressView = ({
             } else {
                 setAddresses(addresses.map((a: any) => ({ ...a, is_default: a.id === addrId })))
                 notifySuccess("Sucesso", "Endereço padrão atualizado!")
-                notifyAddressUpdated(addrId)
+                const targetAddr = result.address || addresses.find((a: any) => a.id === addrId)
+                notifyAddressUpdated(addrId, targetAddr, result.citySlug)
+                router.refresh()
             }
         } catch {
             setError("Erro ao definir endereço padrão.")

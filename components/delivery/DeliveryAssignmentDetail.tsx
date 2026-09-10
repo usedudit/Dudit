@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Badge,
@@ -996,6 +996,21 @@ export default function DeliveryAssignmentDetail({
                     const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
                     const deliveryMeta = getDeliveryStatusMeta(isOrderDelivered ? "delivered" : (assignment.status === "out_for_delivery" ? "sent" : assignment.status))
                     const ordItems = order.items || []
+                    const orderDate = order.created_at || order.order_date || order.order_created_at || assignment.assigned_at
+                    const orderIsPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((order.payment_status || order.situation || "").toLowerCase())
+                    const orderIsCash = (order.payment_method || assignment.payment_method || "").toLowerCase().includes("dinheiro") || (order.payment_method || assignment.payment_method || "").toLowerCase().includes("cash")
+                    const orderNeedsPayment = orderIsCash && !orderIsPaid
+
+                    const orderHistoryEntries: HistoryEntry[] = []
+                    if (order.created_at || order.order_date) {
+                        orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
+                    }
+                    if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                        orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
+                    }
+                    if (isOrderDelivered) {
+                        orderHistoryEntries.push({ id: "delivered", actor_name: "Entregador", change_lines: ["Pedido entregue ao cliente"], created_at: assignment.delivered_at, entry_type: "status" })
+                    }
 
                     const sheetContent = (
                         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
@@ -1009,8 +1024,8 @@ export default function DeliveryAssignmentDetail({
                                 </Button>
                             </header>
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                                <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                <Tabs defaultValue="dados_gerais" className="w-full">
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
                                         <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
                                             Dados Gerais
@@ -1018,172 +1033,161 @@ export default function DeliveryAssignmentDetail({
                                         <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
                                             Itens do Pedido ({ordItems.length})
                                         </TabsTrigger>
+                                        <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
+                                            Histórico
+                                        </TabsTrigger>
                                     </TabsList>
 
-                                    <div className="flex-1 overflow-y-auto space-y-6">
-                                        <TabsContent value="dados_gerais" className="mt-0 space-y-6">
-                                            <div className="space-y-4">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
-                                                        {formatCurrency(order.total_amount || 0)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(order.delivery_fee || 0)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
-                                                        {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                    <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
-                                                        {deliveryMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {order.created_at ? formatDateTime(order.created_at) : (assignment.assigned_at ? formatDateTime(assignment.assigned_at) : "-")}
-                                                    </span>
-                                                </div>
+                                    <TabsContent value="dados_gerais" className="mt-0 space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Total</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-lg">
+                                                    {formatCurrency(order.total_amount || 0)}
+                                                </span>
                                             </div>
-
-                                            <div className="border-t border-brand-border dark:border-dark-border w-full" />
-
-                                            <CustomerCard
-                                                customer={{
-                                                    name: order.customer_name || "Cliente",
-                                                    phone: order.customer_phone || "",
-                                                    email: order.customer_email || "",
-                                                }}
-                                                address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
-                                                showMap={false}
-                                                chrome="minimal"
-                                            />
-
-                                            {order.notes && (
-                                                <div>
-                                                    <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
-                                                    <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
-                                                        {order.notes}
-                                                    </p>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa de Entrega (Frete)</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {formatCurrency(order.delivery_fee || 0)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Forma de Pagamento</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-right">
+                                                    {formatPaymentMethodLabel(order.payment_method, null) || "Não informado"}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
+                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
+                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(isOrderDelivered ? "delivered" : "sent")}>
+                                                    {deliveryMeta.label}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                    {orderDate ? formatDateTime(orderDate) : "-"}
+                                                </span>
+                                            </div>
+                                            {order.delivery_address && (
+                                                <div className="flex justify-between items-start text-sm gap-4">
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
+                                                    <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
+                                                        <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
+                                                        {order.delivery_address}
+                                                    </span>
                                                 </div>
                                             )}
+                                        </div>
 
-                                            {/* Action to deliver single order when in route */}
-                                            {canMarkDelivered && (
-                                                <div className="pt-2">
-                                                    <Button
-                                                        variant="default"
-                                                        className="w-full h-12 text-sm font-bold"
-                                                        disabled={orderDetailLoading}
-                                                        isLoading={orderDetailLoading}
-                                                        onClick={async () => {
-                                                            setOrderDetailLoading(true)
-                                                            const res = await markSingleOrderDeliveredAction({
-                                                                assignmentId: assignment.assignment_id,
-                                                                orderId: order.order_id,
-                                                            })
-                                                            setOrderDetailLoading(false)
-                                                            if (!res.success) {
-                                                                toast.error(res.error || "Não foi possível marcar como entregue.")
-                                                                return
-                                                            }
-                                                            setOrderDeliveredMap(prev => ({ ...prev, [order.order_id]: true }))
-                                                            toast.success(`Pedido #${order.order_number || String(order.order_id).slice(0, 8)} entregue com sucesso!`)
-                                                            const allDone = ordersList.every((o: any) => o.order_id === order.order_id || orderDeliveredMap[o.order_id])
-                                                            if (allDone) {
-                                                                setAssignment((prev: any) => ({ ...prev, status: "delivered", delivered_at: new Date().toISOString() }))
-                                                            }
-                                                        }}
-                                                    >
-                                                        <CheckCircleIcon size={18} className="mr-2" />
-                                                        Confirmar Entrega deste Pedido
+                                        <div className="border-t border-brand-border dark:border-dark-border w-full" />
+
+                                        <CustomerCard
+                                            customer={{
+                                                name: order.customer_name || "Cliente",
+                                                phone: order.customer_phone || "",
+                                                email: order.customer_email || "",
+                                            }}
+                                            address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
+                                            showMap={true}
+                                            chrome="minimal"
+                                        />
+
+                                        {order.notes && (
+                                            <div>
+                                                <h4 className="text-xs font-bold text-brand-dark dark:text-dark-heading mb-2 uppercase tracking-wide">Observações do Pedido</h4>
+                                                <p className="text-sm text-brand-dark dark:text-dark-body bg-brand-gray/50 dark:bg-dark-border/20 rounded-xl p-3 border border-brand-border dark:border-dark-border">
+                                                    {order.notes}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {orderNeedsPayment && (
+                                            <div className="pt-2">
+                                                {assignment.payment_confirmed_at ? (
+                                                    <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                        Recebimento em dinheiro confirmado
+                                                    </div>
+                                                ) : (
+                                                    <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full">
+                                                        Confirmar Recebimento em Dinheiro
                                                     </Button>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
+                                        )}
 
-                                            {isOrderDelivered && (
-                                                <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                    <CheckCircleIcon size={16} className="inline mr-1" />
-                                                    Este pedido já foi entregue ao cliente
-                                                </div>
-                                            )}
-                                        </TabsContent>
+                                        {isOrderDelivered && (
+                                            <div className="rounded-xl bg-emerald-50 p-4 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                <CheckCircleIcon size={16} className="inline mr-1" />
+                                                Este pedido já foi entregue ao cliente
+                                            </div>
+                                        )}
+                                    </TabsContent>
 
-                                        <TabsContent value="itens" className="mt-0">
-                                            {ordItems.length === 0 ? (
-                                                <div className="flex items-center justify-center py-8">
-                                                    <IconPlaceholder
-                                                        icon={BoxIcon}
-                                                        title="Sem itens por aqui"
-                                                        subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-4">
-                                                    {ordItems.map((item: any, idx: number) => {
-                                                        const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
-                                                        const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
-                                                        const itemUnit = item.products?.unit || item.unit || "un"
-                                                        const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
-                                                        const itemQty = Number(item.quantity || 1)
-                                                        const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
+                                    <TabsContent value="itens" className="mt-0">
+                                        {ordItems.length === 0 ? (
+                                            <div className="flex items-center justify-center py-8">
+                                                <IconPlaceholder
+                                                    icon={BoxIcon}
+                                                    title="Sem itens por aqui"
+                                                    subtitle="Nenhum item detalhado foi retornado para o pedido selecionado."
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {ordItems.map((item: any, idx: number) => {
+                                                    const itemImage = getR2ImageUrl(item.product_variants?.variant_options?.image || item.products?.images || item.services?.images || item.images || item.image || item.image_url || null, "thumbnail")
+                                                    const itemSku = item.product_variants?.sku || item.products?.sku || item.sku || (item.sku !== "N/A" ? item.sku : null)
+                                                    const itemUnit = item.products?.unit || item.unit || "un"
+                                                    const itemPrice = Number(item.product_price || item.price || item.unit_price || 0)
+                                                    const itemQty = Number(item.quantity || 1)
+                                                    const itemSubtotal = Number(item.subtotal || itemPrice * itemQty)
 
-                                                        return (
-                                                            <div key={item.id || idx} className="flex items-start gap-4">
-                                                                <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
-                                                                    <img
-                                                                        src={itemImage}
-                                                                        className="w-full h-full object-cover rounded-xl"
-                                                                        alt={item.name || item.product_name || "Produto sem nome"}
-                                                                        onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
-                                                                    />
+                                                    return (
+                                                        <div key={item.id || idx} className="flex items-start gap-4">
+                                                            <div className="w-12 h-12 overflow-hidden shrink-0 rounded-full border border-brand-border dark:border-dark-border">
+                                                                <img
+                                                                    src={itemImage}
+                                                                    className="w-full h-full object-cover rounded-xl"
+                                                                    alt={item.name || item.product_name || "Produto sem nome"}
+                                                                    onError={(e: any) => { e.currentTarget.src = "https://img.dudit.com.br/static/Placeholder.png" }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                    <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
+                                                                        {item.name || item.product_name || "Produto sem nome"}
+                                                                    </h4>
+                                                                    <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(itemSubtotal)}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start mb-0.5">
-                                                                        <h4 className="font-bold text-[14px] text-brand-dark dark:text-dark-heading truncate">
-                                                                            {item.name || item.product_name || "Produto sem nome"}
-                                                                        </h4>
-                                                                        <span className="font-bold text-[14px] text-brand-dark dark:text-dark-heading">
-                                                                            {formatCurrency(itemSubtotal)}
-                                                                        </span>
+                                                                {itemSku && (
+                                                                    <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
+                                                                        SKU: {itemSku}
                                                                     </div>
-                                                                    {itemSku && (
-                                                                        <div className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase mb-1">
-                                                                            SKU: {itemSku}
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
-                                                                        {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
-                                                                    </div>
+                                                                )}
+                                                                <div className="text-[11px] text-brand-inactive-text dark:text-dark-body">
+                                                                    {formatQuantityWithUnit(itemQty, itemUnit)} • {formatUnitPriceWithUnit(itemPrice, itemUnit)}
                                                                 </div>
                                                             </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                        </TabsContent>
-                                    </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </TabsContent>
+
+                                    <TabsContent value="historico" className="mt-0">
+                                        <HistoryTimeline entries={orderHistoryEntries} />
+                                    </TabsContent>
                                 </Tabs>
                             </div>
-
-                            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
-                                <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
-                                    Fechar
-                                </Button>
-                            </footer>
                         </div>
                     )
 
@@ -1193,17 +1197,29 @@ export default function DeliveryAssignmentDetail({
                         </BottomSheet>
                     ) : (
                         <Portal>
-                            <div
-                                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                                onClick={handleClose}
-                            >
-                                <div
-                                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {sheetContent}
-                                </div>
-                            </div>
+                            <AnimatePresence>
+                                {isOpen && (
+                                    <motion.div
+                                        className="fixed inset-0 z-[110] bg-black/50"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        onClick={handleClose}
+                                    >
+                                        <motion.div
+                                            className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                                            initial={{ x: "120%", opacity: 0 }}
+                                            animate={{ x: 0, opacity: 1 }}
+                                            exit={{ x: "120%", opacity: 0 }}
+                                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            {sheetContent}
+                                        </motion.div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </Portal>
                     )
                 })()}

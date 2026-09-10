@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import {
     Badge,
@@ -37,6 +37,7 @@ import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
+import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import type { DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
@@ -646,45 +647,58 @@ export default function AvailableDeliveryDetail({
                     </div>
                 </Tabs>
 
-                {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
-                {(() => {
-                    const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
-                    const handleClose = () => {
-                        setIsOrderDetailSheetOpen(false)
-                        setSelectedOrderForDetail(null)
-                    }
+                    {/* EXACT SAME ORDER DETAILS SHEET AS ERP */}
+                    {(() => {
+                        const isOpen = isOrderDetailSheetOpen && !!selectedOrderForDetail
+                        const handleClose = () => {
+                            setIsOrderDetailSheetOpen(false)
+                            setSelectedOrderForDetail(null)
+                        }
 
-                    if (!selectedOrderForDetail) return null
-                    const order = selectedOrderForDetail
-                    const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
-                    const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
-                    const deliveryMeta = getDeliveryStatusMeta("available")
-                    const ordItems = order.items || []
+                        if (!selectedOrderForDetail) return null
+                        const order = selectedOrderForDetail
+                        const displayId = order.order_number ? `#${order.order_number}` : `#${String(order.order_id || order.id || "").slice(0, 8).toUpperCase()}`
+                        const paymentMeta = getPaymentStatusMeta(order.payment_status || order.situation || "pending")
+                        const deliveryMeta = getDeliveryStatusMeta("available")
+                        const ordItems = order.items || []
+                        const orderDate = order.created_at || order.order_date || order.order_created_at || offer.assigned_at
 
-                    const sheetContent = (
-                        <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
-                            <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
-                                <div>
-                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
-                                </div>
-                                <Button variant="filled" onClick={handleClose} size="icon">
-                                    <XIcon className="h-5 w-5" />
-                                </Button>
-                            </header>
+                        const orderHistoryEntries: HistoryEntry[] = []
+                        if (order.created_at || order.order_date) {
+                            orderHistoryEntries.push({ id: "created", actor_name: "Sistema", change_lines: ["Pedido criado"], created_at: order.created_at || order.order_date, entry_type: "status" })
+                        }
+                        if (order.payment_status === "paid" || order.situation === "paid" || order.situation === "concluído") {
+                            orderHistoryEntries.push({ id: "paid", actor_name: "Sistema", change_lines: ["Pagamento confirmado"], created_at: order.updated_at || order.created_at, entry_type: "payment" })
+                        }
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                                <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
-                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
-                                        <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
-                                            Dados Gerais
-                                        </TabsTrigger>
-                                        <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
-                                            Itens do Pedido ({ordItems.length})
-                                        </TabsTrigger>
-                                    </TabsList>
+                        const sheetContent = (
+                            <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
+                                <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Detalhes do Pedido</h2>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{displayId}</p>
+                                    </div>
+                                    <Button variant="filled" onClick={handleClose} size="icon">
+                                        <XIcon className="h-5 w-5" />
+                                    </Button>
+                                </header>
 
-                                    <div className="flex-1 overflow-y-auto space-y-6">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                                    <Tabs defaultValue="dados_gerais" className="w-full">
+                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                                            <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                                Dados Gerais
+                                            </TabsTrigger>
+                                            <TabsTrigger value="itens" className="px-0 pb-3 text-sm">
+                                                Itens do Pedido ({ordItems.length})
+                                            </TabsTrigger>
+                                            {orderHistoryEntries.length > 0 && (
+                                                <TabsTrigger value="historico" className="px-0 pb-3 text-sm">
+                                                    Histórico
+                                                </TabsTrigger>
+                                            )}
+                                        </TabsList>
+
                                         <TabsContent value="dados_gerais" className="mt-0 space-y-6">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between items-center text-sm">
@@ -710,7 +724,7 @@ export default function AvailableDeliveryDetail({
                                                     <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
+                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Entrega</span>
                                                     <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon("available")}>
                                                         {deliveryMeta.label}
                                                     </Badge>
@@ -718,9 +732,18 @@ export default function AvailableDeliveryDetail({
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {order.created_at ? formatDateTime(order.created_at) : (offer.assigned_at ? formatDateTime(offer.assigned_at) : "-")}
+                                                        {orderDate ? formatDateTime(orderDate) : "-"}
                                                     </span>
                                                 </div>
+                                                {order.delivery_address && (
+                                                    <div className="flex justify-between items-start text-sm gap-4">
+                                                        <span className="text-brand-inactive-text dark:text-dark-body font-medium shrink-0">Endereço de Entrega</span>
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-right flex items-start gap-1">
+                                                            <MapPinIcon size={14} className="shrink-0 mt-0.5 text-brand-inactive-text" />
+                                                            {order.delivery_address}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="border-t border-brand-border dark:border-dark-border w-full" />
@@ -732,7 +755,7 @@ export default function AvailableDeliveryDetail({
                                                     email: order.customer_email || "",
                                                 }}
                                                 address={order.delivery_address ? parseAddressString(order.delivery_address) : null}
-                                                showMap={false}
+                                                showMap={true}
                                                 chrome="minimal"
                                             />
 
@@ -799,38 +822,49 @@ export default function AvailableDeliveryDetail({
                                                 </div>
                                             )}
                                         </TabsContent>
-                                    </div>
-                                </Tabs>
-                            </div>
 
-                            <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
-                                <Button type="button" variant="outline" className="w-full h-12" onClick={handleClose}>
-                                    Fechar
-                                </Button>
-                            </footer>
-                        </div>
-                    )
-
-                    return isMobile ? (
-                        <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                            {sheetContent}
-                        </BottomSheet>
-                    ) : (
-                        <Portal>
-                            <div
-                                className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                                onClick={handleClose}
-                            >
-                                <div
-                                    className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {sheetContent}
+                                        {orderHistoryEntries.length > 0 && (
+                                            <TabsContent value="historico" className="mt-0">
+                                                <HistoryTimeline entries={orderHistoryEntries} />
+                                            </TabsContent>
+                                        )}
+                                    </Tabs>
                                 </div>
                             </div>
-                        </Portal>
-                    )
-                })()}
+                        )
+
+                        return isMobile ? (
+                            <BottomSheet isOpen={isOpen} onClose={handleClose}>
+                                {sheetContent}
+                            </BottomSheet>
+                        ) : (
+                            <Portal>
+                                <AnimatePresence>
+                                    {isOpen && (
+                                        <motion.div
+                                            className="fixed inset-0 z-[110] bg-black/50"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            onClick={handleClose}
+                                        >
+                                            <motion.div
+                                                className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"
+                                                initial={{ x: "120%", opacity: 0 }}
+                                                animate={{ x: 0, opacity: 1 }}
+                                                exit={{ x: "120%", opacity: 0 }}
+                                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                {sheetContent}
+                                            </motion.div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </Portal>
+                        )
+                    })()}
             </div>
         </FadeIn>
     )

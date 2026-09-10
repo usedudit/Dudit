@@ -260,12 +260,23 @@ export function PaymentWrapper({
     useEffect(() => {
         if (!open || !useMercadoPago || sdkLoaded) return
 
+        // Carregar script de segurança do Mercado Pago para Device ID / Antifraude
+        if (!document.getElementById("mp-security-script")) {
+            const securityScript = document.createElement("script")
+            securityScript.id = "mp-security-script"
+            securityScript.src = "https://www.mercadopago.com/v2/security.js"
+            securityScript.setAttribute("view", "checkout")
+            securityScript.async = true
+            document.body.appendChild(securityScript)
+        }
+
         if ((window as any).MercadoPago) {
             setSdkLoaded(true)
             return
         }
 
         const script = document.createElement("script")
+        script.id = "mp-js-v2-script"
         script.src = "https://sdk.mercadopago.com/js/v2"
         script.async = true
 
@@ -334,7 +345,10 @@ export function PaymentWrapper({
                 setBrickError("Chave pública do Mercado Pago não configurada")
                 return
             }
-            const mp = new (window as any).MercadoPago(mpPublicKey)
+            const mp = new (window as any).MercadoPago(mpPublicKey, {
+                locale: "pt-BR",
+                advancedFraudPrevention: true,
+            })
             const bricksBuilder = mp.bricks()
             mpInstanceRef.current = mp
             bricksBuilderRef.current = bricksBuilder
@@ -491,11 +505,13 @@ export function PaymentWrapper({
         setBrickError(null)
         try {
             const resolvedFormData = formData.formData || formData
+            const deviceId = (window as any).MP_DEVICE_SESSION_ID || null
 
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-payment", {
                 method: "POST",
                 body: {
                     paymentFormData: resolvedFormData,
+                    deviceId,
                     items: orderDetails.items,
                     partnerId,
                     buyerId,

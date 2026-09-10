@@ -144,30 +144,31 @@ export default async function HomePage() {
     const sessionData = await sessionDataPromise
     const dbProfile = sessionData?.profile
 
-    // Resolve city selection (check explicit city cookie first, fallback to user profile address)
+    // Resolve city selection:
+    // 1. For authenticated users with an address, their default address is the primary source of truth.
+    // 2. For visitors or users without an address, resolve from explicit city cookie.
+    // 3. Fallback to default state SP (Brasil scope).
     let citySlug: string | null = null
     let cityName: string | null = null
 
-    const cookieStore = await cookies()
-    const cookieCity = cookieStore.get("dudit_city")?.value
-    if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
-        const resolved = await resolveCityAndStateFromSlug(cookieCity)
-        if (resolved) {
-            citySlug = cookieCity
-            cityName = resolved.city
-        }
-    }
-
-    if (!citySlug || !cityName) {
-        if (dbProfile?.city && dbProfile?.state) {
-            cityName = dbProfile.city
-            const normalizedCity = dbProfile.city
-                .toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "")
-            citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
+    if (dbProfile?.city && dbProfile?.state) {
+        cityName = dbProfile.city
+        const normalizedCity = dbProfile.city
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "")
+        citySlug = `${normalizedCity}-${dbProfile.state.toLowerCase()}`
+    } else {
+        const cookieStore = await cookies()
+        const cookieCity = cookieStore.get("dudit_city")?.value
+        if (cookieCity && cookieCity !== "brasil" && !cookieCity.startsWith("estado-")) {
+            const resolved = await resolveCityAndStateFromSlug(cookieCity)
+            if (resolved) {
+                citySlug = cookieCity
+                cityName = resolved.city
+            }
         }
     }
 

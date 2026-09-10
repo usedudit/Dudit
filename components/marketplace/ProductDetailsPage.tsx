@@ -26,7 +26,7 @@ import { invalidateCartCache } from "@/hooks/use-cart"
 import { computeOrderPreparationEstimate } from "@/lib/utils/order-preparation"
 import { getPartnerDeliveryConfigAction, quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
-import { notifyAddressUpdated, useAddressSync } from "@/lib/utils/address-sync"
+import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
@@ -270,18 +270,6 @@ export function ProductDetailsPageClient({
     const isProductOwner = !canBuyState.canBuy
     const isTeamMember = canBuyState.isTeamMember
 
-    useEffect(() => {
-        if (product?.id) {
-            trackEvent("product_viewed", {
-                product_id: product.id,
-                product_name: product.name,
-                store_id: product.store_id,
-                price: product.price,
-                category: product.category_name,
-            })
-        }
-    }, [product?.id])
-
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
     // Combined effect: promotions + view counter + delivery config
@@ -488,8 +476,7 @@ export function ProductDetailsPageClient({
     // Load user addresses if logged in
     useEffect(() => {
         if (userId) {
-            const timer = setTimeout(() => loadUserAddresses(), 1000)
-            return () => clearTimeout(timer)
+            void loadUserAddresses()
         } else {
             setUserAddresses([])
             setSelectedAddressId("")
@@ -508,8 +495,11 @@ export function ProductDetailsPageClient({
             if (result.addresses) {
                 const list = result.addresses as any[]
                 setUserAddresses(list)
+                const storedActiveId = typeof window !== "undefined" ? localStorage.getItem(DUDIT_ACTIVE_ADDRESS_STORAGE_KEY) : null
                 if (preferredId && list.some((a: any) => a.id === preferredId)) {
                     setSelectedAddressId(preferredId)
+                } else if (storedActiveId && list.some((a: any) => a.id === storedActiveId)) {
+                    setSelectedAddressId(storedActiveId)
                 } else {
                     const defaultAddress = list.find((a: any) => a.is_default)
                     if (defaultAddress) {
@@ -531,7 +521,8 @@ export function ProductDetailsPageClient({
 
     const handleAddressSelect = (addressId: string) => {
         setSelectedAddressId(addressId)
-        notifyAddressUpdated(addressId)
+        const addr = userAddresses.find(a => a.id === addressId)
+        notifyAddressUpdated(addressId, addr)
     }
 
     const handleCepBlur = async () => {
@@ -586,7 +577,7 @@ export function ProductDetailsPageClient({
             if (result.address) {
                 setUserAddresses(prev => [...prev, result.address])
                 setSelectedAddressId(result.address.id)
-                notifyAddressUpdated(result.address.id)
+                notifyAddressUpdated(result.address.id, result.address, (result as any)?.citySlug)
             } else {
                 await loadUserAddresses()
                 notifyAddressUpdated()
@@ -2396,6 +2387,26 @@ export function ProductDetailsPageClient({
                         <span className="text-brand-inactive-text dark:text-dark-body truncate max-w-[300px]">{product.name}</span>
                     </div>
 
+                    {/* Desktop Action Buttons (top right) */}
+                    <div className="hidden lg:flex justify-end gap-2 mb-4">
+                        {(() => {
+                            const isFavProd = isFav(product.id, "produto")
+                            return (
+                                <Button variant="outline" size="icon" className="w-10 h-10"
+                                    onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
+                                    title={isFavProd ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
+                                    <HeartIcon size={18} className={isFavProd ? "text-brand-green fill-brand-green" : "text-brand-green"} />
+                                </Button>
+                            )
+                        })()}
+                        <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
+                            <ShareIcon size={18} className="text-brand-green" />
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
+                            <PlusIcon size={18} className="text-brand-green" />
+                        </Button>
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 xl:gap-12">
                         <div className="lg:col-span-8">
 
@@ -2459,33 +2470,9 @@ export function ProductDetailsPageClient({
                                             </div>
                                         </div>
 
-                                        {/* Desktop Actions Column (top) + Next Button */}
+                                        {/* Desktop Next Button */}
                                         <div className="hidden lg:flex flex-col items-center gap-3 shrink-0">
-                                            {/* Action buttons at top */}
-                                            <div className="flex flex-col items-center gap-2">
-                                                {(() => {
-                                                    const isFavProd = isFav(product.id, "produto")
-                                                    return (
-                                                        <Button variant="outline" size="icon" className="w-10 h-10"
-                                                            onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
-                                                            title={isFavProd ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                                                            <HeartIcon size={18} className={isFavProd ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                                                        </Button>
-                                                    )
-                                                })()}
-
-                                                <Button variant="outline" size="icon" onClick={() => setShowShareModal(true)} className="w-10 h-10" title="Compartilhar">
-                                                    <ShareIcon size={18} className="text-brand-green" />
-                                                </Button>
-                                                <Button variant="outline" size="icon" onClick={() => { if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); setShowCollectionModal(true) }} className="w-10 h-10 flex items-center justify-center" title="Adicionar à coleção">
-                                                    <PlusIcon size={18} className="text-brand-green" />
-                                                </Button>
-                                            </div>
-
-                                            {/* Spacer to push Next button to middle */}
                                             <div className="flex-1" />
-
-                                            {/* Next Button centered */}
                                             {galleryItems.length > 1 && (
                                                 <Button variant="filled" onClick={goToNext} className="w-10 h-10 flex items-center justify-center">
                                                     <ChevronRightIcon size={20} className="text-brand-dark dark:text-dark-heading" />

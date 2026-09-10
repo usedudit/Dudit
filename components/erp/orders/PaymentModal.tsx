@@ -908,11 +908,23 @@ const PaymentModal = ({
     // Load MP SDK when entering mercadopago view
     useEffect(() => {
         if (view !== 'mercadopago' || !isOpen || mpSdkLoaded) return;
+
+        // Carregar script de segurança do Mercado Pago para Device ID / Antifraude
+        if (!document.getElementById("mp-security-script")) {
+            const securityScript = document.createElement("script");
+            securityScript.id = "mp-security-script";
+            securityScript.src = "https://www.mercadopago.com/v2/security.js";
+            securityScript.setAttribute("view", "checkout");
+            securityScript.async = true;
+            document.body.appendChild(securityScript);
+        }
+
         if ((window as any).MercadoPago) {
             setMpSdkLoaded(true);
             return;
         }
         const script = document.createElement("script");
+        script.id = "mp-js-v2-script";
         script.src = "https://sdk.mercadopago.com/js/v2";
         script.async = true;
         script.onload = () => setMpSdkLoaded(true);
@@ -946,7 +958,10 @@ const PaymentModal = ({
                 setMpBrickError("Chave pública do Mercado Pago não configurada.");
                 return;
             }
-            const mp = new (window as any).MercadoPago(mpPublicKey);
+            const mp = new (window as any).MercadoPago(mpPublicKey, {
+                locale: "pt-BR",
+                advancedFraudPrevention: true,
+            });
             const bricksBuilder = mp.bricks();
             mpInstanceRef.current = mp;
             mpBricksBuilderRef.current = bricksBuilder;
@@ -1109,12 +1124,14 @@ const PaymentModal = ({
         setMpBrickError(null);
         try {
             const resolvedFormData = formData.formData || formData;
+            const deviceId = (window as any).MP_DEVICE_SESSION_ID || null;
 
             const responseData = await fetchJSONWithCSRF<any>("/api/mercadopago/process-erp-payment", {
                 method: "POST",
                 body: {
                     orderId,
                     paymentFormData: resolvedFormData,
+                    deviceId,
                     partnerId,
                     amount: chargeTarget,
                     paymentQuote: mpPaymentQuoteRef.current,
