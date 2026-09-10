@@ -325,12 +325,21 @@ export async function middleware(request: NextRequest) {
     .filter(Boolean)
     .join(" ")
 
+  const posthogOrigins = [
+    "https://*.posthog.com",
+    "https://us.i.posthog.com",
+    "https://us-assets.i.posthog.com",
+    "https://eu.i.posthog.com",
+    "https://eu-assets.i.posthog.com",
+  ].join(" ")
+
   const cspHeader = `
     default-src 'self';
     worker-src 'self' blob:;
     child-src 'self' blob: https://*.googlesyndication.com https://*.doubleclick.net https://googleads.g.doubleclick.net https://*.google;
     media-src 'self' blob: ${r2MediaOrigins};
     script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''}
+        ${posthogOrigins}
         https://sdk.mercadopago.com 
         https://www.mercadopago.com 
         https://*.mercadopago.com 
@@ -363,6 +372,7 @@ export async function middleware(request: NextRequest) {
         https://www.dudit.com.br;
     connect-src 'self' data: blob: 
         ${sentryConnectOrigins}
+        ${posthogOrigins}
         https://*.supabase.co wss://*.supabase.co ${process.env.NEXT_PUBLIC_SUPABASE_URL || ''} wss://${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https:\/\//, '') || ''} 
         https://dudit.com.br
         https://www.dudit.com.br

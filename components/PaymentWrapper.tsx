@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 import confetti from "canvas-confetti"
 import { CopyIcon, BoxIcon, CheckCircleIcon, PrinterIcon, CalendarIcon } from "@/lib/icons"
-import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator } from "@/components/reusable"
+import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator, Barcode } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { useRealtimeRecord } from "@/hooks/use-realtime-record"
 import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
@@ -16,6 +16,7 @@ import { fetchJSONWithCSRF } from "@/lib/utils/fetch-with-csrf"
 import { formatCurrency } from "@/lib/utils"
 import type { MpAcceptedPaymentMethods } from "@/app/actions/mercadopago"
 import { generateStaticPix } from "@/lib/utils/pix-generator"
+import { installMercadoPagoZipInterceptor } from "@/lib/payments/mercadopago-zip-interceptor"
 import QRCode from "qrcode"
 
 interface OrderDetailItem {
@@ -228,6 +229,18 @@ export function PaymentWrapper({
         }
     }, [orderId, actualOrderId, orderNumber, actualOrderNumber])
 
+    useEffect(() => {
+        if (initialPixData) {
+            setPixData(initialPixData)
+            setBoletoData(undefined)
+            setStep("pix")
+        } else if (initialBoletoData) {
+            setBoletoData(initialBoletoData)
+            setPixData(undefined)
+            setStep("boleto")
+        }
+    }, [initialPixData, initialBoletoData])
+
     const handleClose = () => {
         setIsClosing(true)
         setTimeout(() => {
@@ -258,7 +271,11 @@ export function PaymentWrapper({
     }
 
     useEffect(() => {
-        if (!open || !useMercadoPago || sdkLoaded) return
+        if (!open || !useMercadoPago) return
+
+        installMercadoPagoZipInterceptor(partnerId)
+
+        if (sdkLoaded) return
 
         // Carregar script de segurança do Mercado Pago para Device ID / Antifraude
         if (!document.getElementById("mp-security-script")) {
@@ -394,7 +411,7 @@ export function PaymentWrapper({
                         email: userEmail || "",
                         ...(userAddress ? {
                             address: {
-                                zipCode: userAddress.zipCode || "",
+                                zipCode: userAddress.zipCode ? userAddress.zipCode.replace(/\D/g, "") : "",
                                 streetName: userAddress.streetName || "",
                                 streetNumber: userAddress.streetNumber || "",
                                 neighborhood: userAddress.neighborhood || "",
@@ -414,8 +431,8 @@ export function PaymentWrapper({
                                 inputBackgroundColor: "#24252b",
                                 formBackgroundColor: "#18181b",
                                 baseColor: "#059669",
-                                baseColorFirstVariant: "#059669E6",
-                                baseColorSecondVariant: "#059669E6",
+                                baseColorFirstVariant: "#05b07b",
+                                baseColorSecondVariant: "#05b07b",
                                 errorColor: "#f04438",
                                 successColor: "#059669",
                                 outlinePrimaryColor: "#3f3f46",
@@ -445,8 +462,8 @@ export function PaymentWrapper({
                                 inputBackgroundColor: "#FFFFFF",
                                 formBackgroundColor: "#FFFFFF",
                                 baseColor: "#059669",
-                                baseColorFirstVariant: "#059669E6",
-                                baseColorSecondVariant: "#059669E6",
+                                baseColorFirstVariant: "#05b07b",
+                                baseColorSecondVariant: "#05b07b",
                                 errorColor: "#f04438",
                                 successColor: "#059669",
                                 outlinePrimaryColor: "#ebebeb",
@@ -474,7 +491,7 @@ export function PaymentWrapper({
                         },
                         texts: {
                             formTitle: "",
-                            formSubmit: "Pagar",
+                            formSubmit: "Pagar agora",
                         },
                         hidePaymentButton: false,
                         hideFormTitle: false,
@@ -988,7 +1005,7 @@ export function PaymentWrapper({
                             className="bg-transparent overflow-hidden px-4 sm:px-0 flex flex-col items-center"
                         >
                             <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
-                                <img src="https://img.dudit.com.br/static/Logo.png" alt="Boleto" className="w-8 h-8 object-contain" />
+                                <img src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-8 h-8 object-contain" />
                             </div>
 
                             <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
@@ -999,34 +1016,62 @@ export function PaymentWrapper({
                             </p>
 
                             <div className="w-full max-w-md">
-                                <div className="flex gap-2 w-full mb-6 relative">
-                                    <Input label="Linha digitável do boleto" value={boletoData?.barcode || "Linha digitável não disponível"} readOnly className="pr-2" onChange={() => { }} />
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            if (boletoData?.barcode) {
-                                                navigator.clipboard.writeText(boletoData.barcode)
-                                                setCopied(true)
-                                                notification.success("Código copiado!", "Linha digitável copiada para a área de transferência.")
-                                                setTimeout(() => setCopied(false), 2000)
-                                            }
-                                        }}
-                                        className="gap-2 shrink-0 h-[42px] w-[42px]"
-                                    >
-                                        {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
-                                    </Button>
-                                    {boletoData?.ticketUrl && (
+                                {boletoData?.barcode && (
+                                    <div className="mb-6">
+                                        <Barcode
+                                            value={boletoData.barcode}
+                                            format="CODE128"
+                                            width={1.5}
+                                            height={60}
+                                            displayValue={false}
+                                            margin={10}
+                                            className="w-full"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="mb-4">
+                                    <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1.5 block">
+                                        Código de barras do boleto
+                                    </label>
+                                    <div className="flex gap-2 w-full">
+                                        <input
+                                            type="text"
+                                            value={boletoData?.barcode || "Código não disponível"}
+                                            readOnly
+                                            className="flex-1 h-[42px] px-3 text-sm text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none"
+                                        />
                                         <Button
                                             variant="outline"
-                                            onClick={() => window.open(boletoData.ticketUrl, "_blank")}
-                                            className="gap-2 shrink-0 h-[42px] w-[42px]"
-                                            title="Imprimir Boleto"
+                                            onClick={() => {
+                                                if (boletoData?.barcode) {
+                                                    navigator.clipboard.writeText(boletoData.barcode)
+                                                    setCopied(true)
+                                                    notification.success("Código copiado!", "Código de barras copiado para a área de transferência.")
+                                                    setTimeout(() => setCopied(false), 2000)
+                                                }
+                                            }}
+                                            className="shrink-0 h-[42px] w-[42px] flex items-center justify-center"
                                         >
-                                            <PrinterIcon size={16} />
+                                            {copied ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
                                         </Button>
-                                    )}
+                                        {boletoData?.ticketUrl && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => window.open(boletoData.ticketUrl, "_blank")}
+                                                className="shrink-0 h-[42px] w-[42px] flex items-center justify-center"
+                                                title="Imprimir Boleto"
+                                            >
+                                                <PrinterIcon size={16} />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
-                                <span className="text-2xl font-bold text-brand-dark">{formatCurrency(amount)}</span>
+
+                                <div className="flex items-center justify-between mb-6 mt-4">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Valor a pagar</span>
+                                    <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                                </div>
 
                                 <InfoCard
                                     message="A aprovação pode levar de 1 a 2 dias úteis. Pagamentos realizados em fins de semana ou feriados serão analisados no próximo dia útil."

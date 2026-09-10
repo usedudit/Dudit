@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
-import { requireUser } from "@/lib/auth/authorization"
+import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { captureError } from "@/lib/monitoring/sentry"
@@ -22,13 +22,12 @@ export async function POST(request: NextRequest) {
 
     // SECURITY: Require authentication
     const user = await requireUser()
-    // Buscar o pedido scoped to authenticated user
     const adminClient = await createAdminClient()
     const { data: order, error: orderError } = await adminClient
       .from("orders")
       .select(`
         *,
-        stores!inner(name),
+        stores(name),
         order_items (
           *,
           products (
@@ -43,12 +42,26 @@ export async function POST(request: NextRequest) {
         )
       `)
       .eq("id", orderId)
-      .eq("buyer_id", user.id)
       .single()
 
     if (orderError || !order) {
       SecureLogger.error("Order not found in retry-payment", { error: orderError })
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    }
+
+    const isBuyer = order.buyer_id === user.id
+    let isPartnerStaff = false
+    if (!isBuyer && order.partner_id) {
+      try {
+        await requirePartnerAccess(order.partner_id, user)
+        isPartnerStaff = true
+      } catch (_) {
+        isPartnerStaff = false
+      }
+    }
+
+    if (!isBuyer && !isPartnerStaff) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
     }
 
     let mpAccessToken: string
@@ -102,13 +115,47 @@ export async function POST(request: NextRequest) {
         )
         if (mpResponse.ok) {
           const fetched = await mpResponse.json()
-          if (fetched.status === "pending" && fetched.point_of_interaction?.transaction_data?.qr_code) {
+          if (fetched.status === "approved") {
+            await adminClient
+              .from("orders")
+              .update({ situation: "paid", updated_at: new Date().toISOString() })
+              .eq("id", order.id)
+            return NextResponse.json({ success: true, alreadyPaid: true })
+          }
+
+          const hasPixQr = Boolean(fetched.point_of_interaction?.transaction_data?.qr_code)
+          const hasBoletoData = Boolean(
+            fetched.barcode?.content ||
+            fetched.point_of_interaction?.transaction_data?.barcode ||
+            fetched.transaction_details?.external_resource_url ||
+            fetched.point_of_interaction?.transaction_data?.ticket_url
+          )
+          const isTicket = fetched.payment_method_id === "bolbradesco" || fetched.payment_method_id === "boleto" || fetched.payment_type_id === "ticket"
+          const isPix = fetched.payment_method_id === "pix" || hasPixQr
+
+          if (fetched.status === "pending" && ((isPix && hasPixQr) || (isTicket && hasBoletoData))) {
             paymentData = fetched
           }
         }
       } catch (err: any) {
-        SecureLogger.warn("Failed to fetch existing MP payment in retry-payment, creating new", { orderId: order.id })
+        SecureLogger.warn("Failed to fetch existing MP payment in retry-payment", { orderId: order.id })
       }
+    }
+
+    // Se não encontrou dados e for staff do ERP, não gera novo pagamento
+    if (!paymentData && isPartnerStaff) {
+      return NextResponse.json({
+        error: "Cobrança não encontrada ou expirada no Mercado Pago.",
+      }, { status: 404 })
+    }
+
+    // Se for comprador e o pedido original era Boleto, não gerar um Pix indevido
+    const orderMethodLower = String(order.payment_method || "").toLowerCase()
+    const isOriginalBoleto = orderMethodLower.includes("boleto") || orderMethodLower.includes("bolbradesco") || orderMethodLower === "ticket"
+    if (!paymentData && isOriginalBoleto) {
+      return NextResponse.json({
+        error: "O boleto deste pedido expirou ou não está mais disponível.",
+      }, { status: 400 })
     }
 
     // Se não tem pagamento ou o anterior não está pendente/válido, cria um novo Pix
@@ -179,13 +226,23 @@ export async function POST(request: NextRequest) {
     const ticketUrl = paymentData.point_of_interaction?.transaction_data?.ticket_url || paymentData.transaction_details?.external_resource_url || null
     const barcode = paymentData.barcode?.content || paymentData.point_of_interaction?.transaction_data?.barcode || null
 
+    const isTicket = paymentData.payment_method_id === "bolbradesco" || paymentData.payment_method_id === "boleto" || paymentData.payment_type_id === "ticket"
+    const isPix = paymentData.payment_method_id === "pix" || Boolean(qrCode)
+
     let boletoData = null
-    if (paymentData.payment_method_id === "bolbradesco" || paymentData.payment_method_id === "boleto" || paymentData.payment_type_id === "ticket") {
-      if (ticketUrl || barcode) {
-        boletoData = {
-          ticketUrl: ticketUrl,
-          barcode: barcode,
-        }
+    if (isTicket && (ticketUrl || barcode)) {
+      boletoData = {
+        ticketUrl: ticketUrl,
+        barcode: barcode,
+      }
+    }
+
+    let pixData = null
+    if (isPix && (qrCode || qrCodeBase64)) {
+      pixData = {
+        qrCode,
+        qrCodeBase64,
+        ticketUrl,
       }
     }
 
@@ -196,11 +253,7 @@ export async function POST(request: NextRequest) {
       paymentStatus: paymentData.status,
       paymentMethod: paymentData.payment_method_id || paymentData.payment_method?.type,
       chargeAmount,
-      pixData: {
-        qrCode,
-        qrCodeBase64,
-        ticketUrl,
-      },
+      pixData,
       boletoData,
       ticketUrl,
       orderDetails: {

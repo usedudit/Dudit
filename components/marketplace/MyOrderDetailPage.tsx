@@ -346,6 +346,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [loadingPayment, setLoadingPayment] = useState(false);
     const [showPixModal, setShowPixModal] = useState(false);
     const [pixData, setPixData] = useState<any>(null);
+    const [boletoData, setBoletoData] = useState<any>(null);
     const [pixOrderDetails, setPixOrderDetails] = useState<any>(null);
     const [chargedAmount, setChargedAmount] = useState<number>(Number(order?.total_amount || 0));
     const [isCanceling, setIsCanceling] = useState(false);
@@ -651,7 +652,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
             else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
-            else if (m.includes("boleto")) baseLabel = "Boleto";
+            else if (m.includes("boleto") || m.includes("bolbradesco") || m === "ticket") baseLabel = "Boleto";
             else baseLabel = methodEntries[0].method;
         } else {
             const pm = String(order.payment_method || "").toLowerCase();
@@ -659,7 +660,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (pm.includes("crédito") || pm.includes("credito") || pm.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (pm.includes("débito") || pm.includes("debito") || pm.includes("debit")) baseLabel = "Cartão de Débito";
             else if (pm.includes("dinheiro") || pm.includes("cash") || pm.includes("money")) baseLabel = "Dinheiro";
-            else if (pm.includes("boleto")) baseLabel = "Boleto";
+            else if (pm.includes("boleto") || pm.includes("bolbradesco") || pm === "ticket") baseLabel = "Boleto";
             else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
         if (!hasMultipleMethods) {
@@ -687,7 +688,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         : getPaymentTypeLabel();
     const isMercadoPago = order.payment_provider === "Mercado Pago" || (isExchangeOrder && hasMercadoPagoOnline);
     const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
-    const canRetryPixPayment = order.situation === "pending" && isMercadoPago && isPixPayment;
+    const isBoletoPayment = paymentMethodName.toLowerCase().includes("boleto") || paymentMethodName.toLowerCase().includes("bolbradesco");
+    const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment);
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         if (isMercadoPago) {
@@ -864,7 +866,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     };
 
     const handlePixClick = async () => {
-        if (!canRetryPixPayment && !isPendingExchangeShortfall) return;
+        if (!canRetryPayment && !isPendingExchangeShortfall) return;
         try {
             setLoadingPayment(true);
             const response = await fetch("/api/orders/retry-payment", {
@@ -885,16 +887,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             if (data.chargeAmount != null) {
                 setChargedAmount(data.chargeAmount);
             }
-            if (data.pixData?.qrCodeBase64) {
+            if (data.boletoData?.barcode || data.boletoData?.ticketUrl) {
+                setPixData(null);
+                setBoletoData(data.boletoData);
+                setPixOrderDetails(data.orderDetails);
+                setShowPixModal(true);
+            } else if (data.pixData?.qrCodeBase64 || data.pixData?.qrCode) {
+                setBoletoData(null);
                 setPixData(data.pixData);
                 setPixOrderDetails(data.orderDetails);
                 setShowPixModal(true);
+            } else {
+                toast({
+                    title: "Pagamento não disponível",
+                    description: "Não foi possível recuperar os dados de pagamento para este pedido.",
+                    variant: "destructive",
+                });
             }
         } catch (err: any) {
             console.error(err);
             toast({
                 title: "Erro ao gerar pagamento",
-                description: err?.message || "Não foi possível carregar o Pix.",
+                description: err?.message || "Não foi possível carregar os dados de pagamento.",
                 variant: "destructive"
             });
         } finally {
@@ -1604,7 +1618,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     </span>
                                                 }
                                                 className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
-                                                onClick={canRetryPixPayment ? handlePixClick : undefined}
+                                                onClick={canRetryPayment ? handlePixClick : undefined}
                                                 right={
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                         {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : totalAmount)}
@@ -1650,7 +1664,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     />
                                                 )
                                             ) : (
-                                                canRetryPixPayment && order.payment_expires_at && (
+                                                canRetryPayment && order.payment_expires_at && (
                                                     <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
                                                 )
                                             )}
@@ -1970,11 +1984,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     </Tabs>
                 </div>
 
-                {pixData && (
+                {(pixData || boletoData) && (
                     <PaymentWrapper
                         open={showPixModal}
-                        onClose={() => setShowPixModal(false)}
+                        onClose={() => {
+                            setShowPixModal(false);
+                            setPixData(null);
+                            setBoletoData(null);
+                        }}
                         pixData={pixData}
+                        boletoData={boletoData}
                         orderId={order.id}
                         amount={chargedAmount || (isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : Number(totalAmount))}
                         orderDetails={pixOrderDetails}

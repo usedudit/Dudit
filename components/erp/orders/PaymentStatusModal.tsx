@@ -4,6 +4,8 @@ import {
     InfoCard,
     IconPlaceholder,
     ListItem,
+    Barcode,
+    Spinner,
 } from '@/components/reusable';
 import {
     CheckCircleIcon,
@@ -13,6 +15,7 @@ import {
     FileIcon,
     MoneyIcon,
     PrinterIcon,
+    CopyIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from "@/components/ui/use-toast";
@@ -176,6 +179,15 @@ export default function PaymentStatusModal({
         remainingPartial: number;
         paymentBreakdown: any[];
     } | null>(null);
+    const [mpLoading, setMpLoading] = useState(false);
+    const [mpPaymentData, setMpPaymentData] = useState<{
+        pixData?: { qrCode: string; qrCodeBase64: string; ticketUrl?: string } | null;
+        boletoData?: { barcode: string; ticketUrl: string } | null;
+        paymentMethod?: string;
+        paymentStatus?: string;
+        chargeAmount?: number;
+    } | null>(null);
+    const [copiedMp, setCopiedMp] = useState(false);
     const loading = paymentStatus === 'processing';
 
     useEffect(() => {
@@ -187,6 +199,9 @@ export default function PaymentStatusModal({
             setErrorMessage('');
             setSuccessSnapshot(null);
             setPrintOrderId(null);
+            setMpLoading(false);
+            setMpPaymentData(null);
+            setCopiedMp(false);
             const id = setTimeout(() => setIsAnimating(true), 50);
             return () => clearTimeout(id);
         } else {
@@ -208,6 +223,51 @@ export default function PaymentStatusModal({
     const totalPaid = targetOrder ? getOrderPaidAmount(targetOrder) : 0;
     const totalRemaining = targetOrder ? getOrderRemainingBalance(targetOrder) : 0;
     const frozen = targetOrder ? isOrderFinanciallyFrozen(targetOrder) : false;
+
+    const isMpOrder = Boolean(
+        targetOrder?.payment_provider === "Mercado Pago" ||
+        targetOrder?.mp_payment_id ||
+        breakdown.some((leg) => {
+            const m = String(leg?.method || "").toLowerCase();
+            const p = String(leg?.provider || "").toLowerCase();
+            return p.includes("mercado pago") || m.includes("mercado pago");
+        })
+    );
+
+    useEffect(() => {
+        if (!isOpen || !targetOrder) return;
+        const targetOrderId = targetOrder.id || targetOrder.originalId;
+        const fullyPaid = targetOrder.situation === "paid" || totalRemaining <= 0.009;
+
+        if (isMpOrder && !fullyPaid && targetOrderId) {
+            setMpLoading(true);
+            fetch("/api/orders/retry-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: targetOrderId }),
+            })
+                .then(async (res) => {
+                    if (!res.ok) return null;
+                    return res.json();
+                })
+                .then((data) => {
+                    if (data && (data.pixData || data.boletoData)) {
+                        setMpPaymentData(data);
+                    } else {
+                        setMpPaymentData(null);
+                    }
+                })
+                .catch((err) => {
+                    console.error("Error fetching MP payment in PaymentStatusModal:", err);
+                    setMpPaymentData(null);
+                })
+                .finally(() => {
+                    setMpLoading(false);
+                });
+        } else {
+            setMpPaymentData(null);
+        }
+    }, [isOpen, targetOrder?.id, targetOrder?.originalId, targetOrder?.situation, totalRemaining, isMpOrder]);
 
     const displayOrderNumber = useMemo(() => {
         if (!targetOrder) return "";
@@ -525,6 +585,173 @@ export default function PaymentStatusModal({
                                             />
                                         )}
                                     </div>
+
+                                    {isMpOrder && !isFullyPaid && (
+                                        <div className="flex flex-col gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50/70 dark:bg-dark-border/20">
+                                            {/* Header do card MP */}
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                        <img
+                                                            src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                            alt="Mercado Pago"
+                                                            className="w-5 h-5 object-contain"
+                                                        />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5 flex-wrap">
+                                                            {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
+                                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                                                                Pendente
+                                                            </span>
+                                                        </h4>
+                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
+                                                            {mpPaymentData?.boletoData
+                                                                ? "Linha digitável e código de barras para pagamento"
+                                                                : "Escaneie o QR Code ou copie a chave Pix"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleSyncMpPayment}
+                                                    disabled={syncing}
+                                                    className="h-8 text-xs shrink-0"
+                                                >
+                                                    {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
+                                                    Verificar
+                                                </Button>
+                                            </div>
+
+                                            {/* Loading */}
+                                            {mpLoading && !mpPaymentData && (
+                                                <div className="flex flex-col items-center justify-center py-6 text-brand-inactive-text">
+                                                    <Spinner size={20} className="mb-2 text-brand-primary" />
+                                                    <span className="text-xs">Carregando dados da cobrança...</span>
+                                                </div>
+                                            )}
+
+                                            {/* Conteúdo: PIX */}
+                                            {mpPaymentData?.pixData && (
+                                                <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-brand-border dark:border-dark-border">
+                                                    {mpPaymentData.pixData.qrCodeBase64 && (
+                                                        <div className="w-48 h-48 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center">
+                                                            <img
+                                                                src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
+                                                                alt="PIX QR Code"
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div className="text-center">
+                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Pix</span>
+                                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                                                        </span>
+                                                    </div>
+                                                    {mpPaymentData.pixData.qrCode && (
+                                                        <div className="w-full max-w-md flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                readOnly
+                                                                value={mpPaymentData.pixData.qrCode}
+                                                                className="flex-1 h-10 px-3 text-xs text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none font-mono truncate"
+                                                            />
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    if (mpPaymentData?.pixData?.qrCode) {
+                                                                        navigator.clipboard.writeText(mpPaymentData.pixData.qrCode);
+                                                                        setCopiedMp(true);
+                                                                        toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." });
+                                                                        setTimeout(() => setCopiedMp(false), 2000);
+                                                                    }
+                                                                }}
+                                                                className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                                                title="Copiar chave Pix"
+                                                            >
+                                                                {copiedMp ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Conteúdo: BOLETO */}
+                                            {mpPaymentData?.boletoData && (
+                                                <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-brand-border dark:border-dark-border">
+                                                    {mpPaymentData.boletoData.barcode && (
+                                                        <div className="w-full max-w-md overflow-hidden bg-white p-3 rounded-lg border border-brand-border flex justify-center">
+                                                            <Barcode
+                                                                value={mpPaymentData.boletoData.barcode}
+                                                                format="CODE128"
+                                                                width={1.5}
+                                                                height={50}
+                                                                displayValue={false}
+                                                                margin={5}
+                                                                className="w-full max-w-sm"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div className="text-center">
+                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block">Valor do Boleto</span>
+                                                        <span className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(mpPaymentData.chargeAmount || totalRemaining)}
+                                                        </span>
+                                                    </div>
+                                                    {mpPaymentData.boletoData.barcode && (
+                                                        <div className="w-full max-w-md flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                readOnly
+                                                                value={mpPaymentData.boletoData.barcode}
+                                                                className="flex-1 h-10 px-3 text-xs text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none font-mono truncate"
+                                                            />
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    if (mpPaymentData?.boletoData?.barcode) {
+                                                                        navigator.clipboard.writeText(mpPaymentData.boletoData.barcode);
+                                                                        setCopiedMp(true);
+                                                                        toast({ title: "Copiado!", description: "Código de barras do boleto copiado." });
+                                                                        setTimeout(() => setCopiedMp(false), 2000);
+                                                                    }
+                                                                }}
+                                                                className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                                                title="Copiar linha digitável"
+                                                            >
+                                                                {copiedMp ? <CheckCircleIcon size={16} className="text-brand-green" /> : <CopyIcon size={16} />}
+                                                            </Button>
+                                                            {mpPaymentData.boletoData.ticketUrl && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => window.open(mpPaymentData!.boletoData!.ticketUrl, "_blank")}
+                                                                    className="h-10 w-10 shrink-0 p-0 flex items-center justify-center"
+                                                                    title="Abrir / Imprimir Boleto"
+                                                                >
+                                                                    <PrinterIcon size={16} />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {mpPaymentData.boletoData.ticketUrl && (
+                                                        <Button
+                                                            variant="outline"
+                                                            className="w-full max-w-md h-9 text-xs"
+                                                            onClick={() => window.open(mpPaymentData!.boletoData!.ticketUrl, "_blank")}
+                                                        >
+                                                            <PrinterIcon size={14} className="mr-1.5" />
+                                                            Imprimir / Abrir Boleto em nova aba
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <DepositReceiptsSection
                                         legs={breakdown}

@@ -75,11 +75,10 @@ function QRCodePoster({ profileUrl, storeName }: { profileUrl: string; storeName
         <>
             <Button
                 variant="outline"
-                size="sm"
-                className="gap-2 rounded-full font-bold text-xs text-brand-green border-brand-green/40 hover:bg-brand-green-light/30"
+                className="w-full"
                 onClick={() => setShowModal(true)}
+                leftIcon={<SparklesIcon size={16} />}
             >
-                <SparklesIcon className="w-3.5 h-3.5" />
                 Gerar Placa com QR Code
             </Button>
 
@@ -225,36 +224,21 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
                         {/* Botões de Ação */}
                         <div className="md:col-span-6 flex flex-col gap-3">
                             <Button
-                                variant="default"
-                                size="sm"
-                                className="w-full gap-2 rounded-full font-bold text-xs bg-[#25D366] hover:bg-[#20bd5a] text-white border-0"
+                                className="w-full"
                                 onClick={openWhatsAppShare}
+                                leftIcon={<WhatsappIcon size={16} />}
                             >
-                                <WhatsappIcon size={15} />
                                 Testar no WhatsApp
                             </Button>
 
-                            <div className="flex items-center gap-2 w-full">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex-1 rounded-full font-semibold text-xs border-brand-border dark:border-dark-border"
-                                    onClick={openStore}
-                                >
-                                    <EyeIcon size={14} className="mr-1.5" />
-                                    Abrir Vitrine
-                                </Button>
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex-1 rounded-full text-xs font-bold"
-                                    onClick={copyLink}
-                                >
-                                    <CopyIcon size={14} className="mr-1.5" />
-                                    {copied ? "Copiado!" : "Copiar Link"}
-                                </Button>
-                            </div>
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={openStore}
+                                leftIcon={<EyeIcon size={16} />}
+                            >
+                                Abrir Vitrine
+                            </Button>
 
                             <div className="w-full pt-1">
                                 <QRCodePoster profileUrl={profileUrl} storeName={storeName} />

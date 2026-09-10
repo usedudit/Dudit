@@ -2246,6 +2246,23 @@ export function CheckoutPageClient() {
                 })
             }
 
+            const activeAddress = selectedAddress || (userAddresses && userAddresses.length > 0 ? userAddresses[0] : null)
+            const resolvedUserAddress = activeAddress ? {
+                zipCode: activeAddress.zip_code?.replace(/\D/g, "") || "",
+                streetName: activeAddress.street || "",
+                streetNumber: activeAddress.number || "",
+                neighborhood: activeAddress.neighborhood || "",
+                city: activeAddress.city || "",
+                federalUnit: activeAddress.state || "",
+            } : (newAddressData.zipCode ? {
+                zipCode: newAddressData.zipCode.replace(/\D/g, ""),
+                streetName: newAddressData.street || "",
+                streetNumber: newAddressData.number || "",
+                neighborhood: newAddressData.neighborhood || "",
+                city: newAddressData.city || "",
+                federalUnit: newAddressData.state || "",
+            } : undefined)
+
             if (paymentOption === "mercadopago") {
                 const tempOrderId = "temp-" + Date.now()
                 const amount = checkoutChargeTotal
@@ -2276,6 +2293,7 @@ export function CheckoutPageClient() {
                     partnerId: partnerId,
                     userEmail: userEmail,
                     userName: userName,
+                    userAddress: resolvedUserAddress,
                     payDepositOnly: payDepositOnly,
                     partnerPhone: checkoutContext?.partner.phone || null,
                     pixKey: checkoutContext?.partner.pixKey || null,
@@ -3827,6 +3845,7 @@ export function CheckoutPageClient() {
                     mpPublicKey={pixPaymentData.mpPublicKey}
                     userEmail={pixPaymentData.userEmail}
                     userName={pixPaymentData.userName}
+                    userAddress={pixPaymentData.userAddress}
                     buyerId={userId!}
                     mpAcceptedPaymentMethods={mpAcceptedPaymentMethods}
                     partnerPhone={pixPaymentData.partnerPhone}
