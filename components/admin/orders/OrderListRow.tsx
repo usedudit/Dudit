@@ -99,7 +99,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                     {situationBadge(order.situation)}
                     {(() => {
                         let pmLabel = order.payment_method || null
-                        if (order.payment_provider === "Mercado Pago" && pmLabel) {
+                        if (order.payment_provider === "Mercado Pago" && pmLabel && !pmLabel.toLowerCase().includes("mercado pago")) {
                             pmLabel = `Mercado Pago (${pmLabel})`
                         }
                         return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} simplify />

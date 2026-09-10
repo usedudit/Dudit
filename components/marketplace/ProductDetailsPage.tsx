@@ -18,6 +18,7 @@ import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { ReportModal } from "./ReportModal"
 import { ReviewsSection } from "./ReviewsSection"
 import { addToCartAction } from "@/app/actions/marketplace/cart"
+import { trackEvent } from "@/lib/analytics"
 import { prepareProductBuyNowCheckoutAction, getGiftItemDetailsAction, checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { useNotification } from "@/hooks/use-notification"
@@ -268,6 +269,18 @@ export function ProductDetailsPageClient({
 
     const isProductOwner = !canBuyState.canBuy
     const isTeamMember = canBuyState.isTeamMember
+
+    useEffect(() => {
+        if (product?.id) {
+            trackEvent("product_viewed", {
+                product_id: product.id,
+                product_name: product.name,
+                store_id: product.store_id,
+                price: product.price,
+                category: product.category_name,
+            })
+        }
+    }, [product?.id])
 
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
@@ -969,6 +982,13 @@ export function ProductDetailsPageClient({
             } else {
                 invalidateCartCache()
                 notifySuccess("Sucesso", "Produto adicionado à sacola!")
+                trackEvent("add_to_cart_clicked", {
+                    product_id: product.id,
+                    product_name: product.name,
+                    store_id: product.store_id,
+                    quantity,
+                    price: selectedVariant?.price || product.price,
+                })
             }
         } catch {
             notifyError("Erro", "Erro ao adicionar à sacola")
@@ -1013,6 +1033,14 @@ export function ProductDetailsPageClient({
             }
 
             invalidateCartCache()
+
+            trackEvent("buy_now_clicked", {
+                product_id: product.id,
+                product_name: product.name,
+                store_id: product.store_id,
+                quantity,
+                price: pricing.total > 0 ? (pricing.total / quantity) : pricing.current,
+            })
 
             const checkoutData = {
                 source: "cart" as const,
@@ -1578,6 +1606,7 @@ export function ProductDetailsPageClient({
                                     href={whatsappUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => trackEvent("whatsapp_lead_clicked", { product_id: product.id, partner_id: partner.id, store_id: product.store_id })}
                                     className="w-full mb-8 h-[46px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold rounded-lg transition-colors text-sm"
                                 >
                                     <WhatsappIcon size={20} className="fill-white" />

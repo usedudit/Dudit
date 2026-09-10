@@ -127,7 +127,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
 
   const targetStoreId = input.storeId || resolved.lines.find((l: any) => l.storeId)?.storeId || null
 
-  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddresses, bumpProductsResult] = await Promise.all([
+  const [{ data: partnerRow }, { data: storeRowData }, plan, deliveryConfig, promosMap, storefrontPaymentMethodsResult, userAddressesResult, bumpProductsResult] = await Promise.all([
     admin
       .from("partners")
       .select(
@@ -177,7 +177,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     })(),
     admin
       .from("addresses")
-      .select("id, zip_code, street, number, complement, neighborhood, city, state, is_default")
+      .select("id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude")
       .eq("user_id", user.id)
       .order("is_default", { ascending: false }),
     (() => {
@@ -428,7 +428,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     },
     deliverySettings: deliveryConfig.success ? (deliveryConfig.settings as Record<string, unknown>) : null,
     storefrontPaymentMethods,
-    userAddresses: (userAddresses || []) as Record<string, unknown>[],
+    userAddresses: ((userAddressesResult as any)?.data || []) as Record<string, unknown>[],
     partnerBumpProducts: ((bumpProductsResult as any)?.data || []) as Record<string, unknown>[],
     mpAcceptedPaymentMethods: mpAcceptedPaymentMethods as any,
   }

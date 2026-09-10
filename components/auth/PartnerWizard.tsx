@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { Upload, Briefcase, Tag, ChevronRight, Store } from "lucide-react"
 import Link from "next/link"
@@ -24,6 +24,7 @@ import { isGifFile } from "@/lib/security/file-validator"
 import { recordLegalConsent } from "@/app/actions/auth/legal-consent"
 import { CURRENT_LEGAL_DOCUMENTS } from "@/lib/legal/constants"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
+import { trackEvent } from "@/lib/analytics"
 
 const initialPartnerData = {
     categoryId: "",
@@ -81,6 +82,14 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
 
     // Step 1: Conta (se não logado). Step 2: Escolha de Modo.
     const [step, setStep] = useState(isUserLoggedIn ? 2 : 1)
+
+    useEffect(() => {
+        trackEvent("partner_wizard_step", {
+            step,
+            is_user_logged_in: isUserLoggedIn,
+        })
+    }, [step, isUserLoggedIn])
+
     const [direction, setDirection] = useState(0)
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -190,6 +199,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     }
 
     const setMode = (mode: BusinessMode) => {
+        trackEvent("partner_mode_selected", { mode })
         const defaultResources = getDefaultResourcesForModeAndCategory(mode, partnerData.categoryName)
         setPartnerData(prev => ({
             ...prev,
@@ -410,6 +420,14 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             })
 
             if (!res.success) throw new Error(res.error)
+
+            trackEvent("partner_created", {
+                mode: partnerData.businessInfo.mode,
+                store_name: sellerName,
+                city: partnerData.address.city,
+                state: partnerData.address.state,
+                is_user_logged_in: isUserLoggedIn,
+            })
 
             if (typeof window !== "undefined") {
                 const { notifyAddressUpdated } = await import("@/lib/utils/address-sync")

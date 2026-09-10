@@ -5,6 +5,7 @@ import { getCurrentUser, requireOrderAccess } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { revalidateProducts, revalidateMarketplace } from "@/lib/utils/revalidation"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { isUuid } from "@/lib/utils/short-id"
 
 const AMOUNT_TOLERANCE = 0.01
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("id, order_number, situation, total_amount, paid_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at, payment_breakdown, finance_account_id, checkout_fulfillment")
+      .select("id, order_number, situation, store_id, total_amount, paid_amount, mp_payment_id, payment_method, payment_provider, buyer_id, partner_id, payment_expires_at, payment_breakdown, finance_account_id, checkout_fulfillment")
       .eq("id", orderId)
       .single()
 
@@ -179,7 +180,8 @@ export async function POST(request: NextRequest) {
       fixedFeeAmount: 0,
       interestAmount: mpLegInterestAmount,
       feeBearer: "merchant",
-      paymentMethodId: paymentData.payment_method_id ?? null,
+      paymentMethodId: paymentData.payment_method_id && isUuid(paymentData.payment_method_id) ? paymentData.payment_method_id : null,
+      mpPaymentMethodId: paymentData.payment_method_id ?? null,
       paymentTypeId: paymentData.payment_type_id ?? null,
       paymentStatus: paymentData.status ?? null,
       paymentStatusDetail: paymentData.status_detail ?? null,
@@ -197,7 +199,13 @@ export async function POST(request: NextRequest) {
       mpLeg.cardholderName = mpCardholderName
     }
 
-    const oldBreakdown = Array.isArray(order.payment_breakdown) ? [...order.payment_breakdown] : []
+    const rawBreakdown = Array.isArray(order.payment_breakdown) ? [...order.payment_breakdown] : []
+    const oldBreakdown = rawBreakdown.map((entry: any) => {
+      if (entry?.paymentMethodId && !isUuid(entry.paymentMethodId)) {
+        return { ...entry, paymentMethodId: null, mpPaymentMethodId: entry.paymentMethodId }
+      }
+      return entry
+    })
     const mpLegIndex = oldBreakdown.findIndex(
       (entry: any) =>
         String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
@@ -265,15 +273,35 @@ export async function POST(request: NextRequest) {
         to: newOrderStatus,
       })
 
-      const updateData: Record<string, unknown> = approvedUpdate
-        ? { ...approvedUpdate, updated_at: new Date().toISOString() }
-        : {
-          situation: newOrderStatus,
-          payment_method: paymentData.payment_method?.type || order.payment_method,
-          payment_provider: "Mercado Pago",
-          updated_at: new Date().toISOString(),
-          payment_breakdown,
+      let resolvedStoreId = order.store_id
+      if (!resolvedStoreId) {
+        const { data: defaultStore } = await supabaseAdmin
+          .from("stores")
+          .select("id")
+          .eq("partner_id", order.partner_id)
+          .order("is_headquarters", { ascending: false })
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        if (defaultStore?.id) {
+          resolvedStoreId = defaultStore.id
         }
+      }
+
+      const updateData: Record<string, unknown> = approvedUpdate
+        ? {
+            ...approvedUpdate,
+            updated_at: new Date().toISOString(),
+            ...(resolvedStoreId && !order.store_id ? { store_id: resolvedStoreId } : {}),
+          }
+        : {
+            situation: newOrderStatus,
+            payment_method: paymentData.payment_method?.type || order.payment_method,
+            payment_provider: "Mercado Pago",
+            updated_at: new Date().toISOString(),
+            payment_breakdown,
+            ...(resolvedStoreId && !order.store_id ? { store_id: resolvedStoreId } : {}),
+          }
 
       const { data: updatedOrder, error: updateError } = await supabaseAdmin
         .from("orders")
@@ -310,7 +338,7 @@ export async function POST(request: NextRequest) {
 
           const { data: fullOrder } = await supabaseAdmin
             .from("orders")
-            .select("order_number, partner_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
+            .select("order_number, partner_id, store_id, total_amount, paid_amount, payment_method, payment_provider, payment_breakdown, buyer_id, customer_name, customer_id, finance_account_id, order_source")
             .eq("id", orderId)
             .single()
 
@@ -319,6 +347,7 @@ export async function POST(request: NextRequest) {
               orderId: orderId,
               orderNumber: fullOrder.order_number,
               partnerId: fullOrder.partner_id,
+              storeId: fullOrder.store_id || resolvedStoreId || null,
               totalAmount: fullOrder.total_amount,
               newBreakdown: fullOrder.payment_breakdown || [],
               oldBreakdown: order.payment_breakdown || [],

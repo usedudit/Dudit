@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import { SWRConfig } from "swr"
+import { identifyUser, resetUser } from "@/lib/analytics"
 
 type SupabaseContextType = {
     supabase: ReturnType<typeof createClient>
@@ -49,8 +50,13 @@ export function SupabaseProvider({
         // Supabase GoTrue API round-trip (~50-150ms) on every page load.
         if (!initialUser) {
             supabase.auth.getUser().then(({ data }: any) => {
-                if (data?.user) setUser(data.user)
+                if (data?.user) {
+                    setUser(data.user)
+                    identifyUser(data.user.id, { email: data.user.email })
+                }
             })
+        } else if (initialUser) {
+            identifyUser(initialUser.id, { email: initialUser.email })
         }
 
         const {
@@ -59,6 +65,11 @@ export function SupabaseProvider({
             setUser(session?.user ?? null)
             if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
                 clearAccountScopedBrowserState()
+            }
+            if (event === "SIGNED_IN" && session?.user) {
+                identifyUser(session.user.id, { email: session.user.email })
+            } else if (event === "SIGNED_OUT") {
+                resetUser()
             }
         })
 

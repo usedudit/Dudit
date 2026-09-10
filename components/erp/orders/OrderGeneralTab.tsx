@@ -184,7 +184,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
     const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
-    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && friendlyMethod
+    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && friendlyMethod && !friendlyMethod.toLowerCase().includes("mercado pago")
         ? `Mercado Pago (${friendlyMethod})${pendingSuffix}`
         : `${friendlyMethod || "Não informado"}${pendingSuffix}`
 
@@ -820,7 +820,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 )}
 
                                 <div className="md:col-span-2 flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                    <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                    <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                     <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
                                 </div>
                             </div>
@@ -1462,7 +1462,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                             )}
 
                             <div className="md:col-span-2 flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                 <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(totalAmount)}</span>
                             </div>
                         </div>

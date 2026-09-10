@@ -1217,7 +1217,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             )}
 
                                                             <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                                <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                                                <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                                                 <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
                                                             </div>
                                                         </div>
@@ -1728,7 +1728,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         )}
 
                                                         <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
-                                                            <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>
+                                                            <span className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading">Total do Pedido</span>
                                                             <span className="font-bold text-2xl text-brand-dark dark:text-dark-heading tracking-tight">{formatCurrency(order.total_amount)}</span>
                                                         </div>
                                                     </div>

@@ -38,6 +38,7 @@ import { buildNotificationContent } from "@/lib/notifications/templates"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
 import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { isUuid } from "@/lib/utils/short-id"
 import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 
@@ -1019,7 +1020,7 @@ export async function createFinancialTransactionsForReceivedAmount(
                 const refNote = `sale-tx:${params.orderNumber}:${newEntry.method}:${oldFormatted}_to_${newFormatted}`
 
                 let legAccountId = params.financeAccountId || null
-                if (!legAccountId && newEntry.paymentMethodId) {
+                if (!legAccountId && newEntry.paymentMethodId && isUuid(newEntry.paymentMethodId)) {
                     const { data: pm } = await supabase
                         .from("payment_methods")
                         .select("default_finance_account_id")
@@ -1041,7 +1042,7 @@ export async function createFinancialTransactionsForReceivedAmount(
                     payment_breakdown: [{
                         method: newEntry.method,
                         amount: delta,
-                        paymentMethodId: newEntry.paymentMethodId || null,
+                        paymentMethodId: (newEntry.paymentMethodId && isUuid(newEntry.paymentMethodId)) ? newEntry.paymentMethodId : null,
                         installmentNumber: newEntry.installmentNumber || 1,
                     }],
                     payment_date: new Date().toISOString(),

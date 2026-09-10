@@ -8,6 +8,7 @@ import { formatPaymentMethodLabel } from "@/lib/payments/payment-method"
 import { captureError } from "@/lib/monitoring/sentry"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { isUuid } from "@/lib/utils/short-id"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -704,7 +705,8 @@ async function processWebhookWithRetry(
       fixedFeeAmount: 0,
       interestAmount: mpLegInterestAmount,
       feeBearer: "merchant",
-      paymentMethodId: paymentInfo.payment_method_id ?? null,
+      paymentMethodId: paymentInfo.payment_method_id && isUuid(paymentInfo.payment_method_id) ? paymentInfo.payment_method_id : null,
+      mpPaymentMethodId: paymentInfo.payment_method_id ?? null,
       paymentTypeId: paymentInfo.payment_type_id ?? null,
       paymentStatus: paymentInfo.status ?? null,
       paymentStatusDetail: paymentInfo.status_detail ?? null,
@@ -722,7 +724,13 @@ async function processWebhookWithRetry(
       mpLeg.cardholderName = mpCardholderName
     }
 
-    const oldBreakdown = Array.isArray(orderData.payment_breakdown) ? [...orderData.payment_breakdown] : []
+    const rawBreakdown = Array.isArray(orderData.payment_breakdown) ? [...orderData.payment_breakdown] : []
+    const oldBreakdown = rawBreakdown.map((entry: any) => {
+      if (entry?.paymentMethodId && !isUuid(entry.paymentMethodId)) {
+        return { ...entry, paymentMethodId: null, mpPaymentMethodId: entry.paymentMethodId }
+      }
+      return entry
+    })
     const mpLegIndex = oldBreakdown.findIndex(
       (entry: any) =>
         String(entry?.provider || "").toLowerCase().includes("mercado pago") ||
@@ -790,9 +798,27 @@ async function processWebhookWithRetry(
       updateData = {
         ...updateData,
         situation: orderStatus,
+        cancelled_at: new Date().toISOString(),
+        payment_method: paymentMethodName,
         payment_provider: "Mercado Pago",
         mp_payment_id: paymentId.toString(),
         payment_breakdown,
+      }
+    }
+
+    let resolvedStoreId = orderData.store_id
+    if (!resolvedStoreId) {
+      const { data: defaultStore } = await supabase
+        .from("stores")
+        .select("id")
+        .eq("partner_id", orderData.partner_id)
+        .order("is_headquarters", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (defaultStore?.id) {
+        resolvedStoreId = defaultStore.id
+        updateData.store_id = defaultStore.id
       }
     }
 
@@ -831,6 +857,67 @@ async function processWebhookWithRetry(
             onOrderStatusChanged(notifyOrder, orderStatus, undefined),
           )
           .catch(console.error)
+      }
+
+      // Log audit event for timeline/history when order is cancelled via webhook
+      if (orderStatus === "cancelled" && previousSituation !== "cancelled") {
+        try {
+          const { logAuditEvent } = await import("@/lib/services/timeline.service")
+          const statusDetail = paymentInfo.status_detail || paymentInfo.status || "cancelado"
+          const statusLabels: Record<string, string> = {
+            cancelled: "cancelado",
+            rejected: "rejeitado",
+            refunded: "reembolsado",
+            charged_back: "estornado",
+          }
+          const statusLabel = statusLabels[paymentInfo.status] || statusDetail
+          await logAuditEvent({
+            partnerId,
+            actorUserId: null,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "cancelled",
+            changeLines: [
+              `Pedido cancelado por: Sistema via Mercado Pago.`,
+              `Motivo: Pagamento ${statusLabel} no Mercado Pago.`,
+            ],
+            source: "system",
+            metadata: {
+              oldStatus: previousSituation,
+              newStatus: "Cancelado",
+              mpPaymentStatus: paymentInfo.status,
+              mpPaymentStatusDetail: paymentInfo.status_detail,
+            },
+          })
+        } catch (auditErr: any) {
+          console.error("[WEBHOOK] Error logging cancellation audit event:", auditErr.message)
+        }
+      }
+
+      // Log audit event for payment approved via webhook
+      if (orderStatus === "paid" && previousSituation !== "paid") {
+        try {
+          const { logAuditEvent } = await import("@/lib/services/timeline.service")
+          await logAuditEvent({
+            partnerId,
+            actorUserId: null,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "paid",
+            changeLines: [
+              `Pagamento aprovado via Mercado Pago.`,
+              `Método: ${paymentMethodName}.`,
+            ],
+            source: "system",
+            metadata: {
+              oldStatus: previousSituation,
+              newStatus: "Pago",
+              mpPaymentStatus: paymentInfo.status,
+            },
+          })
+        } catch (auditErr: any) {
+          console.error("[WEBHOOK] Error logging payment audit event:", auditErr.message)
+        }
       }
     }
 

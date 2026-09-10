@@ -669,7 +669,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 baseLabel = `${baseLabel} - ${installmentCount}x`;
             }
         }
-        if (order.payment_provider === "Mercado Pago") {
+        if (order.payment_provider === "Mercado Pago" && !baseLabel.toLowerCase().includes("mercado pago")) {
             return `Mercado Pago (${baseLabel})`;
         }
         return baseLabel;

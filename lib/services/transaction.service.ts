@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { PaymentBreakdownEntry } from "@/lib/payments/financial-engine"
+import { isUuid } from "@/lib/utils/short-id"
 
 interface OrderDataForTransaction {
     order_number: string
@@ -158,7 +159,7 @@ function buildEntries(orderData: OrderDataForTransaction): LedgerEntry[] {
                 net,
                 cost: round2(gross - net),
                 isMercadoPago,
-                paymentMethodId: entry.paymentMethodId || null,
+                paymentMethodId: entry.paymentMethodId && isUuid(entry.paymentMethodId) ? entry.paymentMethodId : null,
                 installmentNumber: Math.min(48, Math.max(1, Math.floor(Number(entry.installmentNumber || 1)))),
                 interestAmount: round2(Number(entry.interestAmount || 0)),
                 feeAmount: round2(Number(entry.feeAmount || 0)),

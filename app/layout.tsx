@@ -15,6 +15,7 @@ import { TimezoneProvider } from "@/lib/date"
 import { ThemeProvider } from "@/components/theme-provider"
 import { RouteAwareGlobalFeatures } from "@/providers/route-aware-global-features"
 import { GlobalAnnouncementBanner } from "@/components/announcements/GlobalAnnouncementBanner"
+import { PostHogProvider } from "@/providers/posthog-provider"
 
 const plusJakartaSans = Plus_Jakarta_Sans({
     subsets: ["latin"],
@@ -233,29 +234,31 @@ export default async function RootLayout({
 
             <body className="font-sans">
                 <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-                    <SupabaseProvider initialUser={user} initialSessionData={null}>
-                        <QueryProvider>
-                            <GlobalAnnouncementBanner />
-                            <PreventSamePageNavigation />
-                            <NotificationProvider>
-                                <RouteAwareGlobalFeatures>
-                                    <TransitionProvider>
-                                        <TimezoneProvider>
-                                            {children}
-                                        </TimezoneProvider>
-                                    </TransitionProvider>
-                                </RouteAwareGlobalFeatures>
-                            </NotificationProvider>
-                            <PWAUpdatePrompt />
-                            {/*
-                              Legal consent intentionally remains global. The
-                              server decides whether a newly published version
-                              still needs acceptance; this is not delegated to
-                              client-side storage.
-                            */}
-                            <LegalConsentBanner />
-                        </QueryProvider>
-                    </SupabaseProvider>
+                    <PostHogProvider>
+                        <SupabaseProvider initialUser={user} initialSessionData={null}>
+                            <QueryProvider>
+                                <GlobalAnnouncementBanner />
+                                <PreventSamePageNavigation />
+                                <NotificationProvider>
+                                    <RouteAwareGlobalFeatures>
+                                        <TransitionProvider>
+                                            <TimezoneProvider>
+                                                {children}
+                                            </TimezoneProvider>
+                                        </TransitionProvider>
+                                    </RouteAwareGlobalFeatures>
+                                </NotificationProvider>
+                                <PWAUpdatePrompt />
+                                {/*
+                                  Legal consent intentionally remains global. The
+                                  server decides whether a newly published version
+                                  still needs acceptance; this is not delegated to
+                                  client-side storage.
+                                */}
+                                <LegalConsentBanner />
+                            </QueryProvider>
+                        </SupabaseProvider>
+                    </PostHogProvider>
                 </ThemeProvider>
 
                 <script

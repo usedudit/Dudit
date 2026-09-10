@@ -954,7 +954,20 @@ export async function checkoutCartAction(
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(paymentMethod)
 
-  const targetStoreId = storeId || resolvedLines.find((l) => l.storeId)?.storeId || null
+  let targetStoreId = storeId || resolvedLines.find((l) => l.storeId)?.storeId || null
+  if (!targetStoreId) {
+    const { data: defaultStore } = await adminClient
+      .from("stores")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .order("is_headquarters", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (defaultStore?.id) {
+      targetStoreId = defaultStore.id
+    }
+  }
 
   const shouldQuoteDelivery = (hasDeliveryLines || (hasProducts && orderDelivery === "delivery")) && Boolean(deliveryAddress) && orderDelivery === "delivery"
 

@@ -20,6 +20,7 @@ import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction, bulkUpdateFulfillmentModesAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
 import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
+import { trackEvent } from "@/lib/analytics"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
 import { invalidateCartCache } from "@/hooks/use-cart"
@@ -319,6 +320,17 @@ export function CheckoutPageClient() {
 
     const [removedCartItems, setRemovedCartItems] = useState<Set<string>>(new Set())
 
+    useEffect(() => {
+        if (partnerId) {
+            trackEvent("checkout_started", {
+                partner_id: partnerId,
+                store_id: storeId,
+                source: sessionData?.source,
+                items_count: products.length,
+            })
+        }
+    }, [partnerId])
+
     const activeCartItemIds = useMemo(
         () => cartItemIds.filter((id) => !removedCartItems.has(id)),
         [cartItemIds, removedCartItems],
@@ -596,7 +608,8 @@ export function CheckoutPageClient() {
         }
         setStorefrontMethodsLoading(false)
 
-        const addresses = checkoutContext.userAddresses as unknown as UserAddress[]
+        const rawAddresses = checkoutContext.userAddresses
+        const addresses = (Array.isArray(rawAddresses) ? rawAddresses : (rawAddresses as any)?.data || []) as unknown as UserAddress[]
         if (addresses && addresses.length > 0) {
             setUserAddresses(prev => {
                 if (prev.length > 0) {
@@ -646,14 +659,18 @@ export function CheckoutPageClient() {
             setUserId(user.id)
             setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuário")
             setUserEmail(user.email || "")
+            if (userAddresses.length === 0) {
+                void loadUserAddresses(undefined, user.id)
+            }
         }
     }, [user])
 
-    const loadUserAddresses = async (targetSelectedId?: string) => {
-        if (!userId) return
+    const loadUserAddresses = async (targetSelectedId?: string, overrideUserId?: string) => {
+        const targetUserId = overrideUserId || userId || user?.id
+        if (!targetUserId) return
         setLoadingAddresses(true)
         try {
-            const result = await getAddressesAction(userId, "user")
+            const result = await getAddressesAction(targetUserId, "user")
             if (result.addresses) {
                 const list = result.addresses as UserAddress[]
                 setUserAddresses(list)
@@ -2250,7 +2267,7 @@ export function CheckoutPageClient() {
                         deliveryFee: isPickup ? 0 : deliveryFee,
                         checkoutPricing: checkoutPricingSnapshot,
                         cartItemIds: cartItemIds,
-                        storeId: storeId || undefined,
+                        storeId: storeId || checkoutContext?.store?.id || sessionData?.storeId || undefined,
                     },
                     sellerName: sessionData?.partnerInfo?.store_name || "Loja",
                     mpPublicKey: sessionData?.partnerInfo?.mpPublicKey || "",
@@ -2368,6 +2385,17 @@ export function CheckoutPageClient() {
                     if ('error' in result && result.error) throw new Error(result.error)
                     const successResult = result as any
                     sessionStorage.removeItem("checkout_session")
+
+                    trackEvent("order_submitted", {
+                        order_id: successResult.orderId,
+                        order_number: successResult.orderNumber,
+                        partner_id: partnerId,
+                        store_id: storeId,
+                        amount: checkoutChargeTotal,
+                        payment_method: formData.paymentMethod,
+                        delivery_type: formData.deliveryType,
+                        items_count: products.length,
+                    })
 
                     setPixPaymentData({
                         orderId: successResult.orderId,

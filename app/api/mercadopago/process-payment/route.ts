@@ -1035,10 +1035,31 @@ async function handler(request: NextRequest) {
     // Fetch delivery_payer setting for snapshot (store-aware)
     const rawMpStoreId = (orderItemsForInsert || []).find((l: any) => l.store_id)?.store_id
     const targetMpStoreId = typeof rawMpStoreId === "string" ? rawMpStoreId : null
-    const deliveryRow = await resolveDeliverySettingsRow(adminClient, partnerId, targetMpStoreId)
+
+    let effectiveStoreId =
+      storeId ||
+      existingOrder?.store_id ||
+      targetMpStoreId ||
+      null
+
+    if (!effectiveStoreId) {
+      const { data: defaultStore } = await adminClient
+        .from("stores")
+        .select("id")
+        .eq("partner_id", partnerId)
+        .order("is_headquarters", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (defaultStore?.id) {
+        effectiveStoreId = defaultStore.id
+      }
+    }
+
+    const deliveryRow = await resolveDeliverySettingsRow(adminClient, partnerId, effectiveStoreId || targetMpStoreId)
     const effectiveDeliveryPayer: "customer" | "seller" = deliveryRow?.delivery_payer === "seller" ? "seller" : "customer"
-    if (targetMpStoreId && deliveryRow?.store_id === targetMpStoreId) {
-      console.log(`[delivery_payer] MP payment using store override: store=${targetMpStoreId}, partner=${partnerId}, payer=${effectiveDeliveryPayer}`)
+    if ((effectiveStoreId || targetMpStoreId) && deliveryRow?.store_id === (effectiveStoreId || targetMpStoreId)) {
+      console.log(`[delivery_payer] MP payment using store override: store=${effectiveStoreId || targetMpStoreId}, partner=${partnerId}, payer=${effectiveDeliveryPayer}`)
     }
     // For MP orders (customer-initiated), seller_commission_amount is 0
     const sellerCommissionAmount = 0
@@ -1098,6 +1119,7 @@ async function handler(request: NextRequest) {
           amount_paid: totalPaidAmount,
           paid_at: paymentStatus === "approved" ? new Date().toISOString() : existingOrder.paid_at,
           payment_expires_at: paymentExpiresAt,
+          ...(effectiveStoreId && !existingOrder.store_id ? { store_id: effectiveStoreId } : {}),
         })
         .eq("id", existingOrderId)
         .select()
@@ -1112,6 +1134,7 @@ async function handler(request: NextRequest) {
         .insert({
           id: targetOrderId,
           partner_id: partnerId,
+          store_id: effectiveStoreId,
           buyer_id: buyerId,
           customer_id: resolvedCustomerId,
           customer_name: customerName,
@@ -1219,7 +1242,7 @@ async function handler(request: NextRequest) {
         const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
         await createTransactionFromOrder(adminClient, {
           order_id: newOrder.id,
-          store_id: storeId || null,
+          store_id: newOrder.store_id || effectiveStoreId || storeId || null,
           order_number: newOrder.order_number || newOrder.id,
           partner_id: partnerId,
           total_amount: chargeAmount,

@@ -6,6 +6,7 @@ import {
   resolveSituationFromPaid,
   type OrderFinancialSnapshot,
 } from "@/lib/payments/order-financial-state"
+import { isUuid } from "@/lib/utils/short-id"
 
 const AMOUNT_TOLERANCE = 0.01
 
@@ -56,9 +57,16 @@ export function buildMpApprovedPaymentUpdate(params: {
   const nextPaid = Math.min(totalAmount, currentPaid > 0.009 ? currentPaid + chargeAmount : chargeAmount)
   const situation = resolveSituationFromPaid(nextPaid, totalAmount)
 
-  const oldBreakdown = Array.isArray(params.existingBreakdown ?? params.order.payment_breakdown)
+  const rawBreakdown = Array.isArray(params.existingBreakdown ?? params.order.payment_breakdown)
     ? [...(params.existingBreakdown ?? params.order.payment_breakdown) as any[]]
     : []
+
+  const oldBreakdown = rawBreakdown.map((entry: any) => {
+    if (entry?.paymentMethodId && !isUuid(entry.paymentMethodId)) {
+      return { ...entry, paymentMethodId: null, mpPaymentMethodId: entry.paymentMethodId }
+    }
+    return entry
+  })
 
   const mpLegIndex = oldBreakdown.findIndex(
     (entry: any) =>
@@ -96,7 +104,8 @@ export function buildMpApprovedPaymentUpdate(params: {
     fixedFeeAmount: 0,
     interestAmount,
     feeBearer: "merchant",
-    paymentMethodId: params.mpPaymentMethodId ?? null,
+    paymentMethodId: params.mpPaymentMethodId && isUuid(params.mpPaymentMethodId) ? params.mpPaymentMethodId : null,
+    mpPaymentMethodId: params.mpPaymentMethodId ?? null,
     paymentTypeId: params.mpPaymentTypeId ?? null,
     paymentStatus: params.mpPaymentStatus ?? null,
     paymentStatusDetail: params.mpPaymentStatusDetail ?? null,

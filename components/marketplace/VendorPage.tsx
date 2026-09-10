@@ -13,6 +13,7 @@ import { ReviewsSection } from "./ReviewsSection"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
+import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
@@ -66,6 +67,7 @@ const openWhatsApp = (phone?: string, storeName?: string) => {
     const cleaned = phone?.replace(/\D/g, "") ?? ""
     const number = cleaned.startsWith("55") ? cleaned : `55${cleaned}`
     const text = encodeURIComponent(`Olá, ${storeName || "tudo bem"}! Vi sua vitrine na Dudit e gostaria de saber mais.`)
+    trackEvent("whatsapp_lead_clicked", { store_name: storeName })
     window.open(`https://wa.me/${number}?text=${text}`, "_blank")
 }
 
@@ -702,6 +704,17 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         }
     }, [activeSection, mobileModalTab, isAboutPageOpen])
 
+    useEffect(() => {
+        if (partner?.id || partner?.storeName) {
+            trackEvent("storefront_viewed", {
+                store_id: partner.id,
+                store_name: partner.storeName,
+                city: partner.city,
+                state: partner.state,
+            })
+        }
+    }, [partner?.id])
+
     const gallery: string[] = useMemo(() => partner?.gallery || [], [partner?.gallery])
     const [searchValue, setSearchValue] = useState("")
     const [categorySearchValue, setCategorySearchValue] = useState("")
@@ -1099,7 +1112,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
                 <div className="w-full max-w-[1400px] mx-auto">
-                    <div className="relative w-full aspect-[1400/300] md:rounded-2xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 lg:mb-4">
+                    <div className="relative w-full max-w-[1400px] rounded-xl lg:rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[1400/300] dark:bg-dark-border/50 shadow-xs lg:mb-4">
                         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                     </div>
                 </div>

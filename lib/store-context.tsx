@@ -5,6 +5,7 @@ import type React from "react"
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { setStoreGroup } from "@/lib/analytics"
 
 interface Store {
   id: string
@@ -89,6 +90,17 @@ export function StoreProvider({
   const [hasError, setHasError] = useState(false)
   const router = useRouter()
   const [partnerId, setPartnerId] = useState<string | null>(propPartnerId || null)
+
+  useEffect(() => {
+    if (selectedStore?.id) {
+      setStoreGroup(selectedStore.id, {
+        name: selectedStore.name,
+        partner_id: selectedStore.partner_id,
+        city: selectedStore.city ?? undefined,
+        state: selectedStore.state ?? undefined,
+      })
+    }
+  }, [selectedStore?.id, selectedStore?.name, selectedStore?.partner_id, selectedStore?.city, selectedStore?.state])
 
   useEffect(() => {
     if (hasInitialStores) return
