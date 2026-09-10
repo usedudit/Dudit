@@ -675,7 +675,19 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     for (let i = 0; i < createdRows.length; i++) {
       const row = createdRows[i]
       const price = Number(row.price || 0)
-      const linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || payload[i]?.marketplaceOrderId
+      let linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || payload[i]?.marketplaceOrderId
+      const orderItemId = row.order_item_id || payload[i]?.orderItemId || payload[i]?.order_item_id
+
+      if (!linkedOrderId && orderItemId) {
+        const { data: orderItem } = await supabase
+          .from("order_items")
+          .select("order_id")
+          .eq("id", orderItemId)
+          .maybeSingle()
+        if (orderItem?.order_id) {
+          linkedOrderId = orderItem.order_id
+        }
+      }
 
       if (linkedOrderId) {
         // Appointment is linked to an existing order (ERP/POS service sale)
@@ -987,14 +999,10 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     // Only send notifications for marketplace/online appointments, not manual ones
     const rowsToNotify = createdRows.filter(row => row.sales_channel && row.sales_channel !== "manual")
     if (rowsToNotify.length > 0) {
-      Promise.all([
-        import("@/lib/services/whatsapp-automation.service"),
-        import("@/lib/services/notification-automation.service"),
-      ])
-        .then(([whatsapp, notifications]) => {
+      import("@/lib/services/notification-automation.service")
+        .then(({ onAppointmentCreated }) => {
           for (const row of rowsToNotify) {
-            whatsapp.onAppointmentCreated(row).catch(console.error)
-            notifications.onAppointmentCreated(row, "system").catch(console.error)
+            onAppointmentCreated(row, "system").catch(console.error)
           }
         })
         .catch(() => { })
@@ -1329,11 +1337,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
     const rescheduled = dateChanged || timeChanged
 
     if (rescheduled && finalRow.source !== "unavailable") {
-      import("@/lib/services/whatsapp-automation.service")
-        .then(({ onAppointmentRescheduled }) =>
-          onAppointmentRescheduled(finalRow, "manual"),
-        )
-        .catch(console.error)
       import("@/lib/services/notification-automation.service")
         .then(({ onAppointmentRescheduled }) =>
           onAppointmentRescheduled(finalRow, "manual"),
@@ -1343,11 +1346,6 @@ export async function updateAppointmentAction(appointmentId: string, payload: Pa
       const prevStatus = String(current.status)
       const nextStatus = String(normalizedStatus)
       if (prevStatus !== nextStatus) {
-        import("@/lib/services/whatsapp-automation.service")
-          .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
-          )
-          .catch(console.error)
         import("@/lib/services/notification-automation.service")
           .then(({ onAppointmentStatusChanged }) =>
             onAppointmentStatusChanged(finalRow, prevStatus, nextStatus, "manual"),
@@ -1388,12 +1386,6 @@ export async function deleteAppointmentAction(appointmentId: string, notifyClien
 
       if (notifyClient && current.source !== "unavailable") {
         const currentWithNote = cancellationNote ? { ...current, cancellation_note: cancellationNote } : current
-
-        import("@/lib/services/whatsapp-automation.service")
-          .then(({ onAppointmentStatusChanged }) =>
-            onAppointmentStatusChanged(currentWithNote, current.status, "Cancelado", "manual"),
-          )
-          .catch(console.error)
 
         import("@/lib/services/notification-automation.service")
           .then(({ onAppointmentStatusChanged }) =>

@@ -336,7 +336,7 @@ export function CheckoutPageClient() {
         [cartItemIds, removedCartItems],
     )
 
-    const { checkoutContext, contextLoading, contextError } = useMarketplaceCheckoutContext({
+    const { checkoutContext, contextLoading, contextError, patchLines } = useMarketplaceCheckoutContext({
         partnerId,
         cartItemIds: activeCartItemIds,
         storeId,
@@ -375,7 +375,16 @@ export function CheckoutPageClient() {
             const token = csrfToken || await fetchCSRFTokenSingleton() || ""
             const result = await bulkUpdateFulfillmentModesAction(changes, token)
             if (result.success) {
-                setRefreshTrigger(prev => prev + 1)
+                patchLines((lines) => {
+                    const updated = lines.map((line) => {
+                        const change = changes.find((c) => c.cartItemId === line.lineId)
+                        if (change) {
+                            return { ...line, fulfillmentMode: change.mode }
+                        }
+                        return line
+                    })
+                    return updated
+                })
             } else {
                 notifyError("Erro", result.error || "Não foi possível salvar as formas de atendimento.")
             }

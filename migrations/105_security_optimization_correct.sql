@@ -57,11 +57,11 @@ ALTER TABLE suppliers
   ADD CONSTRAINT suppliers_email_format 
   CHECK (email IS NULL OR email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$');
 
--- Validação de CPF (11 dígitos)
+-- Validação de CPF:
+-- NOTA: Na tabela customers, o CPF é criptografado com AES-256 (encryptCPF).
+-- Por ser ciphertext ("v2:..."), não deve possuir constraint de validação numérica no banco.
 ALTER TABLE customers 
-  DROP CONSTRAINT IF EXISTS customers_cpf_format,
-  ADD CONSTRAINT customers_cpf_format 
-  CHECK (cpf IS NULL OR cpf ~ '^\d{11}$');
+  DROP CONSTRAINT IF EXISTS customers_cpf_format;
 
 -- Validação de CNPJ (14 caracteres alfanuméricos)
 ALTER TABLE customers 

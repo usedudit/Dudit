@@ -383,6 +383,13 @@ export async function POST(request: NextRequest) {
         }
 
         revalidateMarketplace()
+      } else if (newOrderStatus === "cancelled") {
+        try {
+          const { syncCancelledOrderAppointmentsAndTransactions } = await import("@/lib/services/sync-cancellation")
+          await syncCancelledOrderAppointmentsAndTransactions(supabaseAdmin, orderId, { orderData: order })
+        } catch (cancelSyncErr) {
+          SecureLogger.error("Error syncing cancelled order appointments in payment sync", { orderId, error: cancelSyncErr })
+        }
       }
 
       return NextResponse.json({

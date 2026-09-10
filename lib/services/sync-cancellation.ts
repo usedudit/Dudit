@@ -152,81 +152,133 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
     }
   }
 
-  // 2. Fetch appointments linked to the order
-  const { data: appointments, error: fetchApptsError } = await supabase
+  // 2. Fetch appointments linked to the order (by marketplace_order_id or linked order_items)
+  let orderItemIds: string[] = []
+  try {
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select("id")
+      .eq("order_id", orderId)
+    orderItemIds = (orderItems || []).map((item: any) => item.id).filter(Boolean)
+  } catch (itemErr) {
+    console.warn("[syncCancelledOrder] Error fetching order items for appointment linkage:", itemErr)
+  }
+
+  let apptQuery = supabase
     .from("appointments")
-    .select("id, status, receivable_transaction_id, payment_transaction_id")
-    .eq("marketplace_order_id", orderId)
-    .eq("partner_id", orderPartnerId)
+    .select("id, status, receivable_transaction_id, payment_transaction_id, store_id, price, paid_amount, partner_id, customer_id, service_name, start_date, start_time")
+
+  if (orderItemIds.length > 0) {
+    apptQuery = apptQuery.or(`marketplace_order_id.eq.${orderId},order_item_id.in.(${orderItemIds.join(",")})`)
+  } else {
+    apptQuery = apptQuery.eq("marketplace_order_id", orderId)
+  }
+
+  if (orderPartnerId) {
+    apptQuery = apptQuery.eq("partner_id", orderPartnerId)
+  }
+
+  const { data: appointments, error: fetchApptsError } = await apptQuery
 
   if (fetchApptsError) {
     console.error("[syncCancelledOrder] Error fetching appointments:", fetchApptsError)
     return
   }
 
-  if (!appointments || appointments.length === 0) {
-    return
-  }
+  if (appointments && appointments.length > 0) {
+    // Identify active appointments to cancel (not Concluído or Cancelado)
+    const activeAppts = appointments.filter(
+      (appt) => appt.status !== "Concluído" && appt.status !== "Cancelado"
+    )
 
-  // 2. Identify active appointments to cancel (not Concluído or Cancelado)
-  const activeAppts = appointments.filter(
-    (appt) => appt.status !== "Concluído" && appt.status !== "Cancelado"
-  )
+    if (activeAppts.length > 0) {
+      const activeApptIds = activeAppts.map((appt) => appt.id)
+      const { error: updateApptsError } = await supabase
+        .from("appointments")
+        .update({
+          status: "Cancelado",
+          payment_status: "unpaid",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", activeApptIds)
 
-  if (activeAppts.length > 0) {
-    const activeApptIds = activeAppts.map((appt) => appt.id)
-    const { error: updateApptsError } = await supabase
-      .from("appointments")
-      .update({
-        status: "Cancelado",
-        updated_at: new Date().toISOString(),
-      })
-      .in("id", activeApptIds)
-
-    if (updateApptsError) {
-      console.error("[syncCancelledOrder] Error updating appointments status:", updateApptsError)
-    }
-  }
-
-  // 3. Collect transaction IDs to check
-  const txIds = new Set<string>()
-  for (const appt of appointments) {
-    if (appt.receivable_transaction_id) txIds.add(appt.receivable_transaction_id)
-    if (appt.payment_transaction_id) txIds.add(appt.payment_transaction_id)
-  }
-
-  if (txIds.size > 0) {
-    // 4. Fetch the transactions to check their current status
-    const { data: txs, error: fetchTxsError } = await supabase
-      .from("transactions")
-      .select("id, status")
-      .in("id", Array.from(txIds))
-      .eq("partner_id", orderPartnerId)
-
-    if (fetchTxsError) {
-      console.error("[syncCancelledOrder] Error fetching transactions:", fetchTxsError)
-      return
-    }
-
-    if (txs && txs.length > 0) {
-      // 5. Filter for transactions with status 'pending', 'Pendente', or 'active'
-      const pendingStatuses = ["pending", "Pendente", "active"]
-      const txsToCancel = txs.filter((tx) => pendingStatuses.includes(tx.status))
-
-      if (txsToCancel.length > 0) {
-        const txIdsToCancel = txsToCancel.map((tx) => tx.id)
-        const { error: updateTxsError } = await supabase
-          .from("transactions")
-          .update({
-            status: "cancelled",
-            updated_at: new Date().toISOString(),
-          })
-          .in("id", txIdsToCancel)
-
-        if (updateTxsError) {
-          console.error("[syncCancelledOrder] Error updating transactions status:", updateTxsError)
+      if (updateApptsError) {
+        console.error("[syncCancelledOrder] Error updating appointments status:", updateApptsError)
+      } else {
+        // Release consumable stock items linked to these appointments
+        try {
+          const { handleAppointmentItemsStockMovement } = await import("@/app/actions/erp/appointment-items")
+          for (const appt of activeAppts) {
+            await handleAppointmentItemsStockMovement({
+              appointmentId: appt.id,
+              partnerId: appt.partner_id || orderPartnerId || "",
+              oldStatus: appt.status,
+              newStatus: "Cancelado",
+              userId: null,
+              storeId: appt.store_id || null,
+              paymentStatus: "unpaid",
+              paidAmount: Number(appt.paid_amount || 0),
+              price: Number(appt.price || 0),
+            })
+          }
+        } catch (stockErr) {
+          console.warn("[syncCancelledOrder] Error releasing appointment items stock:", stockErr)
         }
       }
     }
+
+    // 3. Collect transaction IDs to check
+    const txIds = new Set<string>()
+    for (const appt of appointments) {
+      if (appt.receivable_transaction_id) txIds.add(appt.receivable_transaction_id)
+      if (appt.payment_transaction_id) txIds.add(appt.payment_transaction_id)
+    }
+
+    if (txIds.size > 0) {
+      // 4. Fetch the transactions to check their current status
+      let txQuery = supabase
+        .from("transactions")
+        .select("id, status")
+        .in("id", Array.from(txIds))
+
+      if (orderPartnerId) {
+        txQuery = txQuery.eq("partner_id", orderPartnerId)
+      }
+
+      const { data: txs, error: fetchTxsError } = await txQuery
+
+      if (fetchTxsError) {
+        console.error("[syncCancelledOrder] Error fetching transactions:", fetchTxsError)
+      } else if (txs && txs.length > 0) {
+        // 5. Filter for transactions with status 'pending', 'Pendente', or 'active'
+        const pendingStatuses = ["pending", "Pendente", "active"]
+        const txsToCancel = txs.filter((tx) => pendingStatuses.includes(tx.status))
+
+        if (txsToCancel.length > 0) {
+          const txIdsToCancel = txsToCancel.map((tx) => tx.id)
+          const { error: updateTxsError } = await supabase
+            .from("transactions")
+            .update({
+              status: "cancelled",
+              updated_at: new Date().toISOString(),
+            })
+            .in("id", txIdsToCancel)
+
+          if (updateTxsError) {
+            console.error("[syncCancelledOrder] Error updating transactions status:", updateTxsError)
+          }
+        }
+      }
+    }
+  }
+
+  // 6. Invalidate agenda and appointment caches
+  try {
+    const { revalidatePath } = await import("next/cache")
+    revalidatePath("/erp/agendamentos")
+    revalidatePath("/erp/servicos")
+    revalidatePath("/erp/pedidos")
+  } catch {
+    // Non-fatal if outside request context
   }
 }

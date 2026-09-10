@@ -722,7 +722,7 @@ export function PaymentWrapper({
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[100] bg-white dark:bg-dark-surface overflow-y-auto custom-scrollbar flex flex-col"
         >
-            <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50 shadow-md">
+            <header className="lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 sticky top-0 z-50">
                 <div className="w-full h-[68px] flex items-center justify-center max-w-[1300px] px-2 mx-auto gap-4">
                     <a href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
@@ -868,11 +868,7 @@ export function PaymentWrapper({
 
                                 <div className="flex flex-col gap-4">
                                     <Separator />
-                                    <Button
-                                        variant="link"
-                                        onClick={handleClose}
-                                        className="w-full"
-                                    >
+                                    <Button variant="link" onClick={handleClose} className="w-full">
                                         Voltar
                                     </Button>
                                 </div>
@@ -983,11 +979,7 @@ export function PaymentWrapper({
 
                                 <div className="flex flex-col gap-4">
                                     <Separator />
-                                    <Button
-                                        variant="link"
-                                        onClick={handleClose}
-                                        className="w-full"
-                                    >
+                                    <Button variant="link" onClick={handleClose} className="w-full">
                                         Acompanhar meus pedidos
                                     </Button>
                                 </div>
@@ -1031,15 +1023,13 @@ export function PaymentWrapper({
                                 )}
 
                                 <div className="mb-4">
-                                    <label className="text-xs font-semibold text-brand-dark dark:text-dark-heading mb-1.5 block">
-                                        Código de barras do boleto
-                                    </label>
                                     <div className="flex gap-2 w-full">
-                                        <input
-                                            type="text"
+                                        <Input
+                                            label="Código de barras do boleto"
                                             value={boletoData?.barcode || "Código não disponível"}
+                                            variant="full-rounded"
                                             readOnly
-                                            className="flex-1 h-[42px] px-3 text-sm text-brand-dark dark:text-dark-heading bg-white dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none"
+                                            className="flex-1 h-[42px] px-3"
                                         />
                                         <Button
                                             variant="outline"
@@ -1080,19 +1070,16 @@ export function PaymentWrapper({
                                 />
 
                                 <Button asChild className="w-full h-12 flex items-center justify-center font-semibold text-base py-0 px-0">
-                                    <Link href="/pedidos" prefetch={false} className="w-full h-full flex items-center justify-center">
+                                    <Link href="/pedidos" prefetch={false} className="w-full h-12">
                                         Ver Meus Pedidos
                                     </Link>
                                 </Button>
 
                                 <div className="flex flex-col gap-4 mt-6">
                                     <Separator />
-                                    <button
-                                        onClick={handleClose}
-                                        className="w-full text-brand-inactive-text font-semibold hover:text-brand-dark transition-colors"
-                                    >
+                                    <Button variant="link" onClick={handleClose} className="w-full">
                                         Fechar
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </motion.div>

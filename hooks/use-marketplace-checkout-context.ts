@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import {
   getMarketplaceCheckoutContextAction,
   type MarketplaceCheckoutContextResult,
 } from "@/app/actions/marketplace/checkout-context"
+
+type CheckoutContextData = Extract<MarketplaceCheckoutContextResult, { success: true }>
 
 export function useMarketplaceCheckoutContext(params: {
   partnerId: string
@@ -14,9 +16,7 @@ export function useMarketplaceCheckoutContext(params: {
   enabled?: boolean
   refreshTrigger?: number
 }) {
-  const [data, setData] = useState<Extract<MarketplaceCheckoutContextResult, { success: true }> | null>(
-    null,
-  )
+  const [data, setData] = useState<CheckoutContextData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -61,5 +61,13 @@ export function useMarketplaceCheckoutContext(params: {
     }
   }, [params.partnerId, cartKey, params.mpConnected, params.storeId, params.enabled, params.refreshTrigger])
 
-  return { checkoutContext: data, contextError: error, contextLoading: loading }
+  const patchLines = useCallback((updater: (lines: CheckoutContextData["lines"]) => CheckoutContextData["lines"]) => {
+    setData((prev) => {
+      if (!prev) return prev
+      const newLines = updater(prev.lines)
+      return { ...prev, lines: newLines }
+    })
+  }, [])
+
+  return { checkoutContext: data, contextError: error, contextLoading: loading, patchLines }
 }

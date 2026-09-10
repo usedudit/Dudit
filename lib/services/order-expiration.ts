@@ -119,6 +119,14 @@ export async function checkAndExpireOrder(
     .update({ stock_released_at: now })
     .eq("id", orderId)
 
+  // Sync cancellation to linked appointments and receivables
+  try {
+    const { syncCancelledOrderAppointmentsAndTransactions } = await import("@/lib/services/sync-cancellation")
+    await syncCancelledOrderAppointmentsAndTransactions(client, orderId, { orderData: order })
+  } catch (syncErr) {
+    console.error("[order-expiration] Error syncing appointments for expired order:", syncErr)
+  }
+
   try {
     const { revalidateMarketplace } = await import("@/lib/utils/revalidation")
     await revalidateMarketplace()

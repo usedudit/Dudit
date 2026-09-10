@@ -72,12 +72,12 @@ export async function createNotification(
 
   const { data, error } = await admin
     .from("notifications")
-    .insert(row)
+    .upsert(row, { onConflict: "idempotency_key", ignoreDuplicates: true })
     .select("*")
-    .single()
+    .maybeSingle()
 
   if (error) {
-    if (error.code === "23505") {
+    if (error.code === "23505" || error.message?.includes("duplicate")) {
       const { data: raced } = await admin
         .from("notifications")
         .select("*")
@@ -87,6 +87,15 @@ export async function createNotification(
     }
     console.error("[notifications] create error", error.message)
     return { notification: null, created: false }
+  }
+
+  if (!data) {
+    const { data: existingAfterConflict } = await admin
+      .from("notifications")
+      .select("*")
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle()
+    return { notification: (existingAfterConflict as NotificationRecord) ?? null, created: false }
   }
 
   const notification = data as NotificationRecord

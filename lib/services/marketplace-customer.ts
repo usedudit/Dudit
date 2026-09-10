@@ -138,7 +138,10 @@ export async function ensureMarketplaceCustomer({
       }
 
       if (Object.keys(updateData).length > 0) {
-        await supabase.from("customers").update(updateData).eq("id", customerId)
+        const { error: updateError } = await supabase.from("customers").update(updateData).eq("id", customerId)
+        if (updateError) {
+          console.error("[ensureMarketplaceCustomer] Error updating customer by marketplace_user_id:", updateError)
+        }
       }
     }
   }
@@ -165,7 +168,8 @@ export async function ensureMarketplaceCustomer({
 
       if (!existingCustomer.cpf && isValidCpf) {
         try {
-          const { encryptCPF, generateCpfLookupHash } = await import("@/lib/crypto")
+          const { encryptCPF } = await import("@/lib/crypto")
+          const { generateCpfLookupHash } = await import("@/lib/services/cpf-hash")
           const encryptedCpf = await encryptCPF(cleanCpf)
           updateData.cpf = encryptedCpf
           updateData.cpf_lookup_hash = generateCpfLookupHash(cleanCpf)
@@ -182,14 +186,18 @@ export async function ensureMarketplaceCustomer({
       }
 
       if (needsUpdate) {
-        await supabase.from("customers").update(updateData).eq("id", customerId)
+        const { error: updateError } = await supabase.from("customers").update(updateData).eq("id", customerId)
+        if (updateError) {
+          console.error("[ensureMarketplaceCustomer] Error updating customer by email:", updateError)
+        }
       }
     }
   }
 
   // 3. Try to find by CPF (only if not found by marketplace_user_id or email)
   if (!customerId && isValidCpf) {
-    const { encryptCPF, decryptCPF, generateCpfLookupHash } = await import("@/lib/crypto")
+    const { decryptCPF } = await import("@/lib/crypto")
+    const { generateCpfLookupHash } = await import("@/lib/services/cpf-hash")
     const lookupHash = generateCpfLookupHash(cleanCpf)
 
     let matchedCustomer: any = null

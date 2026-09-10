@@ -123,6 +123,23 @@ export function CheckoutFulfillmentPanel({
   const showProductsSection = hasProducts && hasAnyFulfillmentOption
   const showServicesSection = hasServices
 
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalDrafts, setModalDrafts] = useState<Record<string, "on_site" | "customer_location">>({})
+  const [saving, setSaving] = useState(false)
+
+  const openModal = useCallback(() => {
+    const drafts: Record<string, "on_site" | "customer_location"> = {}
+    for (const line of serviceLines) {
+      drafts[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
+    }
+    setModalDrafts(drafts)
+    setModalOpen(true)
+  }, [serviceLines])
+
+  const handleDraftChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
+    setModalDrafts((prev) => ({ ...prev, [lineId]: mode }))
+  }, [])
+
   const servicesWithChoice = useMemo(
     () => serviceLines.filter((l) => {
       const allowed = l.allowedFulfillmentModes || ["on_site"]
@@ -131,24 +148,13 @@ export function CheckoutFulfillmentPanel({
     [serviceLines]
   )
 
-  const showFulfillmentListItem = servicesWithChoice.length > 0
-
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalDrafts, setModalDrafts] = useState<Record<string, "on_site" | "customer_location">>({})
-  const [saving, setSaving] = useState(false)
-
-  const openModal = useCallback(() => {
-    const drafts: Record<string, "on_site" | "customer_location"> = {}
-    for (const line of servicesWithChoice) {
-      drafts[line.lineId] = (line.fulfillmentMode as "on_site" | "customer_location") || "on_site"
-    }
-    setModalDrafts(drafts)
-    setModalOpen(true)
-  }, [servicesWithChoice])
-
-  const handleDraftChange = useCallback((lineId: string, mode: "on_site" | "customer_location") => {
-    setModalDrafts((prev) => ({ ...prev, [lineId]: mode }))
-  }, [])
+  const servicesOnSiteOnly = useMemo(
+    () => serviceLines.filter((l) => {
+      const allowed = l.allowedFulfillmentModes || ["on_site"]
+      return !(allowed.includes("on_site") && allowed.includes("customer_location"))
+    }),
+    [serviceLines]
+  )
 
   const hasPendingChanges = useMemo(() => {
     return servicesWithChoice.some((line) => {
@@ -261,7 +267,7 @@ export function CheckoutFulfillmentPanel({
     return (
       <FormSection title="Serviços">
         <div className="space-y-3">
-          {showFulfillmentListItem && (
+          {servicesWithChoice.length > 0 && (
             <ListItem
               title="Forma de atendimento"
               description="Defina onde cada serviço será realizado"
@@ -270,26 +276,20 @@ export function CheckoutFulfillmentPanel({
             />
           )}
 
-          {serviceLines.map((line) => {
-            const allowed = line.allowedFulfillmentModes || ["on_site"]
-            const supportsBoth = allowed.includes("on_site") && allowed.includes("customer_location")
-            if (supportsBoth) return null
-
-            return (
-              <div
-                key={line.lineId}
-                className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
-              >
-                <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
-                {line.bookingSummary && (
-                  <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
-                )}
-                <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit mt-2">
-                  {getModeLabel(allowed[0] || "on_site")}
-                </div>
+          {servicesOnSiteOnly.map((line) => (
+            <div
+              key={line.lineId}
+              className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
+            >
+              <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
+              {line.bookingSummary && (
+                <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
+              )}
+              <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit mt-2">
+                No estabelecimento
               </div>
-            )
-          })}
+            </div>
+          ))}
 
           {anyServiceRequiresCustomerAddress && (
             <div className="pt-2">
@@ -328,12 +328,16 @@ export function CheckoutFulfillmentPanel({
         onClose={() => setModalOpen(false)}
         title="Forma de atendimento"
         footer={
-          <Button variant="default" onClick={handleModalSave} disabled={saving} isLoading={saving} className="flex-1">
-            Salvar
-          </Button>
+          servicesWithChoice.length > 0 ? (
+            <Button variant="default" onClick={handleModalSave} disabled={saving} isLoading={saving} className="flex-1">
+              Salvar
+            </Button>
+          ) : undefined
         }
       >
         <div className="w-full">
+          <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Serviços</p>
+
           <div className="flex items-center gap-4 pb-3 border-b border-brand-border dark:border-dark-border mb-1">
             <div className="flex-1" />
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-center">No estabelecimento</span>
@@ -345,7 +349,7 @@ export function CheckoutFulfillmentPanel({
             return (
               <div
                 key={line.lineId}
-                className="flex items-center gap-4 py-3 border-b border-brand-border/50 dark:border-dark-border/50 last:border-b-0"
+                className="flex items-center gap-4 py-3 border-b border-brand-border/50 dark:border-dark-border/50"
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{line.displayName}</p>
@@ -372,6 +376,36 @@ export function CheckoutFulfillmentPanel({
               </div>
             )
           })}
+
+          {servicesOnSiteOnly.map((line) => (
+            <div
+              key={line.lineId}
+              className="flex items-center gap-4 py-3 border-b border-brand-border/50 dark:border-dark-border/50 last:border-b-0 opacity-60"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-brand-dark dark:text-dark-heading text-sm">{line.displayName}</p>
+                {line.bookingSummary && (
+                  <p className="text-xs text-brand-inactive-text mt-0.5">{line.bookingSummary}</p>
+                )}
+              </div>
+              <div className="w-28 flex justify-center">
+                <RadioButton
+                  name={`modal-${line.lineId}`}
+                  value="on_site"
+                  checked
+                  onChange={() => {}}
+                />
+              </div>
+              <div className="w-28 flex justify-center">
+                <RadioButton
+                  name={`modal-${line.lineId}`}
+                  value="customer_location"
+                  checked={false}
+                  onChange={() => {}}
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </DefaultModal>
     </div>

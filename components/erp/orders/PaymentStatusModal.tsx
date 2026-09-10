@@ -6,6 +6,8 @@ import {
     ListItem,
     Barcode,
     Spinner,
+    Input,
+    Badge,
 } from '@/components/reusable';
 import {
     CheckCircleIcon,
@@ -587,7 +589,7 @@ export default function PaymentStatusModal({
                                     </div>
 
                                     {isMpOrder && !isFullyPaid && (
-                                        <div className="flex flex-col gap-4 p-5 rounded-2xl border border-brand-border dark:border-dark-border bg-gray-50/70 dark:bg-dark-border/20">
+                                        <div className="flex flex-col gap-4">
                                             {/* Header do card MP */}
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -601,9 +603,7 @@ export default function PaymentStatusModal({
                                                     <div className="min-w-0">
                                                         <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5 flex-wrap">
                                                             {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
-                                                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-                                                                Pendente
-                                                            </span>
+                                                            <Badge variant="orange">Pendente</Badge>
                                                         </h4>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
                                                             {mpPaymentData?.boletoData
@@ -614,10 +614,9 @@ export default function PaymentStatusModal({
                                                 </div>
                                                 <Button
                                                     variant="outline"
-                                                    size="sm"
                                                     onClick={handleSyncMpPayment}
                                                     disabled={syncing}
-                                                    className="h-8 text-xs shrink-0"
+                                                    className="h-8"
                                                 >
                                                     {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
                                                     Verificar
@@ -634,9 +633,9 @@ export default function PaymentStatusModal({
 
                                             {/* Conteúdo: PIX */}
                                             {mpPaymentData?.pixData && (
-                                                <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-brand-border dark:border-dark-border">
+                                                <div className="flex flex-col items-center gap-4">
                                                     {mpPaymentData.pixData.qrCodeBase64 && (
-                                                        <div className="w-48 h-48 p-2 bg-white rounded-xl border border-brand-border flex items-center justify-center">
+                                                        <div className="w-48 h-48 p-2 bg-white flex items-center justify-center">
                                                             <img
                                                                 src={`data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}`}
                                                                 alt="PIX QR Code"
@@ -652,11 +651,11 @@ export default function PaymentStatusModal({
                                                     </div>
                                                     {mpPaymentData.pixData.qrCode && (
                                                         <div className="w-full max-w-md flex gap-2">
-                                                            <input
-                                                                type="text"
+                                                            <Input
+                                                                variant="full-rounded"
                                                                 readOnly
                                                                 value={mpPaymentData.pixData.qrCode}
-                                                                className="flex-1 h-10 px-3 text-xs text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none font-mono truncate"
+                                                                className="flex-1 h-10 truncate"
                                                             />
                                                             <Button
                                                                 variant="outline"
@@ -681,9 +680,9 @@ export default function PaymentStatusModal({
 
                                             {/* Conteúdo: BOLETO */}
                                             {mpPaymentData?.boletoData && (
-                                                <div className="flex flex-col items-center gap-4 bg-white dark:bg-dark-surface p-4 rounded-xl border border-brand-border dark:border-dark-border">
+                                                <div className="flex flex-col items-center gap-4">
                                                     {mpPaymentData.boletoData.barcode && (
-                                                        <div className="w-full max-w-md overflow-hidden bg-white p-3 rounded-lg border border-brand-border flex justify-center">
+                                                        <div className="w-full max-w-md overflow-hidden bg-white flex justify-center">
                                                             <Barcode
                                                                 value={mpPaymentData.boletoData.barcode}
                                                                 format="CODE128"
@@ -703,11 +702,11 @@ export default function PaymentStatusModal({
                                                     </div>
                                                     {mpPaymentData.boletoData.barcode && (
                                                         <div className="w-full max-w-md flex gap-2">
-                                                            <input
-                                                                type="text"
+                                                            <Input
+                                                                variant="full-rounded"
                                                                 readOnly
                                                                 value={mpPaymentData.boletoData.barcode}
-                                                                className="flex-1 h-10 px-3 text-xs text-brand-dark dark:text-dark-heading bg-gray-50 dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-lg outline-none font-mono truncate"
+                                                                className="flex-1 h-10 truncate"
                                                             />
                                                             <Button
                                                                 variant="outline"
@@ -741,10 +740,9 @@ export default function PaymentStatusModal({
                                                     {mpPaymentData.boletoData.ticketUrl && (
                                                         <Button
                                                             variant="outline"
-                                                            className="w-full max-w-md h-9 text-xs"
                                                             onClick={() => window.open(mpPaymentData!.boletoData!.ticketUrl, "_blank")}
+                                                            leftIcon={<PrinterIcon size={16} />}
                                                         >
-                                                            <PrinterIcon size={14} className="mr-1.5" />
                                                             Imprimir / Abrir Boleto em nova aba
                                                         </Button>
                                                     )}

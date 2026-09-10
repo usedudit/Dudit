@@ -3458,12 +3458,6 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     const notifyDelivery =
         data.deliveryStatus !== currentOrder.delivery_status ? data.deliveryStatus : undefined
 
-    import("@/lib/services/whatsapp-automation.service")
-        .then(({ onOrderStatusChanged }) =>
-            onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery, "manual"),
-        )
-        .catch(console.error)
-
     import("@/lib/services/notification-automation.service")
         .then(({ onOrderStatusChanged }) =>
             onOrderStatusChanged(notifyOrder, notifySituation, notifyDelivery, "manual"),
@@ -4953,9 +4947,6 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
 
         if (order.situation !== nextSituation) {
             const notifyOrder = { ...order, partner_id: payload.partnerId }
-            import("@/lib/services/whatsapp-automation.service")
-                .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, "manual"))
-                .catch(console.error)
             import("@/lib/services/notification-automation.service")
                 .then(({ onOrderStatusChanged }) => onOrderStatusChanged(notifyOrder, nextSituation, undefined, "manual"))
                 .catch(console.error)

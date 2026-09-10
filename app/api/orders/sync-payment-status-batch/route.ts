@@ -238,7 +238,6 @@ export async function POST(request: NextRequest) {
 
             SecureLogger.info("Order status updated in batch sync", { orderId: order.id, newStatus: newOrderStatus })
 
-            // Handle post-payment hooks for paid status
             if (newOrderStatus === "paid") {
               try {
                 const { createTransactionFromOrder } = await import("@/lib/services/transaction.service")
@@ -284,6 +283,13 @@ export async function POST(request: NextRequest) {
                   orderId: order.id,
                   error: txErr.message,
                 })
+              }
+            } else if (newOrderStatus === "cancelled") {
+              try {
+                const { syncCancelledOrderAppointmentsAndTransactions } = await import("@/lib/services/sync-cancellation")
+                await syncCancelledOrderAppointmentsAndTransactions(supabaseAdmin, order.id, { orderData: order })
+              } catch (cancelSyncErr) {
+                SecureLogger.error("Error syncing cancelled order appointments in batch payment sync", { orderId: order.id, error: cancelSyncErr })
               }
             }
 

@@ -3,6 +3,10 @@ import { syncCancelledOrderAppointmentsAndTransactions } from "./sync-cancellati
 import { buildNotificationContent } from "@/lib/notifications/templates"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+vi.mock("@/app/actions/erp/appointment-items", () => ({
+  handleAppointmentItemsStockMovement: vi.fn().mockResolvedValue(undefined),
+}))
+
 describe("Batch Order Cancellation & Notification Optimizations", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -189,6 +193,68 @@ describe("Batch Order Cancellation & Notification Optimizations", () => {
       expect(content.title).toBe("💔 Pedido cancelado")
       expect(content.message).toContain("Seu pedido #105 em Loja Teste foi cancelado")
       expect(content.message).toContain("Motivo: Desistência do cliente.")
+    })
+  })
+
+  describe("Appointment and transaction cancellation synchronization", () => {
+    it("updates active appointments to Cancelado and payment_status to unpaid", async () => {
+      let updatedAppointmentsPayload: any = null
+      let updatedAppointmentIds: string[] = []
+
+      const mockSupabase = {
+        from: vi.fn().mockImplementation((table: string) => {
+          const chain: Record<string, any> = {}
+          chain.select = vi.fn().mockReturnValue(chain)
+          chain.eq = vi.fn().mockReturnValue(chain)
+          chain.or = vi.fn().mockReturnValue(chain)
+          chain.in = vi.fn().mockImplementation((col: string, val: any) => {
+            if (table === "appointments" && col === "id") {
+              updatedAppointmentIds = val
+            }
+            return chain
+          })
+          chain.update = vi.fn().mockImplementation((payload: any) => {
+            if (table === "appointments") {
+              updatedAppointmentsPayload = payload
+            }
+            return chain
+          })
+          chain.single = vi.fn().mockResolvedValue({ data: null, error: null })
+          chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+          chain.then = vi.fn().mockImplementation((onFulfilled) => {
+            if (table === "order_items") {
+              return Promise.resolve({ data: [{ id: "item-1" }, { id: "item-2" }], error: null }).then(onFulfilled)
+            }
+            if (table === "appointments") {
+              return Promise.resolve({
+                data: [
+                  { id: "appt-1", status: "Reservado", price: 100, paid_amount: 0 },
+                  { id: "appt-2", status: "Concluído", price: 50, paid_amount: 50 },
+                ],
+                error: null,
+              }).then(onFulfilled)
+            }
+            return Promise.resolve({ data: [], error: null }).then(onFulfilled)
+          })
+          return chain
+        }),
+      } as unknown as SupabaseClient
+
+      await syncCancelledOrderAppointmentsAndTransactions(mockSupabase, "order-789", {
+        orderData: {
+          id: "order-789",
+          partner_id: "partner-xyz",
+          buyer_id: null,
+          customer_id: null,
+          store_id: null,
+          paid_amount: 0,
+        },
+      })
+
+      expect(updatedAppointmentsPayload).not.toBeNull()
+      expect(updatedAppointmentsPayload.status).toBe("Cancelado")
+      expect(updatedAppointmentsPayload.payment_status).toBe("unpaid")
+      expect(updatedAppointmentIds).toEqual(["appt-1"])
     })
   })
 })
