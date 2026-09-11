@@ -37,6 +37,7 @@ import QuantitySelector from '@/components/reusable/QuantitySelector';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import { formatUnit, formatQuantityWithUnit } from '@/lib/utils/formatters';
 import { createBatchStockMovementAction } from '@/app/actions/erp/stock-movements';
+import { uploadAndSavePendingAttachments } from '@/lib/utils/attachment-uploader';
 import { fetchPartnerProductsBucket } from '@/app/actions/erp/client-loaders';
 import { useNotification } from '@/hooks/use-notification';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -64,6 +65,7 @@ interface MovementItem {
 }
 
 interface CreateStockMovementProps {
+    partnerId: string;
     onBack: () => void;
     onSuccess?: () => void;
 }
@@ -74,7 +76,7 @@ const REQUIRED_FIELDS = [
     { field: "customReason", tab: "Geral" },
 ]
 
-const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }) => {
+const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, onSuccess }) => {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [activeTab, setActiveTab] = useState('Geral');
     const [isScrolled, setIsScrolled] = useState(false);
@@ -441,6 +443,19 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
             if (!res || !res.success) {
                 notifyError(res?.error || "Erro interno ao salvar movimentação.");
             } else {
+                const movementRecord = res.data as any;
+                const movementId = movementRecord?.id;
+                
+                if (movementId && (stagedFiles.length > 0 || stagedImages.length > 0)) {
+                    await uploadAndSavePendingAttachments({
+                        partnerId,
+                        entityId: movementId,
+                        entityType: "stock_movement",
+                        files: stagedFiles,
+                        images: stagedImages,
+                    });
+                }
+                
                 notifySuccess("Movimentação registrada com sucesso!");
                 if (onSuccess) onSuccess();
                 onBack();
@@ -961,7 +976,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ onBack, onSuccess }
                                         <TabsContent value="Anexos" className="mt-0">
                                             <motion.div key="Anexos" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                                 <GenericAttachmentsTab
-                                                    partnerId=""
+                                                    partnerId={partnerId}
                                                     entityType="stock_movement"
                                                     isEditing={true}
                                                     stagedFiles={stagedFiles}

@@ -439,6 +439,7 @@ const StockMovementPageContent = ({ partnerId, storeId, movements: initialMoveme
             {isCreatingEntity ? (
                 <FadeIn key="create" className="w-full h-full">
                     <CreateStockMovement
+                        partnerId={partnerId}
                         onBack={closeEntity}
                         onSuccess={() => { afterMutation(); closeEntity(); }}
                     />

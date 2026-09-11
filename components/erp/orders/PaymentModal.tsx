@@ -2441,7 +2441,7 @@ const PaymentModal = ({
                                                         </div>
                                                     )}
                                                     {customerCredit > 0.009 && (
-                                                        <div className="p-4 rounded-2xl border border-green-300 dark:border-green-800/50 bg-green-50/80 dark:bg-green-950/20 shadow-sm transition-all">
+                                                        <div className="p-4 rounded-2xl border border-brand-green transition-all">
                                                             <div className="flex items-center justify-between gap-3">
                                                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                                                     <Checkbox
@@ -2468,15 +2468,15 @@ const PaymentModal = ({
                                                                                 const num = Math.min(customerCredit, Math.min(chargeTarget, Math.max(0, Number(val || 0))));
                                                                                 setStoreCreditToUse(num);
                                                                             }}
-                                                                            className="text-right font-bold text-sm h-9"
+                                                                            className="h-9"
                                                                         />
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             {useStoreCredit && (
-                                                                <div className="mt-3 pt-2.5 border-t border-green-200 dark:border-green-800/40 flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                                <div className="mt-3 pt-2.5 border-t border-brand-green flex justify-between items-center text-xs font-semibold text-brand-dark dark:text-dark-heading">
                                                                     <span>Abatido no crédito: <strong className="text-brand-green">{formatCurrency(effectiveCreditApplied)}</strong></span>
-                                                                    <span>Restante a pagar: <strong className="text-brand-primary">{formatCurrency(netChargeTarget)}</strong></span>
+                                                                    <span>Restante a pagar: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(netChargeTarget)}</strong></span>
                                                                 </div>
                                                             )}
                                                             {useStoreCredit && netChargeTarget <= 0.009 && (

@@ -955,6 +955,9 @@ export default function CreateTransactionPage({
                     patch as any,
                 )
                 if (!res.success) return error(res.error || "Erro ao atualizar transação")
+                
+                await uploadStagedAttachments(editTransaction.id)
+                
                 success("Transação atualizada com sucesso!")
                 onSuccess?.()
                 debouncedRefresh()
@@ -995,6 +998,8 @@ export default function CreateTransactionPage({
                     paymentMethodId: paymentMethodId || null,
                 })
                 if (!res.success) return error(res.error || "Erro ao transferir")
+                const transferTxId = (res.data as { id?: string } | undefined)?.id
+                if (transferTxId) await uploadStagedAttachments(transferTxId)
                 success("Transferência registrada!")
                 onSuccess?.()
                 debouncedRefresh()
@@ -1037,6 +1042,8 @@ export default function CreateTransactionPage({
                     origin: "manual",
                 })
                 if (!res.success) return error(res.error || "Erro ao salvar")
+                const adjustmentTxId = (res.data as { id?: string } | undefined)?.id
+                if (adjustmentTxId) await uploadStagedAttachments(adjustmentTxId)
                 success("Ajuste registrado!")
                 onSuccess?.()
                 debouncedRefresh()
@@ -1075,6 +1082,8 @@ export default function CreateTransactionPage({
                     referenceNote: referenceNote.trim() || null,
                 })
                 if (!res.success) return error(res.error || "Erro ao salvar reembolso")
+                const refundTxId = (res.data as { id?: string } | undefined)?.id
+                if (refundTxId) await uploadStagedAttachments(refundTxId)
                 success("Reembolso registrado!")
                 onSuccess?.()
                 debouncedRefresh()
@@ -1122,6 +1131,7 @@ export default function CreateTransactionPage({
                 })
                 if (!recRes.success) return error(recRes.error || "Erro ao criar recorrência")
                 const newId = (recRes.data as { id?: string } | undefined)?.id
+                if (newId) await uploadStagedAttachments(newId)
                 if (status === "paid" && newId) {
                     const paidRes = await markRecurringOccurrenceAsPaidAction({
                         partnerId,
@@ -1172,6 +1182,8 @@ export default function CreateTransactionPage({
                     firstInstallmentPaymentDate: status === "paid" ? formatLocalYmdToIso(paymentDate) : null,
                 })
                 if (!installmentRes.success) return error(installmentRes.error || "Erro ao criar parcelamento")
+                const installmentGroupId = (installmentRes.data as { id?: string } | undefined)?.id
+                if (installmentGroupId) await uploadStagedAttachments(installmentGroupId)
                 success("Parcelamento criado com sucesso!")
                 onSuccess?.()
                 debouncedRefresh()

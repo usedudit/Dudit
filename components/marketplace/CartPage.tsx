@@ -978,13 +978,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     >
                                                                                                         {getItemName(item)}
                                                                                                     </Link>
-                                                                                                    <button
+                                                                                                    <Button
+                                                                                                        variant="ghostred"
                                                                                                         onClick={() => setDeleteModal({ open: true, cartItemId: item.id })}
-                                                                                                        className="text-brand-red p-1 hover:bg-brand-red/15 rounded-full transition-colors shrink-0"
+                                                                                                        className="p-1 shrink-0"
                                                                                                         disabled={loading === item.id}
                                                                                                     >
                                                                                                         <TrashIcon size={16} />
-                                                                                                    </button>
+                                                                                                    </Button>
                                                                                                 </div>
 
                                                                                                 {item.variant_id && item.product_variants && (
@@ -1088,8 +1089,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         </div>
                                                                                                     )}
 
-                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+{item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                        <div className="mt-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
@@ -1246,8 +1247,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         </div>
                                                                                                     )}
 
-                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                                                        <div className="mt-1 mb-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
+{item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                        <div className="mt-1 mb-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
@@ -1303,7 +1304,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                             </div>
                                                                                                         )
                                                                                                     })()}
-                                                                                                    <button onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="text-brand-red p-2 hover:bg-brand-red/15 rounded-full transition-colors" disabled={loading === item.id}><TrashIcon size={18} /></button>
+                                                                                                    <Button variant="ghostred" onClick={() => setDeleteModal({ open: true, cartItemId: item.id })} className="p-2" disabled={loading === item.id}><TrashIcon size={18} /></Button>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>

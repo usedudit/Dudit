@@ -64,7 +64,7 @@ BEGIN
     -- Schedule to run every minute
     PERFORM cron.schedule(
       'dudit-expire-orders-every-minute',
-      '* * * * *',
+      '*/5 * * * *',
       'SELECT public.cron_expire_expired_orders();'
     );
   END IF;

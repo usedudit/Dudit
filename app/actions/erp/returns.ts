@@ -162,6 +162,7 @@ const processReturnSchema = z.object({
     notes: z.string().max(500).optional().nullable(),
     idempotencyKey: z.string().trim().max(160).optional().nullable(),
     skipMpPaymentCheck: z.boolean().optional().default(false),
+    accountId: z.string().uuid().optional().nullable(),
 })
 
 const executeMpRefundSchema = z.object({
@@ -1123,6 +1124,7 @@ export async function processReturnRequestAction(input: unknown) {
             p_exchange_balance_resolution: data.exchangeBalanceResolution || null,
             p_notes: sanitizeNotes(data.notes),
             p_idempotency_key: data.idempotencyKey || crypto.randomUUID(),
+            p_account_id: data.accountId || null,
         })
 
         if (error) throw error

@@ -2800,6 +2800,7 @@ export type TransactionDetailPayload = {
     transactionType: ERPTransaction["transactionType"]
     isRecurring: boolean
     paymentMethodSubtitle: string
+    paymentProvider?: string | null
     paymentDateSubtitle: string | null
     creatorName: string
     originLabel: string
@@ -3202,7 +3203,7 @@ export async function getTransactionDetailsAction(
 
         let items: TransactionDetailPayload["items"] = []
         let salesSummary: TransactionDetailPayload["salesSummary"] = null
-        let salesOrder: { buyer_id?: string | null; customer_name?: string | null } | null = null
+        let salesOrder: { buyer_id?: string | null; customer_name?: string | null; payment_provider?: string | null } | null = null
         let posSaleCustomerId: string | null | undefined = undefined
 
         if (row.category === "Vendas" && row.description) {
@@ -3218,6 +3219,7 @@ export async function getTransactionDetailsAction(
           total_amount,
           paid_amount,
           payment_method,
+          payment_provider,
           delivery_fee,
           additional_costs,
           discount_value,
@@ -3599,6 +3601,7 @@ export async function getTransactionDetailsAction(
             transactionType: row.transaction_type,
             isRecurring: !!row.recurring_id,
             paymentMethodSubtitle: finalPaymentSubtitle,
+            paymentProvider: salesOrder ? (salesOrder as any).payment_provider || null : null,
             paymentDateSubtitle,
             creatorName,
             originLabel: originLabel(row.origin),

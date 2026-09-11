@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, FormSection, InfoCard, Tabs, TabsList, TabsTrigger, RadioButton, ListItem, DefaultModal } from "@/components/reusable"
-import { MapPinIcon } from "@/lib/icons"
+import { MapPinIcon, ServiceIcon } from "@/lib/icons"
 import type { CheckoutRequirements } from "@/lib/commerce/checkout-requirements"
 import type { MarketplaceCheckoutDisplayLine } from "@/lib/commerce/marketplace-checkout-lines"
 import { IconPlaceholder } from "@/components/reusable"
@@ -37,15 +37,15 @@ function AddressBlock({
   if (userAddresses.length > 0 && currentAddress) {
     return (
       <div className="flex items-center justify-between w-full">
-        <div className="flex items-stretch gap-3">
+        <div className="flex items-stretch gap-4">
           <img
             src="https://img.dudit.com.br/static/Map.png"
             alt="Endereço"
-            className="w-12 h-12 object-cover rounded-xl shrink-0"
+            className="w-12 h-12 object-cover rounded-full shrink-0"
           />
           <div className="flex flex-col justify-center">
-            <p className="text-md font-bold text-brand-dark dark:text-dark-heading">{title}</p>
-            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+            <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">{title}</p>
+            <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">
               {currentAddress.street}, {currentAddress.number}
               {currentAddress.neighborhood ? ` - ${currentAddress.neighborhood}` : ""}
             </p>
@@ -203,15 +203,15 @@ export function CheckoutFulfillmentPanel({
     if (!showProductsSection) {
       return (
         <FormSection title={hasServices ? "Produtos" : "Entrega"}>
-          <div className="flex items-center gap-3 py-2">
+          <div className="flex items-center gap-4 py-2">
             <img
               src="https://img.dudit.com.br/static/Map.png"
               alt="Entrega"
-              className="w-12 h-12 object-cover rounded-xl shrink-0"
+              className="w-12 h-12 object-cover rounded-full shrink-0"
             />
             <div>
-              <p className="text-md font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
-              <p className="text-sm text-brand-inactive-text dark:text-dark-body">O vendedor entrará em contato para combinar a entrega.</p>
+              <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">A combinar</p>
+              <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">O vendedor entrará em contato para combinar a entrega.</p>
             </div>
           </div>
         </FormSection>
@@ -234,17 +234,17 @@ export function CheckoutFulfillmentPanel({
           <AnimatePresence mode="wait">
             {isPickup && canShowProductPickup && (
               <motion.div key="pickup" initial="closed" animate="open" exit="closed" variants={fadeVariants}>
-                <div className="flex items-stretch gap-3">
+                <div className="flex items-stretch gap-4">
                   <img
                     src="https://img.dudit.com.br/static/Map.png"
                     alt="Retirada"
-                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                    className="w-12 h-12 object-cover rounded-full shrink-0"
                   />
                   <div>
-                    <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                    <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
                       Local de retirada
                     </p>
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">{partnerAddressLabel}</p>
+                    <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">{partnerAddressLabel}</p>
                     {preparationHint}
                   </div>
                 </div>
@@ -269,27 +269,13 @@ export function CheckoutFulfillmentPanel({
         <div className="space-y-3">
           {servicesWithChoice.length > 0 && (
             <ListItem
+              icon={ServiceIcon}
               title="Forma de atendimento"
               description="Defina onde cada serviço será realizado"
               onClick={openModal}
               showChevron
             />
           )}
-
-          {servicesOnSiteOnly.map((line) => (
-            <div
-              key={line.lineId}
-              className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface"
-            >
-              <p className="font-bold text-brand-dark dark:text-dark-heading text-base">{line.displayName}</p>
-              {line.bookingSummary && (
-                <p className="text-sm text-brand-inactive-text mt-1">{line.bookingSummary}</p>
-              )}
-              <div className="text-xs font-semibold text-brand-inactive-text bg-gray-50 dark:bg-dark-border/30 px-3 py-2 rounded-xl w-fit mt-2">
-                No estabelecimento
-              </div>
-            </div>
-          ))}
 
           {anyServiceRequiresCustomerAddress && (
             <div className="pt-2">
@@ -298,17 +284,17 @@ export function CheckoutFulfillmentPanel({
           )}
 
           {anyServiceRequiresOnSite && (
-            <div className="flex items-stretch gap-3 border-t border-brand-border dark:border-dark-border pt-4">
+            <div className="flex items-stretch gap-4 border-t border-brand-border dark:border-dark-border pt-4">
               <img
                 src="https://img.dudit.com.br/static/Map.png"
                 alt="Local"
-                className="w-12 h-12 object-cover rounded-xl shrink-0"
+                className="w-12 h-12 object-cover rounded-full shrink-0"
               />
               <div>
-                <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">
                   Local do atendimento no estabelecimento
                 </p>
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body">{partnerAddressLabel}</p>
+                <p className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body leading-tight whitespace-normal break-words">{partnerAddressLabel}</p>
               </div>
             </div>
           )}
@@ -336,9 +322,8 @@ export function CheckoutFulfillmentPanel({
         }
       >
         <div className="w-full">
-          <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Serviços</p>
-
           <div className="flex items-center gap-4 pb-3 border-b border-brand-border dark:border-dark-border mb-1">
+            <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-left">Serviços</span>
             <div className="flex-1" />
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-center">No estabelecimento</span>
             <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body w-28 text-center">No meu endereço</span>
@@ -393,7 +378,7 @@ export function CheckoutFulfillmentPanel({
                   name={`modal-${line.lineId}`}
                   value="on_site"
                   checked
-                  onChange={() => {}}
+                  onChange={() => { }}
                 />
               </div>
               <div className="w-28 flex justify-center">
@@ -401,7 +386,7 @@ export function CheckoutFulfillmentPanel({
                   name={`modal-${line.lineId}`}
                   value="customer_location"
                   checked={false}
-                  onChange={() => {}}
+                  onChange={() => { }}
                 />
               </div>
             </div>

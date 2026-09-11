@@ -603,7 +603,7 @@ export default function PaymentStatusModal({
                                                     <div className="min-w-0">
                                                         <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5 flex-wrap">
                                                             {mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago"}
-                                                            <Badge variant="orange">Pendente</Badge>
+                                                            <Badge variant="orange" className="whitespace-nowrap scale-90">Pendente</Badge>
                                                         </h4>
                                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body truncate">
                                                             {mpPaymentData?.boletoData
@@ -736,15 +736,6 @@ export default function PaymentStatusModal({
                                                                 </Button>
                                                             )}
                                                         </div>
-                                                    )}
-                                                    {mpPaymentData.boletoData.ticketUrl && (
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => window.open(mpPaymentData!.boletoData!.ticketUrl, "_blank")}
-                                                            leftIcon={<PrinterIcon size={16} />}
-                                                        >
-                                                            Imprimir / Abrir Boleto em nova aba
-                                                        </Button>
                                                     )}
                                                 </div>
                                             )}

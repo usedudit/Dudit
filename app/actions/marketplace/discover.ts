@@ -56,10 +56,16 @@ interface PartnerTiers {
     cityIds: Set<string>
     stateIds: Set<string>
     allIds: Set<string>
+    cityStoreIds: Set<string>
+    stateStoreIds: Set<string>
+    allStoreIds: Set<string>
 }
 
 interface RawProduct {
     id: string
+    short_id?: string
+    store_id?: string
+    partner_id?: string
     name: string
     price: number
     promotional_price?: number
@@ -243,6 +249,9 @@ interface PartnerTiersRaw {
     cityIds: string[]
     stateIds: string[]
     allIds: string[]
+    cityStoreIds: string[]
+    stateStoreIds: string[]
+    allStoreIds: string[]
 }
 
 const getCachedPartnerIdsByTier = (
@@ -254,51 +263,63 @@ const getCachedPartnerIdsByTier = (
         const supabase = getAdminClient()
         const { data: stores, error } = await supabase
             .from("stores")
-            .select("partner_id, addresses!store_id!left(city, state)")
+            .select("id, partner_id, addresses!store_id!left(city, state)")
             .eq("is_active", true)
 
         if (error) {
             dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
-            return { cityIds: [], stateIds: [], allIds: [] }
+            return { cityIds: [], stateIds: [], allIds: [], cityStoreIds: [], stateStoreIds: [], allStoreIds: [] }
         }
 
         if (!stores || stores.length === 0) {
             dWarn("[DISCOVER][PARTNER_IDS] No active partners found in Brazil")
-            return { cityIds: [], stateIds: [], allIds: [] }
+            return { cityIds: [], stateIds: [], allIds: [], cityStoreIds: [], stateStoreIds: [], allStoreIds: [] }
         }
 
         const allIds = new Set<string>()
+        const allStoreIds = new Set<string>()
         const stateIds = new Set<string>()
+        const stateStoreIds = new Set<string>()
         let statePartnerCount = 0
         const isCountryScope = !state || state.trim() === "" || state.trim().toUpperCase() === "BR" || state.trim().toLowerCase() === "brasil"
         const targetState = !isCountryScope ? state.trim().toLowerCase() : null
 
         for (const s of stores) {
-            if ((s as any).partner_id) {
-                allIds.add((s as any).partner_id)
-            }
+            const pid = (s as any).partner_id
+            const storeId = (s as any).id
+            if (pid) allIds.add(pid)
+            if (storeId) allStoreIds.add(storeId)
+
             const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
             if (targetState && addr?.state?.toLowerCase() === targetState) {
-                stateIds.add((s as any).partner_id)
+                if (pid) stateIds.add(pid)
+                if (storeId) stateStoreIds.add(storeId)
                 statePartnerCount++
             }
         }
 
         let cityIds: Set<string>
+        let cityStoreIds: Set<string>
         let cityPartnerCount = 0
 
         if (isCountryScope) {
             cityIds = new Set()
+            cityStoreIds = new Set()
         } else if (stateOnly) {
             cityIds = new Set(stateIds)
+            cityStoreIds = new Set(stateStoreIds)
             cityPartnerCount = statePartnerCount
         } else {
             cityIds = new Set<string>()
+            cityStoreIds = new Set<string>()
             const targetCitySlug = normalizeCitySlug(city)
             for (const s of stores) {
+                const pid = (s as any).partner_id
+                const storeId = (s as any).id
                 const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
                 if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
-                    cityIds.add((s as any).partner_id)
+                    if (pid) cityIds.add(pid)
+                    if (storeId) cityStoreIds.add(storeId)
                     cityPartnerCount++
                 }
             }
@@ -310,6 +331,9 @@ const getCachedPartnerIdsByTier = (
             cityIds: Array.from(cityIds),
             stateIds: Array.from(stateIds),
             allIds: Array.from(allIds),
+            cityStoreIds: Array.from(cityStoreIds),
+            stateStoreIds: Array.from(stateStoreIds),
+            allStoreIds: Array.from(allStoreIds),
         }
     },
     [`partner-ids-by-tier-${city}-${state}-${stateOnly}`],
@@ -329,6 +353,9 @@ const getPartnerIdsByTier = cache(async (
         cityIds: new Set(raw.cityIds),
         stateIds: new Set(raw.stateIds),
         allIds: new Set(raw.allIds),
+        cityStoreIds: new Set(raw.cityStoreIds || []),
+        stateStoreIds: new Set(raw.stateStoreIds || []),
+        allStoreIds: new Set(raw.allStoreIds || []),
     }
 })
 
@@ -337,6 +364,56 @@ const getPartnerIdsByTier = cache(async (
 function getPartnerId(item: { partners?: any }): string | undefined {
     const raw = Array.isArray(item.partners) ? item.partners[0] : item.partners
     return raw?.id
+}
+
+function getItemStoreId(item: any): string | undefined {
+    const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+    return item.store_id || rawStore?.id || (item.itemType === "vitrine" || (!item.itemType && item.slug && item.phone) ? item.id : undefined)
+}
+
+function getItemStoreAddress(item: any): { city?: string | null; state?: string | null } | null {
+    const rawStore = Array.isArray(item.stores) ? item.stores[0] : item.stores
+    const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+    if (addr?.city || addr?.state) return addr
+    const selfAddr = Array.isArray(item.addresses) ? item.addresses[0] : item.addresses
+    if (selfAddr?.city || selfAddr?.state) return selfAddr
+    return null
+}
+
+function getItemTier(
+    item: any,
+    tiers: PartnerTiers,
+    targetCity?: string,
+    targetState?: string,
+): number {
+    const storeId = getItemStoreId(item)
+    const addr = getItemStoreAddress(item)
+    const storeCitySlug = addr?.city ? normalizeCitySlug(addr.city) : null
+    const targetCitySlug = targetCity ? normalizeCitySlug(targetCity) : null
+    const storeStateNorm = addr?.state ? addr.state.trim().toLowerCase() : null
+    const targetStateNorm = targetState && targetState.toUpperCase() !== "BR" && targetState.toLowerCase() !== "brasil"
+        ? targetState.trim().toLowerCase()
+        : null
+
+    // 1. City match by Store ID or Store City
+    if (storeId && tiers.cityStoreIds?.has(storeId)) return 0
+    if (targetCitySlug && storeCitySlug && storeCitySlug === targetCitySlug) return 0
+
+    // 2. State match by Store ID or Store State
+    if (storeId && tiers.stateStoreIds?.has(storeId)) return 1
+    if (targetStateNorm && storeStateNorm && storeStateNorm === targetStateNorm) return 1
+
+    // If store address is explicitly outside target city/state, don't falsely upgrade via partner_id
+    if (storeCitySlug && targetCitySlug && storeCitySlug !== targetCitySlug && storeStateNorm && targetStateNorm && storeStateNorm !== targetStateNorm) {
+        return 2
+    }
+
+    // 3. Fallback to Partner-level match if store address is not known
+    const pid = getPartnerId(item) || (item as any).partner_id
+    if (pid && tiers.cityIds?.has(pid) && !storeCitySlug) return 0
+    if (pid && tiers.stateIds?.has(pid) && !storeStateNorm) return 1
+
+    return 2
 }
 
 function getPartnerShowcaseInactive(item: any): boolean {
@@ -348,13 +425,12 @@ function applyTierSort<T>(
     items: T[],
     tiers: PartnerTiers,
     scorer: (item: T) => number,
+    targetCity?: string,
+    targetState?: string,
 ): (T & WithTier)[] {
     return items
         .map(item => {
-            const pid = getPartnerId(item as any)
-            const tier = pid && tiers.cityIds.has(pid) ? 0
-                : pid && tiers.stateIds.has(pid) ? 1
-                    : 2
+            const tier = getItemTier(item, tiers, targetCity, targetState)
             return { ...item, _tier: tier } as T & WithTier
         })
         .sort((a, b) => {
@@ -369,7 +445,7 @@ function applyTierSort<T>(
 
 // ─── Product query fields ───────────────────────────────────────────────────
 
-const BASE_FIELDS = `id, short_id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
+const BASE_FIELDS = `id, short_id, store_id, partner_id, name, price, promotional_price, images, rating, stock_quantity, stock_available, marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)), product_variants(variant_options, price_adjustment, is_active)`
 const STATS_FIELDS = `views_last_30_days, sales_last_7_days, sales_last_30_days, favorites_count`
 
 const PARTNER_JOIN = `partners!inner(
@@ -521,7 +597,7 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const supabase = getAdminClient()
     const { data, error } = await supabase
         .from("services")
-        .select(`id, short_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+        .select(`id, short_id, store_id, partner_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
         .in("status", ["ativo", "active"])
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
@@ -581,7 +657,7 @@ async function fetchTrending(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const r = item as RawProduct
         const engagement = (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5
         return engagement > 0 ? engagement : ((r as any).marketplace_score ?? 0)
-    })
+    }, ctx.city, ctx.state)
 
     // Prefer items with real engagement signals, fallback to top scores if fresh database
     const withSignals = tagged.filter(item => {
@@ -714,7 +790,7 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
         return null
     }
 
-    const tagged = applyTierSort(products as RawProduct[], tiers, () => 0)
+    const tagged = applyTierSort(products as RawProduct[], tiers, () => 0, ctx.city, ctx.state)
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("endingSoon", ctx, displayScope)
 
@@ -781,11 +857,7 @@ async function fetchNearby(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         if (lat != null && lng != null && ctx.coords) {
             distKm = calculateDistance(ctx.coords, { lat: Number(lat), lng: Number(lng) })
         }
-        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-        const pid = rawPartner?.id
-        const tier = pid && tiers.cityIds.has(pid) ? 0
-            : pid && tiers.stateIds.has(pid) ? 1
-                : 2
+        const tier = getItemTier(item, tiers, ctx.city, ctx.state)
         return { ...item, _distKm: distKm, _tier: tier }
     })
 
@@ -868,14 +940,14 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         ? applyTierSort(products, tiers, item => {
             const r = item as RawProduct
             return r.created_at ? new Date(r.created_at).getTime() : 0
-        })
+        }, ctx.city, ctx.state)
         : []
 
     const taggedServices = services.length > 0
         ? applyTierSort(services, tiers, item => {
             const r = item as any
             return r.created_at ? new Date(r.created_at).getTime() : 0
-        })
+        }, ctx.city, ctx.state)
         : []
 
     const merged = [
@@ -903,12 +975,13 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             const storeName = rawStore?.name || "Vendedor"
             const storeImage = rawStore?.logo_url
             const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+            const rawDelivery = Array.isArray(rawStore?.delivery_settings) ? rawStore.delivery_settings[0] : rawStore?.delivery_settings
             const storeCity = addr?.city || rawStore?.city || null
             const storeState = addr?.state || rawStore?.state || null
             const storeSlug = rawStore?.slug || null
-            const partner = rawPartner ? {
-                id: rawPartner.id,
-                store_id: rawStore?.id || rawPartner.id,
+            const partner = rawPartner || rawStore ? {
+                id: rawPartner?.id || rawStore?.partner_id,
+                store_id: rawStore?.id || item.store_id || rawPartner?.id,
                 short_id: rawStore?.short_id || null,
                 slug: storeSlug,
                 store_name: storeName,
@@ -919,6 +992,7 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
                 city: storeCity,
                 state: storeState,
                 neighborhood: addr?.neighborhood ?? null,
+                delivery_settings: rawDelivery || null,
             } : null
             return {
                 id: item.id,
@@ -929,6 +1003,9 @@ async function fetchRecent(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
                 rating: item.rating,
                 partners: partner,
                 itemType: "servico" as const,
+                duration_minutes: item.duration_minutes ?? null,
+                delivery_settings: rawDelivery || null,
+                created_at: item.created_at,
             }
         }
 
@@ -982,7 +1059,7 @@ async function fetchGems(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeSec
         const discoverBoost = (hashSeed(seed, r.id) % 20) / 100
         const varietyBonus = discoverBoost * (objectiveScore || 20)
         return objectiveScore + varietyBonus
-    })
+    }, ctx.city, ctx.state)
 
     // Diversity: max 3 per category
     const catCount = new Map<string, number>()
@@ -1132,7 +1209,7 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     const favSet = new Set(favProductIds)
     const tagged = applyTierSort(data as RawProduct[], tiers, item => {
         return (item as any).marketplace_score ?? 0
-    })
+    }, ctx.city, ctx.state)
 
     const filtered = tagged.filter(item => !favSet.has((item as RawProduct).id))
     const displayScope = determineDisplayScope(filtered, ctx)
@@ -1176,7 +1253,7 @@ async function fetchBestSellers(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
 
     const tagged = applyTierSort(withSales, tiers, item => {
         return (item as RawProduct).sales_last_30_days ?? 0
-    })
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("bestSellers", ctx, displayScope)
@@ -1219,7 +1296,7 @@ async function fetchTopRated(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
 
     const tagged = applyTierSort(withRating, tiers, item => {
         return (item as RawProduct).rating ?? 0
-    })
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topRated", ctx, displayScope)
@@ -1276,7 +1353,7 @@ async function fetchPromos(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
             : Number(extractFirstVariantFallback(r.product_variants).fallback_variant_price || 0)
         if (!r.promotional_price || origPrice <= 0) return 0
         return ((origPrice - Number(r.promotional_price)) / origPrice) * 100
-    })
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("promos", ctx, displayScope)
@@ -1384,7 +1461,7 @@ async function fetchThemedSection(
     const tagged = applyTierSort(matching, tiers, item => {
         const r = item as RawProduct
         return (r.views_last_30_days ?? 0) + (r.favorites_count ?? 0) * 2 + (r.sales_last_30_days ?? 0) * 5 + ((r as any).marketplace_score ?? 0)
-    })
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const scoped = filterByScope(tagged, displayScope)
@@ -1418,14 +1495,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const tagged = (data as any[]).map(item => {
-        const rawPartner = Array.isArray(item.partners) ? item.partners[0] : item.partners
-        const pid = rawPartner?.id
-        const tier = pid && tiers.cityIds.has(pid) ? 0
-            : pid && tiers.stateIds.has(pid) ? 1
-                : 2
-        return { ...item, _tier: tier }
-    }).sort((a: any, b: any) => a._tier - b._tier || (b.rating ?? 0) - (a.rating ?? 0))
+    const tagged = applyTierSort(data as any[], tiers, item => item.rating ?? 0, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("services", ctx, displayScope)
@@ -1525,21 +1595,7 @@ async function fetchVitrines(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         return null
     }
 
-    const tagged = data.map((s: Record<string, any>) => {
-        const pid = s.partner_id
-        const p = Array.isArray(s.partners) ? s.partners[0] : s.partners
-        const tier = pid && tiers.cityIds.has(pid) ? 0
-            : pid && tiers.stateIds.has(pid) ? 1
-                : 2
-        return { ...s, partners: p, _tier: tier }
-    }).sort((a: any, b: any) => {
-        const tierDiff = a._tier - b._tier
-        if (tierDiff !== 0) return tierDiff
-        const aInactive = a.is_showcase_active === false ? 1 : 0
-        const bInactive = b.is_showcase_active === false ? 1 : 0
-        if (aInactive !== bInactive) return aInactive - bInactive
-        return (b.rating ?? 0) - (a.rating ?? 0)
-    })
+    const tagged = applyTierSort(data as any[], tiers, item => item.rating ?? 0, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const display = sectionDisplay("topVitrines", ctx, displayScope)
@@ -1622,7 +1678,7 @@ async function fetchAllProducts(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<
     const tagged = applyTierSort(pool, tiers, item => {
         const r = item as RawProduct
         return r.created_at ? new Date(r.created_at).getTime() : 0
-    })
+    }, ctx.city, ctx.state)
 
     const displayScope = determineDisplayScope(tagged, ctx)
     const isCountry = displayScope === "country"
@@ -1815,12 +1871,18 @@ const getPersonalizedByStableKey = cache(async (
     cityIdsKey: string,
     stateIdsKey: string,
     allIdsKey: string,
+    cityStoreIdsKey?: string,
+    stateStoreIdsKey?: string,
+    allStoreIdsKey?: string,
 ): Promise<HomeSection | null> => {
     return fetchPersonalizedUncached(
         {
             cityIds: parsePartnerIds(cityIdsKey),
             stateIds: parsePartnerIds(stateIdsKey),
             allIds: parsePartnerIds(allIdsKey),
+            cityStoreIds: parsePartnerIds(cityStoreIdsKey || "[]"),
+            stateStoreIds: parsePartnerIds(stateStoreIdsKey || "[]"),
+            allStoreIds: parsePartnerIds(allStoreIdsKey || "[]"),
         },
         {
             city,
@@ -1847,8 +1909,12 @@ function fetchPersonalized(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<HomeS
         serializePartnerIds(tiers.cityIds),
         serializePartnerIds(tiers.stateIds),
         serializePartnerIds(tiers.allIds),
+        serializePartnerIds(tiers.cityStoreIds),
+        serializePartnerIds(tiers.stateStoreIds),
+        serializePartnerIds(tiers.allStoreIds),
     )
 }
+
 
 const getSharedHomeSections = (
     scope: string,

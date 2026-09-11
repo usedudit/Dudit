@@ -13,6 +13,21 @@ export function resolvePaymentMethodDetails(payment?: any, purchase?: any): Reso
     const methodId = String(details.payment_method_id || details.payment_type_id || "").toLowerCase().trim()
     const desc = String(purchase?.description || "").toLowerCase()
 
+    // 0. Vale-compra / Store Credit
+    if (
+        rawType === "store_credit" ||
+        rawType === "store-credit" ||
+        rawType.includes("vale-compra") ||
+        rawType.includes("vale_compra")
+    ) {
+        return {
+            name: "Vale-compra",
+            type: "other",
+            iconUrl: "https://img.dudit.com.br/static/icons/payments/Voucher.png",
+            detailsText: "Crédito em loja",
+        }
+    }
+
     // 1. PIX
     if (
         rawType === "pix" ||

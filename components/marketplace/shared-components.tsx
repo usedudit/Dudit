@@ -148,7 +148,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         </h3>
                         {showRating && (
                             <div className="flex items-center gap-0.5 shrink-0 ml-1">
-                                <StarIcon size={10} className="text-amber-500 fill-amber-500" />
+                                <StarIcon size={10} className="text-brand-green fill-brand-green" />
                                 <span className="text-xs font-bold text-brand-dark dark:text-dark-heading">{Number(vitrine.rating ?? partner.rating).toFixed(1)}</span>
                             </div>
                         )}

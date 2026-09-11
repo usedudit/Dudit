@@ -828,6 +828,9 @@ export function CheckoutPageClient() {
         credit_card: "Cartão de crédito",
         debit_card: "Cartão de débito",
         cash: "Dinheiro",
+        store_credit: "Vale-compra",
+        "vale-compra": "Vale-compra",
+        "vale_compra": "Vale-compra",
         other: "Outros",
     }
     const visibleStorefrontMethods = useMemo(() => {
@@ -849,11 +852,15 @@ export function CheckoutPageClient() {
                     label: paymentTypeLabelMap[type] || type,
                 }
             })
+    const isOnlyServices = requirements?.hasServiceLines && !requirements?.hasProductLines && !requirements?.hasSubscriptionLines
+
     const traditionalPaymentLabel = requirements?.hasPayOnService
         ? "Pagar no atendimento"
-        : isPickup
-            ? "Pagar na Retirada"
-            : "Pagar na Entrega"
+        : isOnlyServices
+            ? "Pagar na conclusão"
+            : isPickup
+                ? "Pagar na Retirada"
+                : "Pagar na Entrega"
 
     const pickupRequiresOnlinePayment = checkoutContext?.partner?.orderFlow !== "whatsapp" && isPickup && (checkoutContext?.partner?.pickupPaymentPolicy || "require_online_payment") === "require_online_payment"
     const isOnlyServicesWithDeposit = Boolean(
@@ -862,6 +869,7 @@ export function CheckoutPageClient() {
         !requirements?.hasProductLines &&
         !requirements?.hasSubscriptionLines
     )
+
     const showTraditionalPaymentOption = !checkoutContext?.deposit.available && (checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||
@@ -1415,7 +1423,7 @@ export function CheckoutPageClient() {
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "service_booking") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide pt-2 mb-2">Serviços</p>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body pt-2 mb-2">Serviços</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "service_booking")
@@ -1489,7 +1497,7 @@ export function CheckoutPageClient() {
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide pt-2 mb-2">Assinaturas</p>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body pt-2 mb-2">Assinaturas</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "subscription")
@@ -2834,7 +2842,8 @@ export function CheckoutPageClient() {
                                                                             selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                                                                 selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                                                     selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                                        MoneyIcon
+                                                                                        selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                                                            MoneyIcon
                                                                         }
                                                                         title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                                                                         description={
@@ -2924,7 +2933,8 @@ export function CheckoutPageClient() {
                                                             selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                                                 selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                                     selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                        MoneyIcon
+                                                                        selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                                            MoneyIcon
                                                         }
                                                         title={selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                                                         description={
@@ -3265,7 +3275,8 @@ export function CheckoutPageClient() {
                                                     selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                                         selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                             selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                                MoneyIcon
+                                                                selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                                    MoneyIcon
                                                 }
                                                 title={formData.paymentMethod ? (selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando...") : "Escolher meio de pagamento"}
                                                 description={
@@ -3634,7 +3645,8 @@ export function CheckoutPageClient() {
                                     selectedStorefrontMethod?.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                         selectedStorefrontMethod?.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                             selectedStorefrontMethod?.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                MoneyIcon
+                                                selectedStorefrontMethod?.type === "store_credit" || selectedStorefrontMethod?.type === "vale-compra" || selectedStorefrontMethod?.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                    MoneyIcon
                             }
                             title={paymentOption === "mercadopago" ? "Mercado Pago" : selectedStorefrontMethod ? (paymentTypeLabelMap[selectedStorefrontMethod.type] || selectedStorefrontMethod.type) : "Carregando..."}
                             description={
@@ -4085,7 +4097,8 @@ export function CheckoutPageClient() {
                                             const icon = m.type === "pix" ? <img src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain" /> :
                                                 m.type === "credit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
                                                     m.type === "debit_card" ? <img src="https://img.dudit.com.br/static/icons/payments/DebitCard.png" alt="Cartão" className="w-5 h-5 object-contain" /> :
-                                                        <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
+                                                        m.type === "store_credit" || m.type === "vale-compra" || m.type === "vale_compra" ? <img src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain" /> :
+                                                            <MoneyIcon className="text-brand-dark dark:text-dark-heading" />;
 
                                             const description = m.type === "pix" ? "Pagamento instantâneo via Pix" : m.type.includes("card") ? "Pagamento com maquininha" : "Pagamento em dinheiro";
 

@@ -32,9 +32,17 @@ DECLARE
   v_status TEXT;
   v_details JSONB;
 BEGIN
-  SELECT o.id, o.partner_id, o.created_at, o.delivered_at, o.return_policy_snapshot, o.order_source
+  SELECT o.id, o.partner_id, o.created_at, o.return_policy_snapshot, o.order_source,
+         do2.delivered_at
   INTO v_order
   FROM public.orders o
+  LEFT JOIN LATERAL (
+    SELECT delivered_at
+    FROM public.delivery_orders
+    WHERE order_id = o.id
+    ORDER BY created_at DESC
+    LIMIT 1
+  ) do2 ON true
   WHERE o.id = p_order_id;
 
   IF NOT FOUND THEN
@@ -240,7 +248,8 @@ CREATE OR REPLACE FUNCTION public.process_return_request(
   p_exchange_items JSONB DEFAULT '[]'::JSONB,
   p_exchange_balance_resolution TEXT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
-  p_idempotency_key TEXT DEFAULT NULL
+  p_idempotency_key TEXT DEFAULT NULL,
+  p_account_id UUID DEFAULT NULL
 ) RETURNS JSONB AS $$
 DECLARE
   v_request RECORD;
@@ -448,7 +457,7 @@ BEGIN
     INSERT INTO public.transactions (
       partner_id, description, category, amount, due_date, status, notes,
       payment_type, transaction_type, customer_id, contact_type, refund_kind,
-      reference_note, origin, created_by_user_id, store_id
+      reference_note, origin, created_by_user_id, store_id, account_id
     ) VALUES (
       v_request.partner_id,
       'Reembolso ' || COALESCE(v_request.order_number_snapshot, v_request.order_id::TEXT),
@@ -465,7 +474,8 @@ BEGIN
       'return:' || p_request_id::TEXT,
       'system',
       p_actor_user_id,
-      v_store_id
+      v_store_id,
+      p_account_id
     )
     RETURNING id INTO v_transaction_id;
 

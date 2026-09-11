@@ -114,10 +114,7 @@ const OrderListItem = React.memo(
                                         if (methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
                                             pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`
                                         }
-                                        if (order.payment_provider === "Mercado Pago" && pmLabel && !pmLabel.toLowerCase().includes("mercado pago")) {
-                                            pmLabel = `Mercado Pago (${pmLabel})`
-                                        }
-                                        return <PaymentMethodIndicator label={pmLabel} simplify />
+                                        return <PaymentMethodIndicator label={pmLabel} provider={order.payment_provider} simplify />
                                     })()}
                                 </div>
                             </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/erp/dashboard/charts/DashboardCharts"
 import { exportCSV, exportXLSX } from "@/lib/utils/export-report"
 import { formatCurrency as brl, formatQuantityWithUnit } from "@/lib/utils"
+import { hasMinimumPlan, type PlanTierSlug } from "@/lib/subscription/plan-tier"
 import {
     AnalyticsIcon, PackageIcon, WrenchIcon, TruckIcon, FileTextIcon,
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
@@ -59,10 +60,25 @@ const REPORT_TABS: TabDefinition[] = [
     { id: "trocas", label: "Trocas/Devoluções", icon: ReturnIcon },
 ]
 
+/** Minimum plan required for each report tab */
+const TAB_MINIMUM_PLAN: Record<TabId, PlanTierSlug> = {
+    vendas: "crescer",
+    produtos: "crescer",
+    financeiro: "crescer",
+    clientes: "crescer",
+    entregas: "crescer",
+    servicos: "escalar",
+    "ordens-servico": "escalar",
+    marketing: "escalar",
+    produtividade: "escalar",
+    trocas: "escalar",
+}
+
 interface ReportsPageProps {
     sells?: string[]
     activeResources?: string[]
     period: Period
+    planSlug: string
     productsData: ProductsDashboardData | null
     servicesData: ServicesDashboardData | null
     financialData: FinancialDashboardData | null
@@ -79,11 +95,12 @@ interface ReportsPageProps {
 }
 
 function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
-    const { sells, activeResources, productsData, servicesData, financialData, deliveryData } = props
+    const { sells, activeResources, productsData, servicesData, financialData, deliveryData, planSlug } = props
     const resourcesList = activeResources || sells || ["products", "services"]
     const sellsProducts = resourcesList.includes("products")
     const sellsServices = resourcesList.includes("services")
     return useMemo(() => REPORT_TABS.filter(tab => {
+        if (!hasMinimumPlan(planSlug, TAB_MINIMUM_PLAN[tab.id])) return false
         switch (tab.id) {
             case "produtos": case "vendas": case "marketing": return sellsProducts && productsData !== null
             case "servicos": return sellsServices && servicesData !== null
@@ -95,7 +112,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
             case "trocas": return props.returnsData !== null
             default: return true
         }
-    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData])
+    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, planSlug])
 }
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
@@ -154,6 +171,29 @@ function SectionPlaceholder({ title, description }: { title: string; description
         <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border">
             <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-3">{title}</h3>
             <p className="text-sm text-brand-inactive-text dark:text-dark-body">{description}</p>
+        </div>
+    )
+}
+
+function PlanUpgradeCTA({ tabId, currentPlan }: { tabId: TabId; currentPlan: string }) {
+    const requiredPlan = TAB_MINIMUM_PLAN[tabId]
+    const tab = REPORT_TABS.find(t => t.id === tabId)
+    const label = requiredPlan === "escalar" ? "Escalar" : "Crescer"
+
+    return (
+        <div className="bg-white dark:bg-dark-surface rounded-[24px] p-8 border border-brand-border dark:border-dark-border flex flex-col items-center justify-center text-center min-h-[300px]">
+            <div className="w-16 h-16 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center mb-4">
+                <StarIcon size={28} className="text-brand-green" />
+            </div>
+            <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-2">
+                {tab?.label} — Plano {label}
+            </h3>
+            <p className="text-sm text-brand-inactive-text dark:text-dark-body max-w-md mb-6">
+                Este relatório está disponível no plano <strong>{label}</strong>.
+                {requiredPlan === "escalar" && currentPlan === "crescer"
+                    ? " Faça upgrade para acessar relatórios avançados."
+                    : " Faça upgrade para acessar estatísticas do seu negócio."}
+            </p>
         </div>
     )
 }

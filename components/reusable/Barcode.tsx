@@ -62,9 +62,9 @@ export const Barcode: React.FC<BarcodeProps> = ({
   }
 
   return (
-    <div 
+    <div
       className={clsx(
-        "flex items-center justify-center p-2.5 rounded-2xl bg-white border border-brand-border dark:border-dark-border shadow-sm select-none", 
+        "flex items-center justify-center select-none",
         className
       )}
     >

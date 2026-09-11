@@ -450,6 +450,8 @@ const StockMovementDetailPage = ({ onBack, movement, isLoading, partnerId }: Sto
                                             entityType="stock_movement"
                                             title="Anexos da Movimentação"
                                             subtitle="Gerencie comprovantes, fotos ou notas fiscais desta movimentação."
+                                            isEditing={false}
+                                            readOnly={true}
                                         />
                                     </FadeIn>
                                 </TabsContent >

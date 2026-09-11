@@ -1270,15 +1270,37 @@ export async function createProductVariantsBatchAction(data: {
             }).eq("id", data.productId)
         }
 
-        // 4+5. Deletar imagens removidas em paralelo e atualizar contadores
-        const imagesToCleanup: string[] = []
-        if (existingVariants) {
-            const newSkus = new Set(data.variants.map(v => v.sku))
+        // 4+5. Deletar imagens removidas com segurança máxima (NUNCA deletar imagens que ainda estejam em uso)
+        const currentInUseImages = new Set<string>()
+        data.variants.forEach(v => {
+            if (v.image && typeof v.image === 'string' && v.image.trim()) {
+                currentInUseImages.add(v.image.trim())
+            }
+        })
+        if (Array.isArray(product.images)) {
+            product.images.forEach((img: string) => {
+                if (img && typeof img === 'string' && img.trim()) {
+                    currentInUseImages.add(img.trim())
+                }
+            })
+        }
+
+        const imagesToCleanup = new Set<string>()
+        if (existingVariants && Array.isArray(existingVariants)) {
             for (const v of existingVariants) {
-                if (!newSkus.has(v.sku) && v.variant_options?.image) imagesToCleanup.push(v.variant_options.image)
+                const img = v.variant_options?.image
+                if (img && typeof img === 'string' && img.trim() && !currentInUseImages.has(img.trim())) {
+                    imagesToCleanup.add(img.trim())
+                }
             }
         }
-        if (data.deletedImages?.length) imagesToCleanup.push(...data.deletedImages)
+        if (data.deletedImages?.length) {
+            for (const img of data.deletedImages) {
+                if (img && typeof img === 'string' && img.trim() && !currentInUseImages.has(img.trim())) {
+                    imagesToCleanup.add(img.trim())
+                }
+            }
+        }
 
         const uniqueNewImages = new Set<string>()
         data.variants.forEach(v => {
@@ -1288,9 +1310,9 @@ export async function createProductVariantsBatchAction(data: {
         })
         const newImagesCount = uniqueNewImages.size
 
-        if (imagesToCleanup.length > 0) {
-            Promise.all(imagesToCleanup.map(img => _deleteFromR2(img))).catch(console.error)
-            await decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.length)
+        if (imagesToCleanup.size > 0) {
+            Promise.all(Array.from(imagesToCleanup).map(img => _deleteFromR2(img))).catch(console.error)
+            await decrement_usage_counter(product.partner_id, "images_count", imagesToCleanup.size)
         }
 
         if (newImagesCount > 0) {
@@ -1355,8 +1377,20 @@ export async function deleteProductVariantAction(variantId: string): Promise<Act
         const { error } = await supabase.from("product_variants").delete().eq("id", variantId)
         if (error) return errorResponse(error.message)
 
-        if (variant.variant_options?.image) {
-            Promise.resolve().then(() => _deleteFromR2(variant.variant_options.image)).catch(console.error)
+        const variantImage = variant.variant_options?.image
+        if (variantImage) {
+            // Verificar se outras variantes do mesmo produto ou o produto ainda usam esta imagem antes de apagar
+            const { data: siblingVariants } = await supabase
+                .from("product_variants")
+                .select("variant_options")
+                .eq("product_id", variant.product_id)
+
+            const isImageStillInUse = siblingVariants?.some(sv => sv.variant_options?.image === variantImage) ||
+                (Array.isArray(product.images) && product.images.includes(variantImage))
+
+            if (!isImageStillInUse) {
+                Promise.resolve().then(() => _deleteFromR2(variantImage)).catch(console.error)
+            }
         }
 
         Promise.resolve().then(() => {
@@ -1389,7 +1423,19 @@ export async function updateProductVariantAction(variantId: string, data: {
         if (data.isActive !== undefined) payload.is_active = data.isActive
         if (data.image !== undefined) {
             if (data.image !== null && variant.variant_options?.image && variant.variant_options.image !== data.image) {
-                await _deleteFromR2(variant.variant_options.image)
+                const oldImage = variant.variant_options.image
+                const { data: siblingVariants } = await supabase
+                    .from("product_variants")
+                    .select("variant_options")
+                    .eq("product_id", variant.product_id)
+                    .neq("id", variantId)
+
+                const isOldImageStillInUse = siblingVariants?.some(sv => sv.variant_options?.image === oldImage) ||
+                    (Array.isArray(product.images) && product.images.includes(oldImage))
+
+                if (!isOldImageStillInUse) {
+                    await _deleteFromR2(oldImage).catch(console.error)
+                }
             }
             payload.variant_options = { ...(variant.variant_options || {}), image: data.image }
         }
@@ -1427,12 +1473,27 @@ export async function batchDeleteVariantsAction(variantIds: string[]): Promise<A
         // 2) All variants must belong to a single partner (reject cross-tenant batches).
         const productPartnerId = await verifyVariantBatchOwnership(variants, user)
 
+        const candidateImages = variants.filter((v: any) => v.variant_options?.image).map((v: any) => v.variant_options.image)
+
         const { error } = await supabase.from("product_variants").delete().in("id", variantIds)
         if (error) return errorResponse(error.message)
 
-        const imagesToDelete = variants.filter((v: any) => v.variant_options?.image).map((v: any) => v.variant_options.image)
-        if (imagesToDelete.length > 0) {
-            Promise.all(imagesToDelete.map((img: string) => _deleteFromR2(img))).catch(() => null)
+        if (candidateImages.length > 0) {
+            const productIds = Array.from(new Set(variants.map(v => v.product_id)))
+            const { data: remainingVariants } = await supabase
+                .from("product_variants")
+                .select("variant_options")
+                .in("product_id", productIds)
+
+            const remainingImages = new Set<string>()
+            remainingVariants?.forEach(rv => {
+                if (rv.variant_options?.image) remainingImages.add(rv.variant_options.image)
+            })
+
+            const imagesToDelete = Array.from(new Set(candidateImages)).filter(img => !remainingImages.has(img))
+            if (imagesToDelete.length > 0) {
+                Promise.all(imagesToDelete.map((img: string) => _deleteFromR2(img))).catch(() => null)
+            }
         }
 
         const firstProd = Array.isArray(variants[0]?.products) ? variants[0].products[0] : variants[0]?.products

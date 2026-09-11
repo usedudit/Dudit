@@ -26,6 +26,7 @@ import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/pa
 import { requireMinimumPlan } from "@/lib/auth/authorization"
 import { checkPermission } from "@/lib/permissions/access"
 import { normalizeBusinessInfo } from "@/lib/business-info"
+import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { redirect } from "next/navigation"
 import type { Period } from "@/lib/period-types"
 
@@ -44,6 +45,8 @@ export default async function ERPEstatisticasPage(props: {
     } catch {
         redirect("/erp/inicio")
     }
+
+    const plan = await getPartnerPlan(partnerId)
 
     const allAccess = await getAllUserPartnerAccess()
     const activeStore = allAccess.find((s: (typeof allAccess)[number]) => s.partnerId === partnerId)
@@ -101,6 +104,7 @@ export default async function ERPEstatisticasPage(props: {
                             <ReportsPage
                                 activeResources={activeResources}
                                 period={period}
+                                planSlug={plan.slug}
                                 productsData={productsData}
                                 servicesData={servicesData}
                                 financialData={financialData}

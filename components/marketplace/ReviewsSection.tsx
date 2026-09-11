@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import Link from "next/link"
 import { StarIcon, FlagIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
+import { anonymizeName } from "@/lib/utils/avatar"
 import { ReportModal } from "./ReportModal"
 import { IconPlaceholder } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
@@ -150,14 +151,14 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                         <div key={rev.id} className="border-b border-brand-border pb-6 last:border-0">
                             <div className="flex items-start gap-3 mb-3">
                                 <UserProfileImage
-                                    fullName={rev.profiles?.full_name || "Usuário"}
+                                    fullName={anonymizeName(rev.profiles?.full_name || "Usuário")}
                                     imageUrl={rev.profiles?.avatar_url || null}
                                     className="w-9 h-9 rounded-full shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
                                         <span className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                            {rev.profiles?.full_name || "Usuário"}
+                                            {anonymizeName(rev.profiles?.full_name || "Usuário")}
                                         </span>
                                         <span className="text-xs text-brand-inactive-text dark:text-dark-body shrink-0">
                                             {formatReviewDate(rev.created_at)}
@@ -166,7 +167,7 @@ export function ReviewsSection({ reviews, showItemInfo = false, className = "" }
                                     <div className="flex items-center justify-between">
                                         <StarRow rating={rev.rating} size={11} />
                                         <button
-                                            onClick={() => setReportTarget({ id: rev.id, name: `${rev.profiles?.full_name || "Usuário"}` })}
+                                            onClick={() => setReportTarget({ id: rev.id, name: anonymizeName(rev.profiles?.full_name || "Usuário") })}
                                             className="text-brand-inactive-text dark:text-dark-body hover:text-brand-red transition-colors mt-1"
                                             title="Denunciar avaliação"
                                         >

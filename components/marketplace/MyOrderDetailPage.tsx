@@ -692,7 +692,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment);
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
-        if (isMercadoPago) {
+        const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
+        if (isStoreCredit) {
+            icons.push(
+                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />
+            );
+        } else if (isMercadoPago) {
             icons.push(
                 <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
             );

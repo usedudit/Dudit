@@ -158,7 +158,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
             {/* Top Part: Customer Identity */}
             <div className={chrome === "minimal" ? "text-left" : "p-6 pb-0 text-left"}>
-                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">
+                <h3 className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading mb-6 mt-2">
                     Cliente
                 </h3>
 
@@ -183,9 +183,9 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
 
                     {onRemove && (
                         <Button
-                            variant="ghost"
+                            variant="ghostred"
                             size="icon"
-                            className="w-8 h-8 text-brand-red hover:bg-red-50 rounded-full"
+                            className="w-8 h-8"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onRemove();
@@ -204,7 +204,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                 {/* Delivery Address */}
                 <div>
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
+                        <h3 className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">
                             Endereço
                         </h3>
                     </div>
@@ -246,7 +246,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                 {hasBillingAddress && (
                     <div className="pt-6 border-t border-brand-border dark:border-dark-border">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">
+                            <h3 className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">
                                 Endereço de Cobrança
                             </h3>
                         </div>
@@ -265,7 +265,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({ customer, address, billingA
                 {/* Contact Info */}
                 <div className="pt-6 border-t border-brand-border dark:border-dark-border">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading">Informações de Contato</h3>
+                        <h3 className="text-[15px] font-semibold text-brand-dark dark:text-dark-heading">Informações de Contato</h3>
                     </div>
 
                     {hasContact ? (

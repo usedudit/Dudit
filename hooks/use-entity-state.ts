@@ -75,7 +75,22 @@ export function useEntityState() {
     const pushedHistoryRef = useRef(false)
 
     // ── SECONDARY: Sync from URL on external navigation ──────────────────
+    // Track the last synced URL string to avoid reacting to transient
+    // searchParams changes triggered by router.refresh() or state updates.
+    const lastSyncedUrlRef = useRef<string>(
+        typeof window !== "undefined" ? window.location.search + window.location.pathname : "",
+    )
+
     useEffect(() => {
+        const currentUrlString = window.location.search + window.location.pathname
+
+        // If the actual browser URL hasn't changed, ignore the effect trigger.
+        // This prevents router.refresh() or other re-renders from resetting
+        // the entity state when the URL is still the same.
+        if (currentUrlString === lastSyncedUrlRef.current) return
+
+        lastSyncedUrlRef.current = currentUrlString
+
         const urlState = stateFromCurrentUrl()
         if (
             urlState.action === localStateRef.current.action &&
@@ -98,6 +113,8 @@ export function useEntityState() {
             localStateRef.current = urlState
             // History was popped by the browser navigation itself
             pushedHistoryRef.current = false
+            // Keep the ref in sync so the sync-effect doesn't react to this change
+            lastSyncedUrlRef.current = window.location.search + window.location.pathname
             setLocalState(urlState)
         }
         window.addEventListener("popstate", handlePopState)
@@ -149,6 +166,8 @@ export function useEntityState() {
                     pushedHistoryRef.current = true
                     window.history.pushState(window.history.state, "", newRelative)
                 }
+                // Keep the ref in sync so the sync-effect doesn't react to this change
+                lastSyncedUrlRef.current = url.search + url.pathname
             }
         },
         [pathname],
@@ -186,6 +205,8 @@ export function useEntityState() {
             const newRelative = `${url.pathname}${url.search}${url.hash}`
             window.history.replaceState(window.history.state, "", newRelative)
         }
+        // Keep the ref in sync so the sync-effect doesn't react to this change
+        lastSyncedUrlRef.current = window.location.search + window.location.pathname
     }, [pathname])
 
     // ── Auto-reset on erp-sidebar-reset ──────────────────────────────────

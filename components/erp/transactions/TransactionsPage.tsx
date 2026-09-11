@@ -388,13 +388,13 @@ export default function TransactionsPage({
 
     useEffect(() => {
         let active = true
-        ;(async () => {
-            const res = await getFinanceAccountsAction(partnerId)
-            if (!active) return
-            if (res.success && res.data?.accounts) {
-                setFinanceAccounts(res.data.accounts.filter((a: any) => a.is_active))
-            }
-        })()
+            ; (async () => {
+                const res = await getFinanceAccountsAction(partnerId)
+                if (!active) return
+                if (res.success && res.data?.accounts) {
+                    setFinanceAccounts(res.data.accounts.filter((a: any) => a.is_active))
+                }
+            })()
         return () => { active = false }
     }, [partnerId])
 
@@ -410,8 +410,8 @@ export default function TransactionsPage({
         if (byId) return byId
         const byName = activePaymentMethodsList.find((m: any) => (m.name || "").toLowerCase() === cleanVal)
         if (byName) return byName
-        const byType = activePaymentMethodsList.find((m: any) => 
-            (m.type && m.type.toLowerCase() === cleanVal) || 
+        const byType = activePaymentMethodsList.find((m: any) =>
+            (m.type && m.type.toLowerCase() === cleanVal) ||
             (m.payment_type && m.payment_type.toLowerCase() === cleanVal)
         )
         if (byType) return byType
@@ -419,14 +419,8 @@ export default function TransactionsPage({
     }, [activePaymentMethodsList])
 
     const paymentMethodDropdownOptions = useMemo(() => {
-        if (activePaymentMethodsList.length > 0) {
-            return activePaymentMethodsList.map((m: any) => ({
-                value: m.name || m.type || m.id,
-                label: m.name || m.type || "Método",
-            }))
-        }
         return STANDARD_PAYMENT_METHODS
-    }, [activePaymentMethodsList])
+    }, [])
 
     const handleSelectPaymentMethod = useCallback((newMethodVal: string) => {
         setPaymentMethodId(newMethodVal)
@@ -1183,7 +1177,7 @@ export default function TransactionsPage({
         setDiscountAmount("0")
         const initialMethod = transaction.paymentMethodId || (transaction.paymentType && transaction.paymentType !== "Não informado" ? transaction.paymentType : (activePaymentMethodsList[0]?.id || "Pix"))
         setPaymentMethodId(initialMethod)
-        
+
         const matched = getMatchedPaymentMethod(initialMethod)
         if (matched?.default_finance_account_id) {
             setFinanceAccountId(matched.default_finance_account_id)
@@ -1611,7 +1605,7 @@ export default function TransactionsPage({
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end text-right justify-center shrink-0">
-                                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body uppercase font-bold tracking-wider">Restante</span>
+                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Restante</span>
                                                 <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
                                                     {formatCurrency(currentRemaining)}
                                                 </span>
@@ -1620,7 +1614,7 @@ export default function TransactionsPage({
 
                                         {/* Summary Details */}
                                         <div className="space-y-4 flex-1">
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body">Resumo do Lançamento</h4>
+                                            <h4 className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Resumo do Lançamento</h4>
 
                                             <div className="space-y-2.5 text-xs">
                                                 <div className="flex justify-between items-center">
@@ -1671,7 +1665,7 @@ export default function TransactionsPage({
                                                     <span className="font-bold text-xs text-brand-dark dark:text-dark-heading block">
                                                         {selectedInstallmentForPayment.ledgerDirection === "in" ? "Total a Receber" : "Total a Pagar"}
                                                     </span>
-                                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body italic">
+                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body">
                                                         Fluxo de caixa líquido
                                                     </span>
                                                 </div>
@@ -2649,7 +2643,6 @@ export default function TransactionsPage({
                     financialSelectionGuards={financialSelectionGuards}
                     financialCategories={categories}
                     financeAccounts={financeAccounts}
-                    paymentMethods={fallbackPaymentMethods.length > 0 ? fallbackPaymentMethods : paymentMethods}
                     onApply={handleBulkApply}
                 />
             )}

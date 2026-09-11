@@ -260,6 +260,23 @@ export default function CreateReturnPage({
     const [isUploading, setIsUploading] = useState(false)
     const [isCustomerSheetOpen, setIsCustomerSheetOpen] = useState(false)
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
+    const [financeAccountId, setFinanceAccountId] = useState<string>("")
+    const [financeAccounts, setFinanceAccounts] = useState<{ id: string; name: string; type: string }[]>([])
+
+    useEffect(() => {
+        if (!partnerId) return
+        import("@/app/actions/erp/finance-accounts").then(mod =>
+            mod.getFinanceAccountsAction(partnerId).then(res => {
+                const accounts = (res as any)?.data?.accounts || (res as any)?.data || []
+                if (Array.isArray(accounts)) {
+                    const banks = accounts.filter((a: any) => a.type === "bank" && a.is_active)
+                    setFinanceAccounts(banks)
+                    const def = banks.find((a: any) => a.is_default) || banks[0]
+                    if (def) setFinanceAccountId(def.id)
+                }
+            }).catch(() => {})
+        ).catch(() => {})
+    }, [partnerId])
 
     const isConsumidorFinal = useMemo(() => {
         if (!selectedOrder) return false
@@ -753,6 +770,7 @@ export default function CreateReturnPage({
                 status: returnStatus,
                 refundValue,
                 refundPaymentMethod,
+                accountId: financeAccountId || null,
                 storeCreditValue: creditValue,
                 replacementProduct,
                 exchangeStatus,
@@ -1610,6 +1628,18 @@ export default function CreateReturnPage({
                                                                                 ]
                                                                         }
                                                                     />
+                                                                    {financeAccounts.length > 0 && refundPaymentMethod !== "Mercado Pago" && (
+                                                                        <FormDropdown
+                                                                            label="Conta de origem"
+                                                                            disabled={isViewOnly}
+                                                                            value={financeAccountId}
+                                                                            setValue={(val) => setFinanceAccountId(val)}
+                                                                            options={financeAccounts.map(a => ({
+                                                                                value: a.id,
+                                                                                label: a.name,
+                                                                            }))}
+                                                                        />
+                                                                    )}
                                                                 </>
                                                             )}
 
@@ -1857,6 +1887,18 @@ export default function CreateReturnPage({
                                                                                                 ]
                                                                                         }
                                                                                     />
+                                                                                    {financeAccounts.length > 0 && refundPaymentMethod !== "Mercado Pago" && (
+                                                                                        <FormDropdown
+                                                                                            label="Conta de origem"
+                                                                                            disabled={isViewOnly}
+                                                                                            value={financeAccountId}
+                                                                                            setValue={(val) => setFinanceAccountId(val)}
+                                                                                            options={financeAccounts.map(a => ({
+                                                                                                value: a.id,
+                                                                                                label: a.name,
+                                                                                            }))}
+                                                                                        />
+                                                                                    )}
                                                                                 </>
                                                                             )}
                                                                         </>

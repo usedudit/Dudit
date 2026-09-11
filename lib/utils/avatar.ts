@@ -32,6 +32,19 @@ export function getAvatarColor(name: string): string {
 }
 
 /**
+ * Anonymize a full name by showing only the first letter of each word followed by "***".
+ * Example: "João Silva" → "J*** S***"
+ */
+export function anonymizeName(fullName: string): string {
+  return fullName
+    .trim()
+    .split(/\s+/)
+    .filter(n => n.length > 0)
+    .map(word => word[0].toUpperCase() + "***")
+    .join(" ")
+}
+
+/**
  * Maps an avatar background color to a corresponding default banner URL.
  */
 export function getBannerUrlByColor(colorClass: string): string {

@@ -170,7 +170,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
 
     const [excludedRowIds, setExcludedRowIds] = useState<Set<string>>(new Set())
     const [rowImages, setRowImages] = useState<Record<string, File | string | null>>({})
-    const [configImages, setConfigImages] = useState<Record<string, File | null>>({})
+    const [configImages, setConfigImages] = useState<Record<string, File | string | null>>({})
 
     // Overrides de dados da tabela (preço, estoque, sku manual)
     const [rowOverrides, setRowOverrides] = useState<Record<string, any>>({})
@@ -226,7 +226,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     const dbVariants = result.data
                     // dbVariants shape: { id, name, type, value, sku, price, stock, image, status, color, size }
 
-                    // Agrupar variantes por tipo (ex: "Cor")
+                    // Agrupar variantes por tipo (ex: "Cor", "Tamanho", "Material")
                     const variantsByType: Record<string, Set<string>> = {}
                     const typesOrder: string[] = []
 
@@ -245,25 +245,56 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                         })
                     })
 
-                    const primaryVariantId = Date.now()
-                    const newVariants: VariantCard[] = typesOrder.map((type, idx) => ({
-                        id: idx === 0 ? primaryVariantId : Date.now() + idx,
-                        type,
-                        values: Array.from(variantsByType[type]),
-                        useImage: false, // will update below if primary card has images
-                    }))
+                    const typeIdMap = new Map<string, number>()
+                    const newVariants: VariantCard[] = typesOrder.map((type, idx) => {
+                        const variantId = Date.now() + idx
+                        typeIdMap.set(type, variantId)
+                        return {
+                            id: variantId,
+                            type,
+                            values: Array.from(variantsByType[type]),
+                            useImage: false,
+                        }
+                    })
 
-                    // rowOverrides e rowImages devem ser indexados pelo combo ID (ex: "Verde"),
-                    // pois é assim que tableRows gera o row.id (comboArray.join("-"))
+                    // Identificar qual tipo de variação usa imagem e mapear para configImages
+                    const configImgs: Record<string, any> = {}
+                    const variantTypeImagesCount: Record<string, number> = {}
+
+                    typesOrder.forEach((type, typeIdx) => {
+                        dbVariants.forEach((v: any) => {
+                            if (v.image && v.value) {
+                                const values = v.value.split(" / ").map((val: string) => val.trim())
+                                const valForType = values[typeIdx]
+                                if (valForType) {
+                                    const variantId = typeIdMap.get(type)!
+                                    const configKey = `${variantId}_${valForType}`
+                                    if (!configImgs[configKey]) {
+                                        configImgs[configKey] = v.image
+                                        variantTypeImagesCount[type] = (variantTypeImagesCount[type] || 0) + 1
+                                    }
+                                }
+                            }
+                        })
+                    })
+
+                    // Encontrar o tipo que possui imagens (ex: "Cor") e marcar useImage = true
+                    let hasImageOption = false
+                    newVariants.forEach((v) => {
+                        if ((variantTypeImagesCount[v.type] || 0) > 0 && !hasImageOption) {
+                            v.useImage = true
+                            hasImageOption = true
+                        }
+                    })
+
+                    // Preencher overrides (sku, price, stock, active) para as linhas da tabela
                     const overrides: Record<string, any> = {}
                     const images: Record<string, string | File> = {}
 
                     dbVariants.forEach((v: any) => {
                         if (!v.value) return
-                        // O row ID na tabela é o valor da variante split por " / " e join por "-" (ex: "Verde-G")
                         const rowId = v.value.split(" / ").map((val: string) => val.trim()).join("-")
 
-                        // SKU, preço, estoque e status
                         overrides[rowId] = {
                             sku: v.sku,
                             price: v.price != null ? String(v.price) : "0",
@@ -271,39 +302,16 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                             active: v.status !== false,
                         }
 
-                        // Imagem (já extraída de variant_options pela action)
-                        if (v.image) {
+                        // Se não tem imagem na config (nenhum tipo com useImage), coloca na row
+                        if (!hasImageOption && v.image) {
                             images[rowId] = v.image
                         }
                     })
-
-                    // Preencher configImages para a variante principal
-                    const configImgs: Record<string, any> = {}
-                    let hasConfigImage = false
-                    if (newVariants.length > 0) {
-                        dbVariants.forEach((v: any) => {
-                            if (v.image && v.value) {
-                                const primaryValue = v.value.split(" / ")[0]?.trim()
-                                if (primaryValue) {
-                                    const configKey = `${primaryVariantId}_${primaryValue}`
-                                    if (!configImgs[configKey]) {
-                                        configImgs[configKey] = v.image
-                                        hasConfigImage = true
-                                    }
-                                }
-                            }
-                        })
-                        if (hasConfigImage) {
-                            newVariants[0].useImage = true
-                        }
-                    }
 
                     setVariants(newVariants)
                     setRowOverrides(overrides)
                     setRowImages(images)
                     setConfigImages(configImgs)
-
-                    // Limpar deletedImages e excludedRowIds
                     setDeletedImageKeys(new Set())
                     setExcludedRowIds(new Set())
                     setExistingVariants(dbVariants)
@@ -372,16 +380,21 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
     // Helper para obter a imagem correta de uma linha
     const getRowImage = useCallback((rowValues: string[], rowId: string) => {
         // 1. Prioridade: Imagem específica da linha (upload direto na tabela)
-        if (rowImages[rowId]) return rowImages[rowId]
+        if (rowImages[rowId] !== undefined && rowImages[rowId] !== null) {
+            return rowImages[rowId]
+        }
 
-        // 2. Fallback: Imagem da configuração (Variante Principal)
+        // 2. Fallback: Imagem da configuração de qualquer variante com useImage ativo
         if (variants.length > 0 && rowValues.length > 0) {
-            const primaryVariant = variants[0]
-            // Só tenta pegar da config se essa variante estiver marcada para usar imagem
-            if (primaryVariant.useImage) {
-                const primaryValue = rowValues[0]
-                const configKey = `${primaryVariant.id}_${primaryValue}`
-                return configImages[configKey] || null
+            for (let i = 0; i < variants.length; i++) {
+                const variant = variants[i]
+                if (variant.useImage && rowValues[i]) {
+                    const primaryValue = rowValues[i]
+                    const configKey = `${variant.id}_${primaryValue}`
+                    if (configImages[configKey] !== undefined && configImages[configKey] !== null) {
+                        return configImages[configKey]
+                    }
+                }
             }
         }
         return null
@@ -422,20 +435,48 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 if (cropContext.type === 'config' && cropContext.value) {
                     configKey = `${cropContext.id}_${cropContext.value}`
                     variantIdToEnable = Number(cropContext.id)
+
+                    // Limpar overrides antigos em string das linhas que compartilham este valor
+                    const variantIdx = variants.findIndex(v => v.id === variantIdToEnable)
+                    if (variantIdx >= 0) {
+                        setRowImages(prev => {
+                            const next = { ...prev }
+                            tableRows.forEach(r => {
+                                if (r.values[variantIdx] === cropContext.value && typeof next[r.id] === 'string') {
+                                    delete next[r.id]
+                                }
+                            })
+                            return next
+                        })
+                    }
                 } else if (cropContext.type === 'row') {
                     const row = tableRows.find(r => r.id === cropContext.id)
-                    if (row && variants.length > 0) {
-                        const mainValue = row.values[0]
-                        const mainVariantId = variants[0].id
-                        configKey = `${mainVariantId}_${mainValue}`
-                        variantIdToEnable = mainVariantId
+                    const imgVariantIdx = variants.findIndex(v => v.useImage)
+                    const targetIdx = imgVariantIdx >= 0 ? imgVariantIdx : 0
+                    const activeVariant = variants[targetIdx]
+
+                    if (row && activeVariant) {
+                        const activeValue = row.values[targetIdx]
+                        if (activeValue) {
+                            configKey = `${activeVariant.id}_${activeValue}`
+                            variantIdToEnable = activeVariant.id
+
+                            // Limpar overrides antigos das linhas com o mesmo valor
+                            setRowImages(prev => {
+                                const next = { ...prev }
+                                tableRows.forEach(r => {
+                                    if (r.values[targetIdx] === activeValue && typeof next[r.id] === 'string') {
+                                        delete next[r.id]
+                                    }
+                                })
+                                next[cropContext.id] = file
+                                return next
+                            })
+                        }
                     } else {
                         setRowImages(prev => ({ ...prev, [cropContext.id]: file }))
-                        // Marcar que esta linha teve imagem modificada
-                        setModifiedImageRows(prev => new Set(prev).add(String(cropContext.id)))
-                        setShowImageCropper(false)
-                        return
                     }
+                    setModifiedImageRows(prev => new Set(prev).add(String(cropContext.id)))
                 }
 
                 if (configKey) {
@@ -444,10 +485,6 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                         if (v.id === variantIdToEnable && !v.useImage) return { ...v, useImage: true }
                         return v
                     }))
-                    // Marcar que a linha foi modificada se é do tipo 'row'
-                    if (cropContext.type === 'row' && cropContext.id) {
-                        setModifiedImageRows(prev => new Set(prev).add(String(cropContext.id)))
-                    }
                 }
             }
             setShowImageCropper(false)
@@ -523,41 +560,57 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
             setConfigImages(prev => {
                 const next = { ...prev }
                 const imageToRemove = prev[key]
-                // Se é uma string (URL do bucket), marcar para deletar
-                if (typeof imageToRemove === 'string') {
-                    setDeletedImageKeys(prev => new Set(prev).add(imageToRemove))
+                if (typeof imageToRemove === 'string' && imageToRemove.trim()) {
+                    setDeletedImageKeys(d => new Set(d).add(imageToRemove.trim()))
                 }
                 delete next[key]
                 return next
             })
+
+            const [varIdStr, ...valParts] = key.split("_")
+            const varId = Number(varIdStr)
+            const val = valParts.join("_")
+            const variantIdx = variants.findIndex(v => v.id === varId)
+            if (variantIdx >= 0) {
+                setRowImages(prev => {
+                    const next = { ...prev }
+                    tableRows.forEach(r => {
+                        if (r.values[variantIdx] === val) {
+                            if (typeof next[r.id] === 'string' && next[r.id]) {
+                                setDeletedImageKeys(d => new Set(d).add(next[r.id] as string))
+                            }
+                            delete next[r.id]
+                        }
+                    })
+                    return next
+                })
+            }
         } else if (type === 'row') {
-            // Tenta remover override específico primeiro
             if (rowImages[key]) {
                 setRowImages(prev => {
                     const next = { ...prev }
                     const imageToRemove = prev[key]
-                    // Se é uma string (URL do bucket), marcar para deletar
-                    if (imageToRemove && typeof imageToRemove === 'string') {
-                        setDeletedImageKeys(prev => new Set(prev).add(imageToRemove))
+                    if (typeof imageToRemove === 'string' && imageToRemove.trim()) {
+                        setDeletedImageKeys(d => new Set(d).add(imageToRemove.trim()))
                     }
                     delete next[key]
                     return next
                 })
-                // Marcar que esta linha teve imagem modificada (deletada)
                 setModifiedImageRows(prev => new Set(prev).add(key))
             } else {
-                // Se não tem override, tenta remover da config (lógica inteligente)
                 const row = tableRows.find(r => r.id === key)
-                if (row && variants.length > 0) {
-                    const mainValue = row.values[0]
-                    const configKey = `${variants[0].id}_${mainValue}`
+                const imgVariantIdx = variants.findIndex(v => v.useImage)
+                const targetIdx = imgVariantIdx >= 0 ? imgVariantIdx : 0
+                if (row && variants[targetIdx]) {
+                    const targetVal = row.values[targetIdx]
+                    const targetConfigKey = `${variants[targetIdx].id}_${targetVal}`
                     setConfigImages(prev => {
                         const next = { ...prev }
-                        const imageToRemove = prev[configKey]
-                        if (typeof imageToRemove === 'string') {
-                            setDeletedImageKeys(prev => new Set(prev).add(imageToRemove))
+                        const imageToRemove = prev[targetConfigKey]
+                        if (typeof imageToRemove === 'string' && imageToRemove.trim()) {
+                            setDeletedImageKeys(d => new Set(d).add(imageToRemove.trim()))
                         }
-                        delete next[configKey]
+                        delete next[targetConfigKey]
                         return next
                     })
                 }
@@ -623,7 +676,7 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
         setSavingStatusText("Processando variações...")
 
         try {
-            // 1. Identificar e deduplicar arquivos de imagem únicos antes do upload
+            // 1. Identificar e deduplicar arquivos de imagem únicos antes do upload para máxima performance
             const uniqueFiles = new Set<File>()
             tableRows.forEach((rawRow) => {
                 const row = getDisplayData(rawRow)
@@ -632,8 +685,13 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                     uniqueFiles.add(activeImage)
                 }
             })
+            Object.values(configImages).forEach(img => {
+                if (img instanceof File) {
+                    uniqueFiles.add(img)
+                }
+            })
 
-            // 2. Comprimir e fazer upload apenas das imagens distintas
+            // 2. Comprimir e fazer upload paralelo apenas das imagens distintas
             const fileUploadMap = new Map<File, string | null>()
             if (uniqueFiles.size > 0) {
                 setSavingStatusText("Salvando variantes...")
@@ -668,8 +726,8 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 let imagePublicId: string | null = null
                 if (activeImage instanceof File) {
                     imagePublicId = fileUploadMap.get(activeImage) || null
-                } else if (typeof activeImage === 'string') {
-                    imagePublicId = activeImage
+                } else if (typeof activeImage === 'string' && activeImage.trim() !== "") {
+                    imagePublicId = activeImage.trim()
                 }
 
                 // SKU UNIQUENESS LOGIC
@@ -717,11 +775,14 @@ const AddVariantSheet: React.FC<AddVariantSheetProps> = ({ isOpen, onClose, prod
                 return
             }
 
+            const activeImageKeys = new Set(variantsToSave.map(v => v.image).filter(Boolean) as string[])
+            const safeDeletedImages = Array.from(deletedImageKeys).filter(img => img && !activeImageKeys.has(img))
+
             const result = await createProductVariantsBatchAction({
                 productId: product.id,
                 variants: variantsToSave,
                 csrf_token: csrfToken,
-                deletedImages: Array.from(deletedImageKeys),
+                deletedImages: safeDeletedImages,
             })
 
             if (result.success) {

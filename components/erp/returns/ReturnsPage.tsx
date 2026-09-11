@@ -213,6 +213,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                         exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                         notes: data.observations || "",
                         idempotencyKey: `erp-init-process:${requestId}`,
+                        accountId: data.accountId || null,
                     })
                     if (!processRes.success) throw new Error(processRes.error)
                     if (processRes.success && (processRes as any).data?.mpPaymentNotFound) {
@@ -232,6 +233,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                             exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                             notes: data.observations || "",
                             idempotencyKey: `erp-init-process:${requestId}`,
+                            accountId: data.accountId || null,
                         })
                         setMpPaymentNotFoundChecked(false)
                         setShowMpPaymentNotFoundModal(true)
@@ -256,6 +258,7 @@ export default function ReturnsPage({ partnerId, roleId, storeId, planGate }: Re
                     exchangeBalanceResolution: data.exchangeBalanceResolution || null,
                     notes: data.observations || "",
                     idempotencyKey: `erp-update:${entityState.entityId}:${Date.now()}`,
+                    accountId: data.accountId || null,
                 }
                 const response = await processReturnRequestAction(processPayload)
                 if (!response.success) throw new Error(response.error)

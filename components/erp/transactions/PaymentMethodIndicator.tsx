@@ -12,10 +12,12 @@ const PixIcon = ({ className }: { className?: string }) => (
 
 export function PaymentMethodIndicator({
     label,
+    provider,
     simplifyMultiple = true,
     simplify = false
 }: {
     label?: string | null
+    provider?: string | null
     simplifyMultiple?: boolean
     simplify?: boolean
 }) {
@@ -29,18 +31,18 @@ export function PaymentMethodIndicator({
 
     if (parts.length > 1) {
         if (simplifyMultiple) {
-            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" simplify={simplify} />
+            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" provider={provider} simplify={simplify} />
         }
         return (
             <div className="flex flex-wrap gap-2 items-center">
                 {parts.map((part, index) => (
-                    <PaymentMethodIndicatorKeyed key={index} part={part} simplify={simplify} />
+                    <PaymentMethodIndicatorKeyed key={index} part={part} provider={provider} simplify={simplify} />
                 ))}
             </div>
         )
     }
     
-    return <PaymentMethodIndicatorKeyed part={parts[0] || label} simplify={simplify} />
+    return <PaymentMethodIndicatorKeyed part={parts[0] || label} provider={provider} simplify={simplify} />
 }
 
 function splitPaymentMethodLabels(label: string): string[] {
@@ -62,7 +64,7 @@ function splitPaymentMethodLabels(label: string): string[] {
     return parts
 }
 
-function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string; simplify?: boolean }) {
+function PaymentMethodIndicatorKeyed({ part, provider, simplify = false }: { part: string; provider?: string | null; simplify?: boolean }) {
     const displayPart = simplify ? (() => {
         let targetPart = part
         const lower = part.toLowerCase()
@@ -90,7 +92,17 @@ function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string;
     let icons: React.ReactNode[] = []
     let colorClass = "text-brand-inactive-text dark:text-dark-body"
 
-    if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
+    if (normalized.includes("vale-compra") || normalized.includes("vale_compra") || normalized.includes("store_credit") || normalized.includes("store credit") || normalized.includes("voucher")) {
+        icons.push(
+            <img 
+                key="vc" 
+                src="https://img.dudit.com.br/static/icons/payments/Voucher.png" 
+                alt="Vale-compra" 
+                className="w-3.5 h-3.5 object-contain" 
+            />
+        )
+        colorClass = "text-amber-700 dark:text-amber-400"
+    } else if (normalized.includes("mercado pago") || normalized.includes("mercadopago")) {
         colorClass = "text-brand-blue dark:text-brand-blue"
         icons.push(
             <img 
@@ -144,6 +156,24 @@ function PaymentMethodIndicatorKeyed({ part, simplify = false }: { part: string;
         colorClass = "text-brand-blue dark:text-brand-blue"
     } else {
         icons.push(<CreditCardIcon key="icon" className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />)
+    }
+
+    const hasMpIcon = icons.some((icon) => {
+        if (React.isValidElement(icon) && icon.type === 'img') {
+            return (icon.props as any)?.src?.includes('MercadoPago')
+        }
+        return false
+    })
+    if (!hasMpIcon && provider?.toLowerCase().includes("mercado pago")) {
+        icons.unshift(
+            <img 
+                key="provider-mp" 
+                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" 
+                alt="Mercado Pago" 
+                className="w-3.5 h-3.5 object-contain" 
+            />
+        )
+        colorClass = "text-brand-blue dark:text-brand-blue"
     }
 
     return (

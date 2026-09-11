@@ -100,6 +100,7 @@ interface Order {
     refunded_amount?: number;
     payment_method?: string;
     payment_breakdown?: any;
+    payment_provider?: string;
     has_items_to_restore?: boolean;
 }
 
@@ -398,6 +399,7 @@ export default function OrdersPage({
                     refunded_amount: Number(o.refunded_amount || 0),
                     payment_method: o.payment_method || "",
                     payment_breakdown: o.payment_breakdown || null,
+                    payment_provider: o.payment_provider || "",
                     has_items_to_restore: Boolean(o.has_items_to_restore),
                 }
             })
@@ -894,6 +896,7 @@ export default function OrdersPage({
                                         paidAmount: Number(order.paid_amount || 0),
                                         payment_method: order.payment_method || "",
                                         payment_breakdown: order.payment_breakdown || [],
+                                        payment_provider: order.payment_provider || "",
                                     })
                                 } else {
                                     router.push(`/erp/pedidos?edit=${order.id}&payment=1`)

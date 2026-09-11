@@ -2,15 +2,17 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem, InfoCard, FormDropdown } from "@/components/reusable"
+import { Button, Input, Checkbox, IconPlaceholder, RadioButton, MoneyInput, PercentageInput, ListItem, InfoCard, FormDropdown, DatePicker } from "@/components/reusable"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import {
     MoneyIcon, Package, EyeIcon, TrashIcon, RemoveImageIcon, AlertTriangleIcon,
     UploadIcon, CheckIcon, EditIcon, ChevronLeftIcon,
-    WrenchIcon, ClockIcon
+    WrenchIcon, ClockIcon,
+    EyeOffIcon
 } from "@/lib/icons"
 
 import { DELIVERY_STATUS_OPTIONS, PICKUP_STATUS_OPTIONS, MIXED_STATUS_OPTIONS } from "@/lib/orders/status"
+import { STANDARD_PAYMENT_METHODS } from "@/lib/finance-utils"
 import DefaultModal from "./DefaultModal"
 import { isGifFile } from "@/lib/security/file-validator"
 import { useToast } from "@/hooks/use-toast"
@@ -83,7 +85,6 @@ interface BulkEditActionsModalProps {
     }
     financialCategories?: Array<{ id: string; name: string }>
     financeAccounts?: Array<{ id: string; name: string }>
-    paymentMethods?: Array<{ id: string; name: string }>
     onApply: (payload: BulkActionPayload) => Promise<void>
 }
 
@@ -146,7 +147,6 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
     financialSelectionGuards,
     financialCategories,
     financeAccounts,
-    paymentMethods,
     onApply
 }) => {
     const { toast } = useToast()
@@ -186,14 +186,14 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
             if (financeAccounts && financeAccounts.length > 0 && !settleAccountId) {
                 setSettleAccountId(financeAccounts[0].id)
             }
-            if (paymentMethods && paymentMethods.length > 0 && !settlePaymentMethodId) {
-                setSettlePaymentMethodId(paymentMethods[0].id)
+            if (!settlePaymentMethodId) {
+                setSettlePaymentMethodId(STANDARD_PAYMENT_METHODS[0].value)
             }
             if (financialCategories && financialCategories.length > 0 && !financialCategoryId) {
                 setFinancialCategoryId(financialCategories[0].id)
             }
         }
-    }, [isOpen, financeAccounts, paymentMethods, financialCategories, settleAccountId, settlePaymentMethodId, financialCategoryId])
+    }, [isOpen, financeAccounts, financialCategories, settleAccountId, settlePaymentMethodId, financialCategoryId])
 
     const cancelledCount = orderSelectionGuards?.cancelledCount || 0
     const financialIgnoredCount = view === "financial_cancel"
@@ -366,7 +366,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 <BulkActionCard icon={CheckIcon} label="Dar Baixa" onClick={() => {
                                     setView('financial_settle')
                                     if (financeAccounts?.[0] && !settleAccountId) setSettleAccountId(financeAccounts[0].id)
-                                    if (paymentMethods?.[0] && !settlePaymentMethodId) setSettlePaymentMethodId(paymentMethods[0].id)
+                                    if (!settlePaymentMethodId) setSettlePaymentMethodId(STANDARD_PAYMENT_METHODS[0].value)
                                 }} />
                                 <BulkActionCard icon={ClockIcon} label="Prorrogar Vencimento" onClick={() => setView('financial_reschedule')} />
                                 <BulkActionCard icon={EditIcon} label="Alterar Categoria" onClick={() => {
@@ -423,12 +423,10 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                             )}
                         </div>
 
-                        <label className="flex items-center gap-3 p-2 cursor-pointer mt-2">
-                            <Checkbox checked={priceConfig.onlyPublished} onChange={c => setPriceConfig(p => ({ ...p, onlyPublished: c }))} />
-                            <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">
-                                Aplicar apenas {targetType === 'service' ? 'aos serviços ativos' : targetType === 'product' ? 'aos produtos publicados' : 'às variações publicadas'}
-                            </span>
-                        </label>
+                        <Checkbox
+                            checked={priceConfig.onlyPublished} onChange={c => setPriceConfig(p => ({ ...p, onlyPublished: c }))}
+                            label={`Aplicar apenas ${targetType === 'service' ? 'aos serviços ativos' : targetType === 'product' ? 'aos produtos publicados' : 'às variações publicadas'}`}
+                        />
                     </div>
                 )
             case 'stock':
@@ -476,37 +474,29 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         )}
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading">Motivo da movimentação</label>
-                            <select
-                                value={stockConfig.reason}
-                                onChange={e => setStockConfig(p => ({ ...p, reason: e.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border border-brand-border bg-white dark:bg-dark-surface dark:border-dark-border text-brand-dark dark:text-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                            >
-                                <option value="">Selecione um motivo</option>
-                                {stockConfig.mode === 'add' || stockConfig.mode === 'fixed' ? (
-                                    <>
-                                        <option value="Compra de Fornecedor">Compra de Fornecedor</option>
-                                        <option value="Devolução de Cliente">Devolução de Cliente</option>
-                                        <option value="Ajuste de Estoque">Ajuste de Estoque</option>
-                                        <option value="Outro">Outro</option>
-                                    </>
+                            <FormDropdown label="Motivo da movimentação"
+                                options={stockConfig.mode === 'add' || stockConfig.mode === 'fixed' ? (
+                                    [{ value: "Compra de Fornecedor", label: "Compra de Fornecedor" },
+                                    { value: "Devolução de Cliente", label: "Devolução de Cliente" },
+                                    { value: "Ajuste de Estoque", label: "Ajuste de Estoque" },
+                                    { value: "Outro", label: "Outro" }]
                                 ) : (
-                                    <>
-                                        <option value="Avaria / Perda">Avaria / Perda</option>
-                                        <option value="Ajuste de Estoque">Ajuste de Estoque</option>
-                                        <option value="Uso Interno">Uso Interno</option>
-                                        <option value="Outro">Outro</option>
-                                    </>
+                                    [{ value: "Avaria / Perda", label: "Avaria / Perda" },
+                                    { value: "Ajuste de Estoque", label: "Ajuste de Estoque" },
+                                    { value: "Uso Interno", label: "Uso Interno" },
+                                    { value: "Outro", label: "Outro" }]
                                 )}
-                            </select>
+                                value={stockConfig.reason}
+                                setValue={(val: string) => setStockConfig(p => ({ ...p, reason: val }))}
+                                placeholder="Selecione um motivo"
+                                width="w-full"
+                            />
                         </div>
 
-                        <label className="flex items-center gap-3 p-2 cursor-pointer">
-                            <Checkbox checked={stockConfig.ignoreNegative} onChange={c => setStockConfig(p => ({ ...p, ignoreNegative: c }))} />
-                            <span className="text-sm text-brand-dark dark:text-dark-heading font-medium">
-                                Ignorar {targetLabel} com estoque negativo
-                            </span>
-                        </label>
+                        <Checkbox
+                            checked={stockConfig.ignoreNegative} onChange={c => setStockConfig(p => ({ ...p, ignoreNegative: c }))}
+                            label={`Ignorar ${targetLabel} com estoque negativo`}
+                        />
                     </div>
                 )
             case 'visibility':
@@ -530,7 +520,7 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                         <ListItem
                             title="Ocultar Selecionados"
                             description={`Os ${targetLabel} ficarão ocultos na vitrine`}
-                            icon={EyeIcon}
+                            icon={EyeOffIcon}
                             onClick={() => setVisConfig('hide')}
                             className="px-4 py-3 gap-4"
                             right={
@@ -720,10 +710,8 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                             />
                         )}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
-                                Motivo do cancelamento (opcional)
-                            </label>
                             <Input
+                                label="Motivo do cancelamento (Opcional)"
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
                                 placeholder="Ex: Cobrança duplicada, despesa cancelada..."
@@ -764,16 +752,13 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 label="Método de Pagamento"
                                 value={settlePaymentMethodId}
                                 setValue={setSettlePaymentMethodId}
-                                options={(paymentMethods || []).map((p) => ({ value: p.id, label: p.name }))}
+                                options={STANDARD_PAYMENT_METHODS}
                                 placeholder="Selecione a forma de pagamento..."
                                 disabled={isCurrentViewBlocked}
                             />
                             <div className="space-y-1">
-                                <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
-                                    Data da Baixa
-                                </label>
-                                <Input
-                                    type="date"
+                                <DatePicker
+                                    label="Data da Baixa"
                                     value={settlePaymentDate}
                                     onChange={(e) => setSettlePaymentDate(e.target.value)}
                                     disabled={isCurrentViewBlocked}
@@ -850,14 +835,12 @@ export const BulkEditActionsModal: React.FC<BulkEditActionsModalProps> = ({
                                 </div>
                             ) : (
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-brand-dark dark:text-dark-heading block">
-                                        Nova data de vencimento
-                                    </label>
                                     <Input
                                         type="date"
                                         value={rescheduleDate}
                                         onChange={(e) => setRescheduleDate(e.target.value)}
                                         disabled={isCurrentViewBlocked}
+                                        label="Nova data de vencimento"
                                     />
                                 </div>
                             )}

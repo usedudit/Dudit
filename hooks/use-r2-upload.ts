@@ -30,11 +30,11 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [progress, setProgress] = useState(0)
-  const xhrRef = useRef<XMLHttpRequest | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const cancelUpload = useCallback(() => {
-    if (xhrRef.current) {
-      xhrRef.current.abort()
+    if (abortRef.current) {
+      abortRef.current.abort()
     }
   }, [])
 
@@ -99,37 +99,22 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
 
       const signedUrlData = (await signedUrlResponse.json()) as SignedUrlResponse
 
-      // Real upload progress tracking using XMLHttpRequest
-      const xhr = new XMLHttpRequest()
-      xhrRef.current = xhr
+      // Upload via fetch (avoids CORS issues with presigned URLs vs XMLHttpRequest)
+      setProgress(0)
 
-      const uploadPromise = new Promise<void>((resolve, reject) => {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const pct = Math.round((event.loaded / event.total) * 100)
-            setProgress(pct)
-          }
-        }
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve()
-          } else {
-            reject(new Error(`Erro no upload para storage: ${xhr.statusText || xhr.status}`))
-          }
-        }
-
-        xhr.onerror = () => reject(new Error("Erro de conexão durante o upload"))
-        xhr.onabort = () => reject(new Error("Upload cancelado pelo usuário"))
-
-        xhr.open("PUT", signedUrlData.uploadUrl)
-        xhr.setRequestHeader("Content-Type", signedUrlData.contentType || file.type)
-        xhr.send(file)
+      const res = await fetch(signedUrlData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": signedUrlData.contentType || file.type },
+        body: file,
       })
 
-      await uploadPromise
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "")
+        throw new Error(`Erro no upload para storage: ${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ""}`)
+      }
 
       setProgress(100)
+
       const result = {
         ...signedUrlData,
         fileName: file.name,
@@ -143,7 +128,7 @@ export function useR2Upload(options?: UseR2UploadOptions): UseR2UploadReturn {
       throw errorObj
     } finally {
       setIsLoading(false)
-      xhrRef.current = null
+      abortRef.current = null
     }
   }, [options])
 

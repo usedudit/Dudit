@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { Button, Spinner, DefaultModal, IconPlaceholder, AlertModal, FormSection } from "@/components/reusable"
-import { UploadIcon, TrashIcon, FileIcon, XIcon, CheckCircleIcon, AlertCircleIcon } from "@/lib/icons"
+import { UploadIcon, TrashIcon, FileIcon, XIcon } from "@/lib/icons"
 import { useToast } from "@/hooks/use-toast"
 import { usePermissions } from "@/lib/permission-context"
 import { hasMinimumPlan, getPlanImageAttachmentLimit } from "@/lib/subscription/plan-tier"
@@ -11,7 +11,7 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { formatFileSize } from "@/components/erp/orders/OrderAttachmentsTab"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import ImageCropperModal from "@/components/ImageCropperModal"
-import { uploadSingleFile } from "@/lib/utils/attachment-uploader"
+
 
 // Import order actions
 import {
@@ -168,7 +168,6 @@ export function GenericAttachmentsTab({
     const [loading, setLoading] = useState(false)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
-    const [isSaving, setIsSaving] = useState(false)
 
     // Image Cropper States
     const [showCropper, setShowCropper] = useState(false)
@@ -373,61 +372,11 @@ export function GenericAttachmentsTab({
     const handleSaveUploads = async () => {
         if (pendingFiles.length === 0) return
 
-        // In new/creation mode, stage files locally without uploading immediately to DB/R2
-        if (isNewMode) {
-            const newFiles = pendingFiles.map(pf => pf.file)
-            updateStagedFiles([...currentStagedFiles, ...newFiles])
-            toast({ description: `${newFiles.length} documento(s) adicionado(s). Eles serão salvos ao guardar o registro.` })
-            setIsModalOpen(false)
-            setPendingFiles([])
-            return
-        }
-
-        if (!entityId) return
-        setIsSaving(true)
-
-        const uploadPromises = pendingFiles.map(async (pending) => {
-            if (pending.status === "completed") return
-
-            setPendingFiles((prev) =>
-                prev.map((f) => (f.id === pending.id ? { ...f, status: "uploading", progress: 5 } : f))
-            )
-
-            try {
-                const res = await uploadSingleFile({
-                    partnerId,
-                    entityId,
-                    entityType,
-                    file: pending.file,
-                })
-
-                if (!res.success) throw new Error(res.error || "Erro no upload")
-
-                setPendingFiles((prev) =>
-                    prev.map((f) => (f.id === pending.id ? { ...f, status: "completed", progress: 100 } : f))
-                )
-            } catch (err: any) {
-                console.error(err)
-                setPendingFiles((prev) =>
-                    prev.map((f) => (f.id === pending.id ? { ...f, status: "failed", error: err.message || "Erro no upload" } : f))
-                )
-            }
-        })
-
-        await Promise.all(uploadPromises)
-        setIsSaving(false)
-
-        const currentPending = pendingFiles
-        const hasFailures = currentPending.some((f) => f.status === "failed")
-        if (!hasFailures) {
-            toast({ description: "Todos os anexos foram enviados com sucesso." })
-            setIsModalOpen(false)
-            setPendingFiles([])
-            loadAttachments()
-            onMutation?.()
-        } else {
-            toast({ description: "Alguns arquivos falharam no upload. Verifique os erros e tente novamente." })
-        }
+        const newFiles = pendingFiles.map(pf => pf.file)
+        updateStagedFiles([...currentStagedFiles, ...newFiles])
+        toast({ description: `${newFiles.length} documento(s) adicionado(s). Eles serão salvos ao guardar o registro.` })
+        setIsModalOpen(false)
+        setPendingFiles([])
     }
 
     // Image section handling via ProductImagesSection
@@ -470,26 +419,8 @@ export function GenericAttachmentsTab({
     }
 
     const processCroppedImage = async (croppedFile: File) => {
-        if (isNewMode) {
-            updateStagedImages([...currentStagedImages, croppedFile])
-            toast({ description: "Imagem adicionada aos anexos pendentes." })
-        } else if (entityId) {
-            setLoading(true)
-            try {
-                const res = await uploadSingleFile({ partnerId, entityId, entityType, file: croppedFile })
-                if (res.success) {
-                    toast({ description: "Imagem enviada com sucesso." })
-                    loadAttachments()
-                    onMutation?.()
-                } else {
-                    toast({ description: res.error || "Erro ao enviar imagem." })
-                }
-            } catch (err) {
-                toast({ description: "Erro ao enviar imagem." })
-            } finally {
-                setLoading(false)
-            }
-        }
+        updateStagedImages([...currentStagedImages, croppedFile])
+        toast({ description: "Imagem adicionada aos anexos pendentes." })
     }
 
     const handleCropComplete = async (croppedDataUrl: string) => {
@@ -679,7 +610,7 @@ export function GenericAttachmentsTab({
                                 onRemoveImage={handleRemoveImageFromSection}
                                 onSetPrimaryImage={() => { }}
                                 isEditing={canEdit}
-                                isSaving={isSaving}
+                                isSaving={false}
                             />
                         </FormSection>
                     )}
@@ -700,13 +631,13 @@ export function GenericAttachmentsTab({
             {isModalOpen && (
                 <DefaultModal
                     isOpen={isModalOpen}
-                    onClose={() => !isSaving && setIsModalOpen(false)}
-                    title="Upload de Documentos"
+                    onClose={() => setIsModalOpen(false)}
+                    title="Adicionar Documentos"
                     maxWidth="md"
                 >
                     <div className="space-y-6">
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Selecione e envie os documentos desejados (PDF, Word, Excel, CSV, Zip, etc.). Limite: máximo de {planLimit} anexos.
+                            Selecione os documentos desejados (PDF, Word, Excel, CSV, Zip, etc.). Eles serão salvos ao guardar o registro. Limite: máximo de {planLimit} anexos.
                         </p>
 
                         <div
@@ -725,7 +656,7 @@ export function GenericAttachmentsTab({
                                 accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.odt,.ppt,.pptx,.zip,.rar,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain,application/zip,application/x-rar-compressed"
                             />
 
-                            <IconPlaceholder icon={UploadIcon} title="Upload de Documentos" subtitle="Selecione e envie os documentos desejados (PDF, Word, Excel, CSV, Zip, etc). Max 10MB cada" />
+                            <IconPlaceholder icon={UploadIcon} title="Upload de Documentos" subtitle="Selecione os documentos desejados (PDF, Word, Excel, CSV, Zip, etc). Max 10MB cada" />
                         </div>
 
                         {pendingFiles.length > 0 && (
@@ -743,43 +674,18 @@ export function GenericAttachmentsTab({
                                                 <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate">
                                                     {pf.name}
                                                 </p>
-                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5 mt-0.5">
-                                                    <span>{formatFileSize(pf.size)}</span>
-                                                    {pf.status === "uploading" && (
-                                                        <span className="text-brand-primary animate-pulse flex items-center gap-1">
-                                                            • Enviando ({pf.progress}%)
-                                                        </span>
-                                                    )}
-                                                    {pf.status === "completed" && (
-                                                        <span className="text-brand-green flex items-center gap-0.5">
-                                                            • <CheckCircleIcon className="w-3.5 h-3.5 inline" /> Concluído
-                                                        </span>
-                                                    )}
-                                                    {pf.status === "failed" && (
-                                                        <span className="text-brand-red flex items-center gap-0.5">
-                                                            • <AlertCircleIcon className="w-3.5 h-3.5 inline" /> {pf.error || "Falhou"}
-                                                        </span>
-                                                    )}
+                                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                    {formatFileSize(pf.size)}
                                                 </p>
                                             </div>
-                                            {!isSaving && pf.status !== "completed" && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemovePending(pf.id)}
-                                                    className="text-brand-inactive-text hover:text-brand-red p-1 rounded-full transition-colors absolute top-3 right-3"
-                                                >
-                                                    <XIcon className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemovePending(pf.id)}
+                                                className="text-brand-inactive-text hover:text-brand-red p-1 rounded-full transition-colors absolute top-3 right-3"
+                                            >
+                                                <XIcon className="w-4 h-4" />
+                                            </button>
                                         </div>
-                                        {pf.status === "uploading" && (
-                                            <div className="w-full bg-brand-border dark:bg-dark-border rounded-full h-1 mt-2.5 overflow-hidden">
-                                                <div
-                                                    className="bg-brand-primary h-1 rounded-full transition-all duration-300"
-                                                    style={{ width: `${pf.progress}%` }}
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -789,25 +695,17 @@ export function GenericAttachmentsTab({
                             <Button
                                 type="button"
                                 variant="outline"
-                                disabled={isSaving}
                                 onClick={() => setIsModalOpen(false)}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 type="button"
-                                disabled={isSaving || pendingFiles.length === 0}
+                                disabled={pendingFiles.length === 0}
                                 onClick={handleSaveUploads}
                                 className="flex items-center gap-2"
                             >
-                                {isSaving ? (
-                                    <>
-                                        <Spinner className="w-4 h-4 text-white animate-spin" />
-                                        <span>Salvando...</span>
-                                    </>
-                                ) : (
-                                    <span>Salvar Anexos</span>
-                                )}
+                                <span>Adicionar</span>
                             </Button>
                         </div>
                     </div>

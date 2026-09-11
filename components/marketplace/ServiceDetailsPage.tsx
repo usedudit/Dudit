@@ -741,18 +741,18 @@ export function ServiceDetailsPageClient({
         const sales = partner.vendas_totais || 0
         const rating = partner.rating || 5.0
         if (sales >= 2000 && rating >= 4.7) {
-            return { name: "Diamante", badge: "💎", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Diamante com excelente histórico de atendimento.", level: 5 }
+            return { name: "Diamante", badge: "<img src='https://img.dudit.com.br/static/selos/Diamante.png' alt='Diamante' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Diamante com excelente histórico de atendimento.", level: 5 }
         }
         if (sales >= 500 && rating >= 4.5) {
-            return { name: "Platina", badge: "💎", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Destaque Platina na Dudit.", level: 4 }
+            return { name: "Platina", badge: "<img src='https://img.dudit.com.br/static/selos/Platina.png' alt='Platina' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Destaque Platina na Dudit.", level: 4 }
         }
         if (sales >= 100 && rating >= 4.3) {
-            return { name: "Ouro", badge: "🥇", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional com reputação Ouro e ótimo serviço.", level: 3 }
+            return { name: "Ouro", badge: "<img src='https://img.dudit.com.br/static/selos/Ouro.png' alt='Ouro' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional com reputação Ouro e ótimo serviço.", level: 3 }
         }
         if (sales >= 20 && rating >= 4.0) {
-            return { name: "Prata", badge: "🥈", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Prata consistente na plataforma.", level: 2 }
+            return { name: "Prata", badge: "<img src='https://img.dudit.com.br/static/selos/Prata.png' alt='Prata' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Prata consistente na plataforma.", level: 2 }
         }
-        return { name: "Bronze", badge: "🥉", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Bronze iniciando seus serviços na Dudit.", level: 1 }
+        return { name: "Bronze", badge: "<img src='https://img.dudit.com.br/static/selos/Bronze.png' alt='Bronze' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Bronze iniciando seus serviços na Dudit.", level: 1 }
     }, [partner])
 
     const partnerProfileImageUrl = useMemo(() => {
@@ -1361,53 +1361,6 @@ export function ServiceDetailsPageClient({
                         message="Este serviço possui valor inicial flexível. Solicite uma proposta para receber preços personalizados e tirar dúvidas diretamente com o prestador."
                     />
                 </div>
-            )}
-
-            {/* ── Selected Summary (Fixed price only) ── */}
-            {showPrice && !isStartingAt && (
-                <AnimatePresence>
-                    {selectedTime && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 mb-6">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <CheckCircleIcon size={16} className="text-brand-green" />
-                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">Resumo do agendamento</span>
-                                </div>
-                                <div className="space-y-1.5 text-sm text-brand-inactive-text dark:text-dark-body">
-                                    <div className="flex justify-between">
-                                        <span>Profissional</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedStaff?.name}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Data</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                            {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Horário</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">{selectedTime}</span>
-                                    </div>
-                                    {(!service.billing_unit || service.billing_unit === 'per_service') && (
-                                        <div className="flex justify-between">
-                                            <span>Duração</span>
-                                            <span className="font-bold text-brand-dark dark:text-dark-heading">{formatDuration(durationMinutes)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between pt-2 border-t border-emerald-200 mt-2">
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading">Valor</span>
-                                        <span className="font-bold text-brand-dark dark:text-dark-heading text-base">{pricePrefix}{formatCurrency(price)}{billingSuffix}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             )}
 
             {/* ── CTA Buttons ── */}

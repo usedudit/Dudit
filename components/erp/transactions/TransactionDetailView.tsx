@@ -13,6 +13,7 @@ import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
+import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
 import InstallmentParcelsTable, { type InstallmentParcelRow } from "./InstallmentParcelsTable"
 import { ListItem } from "@/components/reusable"
 import { AdjustIcon, ArrowRightIcon, BankIcon, CashierIcon, DigitalWalletIcon, MoneyIcon, ReturnIcon, ShoppingCartIcon, RepeatIcon, TrendingUpIcon } from "@/lib/icons"
@@ -440,9 +441,11 @@ export default function TransactionDetailView({ transactionId, partnerId, onBack
                                                         <PaymentRow
                                                             label="Meio de pagamento"
                                                             value={
-                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                    {detail.paymentMethodSubtitle}
-                                                                </span>
+                                                                <PaymentMethodIndicator
+                                                                    label={detail.paymentMethodSubtitle}
+                                                                    provider={detail.paymentProvider}
+                                                                    simplify
+                                                                />
                                                             }
                                                         />
                                                     )}

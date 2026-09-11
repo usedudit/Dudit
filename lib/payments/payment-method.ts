@@ -1,4 +1,4 @@
-export type CanonicalPaymentType = "pix" | "credit_card" | "debit_card" | "cash" | "other" | "bank_transfer"
+export type CanonicalPaymentType = "pix" | "credit_card" | "debit_card" | "cash" | "other" | "bank_transfer" | "store_credit" | "vale_compra" | "vale-compra"
 
 export function toCanonicalPaymentType(value: string | null | undefined): CanonicalPaymentType {
   const raw = String(value || "").trim().toLowerCase()
@@ -7,6 +7,7 @@ export function toCanonicalPaymentType(value: string | null | undefined): Canoni
   if (["debit_card", "debito", "cartao_debito", "cartão de débito", "cartao de debito", "debit"].includes(raw)) return "debit_card"
   if (["cash", "dinheiro"].includes(raw)) return "cash"
   if (["bank_transfer", "transferencia_bancaria", "transferencia", "ted", "doc", "transferência", "transferência bancária"].includes(raw)) return "bank_transfer"
+  if (["store_credit", "vale_compra", "vale-compra"].includes(raw)) return "store_credit"
   return "other"
 }
 
