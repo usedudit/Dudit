@@ -1028,7 +1028,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     </p>
                                                                                                 )}
 
-                                                                                                <div className="flex items-center justify-between mt-2">
+                                                                                                <div className="flex flex-col items-center gap-2 md:hidden mt-2">
                                                                                                     {isOutOfStock ? (
                                                                                                         <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
                                                                                                             Esgotado
@@ -1089,8 +1089,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         </div>
                                                                                                     )}
 
-{item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                        <div className="mt-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                                                        <div className="mt-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
@@ -1247,8 +1247,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                         </div>
                                                                                                     )}
 
-{item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                        <div className="mt-1 mb-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                    {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
+                                                                                                        <div className="mt-1 mb-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>

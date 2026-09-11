@@ -192,7 +192,7 @@ export default function POSShippingSheet({
                         setOutsideRadiusWarning(
                             quote.outsideRadiusWarning ||
                             (quote.breakdown as any)?.outsideRadiusWarning ||
-                            `Endereço fora do raio máximo de entrega da loja (${quote.distanceKm} km / Máximo: ${quote.maxDeliveryKm} km).`
+                            `Endereço fora do raio de entrega (${quote.distanceKm} km / Máximo: ${quote.maxDeliveryKm} km).`
                         )
                     } else {
                         setOutsideRadiusWarning(null)

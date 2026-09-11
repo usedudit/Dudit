@@ -116,11 +116,11 @@ export function calculateDeliveryFee(input: CalculateDeliveryFeeInput): {
 
   const isOutsideRadius = effectiveMaxKm != null && distanceKm > effectiveMaxKm
   if (isOutsideRadius && !input.allowOutsideRadius) {
-    throw new Error("Endereço fora do raio máximo de entrega do vendedor.")
+    throw new Error("Endereço fora do raio de entrega.")
   }
 
   const outsideRadiusWarning = isOutsideRadius
-    ? `Endereço fora do raio máximo de entrega da loja (${distanceKm} km / Máximo: ${effectiveMaxKm} km).`
+    ? `Endereço fora do raio de entrega (${distanceKm} km / Máximo: ${effectiveMaxKm} km).`
     : undefined
 
   let fee = baseFee

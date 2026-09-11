@@ -870,6 +870,12 @@ export function CheckoutPageClient() {
         !requirements?.hasSubscriptionLines
     )
 
+    const hasUnavailableServices = useMemo(() => {
+        return Object.values(serviceAvailability).some(
+            (s) => s.checked && !s.available
+        )
+    }, [serviceAvailability])
+
     const showTraditionalPaymentOption = !checkoutContext?.deposit.available && (checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
         requirements?.hasPayOnService ||

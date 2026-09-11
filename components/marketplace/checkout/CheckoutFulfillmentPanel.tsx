@@ -272,6 +272,7 @@ export function CheckoutFulfillmentPanel({
               icon={ServiceIcon}
               title="Forma de atendimento"
               description="Defina onde cada serviço será realizado"
+              className="px-4 py-3"
               onClick={openModal}
               showChevron
             />

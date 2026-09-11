@@ -510,7 +510,12 @@ export default function CreateReturnPage({
     const handleImageCropComplete = useCallback(async (croppedImageDataUrl: string) => {
         try {
             const blob = await (await fetch(croppedImageDataUrl)).blob()
-            const extension = blob.type === "image/png" ? "png" : "jpg"
+            const extensionMap: Record<string, string> = {
+                "image/jpeg": "jpg",
+                "image/png": "png",
+                "image/webp": "webp",
+            }
+            const extension = extensionMap[blob.type] || "jpg"
             const file = new File([blob], `evidence-image.${extension}`, { type: blob.type })
             setEvidenceImages((prev) => [...prev, file])
         } catch (err) {

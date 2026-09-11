@@ -8,15 +8,19 @@ import * as Sentry from "@sentry/nextjs"
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com"
 
-// Initialize PostHog once in browser environment (Lean mode: zero autocapture, zero pageview noise)
+// Initialize PostHog once in browser environment (Ultra-Lean mode: zero dead clicks, zero web vitals, zero person properties, zero group identify)
 if (typeof window !== "undefined" && POSTHOG_KEY) {
     if (!posthog.__loaded) {
         posthog.init(POSTHOG_KEY, {
             api_host: POSTHOG_HOST,
-            person_profiles: "identified_only",
+            person_profiles: "never", // Desativa criação/atualização de person profiles e envio de $set
             capture_pageview: false, // Desativado para economizar cota de eventos
             capture_pageleave: false, // Desativado para economizar cota de eventos
             autocapture: false, // Desativado: não grava cliques aleatórios de tela/ERP
+            capture_performance: false, // Desativa $web_vitals e métricas de performance do navegador
+            capture_dead_clicks: false, // Desativa detecção e eventos de $dead_click e $dead_swipe
+            capture_heatmaps: false, // Desativa envio de dados de mapa de calor
+            disable_session_recording: false, // Gravação de replay apenas com mascaramento estrito
             session_recording: {
                 maskAllInputs: true,
                 maskTextSelector: ".ph-no-capture, [data-sensitive='true']",

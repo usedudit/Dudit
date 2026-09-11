@@ -54,35 +54,25 @@ export function trackEvent(
 }
 
 /**
- * Identify an authenticated user
+ * Identify an authenticated user (No-op in Ultra-Lean mode to eliminate person properties / $set events)
  */
-export function identifyUser(userId: string, traits?: Record<string, any>) {
-    if (typeof window === "undefined") return
-    try {
-        posthog.identify(userId, traits)
-    } catch (err) {
-        console.warn("[PostHog] Failed to identify user:", err)
-    }
+export function identifyUser(_userId: string, _traits?: Record<string, any>) {
+    // Intencionalmente no-op: person_profiles='never' configurado no PostHog para economizar cota
 }
 
 /**
  * Reset PostHog user identity on logout
  */
 export function resetUser() {
-    if (typeof window === "undefined") return
-    try {
-        posthog.reset()
-    } catch (err) {
-        console.warn("[PostHog] Failed to reset user:", err)
-    }
+    // Intencionalmente no-op
 }
 
 /**
- * Associate events with a B2B Store / Partner group
+ * Associate events with a B2B Store / Partner group (No-op to eliminate $groupidentify events)
  */
 export function setStoreGroup(
-    storeId: string,
-    properties?: {
+    _storeId: string,
+    _properties?: {
         name?: string
         plan?: string
         mode?: string
@@ -90,12 +80,7 @@ export function setStoreGroup(
         [key: string]: any
     }
 ) {
-    if (typeof window === "undefined") return
-    try {
-        posthog.group("store", storeId, properties)
-    } catch (err) {
-        console.warn("[PostHog] Failed to set store group:", err)
-    }
+    // Intencionalmente no-op: evita eventos de $groupidentify
 }
 
 /**
