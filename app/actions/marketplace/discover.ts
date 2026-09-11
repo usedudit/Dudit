@@ -252,16 +252,10 @@ const getCachedPartnerIdsByTier = (
 ) => unstable_cache(
     async (): Promise<PartnerTiersRaw> => {
         const supabase = getAdminClient()
-        let query = supabase
+        const { data: stores, error } = await supabase
             .from("stores")
-            .select("partner_id, addresses!store_id!inner(city, state)")
+            .select("partner_id, addresses!store_id!left(city, state)")
             .eq("is_active", true)
-
-        if (state && state.trim()) {
-            query = query.ilike("addresses.state", state.trim())
-        }
-
-        const { data: stores, error } = await query
 
         if (error) {
             dError(`[DISCOVER][PARTNER_IDS] Error:`, error, `city=${city} state=${state}`)
@@ -276,12 +270,15 @@ const getCachedPartnerIdsByTier = (
         const allIds = new Set<string>()
         const stateIds = new Set<string>()
         let statePartnerCount = 0
-        const targetState = state.toLowerCase()
+        const isCountryScope = !state || state.trim() === "" || state.trim().toUpperCase() === "BR" || state.trim().toLowerCase() === "brasil"
+        const targetState = !isCountryScope ? state.trim().toLowerCase() : null
 
         for (const s of stores) {
-            allIds.add((s as any).partner_id)
-            const addr = (s as any).addresses?.[0] || (s as any).addresses
-            if (addr?.state?.toLowerCase() === targetState) {
+            if ((s as any).partner_id) {
+                allIds.add((s as any).partner_id)
+            }
+            const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
+            if (targetState && addr?.state?.toLowerCase() === targetState) {
                 stateIds.add((s as any).partner_id)
                 statePartnerCount++
             }
@@ -290,14 +287,16 @@ const getCachedPartnerIdsByTier = (
         let cityIds: Set<string>
         let cityPartnerCount = 0
 
-        if (stateOnly) {
+        if (isCountryScope) {
+            cityIds = new Set()
+        } else if (stateOnly) {
             cityIds = new Set(stateIds)
             cityPartnerCount = statePartnerCount
         } else {
             cityIds = new Set<string>()
             const targetCitySlug = normalizeCitySlug(city)
             for (const s of stores) {
-                const addr = (s as any).addresses?.[0] || (s as any).addresses
+                const addr = Array.isArray((s as any).addresses) ? (s as any).addresses[0] : (s as any).addresses
                 if (addr?.city && normalizeCitySlug(addr.city) === targetCitySlug) {
                     cityIds.add((s as any).partner_id)
                     cityPartnerCount++
@@ -315,8 +314,8 @@ const getCachedPartnerIdsByTier = (
     },
     [`partner-ids-by-tier-${city}-${state}-${stateOnly}`],
     {
-        tags: ["partners", "addresses"],
-        revalidate: 3600 // 1 hour TTL
+        tags: ["partners", "addresses", "stores"],
+        revalidate: 60
     }
 )
 
@@ -379,7 +378,8 @@ const PARTNER_JOIN = `partners!inner(
 stores!left(
     id, short_id, name, slug, description, logo_url, banner_url,
     phone, is_showcase_active,
-    addresses!store_id!left(city, state, neighborhood, latitude, longitude)
+    addresses!store_id!left(city, state, neighborhood, latitude, longitude),
+    delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, delivery_payer)
 )`
 
 function extractFirstVariantFallback(variants: any[] | null | undefined, basePrice?: number) {
@@ -405,6 +405,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     const storeName = rawStore?.name || "Vendedor"
     const storeImage = rawStore?.logo_url
     const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+    const rawDelivery = Array.isArray(rawStore?.delivery_settings) ? rawStore.delivery_settings[0] : rawStore?.delivery_settings
     const storeCity = addr?.city || rawStore?.city || null
     const storeState = addr?.state || rawStore?.state || null
     const storeLat = addr?.latitude ?? null
@@ -413,8 +414,8 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
 
     const partner = rawPartner || rawStore
         ? {
-            id: rawPartner.id,
-            store_id: rawStore?.id || rawPartner.id,
+            id: rawPartner?.id || rawStore?.partner_id,
+            store_id: rawStore?.id || rawPartner?.id,
             short_id: rawStore?.short_id || null,
             slug: rawStore?.slug || null,
             store_name: storeName,
@@ -425,6 +426,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
             city: storeCity,
             state: storeState,
             neighborhood: addr?.neighborhood ?? null,
+            delivery_settings: rawDelivery || null,
         }
         : null
 
@@ -519,7 +521,7 @@ const getSharedHomeServicesPool = cache(async (allIdsKey: string, allIds: string
     const supabase = getAdminClient()
     const { data, error } = await supabase
         .from("services")
-        .select(`id, short_id, name, price, promotional_price, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
+        .select(`id, short_id, name, price, promotional_price, duration_minutes, price_type, billing_unit, show_price_in_store, images, rating, created_at, marketplace_category_id, marketplace_category:marketplace_service_categories!marketplace_category_id(name, parent:marketplace_service_categories!parent_id(name)), ${PARTNER_JOIN}`)
         .in("status", ["ativo", "active"])
         .is("deleted_at", null)
         .eq("show_in_marketplace", true)
@@ -1440,13 +1442,14 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
         const storeName = rawStore?.name || "Vendedor"
         const storeImage = rawStore?.logo_url
         const addr = Array.isArray(rawStore?.addresses) ? rawStore.addresses[0] : rawStore?.addresses
+        const rawDelivery = Array.isArray(rawStore?.delivery_settings) ? rawStore.delivery_settings[0] : rawStore?.delivery_settings
         const storeCity = addr?.city || rawStore?.city || null
         const storeState = addr?.state || rawStore?.state || null
         const storeSlug = rawStore?.slug || null
-        const partner = rawPartner
+        const partner = rawPartner || rawStore
             ? {
-                id: rawPartner.id,
-                store_id: rawStore?.id || rawPartner.id,
+                id: rawPartner?.id || rawStore?.partner_id,
+                store_id: rawStore?.id || rawPartner?.id,
                 short_id: rawStore?.short_id || null,
                 slug: storeSlug,
                 store_name: storeName,
@@ -1457,6 +1460,7 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
                 city: storeCity,
                 state: storeState,
                 neighborhood: addr?.neighborhood ?? null,
+                delivery_settings: rawDelivery || null,
             }
             : null
 
@@ -1483,6 +1487,10 @@ async function fetchServices(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<Hom
             subcategoryName,
             partners: partner,
             itemType: "servico" as const,
+            duration_minutes: item.duration_minutes ?? null,
+            price_type: item.price_type ?? null,
+            billing_unit: item.billing_unit ?? null,
+            delivery_settings: rawDelivery || null,
             created_at: item.created_at,
             show_price_in_store: item.show_price_in_store !== false,
         }

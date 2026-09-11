@@ -58,6 +58,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
         gallery: storeData.gallery || [],
         planSlug: "free",
         isShowcaseActive: storeData.is_showcase_active ?? partner?.is_showcase_active ?? true,
+        delivery_settings: (Array.isArray(storeData.delivery_settings) ? storeData.delivery_settings[0] : storeData.delivery_settings) || null,
     }
 
     const storeStats = {

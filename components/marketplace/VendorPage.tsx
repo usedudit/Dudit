@@ -98,11 +98,13 @@ const normalizeItemForCard = (item: any, partner: any) => {
         images: getProductDisplayImages(item),
         partners: {
             id: partner.id,
+            store_id: partner.id,
             store_name: partner.storeName,
             store_avatar: partner.storeImageUrl,
             city: partner.city,
             state: partner.state,
             distance_km_formatted: partner.distance_km_formatted,
+            delivery_settings: partner.delivery_settings || partner.deliverySettings || null,
         },
     }
 }

@@ -26,6 +26,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                        delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
                         partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
                     `)
                     .eq("slug", slug)
@@ -48,6 +49,7 @@ export async function getStoreBySlug(slug: string) {
         .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                        delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
                         partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
         `)
         .eq("slug", slug)
@@ -69,6 +71,7 @@ export const getCachedStoreById = async (storeId: string) => {
                     .select(`
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                        delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
                         partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                     `)
 
@@ -87,6 +90,7 @@ export const getCachedStoreById = async (storeId: string) => {
                             .select(`
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                                delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
                                 partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                             `)
                             .eq("partner_id", storeId)
@@ -98,6 +102,7 @@ export const getCachedStoreById = async (storeId: string) => {
                             .select(`
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
+                                delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
                                 partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
                             `)
                             .eq("slug", storeId)

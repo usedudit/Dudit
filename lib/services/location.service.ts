@@ -165,15 +165,22 @@ export function formatAverageDeliveryTimeFromRange(timeStr: string | null | unde
 }
 
 /**
- * Formata a duração do serviço (ex: "30 min", "1h", "1h 30m", "2h")
+ * Formata a duração do serviço (ex: "Duração: 30 min", "Duração: 1h", "Duração: 1h 30m", "Duração: 2h")
  */
-export function formatServiceDuration(minutes: number | null | undefined): string | null {
-    if (!minutes || typeof minutes !== "number" || minutes <= 0) return null
-    if (minutes < 60) return `${minutes} min`
-    const hours = Math.floor(minutes / 60)
-    const rem = minutes % 60
-    if (rem === 0) return `${hours}h`
-    return `${hours}h ${rem}m`
+export function formatServiceDuration(minutes: number | string | null | undefined): string | null {
+    if (minutes == null) return null
+    const num = typeof minutes === "number" ? minutes : Number(minutes)
+    if (!isFiniteNumber(num) || num <= 0) return null
+    let timeStr = ""
+    if (num < 60) {
+        timeStr = `${num} min`
+    } else {
+        const hours = Math.floor(num / 60)
+        const rem = num % 60
+        if (rem === 0) timeStr = `${hours}h`
+        else timeStr = `${hours}h ${rem}m`
+    }
+    return `Duração: ${timeStr}`
 }
 
 export interface DeliveryFeeEstimateParams {
@@ -201,11 +208,17 @@ export function estimateDeliveryFeeLabel(params?: DeliveryFeeEstimateParams | nu
         return "Grátis"
     }
 
+    // Se nenhuma configuração de taxa foi fornecida (ex: delivery_settings não carregado/inexistente), não inventar "Grátis"
+    const hasExplicitFeeConfig = params.baseFee != null || params.extraKmPrice != null || params.deliveryPayer != null
+    if (!hasExplicitFeeConfig) {
+        return null
+    }
+
     const baseFee = Number(params.baseFee ?? 0)
     const includedKm = Number(params.includedKm ?? 0)
     const extraKmPrice = Number(params.extraKmPrice ?? 0)
-    const maxDeliveryKm = params.maxDeliveryKm != null ? Number(params.maxDeliveryKm) : null
-    const distanceKm = params.distanceKm != null ? Number(params.distanceKm) : null
+    const maxDeliveryKm = params.maxDeliveryKm != null && !isNaN(Number(params.maxDeliveryKm)) ? Number(params.maxDeliveryKm) : null
+    const distanceKm = params.distanceKm != null && !isNaN(Number(params.distanceKm)) ? Number(params.distanceKm) : null
 
     if (distanceKm != null && maxDeliveryKm != null && maxDeliveryKm > 0 && distanceKm > maxDeliveryKm) {
         return null // Fora do raio de entrega
