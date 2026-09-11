@@ -214,7 +214,7 @@ export async function syncCancelledOrderAppointmentsAndTransactions(
               partnerId: appt.partner_id || orderPartnerId || "",
               oldStatus: appt.status,
               newStatus: "Cancelado",
-              userId: null,
+              userId: (appt as any).user_id || orderPartnerId || "",
               storeId: appt.store_id || null,
               paymentStatus: "unpaid",
               paidAmount: Number(appt.paid_amount || 0),

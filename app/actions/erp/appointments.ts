@@ -675,8 +675,8 @@ export async function createAppointmentsAction(payload: AppointmentInput[]) {
     for (let i = 0; i < createdRows.length; i++) {
       const row = createdRows[i]
       const price = Number(row.price || 0)
-      let linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || payload[i]?.marketplaceOrderId
-      const orderItemId = row.order_item_id || payload[i]?.orderItemId || payload[i]?.order_item_id
+      let linkedOrderId = row.marketplace_order_id || payload[i]?.orderId || (payload[i] as any)?.marketplaceOrderId
+      const orderItemId = row.order_item_id || payload[i]?.orderItemId || (payload[i] as any)?.order_item_id
 
       if (!linkedOrderId && orderItemId) {
         const { data: orderItem } = await supabase
