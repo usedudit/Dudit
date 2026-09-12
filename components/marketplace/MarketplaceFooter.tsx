@@ -75,7 +75,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                             <h4 className="text-sm font-medium text-white mb-6">Suporte</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
-                                <li><Link href="/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
+                                <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
                                 <li><Link href="/institucional/termos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Termos de uso</Link></li>
                                 <li><Link href="/institucional/privacidade" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Política de Privacidade</Link></li>
                             </ul>

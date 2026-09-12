@@ -664,7 +664,7 @@ const Header: React.FC<HeaderProps> = ({
                 <header className="lg:hidden w-full fixed top-0 left-0 right-0 z-50 bg-brand-dark dark:bg-dark-surface border-b border-white/10">
                     <div className="px-4 py-3 flex items-center justify-between min-h-[50px]">
                         <button onClick={handleGoBack} className="shrink-0 text-white p-1 -ml-1">
-                            <ChevronLeftIcon size={20} strokeWidth={2.5} />
+                            <ChevronLeftIcon size={18} strokeWidth={2.5} />
                         </button>
                         <div className="flex-1 text-center min-w-0">
                             <h1 className="text-white font-bold text-[16px] truncate px-4">
@@ -697,7 +697,7 @@ const Header: React.FC<HeaderProps> = ({
                                     }
                                 }}
                             >
-                                <ChevronLeftIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
+                                <ChevronLeftIcon size={18} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} strokeWidth={2.5} />
                             </Button>
                         ) : user ? (
                             <button
@@ -783,7 +783,7 @@ const Header: React.FC<HeaderProps> = ({
                                     }}
                                     className="w-8 h-8 flex items-center justify-center text-white"
                                 >
-                                    {vendorCategorySearchOpen ? <span className="text-[22px] leading-none">×</span> : <SearchIcon size={20} />}
+                                    {vendorCategorySearchOpen ? <span className="text-[22px] leading-none">×</span> : <SearchIcon size={18} />}
                                 </button>
                             ) : isProductDetail && storeSearchPlaceholder ? (
                                 onShare ? (
@@ -792,7 +792,7 @@ const Header: React.FC<HeaderProps> = ({
                                         onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                                         size="icon"
                                     >
-                                        <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
+                                        <ShareIcon size={18} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                     </Button>
                                 ) : <div className="w-1" />
                             ) : isProductDetail ? (
@@ -803,7 +803,7 @@ const Header: React.FC<HeaderProps> = ({
                                             onClick={(e) => { e.stopPropagation(); onShare?.(); }}
                                             size="icon"
                                         >
-                                            <ShareIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
+                                            <ShareIcon size={18} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"}`} />
                                         </Button>
                                     )}
                                     {favoriteButton ? (
@@ -814,14 +814,14 @@ const Header: React.FC<HeaderProps> = ({
                                             onClick={(e) => { e.stopPropagation(); onFavorite?.(); }}
                                             size="icon"
                                         >
-                                            <HeartIcon size={20} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"} ${isFavorite ? "fill-current" : ""}`} />
+                                            <HeartIcon size={18} className={`${isTransparentHeader ? "text-brand-dark dark:text-dark-heading" : "text-white"} ${isFavorite ? "fill-current" : ""}`} />
                                         </Button>
                                     ) : null}
                                 </>
                             ) : (
                                 <>
                                     <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
-                                        <ShoppingBagIcon size={20} strokeWidth={2} />
+                                        <ShoppingBagIcon size={18} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                                 {cartCount}
@@ -1235,13 +1235,13 @@ const Header: React.FC<HeaderProps> = ({
                         {user && <NotificationBell variant="marketplace" />}
 
                         <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
-                            <Package size={20} />
+                            <Package size={18} />
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
                         </Link>
 
                         <Link href="/sacola" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <div className="relative">
-                                <ShoppingBagIcon size={20} />
+                                <ShoppingBagIcon size={18} />
                                 {cartCount > 0 && (
                                     <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                         {cartCount}

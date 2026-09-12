@@ -869,18 +869,18 @@ export function ProductDetailsPageClient({
         const sales = partner.vendas_totais || 0
         const rating = partner.rating || 5.0
         if (sales >= 2000 && rating >= 4.7) {
-            return { name: "Diamante", badge: "<img src='https://img.dudit.com.br/static/selos/Diamante.png' alt='Diamante' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
+            return { name: "Diamante", badge: <img src="https://img.dudit.com.br/static/selos/Diamante.png" alt="Diamante" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
         }
         if (sales >= 500 && rating >= 4.5) {
-            return { name: "Platina", badge: "<img src='https://img.dudit.com.br/static/selos/Platina.png' alt='Platina' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
+            return { name: "Platina", badge: <img src="https://img.dudit.com.br/static/selos/Platina.png" alt="Platina" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
         }
         if (sales >= 100 && rating >= 4.3) {
-            return { name: "Ouro", badge: "<img src='https://img.dudit.com.br/static/selos/Ouro.png' alt='Ouro' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
+            return { name: "Ouro", badge: <img src="https://img.dudit.com.br/static/selos/Ouro.png" alt="Ouro" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
         }
         if (sales >= 20 && rating >= 4.0) {
-            return { name: "Prata", badge: "<img src='https://img.dudit.com.br/static/selos/Prata.png' alt='Prata' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Prata consistente na plataforma.", level: 2 }
+            return { name: "Prata", badge: <img src="https://img.dudit.com.br/static/selos/Prata.png" alt="Prata" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Prata consistente na plataforma.", level: 2 }
         }
-        return { name: "Bronze", badge: "<img src='https://img.dudit.com.br/static/selos/Bronze.png' alt='Bronze' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
+        return { name: "Bronze", badge: <img src="https://img.dudit.com.br/static/selos/Bronze.png" alt="Bronze" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
     }, [partner])
 
     const MAX_STOCK = selectedVariant ? (selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0) : (product.stock_available ?? product.stock_quantity ?? 0)
@@ -1236,7 +1236,7 @@ export function ProductDetailsPageClient({
                 )}
             </div>
 
-            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
+            <h1 className="text-lg md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {product.name}
             </h1>
 
@@ -1684,16 +1684,16 @@ export function ProductDetailsPageClient({
                                                     ) : calculatedAddress ? (
                                                         <div>
                                                             <p className="text-xs text-brand-green font-medium">Para {calculatedAddress}</p>
-                                                             {isEstimate && (
-                                                                 <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                     Valor final a combinar com a loja
-                                                                 </p>
-                                                             )}
+                                                            {isEstimate && (
+                                                                <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                    Valor final a combinar com a loja
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     ) : (
-                                                         <div>
-                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Informe seu CEP para calcular</p>
-                                                         </div>
+                                                        <div>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Informe seu CEP para calcular</p>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="text-right">
@@ -2239,13 +2239,12 @@ export function ProductDetailsPageClient({
                     cartCount={cartCount}
                     productName={product.name}
                     onShare={() => setShowShareModal(true)}
-                    favoriteButton={
-                        <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(product.id, "produto") }}
-                            className="flex items-center justify-center w-8 h-8 transition-all duration-200 cursor-pointer select-none"
-                            title={isFav(product.id, "produto") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                            <HeartIcon size={20} className={isFav(product.id, "produto") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                        </button>
-                    }
+                    onFavorite={async () => {
+                        if (isProductOwner) return;
+                        if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname));
+                        await toggleFav(product.id, "produto");
+                    }}
+                    isFavorite={isFav(product.id, "produto")}
                 />
             )}
             <motion.div
@@ -2491,8 +2490,7 @@ export function ProductDetailsPageClient({
                             <div className="lg:hidden mb-6">{BuyPanel}</div>
 
                             {/* Description */}
-                            <div className="mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
+                            <FormSection title="Descrição">
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
                                     {product.description ? (
                                         <div
@@ -2500,7 +2498,7 @@ export function ProductDetailsPageClient({
                                             dangerouslySetInnerHTML={{ __html: sanitizeRichText(product.description) }}
                                         />
                                     ) : (
-                                        <p className="text-sm md:text-[0.9375rem] text-gray-600 dark:text-dark-body leading-relaxed">Sem descrição.</p>
+                                        <p className="text-sm md:text-[0.9375rem] text-brand-inactive-text dark:text-dark-body leading-relaxed">Sem descrição.</p>
                                     )}
                                     {!isDescriptionExpanded && product.description?.length > 200 && (
                                         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-gray-900 dark:to-transparent" />
@@ -2513,7 +2511,7 @@ export function ProductDetailsPageClient({
                                         <ChevronDownIcon size={16} className={`transition-transform ${isDescriptionExpanded ? "rotate-180" : ""}`} />
                                     </button>
                                 )}
-                            </div>
+                            </FormSection>
 
                             {/* Detalhes do Produto - Estilo OLX com ListItem sem bordas */}
                             {(() => {
@@ -2641,9 +2639,10 @@ export function ProductDetailsPageClient({
                             )}
 
                             {/* Reviews */}
-                            <div ref={reviewsRef} className="border-t border-brand-border pt-2">
-                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 mt-8">Avaliações do produto</h3>
-                                <ReviewsSection reviews={reviews} />
+                            <div ref={reviewsRef}>
+                                <FormSection title="Avaliações do produto" hasSeparator>
+                                    <ReviewsSection reviews={reviews} />
+                                </FormSection>
                             </div>
                         </div>
 

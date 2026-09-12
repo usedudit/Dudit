@@ -448,10 +448,15 @@ export function ExplorarPageClient({
 
         const pathCity = slug[0] || null
         const urlCity = pathCity || searchParams.get("cidade")
+        const isLoggedIn = Boolean(userProfile)
 
         if (urlCity) {
-            document.cookie = `dudit_city=${urlCity}; path=/; max-age=${60 * 60 * 24 * 30}`
-            localStorage.setItem("dudit_city", urlCity)
+            // Logged-in users: persist the URL city to cookie/localStorage
+            // Logged-out users: only use the URL city for this session (don't persist)
+            if (isLoggedIn) {
+                document.cookie = `dudit_city=${urlCity}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem("dudit_city", urlCity)
+            }
             return
         }
 
@@ -469,21 +474,11 @@ export function ExplorarPageClient({
             return
         }
 
-        // 2. Fall back to cookie/localStorage ONLY for logged-out visitors
-        if (!userProfile) {
-            let savedCity = localStorage.getItem("dudit_city")
-            if (!savedCity) {
-                const match = document.cookie.match(/(?:^|; )dudit_city=([^;]*)/)
-                if (match) savedCity = match[1]
-            }
-            if (savedCity) {
-                document.cookie = `dudit_city=${savedCity}; path=/; max-age=${60 * 60 * 24 * 30}`
-                localStorage.setItem("dudit_city", savedCity)
-            }
-        }
+        // 2. Fall back to cookie/localStorage for logged-out visitors (read-only, don't overwrite)
+        // No action needed here - the cookie/localStorage already has the value from the server
 
         // 3. For logged-out users without a saved location, auto-locate ONLY if permission is already granted
-        if (!userProfile && typeof window !== "undefined" && navigator?.permissions) {
+        if (!isLoggedIn && typeof window !== "undefined" && navigator?.permissions) {
             navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
                 if (result.state === "granted") {
                     requestLocation()
@@ -932,12 +927,19 @@ export function ExplorarPageClient({
 
     const handleSelectCity = (citySlug: string | null) => {
         triggerFilterLoading()
+        const isLoggedIn = Boolean(userProfile)
         if (citySlug) {
-            document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-            localStorage.setItem("dudit_city", citySlug)
+            // Only persist to cookie/localStorage for logged-in users
+            // Logged-out users: just update local state + URL
+            if (isLoggedIn) {
+                document.cookie = `dudit_city=${citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
+                localStorage.setItem("dudit_city", citySlug)
+            }
         } else {
-            document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
-            localStorage.removeItem("dudit_city")
+            if (isLoggedIn) {
+                document.cookie = "dudit_city=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"
+                localStorage.removeItem("dudit_city")
+            }
         }
         setSelectedCitySlug(citySlug)
         setCitySearchText("")
@@ -1784,6 +1786,8 @@ export function ExplorarPageClient({
                                         router.back()
                                     }
                                 }}
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
                             />
                         )}
 

@@ -7,6 +7,9 @@ import { Input } from "@/components/reusable/Input"
 import {
     MapPinIcon,
     ChevronRightIcon,
+    SearchIcon,
+    ShoppingBagIcon,
+    WhatsappIcon,
 } from "@/lib/icons"
 import { COMMON_CITY_ACCENTS } from "@/components/marketplace/explorar-constants"
 
@@ -126,208 +129,266 @@ export function MarketplaceLandingView({
     const effectiveCityName = selectedCityName && selectedCityName !== "Brasil" ? selectedCityName : null
 
     return (
-        <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] my-8 flex flex-col gap-10 font-sans">
-            {/* 1. HERO COM LOCALIZAÇÃO E O DINO "ONDE VOCÊ ESTÁ" OU BLOCO DE AÇÃO DA CIDADE */}
-            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className={`flex-grow text-center md:text-left ${isCityEmpty ? "md:max-w-[58%]" : "md:max-w-[65%]"}`}>
-                    <h2 className="text-3xl font-black text-brand-dark mb-4 leading-tight dark:text-dark-heading">
+        <div className="w-full flex flex-col font-sans">
+
+            {/* ═══════════════════════════════════════════════════════════
+                HERO 1 — LOCALIZAÇÃO / CIDADE VAZIA
+            ═══════════════════════════════════════════════════════════ */}
+            <section className="w-full bg-gradient-to-b from-brand-dark to-[#0a4a3a] text-white">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-12 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+
+                    {/* Texto + Busca */}
+                    <div className="flex-grow text-center md:text-left max-w-[640px]">
                         {isCityEmpty && effectiveCityName ? (
                             <>
-                                Estamos chegando em{" "}
-                                <span className="text-brand-green">{effectiveCityName}!</span>
+                                <h1 className="text-3xl md:text-[42px] font-black mb-4 leading-tight">
+                                    Estamos chegando em{" "}
+                                    <span className="text-brand-green">{effectiveCityName}</span>!
+                                </h1>
+                                <p className="text-white/70 text-base md:text-lg mb-8 leading-relaxed max-w-lg mx-auto md:mx-0">
+                                    Ainda não temos lojas ou serviços cadastrados aqui.
+                                    Você pode escolher outra cidade ou cadastrar seu negócio de graça.
+                                </p>
                             </>
                         ) : (
-                            "Onde você está?"
+                            <>
+                                <h1 className="text-3xl md:text-[42px] font-black mb-4 leading-tight">
+                                    Onde você está?
+                                </h1>
+                                <p className="text-white/70 text-base md:text-lg mb-8 leading-relaxed max-w-lg mx-auto md:mx-0">
+                                    Para encontrar produtos, serviços e negócios locais pertinho de você,
+                                    precisamos saber a sua cidade.
+                                </p>
+                            </>
                         )}
-                    </h2>
 
-                    <p className="text-gray-600 text-base md:text-lg mb-6 leading-relaxed dark:text-dark-body">
-                        {isCityEmpty && effectiveCityName
-                            ? `Ainda não temos lojas ou produtos cadastrados em ${effectiveCityName}. Você pode escolher outra cidade abaixo ou cadastrar seu negócio de graça!`
-                            : "Para encontrar os melhores produtos, serviços e negócios locais pertinho de você, precisamos saber a sua localização."}
-                    </p>
+                        {/* Campo de Busca de Cidade */}
+                        <div className="max-w-md mx-auto md:mx-0 relative mb-6">
+                            <Input
+                                ref={searchInputRef}
+                                id="landingCitySearchInput"
+                                name="landingCitySearchInput"
+                                placeholder="Digite sua cidade (ex: Londrina, Curitiba...)"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => setIsInputFocused(true)}
+                                onBlur={() => setTimeout(() => setIsInputFocused(false), 250)}
+                                prefix={<MapPinIcon size={18} className="text-brand-green" />}
+                            />
 
-                    {/* Campo de Busca de Cidade */}
-                    <div className="max-w-md mx-auto md:mx-0 relative mb-4">
-                        <Input
-                            ref={searchInputRef}
-                            id="landingCitySearchInput"
-                            name="landingCitySearchInput"
-                            placeholder="Digite sua cidade (ex: Londrina, Curitiba...)"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onFocus={() => setIsInputFocused(true)}
-                            onBlur={() => setTimeout(() => setIsInputFocused(false), 250)}
-                            prefix={<MapPinIcon size={18} className="text-brand-green" />}
-                        />
+                            {isInputFocused && filteredCities.length > 0 && (
+                                <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border shadow-lg">
+                                    {filteredCities.map((slug) => (
+                                        <button
+                                            key={slug}
+                                            type="button"
+                                            onMouseDown={() => onSelectCitySlug(slug)}
+                                            className="w-full text-left px-4 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/40 text-brand-dark dark:text-dark-heading text-sm font-medium flex items-center justify-between"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <MapPinIcon size={16} className="text-brand-green shrink-0" />
+                                                <span>{formatCitySlug(slug)}</span>
+                                            </div>
+                                            <ChevronRightIcon size={16} className="text-brand-inactive-text" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
-                        {isInputFocused && filteredCities.length > 0 && (
-                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-dark-border">
-                                {filteredCities.map((slug) => (
-                                    <button
-                                        key={slug}
-                                        type="button"
-                                        onMouseDown={() => onSelectCitySlug(slug)}
-                                        className="w-full text-left px-4 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/40 text-brand-dark dark:text-dark-heading text-sm font-medium flex items-center justify-between"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <MapPinIcon size={16} className="text-brand-green shrink-0" />
-                                            <span>{formatCitySlug(slug)}</span>
-                                        </div>
-                                        <ChevronRightIcon size={16} className="text-brand-inactive-text" />
-                                    </button>
-                                ))}
-                            </div>
+                        <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                            <Button
+                                onClick={onRequestLocation}
+                                disabled={isLocationLoading}
+                            >
+                                {isLocationLoading ? "Localizando..." : "Usar localização atual"}
+                            </Button>
+
+                            {user ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={onOpenAddressModal}
+                                    className="border-white/20 text-white hover:bg-white/10"
+                                >
+                                    Adicionar Endereço
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={onOpenVisitorModal}
+                                    className="border-white/20 text-white hover:bg-white/10"
+                                >
+                                    Escolher Cidade
+                                </Button>
+                            )}
+                        </div>
+
+                        {locationError && (
+                            <p className="text-red-300 text-sm mt-3 font-semibold">{locationError}</p>
                         )}
                     </div>
 
-                    <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                        <Button
-                            onClick={onRequestLocation}
-                            disabled={isLocationLoading}
-                        >
-                            {isLocationLoading ? "Localizando..." : "Usar localização atual"}
-                        </Button>
-
-                        {user ? (
-                            <Button
-                                variant="outline"
-                                onClick={onOpenAddressModal}
-                            >
-                                Adicionar Endereço
-                            </Button>
-                        ) : (
-                            <Button
-                                variant="outline"
-                                onClick={onOpenVisitorModal}
-                            >
-                                Escolher Cidade
-                            </Button>
-                        )}
-                    </div>
-
-                    {locationError && (
-                        <p className="text-brand-red text-sm mt-3 font-semibold">{locationError}</p>
+                    {/* Mascote lateral */}
+                    {isCityEmpty ? (
+                        <div className="w-[200px] md:w-[280px] shrink-0 flex items-center justify-center">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/EstamosChegando.png"
+                                alt="Estamos chegando!"
+                                className="w-full h-auto object-contain select-none drop-shadow-2xl"
+                            />
+                        </div>
+                    ) : (
+                        <div className="w-[180px] md:w-[260px] shrink-0 flex items-center justify-center">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                                alt="Onde você está?"
+                                className="w-full h-auto object-contain select-none drop-shadow-2xl"
+                            />
+                        </div>
                     )}
                 </div>
+            </section>
 
-                {/* LADO DIREITO: Se a cidade estiver vazia, exibe o card de ação amigável (Eu vendo algo / Conheço quem vende). Se não, mostra o dino Onde Você Está */}
-                {isCityEmpty ? (
-                    <div className="w-full md:w-[320px] lg:w-[350px] shrink-0 bg-white dark:bg-dark-surface border border-[#f5e9d9] dark:border-[#3a3120] rounded-[20px] p-6 flex flex-col items-center text-center">
-                        <img
-                            src="https://img.dudit.com.br/static/mascots/NaoEncontrado.png"
-                            alt="Não temos nada por aqui ainda!"
-                            className="w-28 h-28 md:w-32 md:h-32 object-contain mb-3 select-none"
-                        />
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1.5">
-                            Não temos nada por aqui ainda!
-                        </h3>
-                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-5 leading-relaxed">
-                            {effectiveCityName
-                                ? `Que tal ser pioneiro em ${effectiveCityName} ou convidar lojas e profissionais que você conhece?`
-                                : "Que tal ser pioneiro na sua cidade ou convidar lojas e profissionais que você conhece?"}
-                        </p>
-                        <div className="flex flex-col gap-2.5 w-full">
-                            <Button
-                                variant="default"
-                                onClick={handleSellerClick}
-                                className="w-full justify-center text-sm font-semibold py-2.5"
-                            >
-                                Eu vendo algo
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={handleInvite}
-                                className="w-full justify-center text-sm font-semibold py-2.5"
-                            >
-                                Conheço quem vende
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="w-[180px] md:w-[240px] shrink-0">
-                        <img
-                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
-                            alt="Onde você está?"
-                            className="w-full h-auto object-contain select-none"
-                        />
-                    </div>
-                )}
-            </div>
+            {/* ═══════════════════════════════════════════════════════════
+                HERO 2 — VOCÊ VENDE? (Situação: "Quero ser encontrado")
+            ═══════════════════════════════════════════════════════════ */}
+            <section className="w-full bg-white dark:bg-dark-background">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
 
-            {/* 2. CARDS ESTILO IFOOD COM OS DINOS DA DUDIT */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Card 1: Vendedores / Lojistas */}
-                <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6">
-                    <div className="w-28 h-28 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center">
+                    {/* Imagem */}
+                    <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center order-2 md:order-1">
                         <img
                             src="https://img.dudit.com.br/static/mascots/PlanoVender.png"
                             alt="Venda na Dudit"
-                            className="w-full h-full object-contain select-none"
+                            className="w-full h-auto object-contain select-none"
                         />
                     </div>
-                    <div className="flex-1 text-center sm:text-left">
-                        <h3 className="text-xl sm:text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                            A sua loja pode crescer na Dudit
-                        </h3>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm leading-relaxed mb-5">
-                            Cadastre seus produtos ou serviços e alcance clientes da sua cidade com 0% de comissão e contato direto no WhatsApp.
+
+                    {/* Texto */}
+                    <div className="flex-1 text-center md:text-left order-1 md:order-2 max-w-[580px]">
+                        <h2 className="text-2xl md:text-[32px] font-black text-brand-dark dark:text-dark-heading mb-3 leading-tight">
+                            Tá perdendo pedido no WhatsApp?
+                        </h2>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-base md:text-lg leading-relaxed mb-6">
+                            Organize seus pedidos, clientes e produtos em um só lugar.
+                            Sua vitrine fica aberta o dia todo, sem precisar responder cada mensagem manualmente.
                         </p>
                         <Button
                             variant="default"
                             onClick={handleSellerClick}
-                            className="py-2.5 px-6 text-sm"
+                            className="py-3 px-8 text-sm"
                         >
                             Começar a vender
                         </Button>
                     </div>
                 </div>
+            </section>
 
-                {/* Card 2: Consumidores / Compradores */}
-                <div className="p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6">
-                    <div className="w-28 h-28 sm:w-36 sm:h-36 shrink-0 flex items-center justify-center">
-                        <img
-                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
-                            alt="Compre local"
-                            className="w-full h-full object-contain select-none"
-                        />
-                    </div>
-                    <div className="flex-1 text-center sm:text-left">
-                        <h3 className="text-xl sm:text-2xl font-bold text-brand-dark dark:text-dark-heading mb-2">
-                            Tudo o que você precisa perto de você
-                        </h3>
-                        <p className="text-brand-inactive-text dark:text-dark-body text-sm leading-relaxed mb-5">
-                            Encontre lojas locais, produtos novos, desapegos e contrate serviços com rapidez, sem taxas e direto com o vendedor.
+            {/* ═══════════════════════════════════════════════════════════
+                HERO 3 — VOCÊ COMPRA? (Situação: "Preciso de algo")
+            ═══════════════════════════════════════════════════════════ */}
+            <section className="w-full bg-brand-gray/40 dark:bg-dark-surface/50">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+
+                    {/* Texto */}
+                    <div className="flex-1 text-center md:text-left max-w-[580px]">
+                        <h2 className="text-2xl md:text-[32px] font-black text-brand-dark dark:text-dark-heading mb-3 leading-tight">
+                            Tem coisa parada em casa?
+                        </h2>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-base md:text-lg leading-relaxed mb-6">
+                            Encontre compradores perto de você. Anuncie seus desapegos em minutos,
+                            sem taxas e com contato direto no WhatsApp.
                         </p>
                         <Button
                             variant="outline"
                             onClick={handleBuyerFocus}
-                            className="py-2.5 px-6 text-sm"
+                            className="py-3 px-8 text-sm"
                         >
                             Informar minha cidade
                         </Button>
                     </div>
-                </div>
-            </div>
 
-            {/* 3. BANNER: PRONTO PARA VENDER NA SUA CIDADE? */}
-            <div className="bg-brand-dark rounded-[24px] p-8 sm:p-12 text-center text-white">
-                <h3 className="text-2xl sm:text-3xl font-bold mb-3">
-                    Pronto para vender na sua cidade?
-                </h3>
-                <p className="text-gray-300 text-sm sm:text-base max-w-xl mx-auto mb-6 leading-relaxed">
-                    Crie sua vitrine em minutos, receba pedidos direto no WhatsApp e mantenha 100% do seu lucro sem pagar comissão.
-                </p>
-                <div className="flex justify-center">
-                    <Button
-                        variant="default"
-                        onClick={handleSellerClick}
-                        className="bg-brand-green text-white hover:bg-brand-green font-bold py-3 px-8 text-sm"
-                    >
-                        Começar grátis
-                    </Button>
+                    {/* Imagem */}
+                    <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            alt="Encontre perto de você"
+                            className="w-full h-auto object-contain select-none"
+                        />
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            {/* ═══════════════════════════════════════════════════════════
+                HERO 4 — PRECISA DE ALGO? (Situação: consumidor)
+            ═══════════════════════════════════════════════════════════ */}
+            <section className="w-full bg-white dark:bg-dark-background">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+
+                    {/* Imagem */}
+                    <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center order-2 md:order-1">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
+                            alt="Encontre perto de você"
+                            className="w-full h-auto object-contain select-none"
+                        />
+                    </div>
+
+                    {/* Texto */}
+                    <div className="flex-1 text-center md:text-left order-1 md:order-2 max-w-[580px]">
+                        <h2 className="text-2xl md:text-[32px] font-black text-brand-dark dark:text-dark-heading mb-3 leading-tight">
+                            Precisa de algo? Procura na Dudit.
+                        </h2>
+                        <p className="text-brand-inactive-text dark:text-dark-body text-base md:text-lg leading-relaxed mb-6">
+                            De eletrônicos a roupas, de marmitas a encanadores.
+                            Tudo organizado para você encontrar rápido o que precisa, perto de você.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={handleBuyerFocus}
+                            className="py-3 px-8 text-sm"
+                        >
+                            Ver ofertas na minha cidade
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+            {/* ═══════════════════════════════════════════════════════════
+                HERO 5 — CONVIDE QUEM VENDE
+            ═══════════════════════════════════════════════════════════ */}
+            <section className="w-full bg-brand-dark dark:bg-[#0a2e24]">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+
+                    {/* Texto */}
+                    <div className="flex-1 text-center md:text-left max-w-[580px]">
+                        <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">
+                            Conhece quem vende?
+                        </h2>
+                        <p className="text-white/70 text-base md:text-lg leading-relaxed mb-6">
+                            Convide lojas e profissionais da sua cidade para a Dudit.
+                            Quanto mais vendedores, mais opções pra todo mundo.
+                        </p>
+                        <Button
+                            variant="default"
+                            onClick={handleInvite}
+                            className="py-3 px-8 text-sm"
+                        >
+                            <WhatsappIcon className="w-4 h-4 mr-2" />
+                            Convidar pelo WhatsApp
+                        </Button>
+                    </div>
+
+                    {/* Imagem */}
+                    <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center">
+                        <img
+                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            alt="Convide quem vende"
+                            className="w-full h-auto object-contain select-none"
+                        />
+                    </div>
+                </div>
+            </section>
         </div>
     )
 }

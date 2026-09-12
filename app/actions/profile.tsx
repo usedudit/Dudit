@@ -73,7 +73,7 @@ export async function updateProfileAction(data: {
 
 
   const sanitizedData = {
-    fullName: data.fullName ? sanitizeInput(data.fullName, 100) : undefined,
+    fullName: data.fullName ? sanitizeInput(data.fullName, 40) : undefined,
     phone: data.phone !== undefined ? (data.phone ? sanitizeInput(data.phone, 20) : "") : undefined,
     cpf: data.cpf !== undefined ? (data.cpf ? sanitizeInput(data.cpf, 20) : "") : undefined,
     zipCode: data.zipCode ? sanitizeInput(data.zipCode, 20) : undefined,

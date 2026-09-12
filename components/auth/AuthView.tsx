@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -9,6 +9,7 @@ import { MarketplaceFooter } from "../marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { generateNameFromEmail, getEmailProvider } from "@/lib/utils"
 import { Button, EmailInput, PasswordInput, PasswordStrengthMeter, Checkbox, InfoCard, Spinner, Turnstile, type TurnstileRef } from "@/components/reusable"
+import { SupportModal } from "@/components/support/SupportModal"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 import { preCheckLogin, handleLoginResult } from "@/app/actions/auth/lockout"
@@ -68,6 +69,14 @@ export default function AuthView({
     const [retryCount, setRetryCount] = useState(0)
     const [verifyContext, setVerifyContext] = useState<"signup" | "recovery">("signup")
     const isSubmittingRef = useRef(false)
+    const [isSupportOpen, setIsSupportOpen] = useState(false)
+
+    const changeMode = (newMode: AuthMode) => {
+        setMode(newMode)
+        const params = new URLSearchParams(window.location.search)
+        params.set("mode", newMode)
+        router.replace(`/auth/login?${params.toString()}`)
+    }
 
     // Limpar token e resetar Turnstile ao mudar de modo
     useEffect(() => {
@@ -195,7 +204,7 @@ export default function AuthView({
                 }
 
                 setVerifyContext("signup")
-                setMode("verify-email")
+                changeMode("verify-email")
 
             } else {
                 try {
@@ -306,7 +315,7 @@ export default function AuthView({
                 throw error
             }
             setVerifyContext("recovery")
-            setMode("verify-email")
+            changeMode("verify-email")
         } catch (e: any) {
             console.error("[AUTH RESET PASSWORD EXCEPTION]", e)
             setError(getErrorMessage(e))
@@ -419,7 +428,7 @@ export default function AuthView({
                                     </div>
                                 )}
 
-                                <button onClick={() => setMode("login")} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">← Voltar para Login</button>
+                                <button onClick={() => changeMode("login")} className="text-sm text-brand-inactive-text dark:text-dark-body hover:text-brand-green mt-4 font-medium">← Voltar para Login</button>
                             </motion.div>
                         )}
 
@@ -463,7 +472,7 @@ export default function AuthView({
                                         <Button
                                             variant="outlinered"
                                             className="w-full sm:w-full h-[42px]"
-                                            onClick={() => { setError(null); setMode("login") }}
+                                            onClick={() => { setError(null); changeMode("login") }}
                                         >
                                             Cancelar
                                         </Button>
@@ -476,7 +485,7 @@ export default function AuthView({
 
                                 <div className="mt-8 pt-6 border-t border-brand-border text-center">
                                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                        Precisa de ajuda? <a href="mailto:contato@dudit.com.br" className="text-brand-green font-bold hover:underline">Fale com a gente</a>
+                                        Precisa de ajuda? <button type="button" onClick={() => setIsSupportOpen(true)} className="text-brand-green font-bold hover:underline">Fale com a gente</button>
                                     </p>
                                 </div>
                             </motion.div>
@@ -536,7 +545,7 @@ export default function AuthView({
 
                                         {mode === "login" && (
                                             <div className="mt-2 text-right">
-                                                <button type="button" onClick={() => setMode("forgot-password")} className="text-brand-green text-[13px] font-bold hover:underline">
+                                                <button type="button" onClick={() => changeMode("forgot-password")} className="text-brand-green text-[13px] font-bold hover:underline">
                                                     Esqueci minha senha
                                                 </button>
                                             </div>
@@ -589,7 +598,7 @@ export default function AuthView({
                         <div className="mt-8 text-center space-y-4">
                             <p className="text-gray-500 dark:text-dark-body text-[14px]">
                                 {mode === "login" ? "Não tem uma conta?" : "Já tem uma conta?"}{" "}
-                                <button onClick={() => { setError(null); setMode(mode === "login" ? "signup" : "login") }} className="text-brand-green font-bold hover:underline">
+                                <button onClick={() => { setError(null); changeMode(mode === "login" ? "signup" : "login") }} className="text-brand-green font-bold hover:underline">
                                     {mode === "login" ? "Crie a sua" : "Entrar"}
                                 </button>
                             </p>
@@ -599,6 +608,12 @@ export default function AuthView({
             </main>
 
             <MarketplaceFooter />
+
+            <SupportModal
+                isOpen={isSupportOpen}
+                onClose={() => setIsSupportOpen(false)}
+                userEmail={email}
+            />
         </div>
     )
 }

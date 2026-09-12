@@ -400,6 +400,7 @@ export function UserProfilePage({
 
     const handleSaveName = () => {
         if (!accountData.fullName.trim()) { setError("O nome completo é obrigatório"); return }
+        if (accountData.fullName.trim().length > 40) { setError("O nome completo deve ter no máximo 40 caracteres"); return }
         saveField((token) => updateProfileAction({ fullName: accountData.fullName, csrf_token: token }), "Nome atualizado!", () => setEdit("name", false))
     }
 

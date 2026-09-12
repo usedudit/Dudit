@@ -121,6 +121,7 @@ export const AccountView = ({
                 id="fullName"
                 name="fullName"
                 value={accountData.fullName}
+                maxLength={40}
                 onChange={e => setAccountData((d: any) => ({ ...d, fullName: e.target.value }))}
               />
               <Feedback error={error} success={success} />

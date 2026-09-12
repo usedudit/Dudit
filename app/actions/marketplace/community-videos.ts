@@ -11,6 +11,7 @@ import { moderateProductContent } from "@/lib/moderation/product-moderation"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getR2PublicUrl } from "@/lib/r2/r2-server-config"
+import { resolveCityAndStateFromSlug } from "./products"
 
 type ActionResult<T = void> = { success: true; data?: T } | { success: false; error: string }
 
@@ -35,12 +36,47 @@ export interface CommunityVideoItem {
   partner?: { name: string; store_name: string; store_image_url: string | null }
 }
 
-export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
+export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
   items: CommunityVideoItem[]
   nextCursor: string | null
   hasMore: boolean
 }> {
   const supabase = await getSupabaseServerClient()
+  const admin = getAdminClient()
+
+  // If a city slug is provided, find partner_ids for stores in that city first
+  let cityPartnerIds: string[] | undefined
+  if (citySlug && citySlug !== "brasil" && !citySlug.startsWith("estado-")) {
+    const resolved = await resolveCityAndStateFromSlug(citySlug)
+    if (resolved) {
+      const { data: cityStores } = await admin
+        .from("stores")
+        .select("partner_id, addresses!store_id!inner(city, state)")
+        .eq("is_active", true)
+        .eq("addresses.city", resolved.city)
+        .eq("addresses.state", resolved.state)
+
+      const ids = (cityStores || []).map((s: any) => s.partner_id).filter(Boolean)
+      // If no stores found in this city, return empty immediately
+      if (ids.length === 0) {
+        return { items: [], nextCursor: null, hasMore: false }
+      }
+      cityPartnerIds = ids
+    }
+  } else if (citySlug && citySlug.startsWith("estado-")) {
+    const uf = citySlug.replace("estado-", "").toUpperCase()
+    const { data: stateStores } = await admin
+      .from("stores")
+      .select("partner_id, addresses!store_id!inner(state)")
+      .eq("is_active", true)
+      .eq("addresses.state", uf)
+
+    const ids = (stateStores || []).map((s: any) => s.partner_id).filter(Boolean)
+    if (ids.length === 0) {
+      return { items: [], nextCursor: null, hasMore: false }
+    }
+    cityPartnerIds = ids
+  }
 
   let query = supabase
     .from("community_videos")
@@ -48,6 +84,11 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
     .eq("moderation_status", "approved")
     .order("published_at", { ascending: false })
     .limit(limit + 1)
+
+  // Filter by city partners if available
+  if (cityPartnerIds && cityPartnerIds.length > 0) {
+    query = query.in("partner_id", cityPartnerIds)
+  }
 
   if (cursor) {
     query = query.lt("published_at", cursor)
@@ -62,27 +103,47 @@ export async function getCommunityVideos(cursor?: string, limit = 20): Promise<{
   if (items.length > 0) {
     const partnerIds = [...new Set(items.map((i) => i.partner_id).filter(Boolean))]
     const storeIds = [...new Set(items.map((i) => i.store_id).filter(Boolean))]
+
     if (partnerIds.length > 0 || storeIds.length > 0) {
-      let storeQuery = supabase
+      let storeQuery = admin
         .from("stores")
         .select("id, name, logo_url, partner_id")
         .eq("is_active", true)
 
+      // Build filter conditions separately for each ID type
+      const conditions: string[] = []
       if (storeIds.length > 0) {
-        storeQuery = storeQuery.or(`id.in.(${storeIds.join(",")}),partner_id.in.(${partnerIds.join(",")})`)
-      } else {
-        storeQuery = storeQuery.in("partner_id", partnerIds)
+        conditions.push(`id.in.(${storeIds.join(",")})`)
+      }
+      if (partnerIds.length > 0) {
+        conditions.push(`partner_id.in.(${partnerIds.join(",")})`)
       }
 
-      const { data: stores } = await storeQuery
+      if (conditions.length === 1) {
+        // Single condition - use eq/in directly
+        if (storeIds.length > 0 && partnerIds.length === 0) {
+          storeQuery = storeQuery.in("id", storeIds)
+        } else if (partnerIds.length > 0 && storeIds.length === 0) {
+          storeQuery = storeQuery.in("partner_id", partnerIds)
+        }
+      } else if (conditions.length > 1) {
+        // Multiple conditions - use or
+        storeQuery = storeQuery.or(conditions.join(","))
+      }
+
+      const { data: stores, error: storeError } = await storeQuery
+
+      if (storeError) {
+        console.error("[getCommunityVideos] Store query error:", storeError)
+      }
 
       type StoreRow = { id: string; name: string | null; logo_url: string | null; partner_id: string }
       const storeByPartnerMap = new Map<string, StoreRow>()
       const storeByIdMap = new Map<string, StoreRow>()
 
       for (const s of (stores || [])) {
-        if (s.id) storeByIdMap.set(s.id, s)
-        if (s.partner_id && !storeByPartnerMap.has(s.partner_id)) storeByPartnerMap.set(s.partner_id, s)
+        if (s.id) storeByIdMap.set(s.id, s as StoreRow)
+        if (s.partner_id && !storeByPartnerMap.has(s.partner_id)) storeByPartnerMap.set(s.partner_id, s as StoreRow)
       }
 
       for (const item of items) {

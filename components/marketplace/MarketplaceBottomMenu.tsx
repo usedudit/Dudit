@@ -135,12 +135,16 @@ export function MarketplaceBottomMenu() {
 
         if (stored) {
             setCitySlug(stored)
-            try {
-                localStorage.setItem("dudit_city", stored)
-                document.cookie = `dudit_city=${stored}; path=/; max-age=${60 * 60 * 24 * 30}`
-            } catch {}
+            // Only persist to cookie/localStorage for logged-in users
+            // Logged-out users: just use the city for the current session
+            if (user) {
+                try {
+                    localStorage.setItem("dudit_city", stored)
+                    document.cookie = `dudit_city=${stored}; path=/; max-age=${60 * 60 * 24 * 30}`
+                } catch {}
+            }
         }
-    }, [pathname, profile])
+    }, [pathname, profile, user])
 
     // Do not show on ERP, admin, auth, checkout, quote or print screens
     const isExcluded =

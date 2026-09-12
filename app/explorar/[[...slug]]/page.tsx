@@ -618,7 +618,7 @@ export default async function ExplorarPage({
     const [exploreAds, searchAds, communityVideosData] = await Promise.all([
         getSponsoredAdsForSlot("explore", adLocation),
         query ? getSponsoredAdsForSlot("search", adLocation) : Promise.resolve([] as SponsoredAd[]),
-        getCommunityVideos(),
+        getCommunityVideos(searchSlug || undefined),
     ])
 
     // BreadcrumbList Schema

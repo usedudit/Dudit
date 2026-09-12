@@ -36,36 +36,34 @@ const BlobGreenLight = ({ className }: { className?: string }) => (
 
 const slides = [
   {
-    title: "Chega de bagunça nas vendas",
-    subtitle: "Organize pedidos, clientes e produtos em um só lugar.",
-    image: "/images/dino-gerente.png", // Dino com Crachá
+    title: "Tá perdendo pedido no WhatsApp?",
+    subtitle: "Organize seus pedidos sem bagunça. Tudo num só lugar.",
+    image: "/images/dino-gerente.png",
   },
   {
-    title: "Simples de usar, de verdade",
-    subtitle: "Funciona junto com seu WhatsApp. Sem complicação.",
-    image: "/images/dino-sucesso.png", // Dino com Joinha
+    title: "Seus clientes sempre perguntam se tem horário?",
+    subtitle: "Sua vitrine fica aberta 24h, sem precisar responder cada mensagem.",
+    image: "/images/dino-sucesso.png",
   },
   {
-    title: "Venda sem pagar taxa",
-    subtitle: "Fique com todo o lucro do que você vende, sem comissão.",
-    image: "/images/dino-vitrine.png", // Dino Acenando
-  },
-
-  // Modo anuncio rapido
-  {
-    title: "Anuncie em minutos",
-    subtitle: "Crie seu anúncio rápido e comece a receber mensagens.",
-    image: "/images/dino-vitrine.png", // Dino Acenando
+    title: "Quer vender sem pagar taxa?",
+    subtitle: "Fique com todo o lucro. Sem comissão, sem surpresa.",
+    image: "/images/dino-vitrine.png",
   },
   {
-    title: "Sem complicação",
-    subtitle: "Sem sistema, sem burocracia. Só anunciar e pronto.",
-    image: "/images/dino-vitrine.png", // Dino Acenando
+    title: "Só vende pelo Instagram?",
+    subtitle: "Mais uma vitrine pra ser encontrado. Cadastro grátis.",
+    image: "/images/dino-vitrine.png",
   },
   {
-    title: "Totalmente grátis",
-    subtitle: "Divulgue o que quiser sem pagar nada.",
-    image: "/images/dino-vitrine.png", // Dino Acenando
+    title: "É profissional autônomo?",
+    subtitle: "Divulgue o que faz, organize seus clientes. Sem complicação.",
+    image: "/images/dino-vitrine.png",
+  },
+  {
+    title: "Quer mais visibilidade?",
+    subtitle: "Seja achado por mais clientes na sua cidade.",
+    image: "/images/dino-vitrine.png",
   },
 ]
 

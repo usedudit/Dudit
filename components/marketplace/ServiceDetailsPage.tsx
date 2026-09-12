@@ -741,18 +741,18 @@ export function ServiceDetailsPageClient({
         const sales = partner.vendas_totais || 0
         const rating = partner.rating || 5.0
         if (sales >= 2000 && rating >= 4.7) {
-            return { name: "Diamante", badge: "<img src='https://img.dudit.com.br/static/selos/Diamante.png' alt='Diamante' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Diamante com excelente histórico de atendimento.", level: 5 }
+            return { name: "Diamante", badge: <img src="https://img.dudit.com.br/static/selos/Diamante.png" alt="Diamante" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Diamante com excelente histórico de atendimento.", level: 5 }
         }
         if (sales >= 500 && rating >= 4.5) {
-            return { name: "Platina", badge: "<img src='https://img.dudit.com.br/static/selos/Platina.png' alt='Platina' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Destaque Platina na Dudit.", level: 4 }
+            return { name: "Platina", badge: <img src="https://img.dudit.com.br/static/selos/Platina.png" alt="Platina" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Destaque Platina na Dudit.", level: 4 }
         }
         if (sales >= 100 && rating >= 4.3) {
-            return { name: "Ouro", badge: "<img src='https://img.dudit.com.br/static/selos/Ouro.png' alt='Ouro' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional com reputação Ouro e ótimo serviço.", level: 3 }
+            return { name: "Ouro", badge: <img src="https://img.dudit.com.br/static/selos/Ouro.png" alt="Ouro" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional com reputação Ouro e ótimo serviço.", level: 3 }
         }
         if (sales >= 20 && rating >= 4.0) {
-            return { name: "Prata", badge: "<img src='https://img.dudit.com.br/static/selos/Prata.png' alt='Prata' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Prata consistente na plataforma.", level: 2 }
+            return { name: "Prata", badge: <img src="https://img.dudit.com.br/static/selos/Prata.png" alt="Prata" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Prata consistente na plataforma.", level: 2 }
         }
-        return { name: "Bronze", badge: "<img src='https://img.dudit.com.br/static/selos/Bronze.png' alt='Bronze' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Bronze iniciando seus serviços na Dudit.", level: 1 }
+        return { name: "Bronze", badge: <img src="https://img.dudit.com.br/static/selos/Bronze.png" alt="Bronze" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Profissional Bronze iniciando seus serviços na Dudit.", level: 1 }
     }, [partner])
 
     const partnerProfileImageUrl = useMemo(() => {
@@ -1022,7 +1022,7 @@ export function ServiceDetailsPageClient({
                 </div>
             )}
 
-            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
+            <h1 className="text-lg md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {service.name}
             </h1>
 
@@ -1918,13 +1918,12 @@ export function ServiceDetailsPageClient({
                 cartCount={cartCount}
                 productName={service.name}
                 onShare={() => setShowShareModal(true)}
-                favoriteButton={
-                    <button onClick={async (e) => { e.stopPropagation(); if (isProductOwner) return; if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname)); await toggleFav(service.id, "servico") }}
-                        className="flex items-center justify-center w-8 h-8 transition-all duration-200 cursor-pointer select-none"
-                        title={isFav(service.id, "servico") ? "Remover dos favoritos" : "Adicionar aos favoritos"}>
-                        <HeartIcon size={20} className={isFav(service.id, "servico") ? "text-brand-green fill-brand-green" : "text-brand-green"} />
-                    </button>
-                }
+                onFavorite={async () => {
+                    if (isProductOwner) return;
+                    if (!user) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname));
+                    await toggleFav(service.id, "servico");
+                }}
+                isFavorite={isFav(service.id, "servico")}
             />
 
             {isMounted && createPortal(

@@ -21,19 +21,18 @@ interface CollectionCardProps {
   className?: string
 }
 
-export function CollectionCard({ collection, className = "w-[270px] sm:w-[320px]" }: CollectionCardProps) {
+export function CollectionCard({ collection, className = "w-full" }: CollectionCardProps) {
   const authorName = collection.author?.full_name || "Usuário"
-  // Use saved banner_color for avatar background, fallback to computed color from name
   const avatarBgColor = collection.banner_color || getAvatarColor(collection.name)
 
   return (
     <Link
       href={getCollectionUrl(collection)}
       prefetch={false}
-      className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
+      className={`flex flex-col group cursor-pointer transition-all duration-300 min-w-0 ${className}`}
     >
 
-      <div className="relative w-full aspect-[16/10] rounded-[16px] overflow-hidden bg-brand-gray dark:bg-dark-border/30 mb-3 shrink-0">
+      <div className="relative w-full aspect-[1400/300] rounded-[16px] overflow-hidden bg-brand-gray dark:bg-dark-border/30 mb-3 shrink-0">
         {collection.cover_url ? (
           <img
             src={collection.cover_url}

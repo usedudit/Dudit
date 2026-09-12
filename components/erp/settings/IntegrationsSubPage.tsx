@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -230,7 +230,6 @@ export const IntegrationsSubPage = ({
     }
 
     const handleEvoDisconnect = async () => {
-        if (!confirm("Desconectar WhatsApp (Evolution)?")) return
         setEvoIsLoading(true)
         try {
             const res = await disconnectEvolutionAction()
@@ -251,6 +250,11 @@ export const IntegrationsSubPage = ({
         setEvoQrCode(null)
         setEvoModalOpen(false)
     }
+
+    // Confirm modal states
+    const [confirmEvoDisconnectOpen, setConfirmEvoDisconnectOpen] = useState(false)
+    const [confirmWaDisconnectOpen, setConfirmWaDisconnectOpen] = useState(false)
+    const [confirmMpDisconnectOpen, setConfirmMpDisconnectOpen] = useState(false)
 
     const [provider] = useState<"meta">("meta")
 
@@ -277,14 +281,6 @@ export const IntegrationsSubPage = ({
     }
 
     const handleDisconnectWa = async () => {
-        if (
-            !confirm(
-                "Tem certeza que deseja desconectar o WhatsApp? Suas mensagens automáticas deixarão de ser enviadas.",
-            )
-        ) {
-            return
-        }
-
         setWaIsLoading(true)
         try {
             const result = await disconnectWhatsappAction(provider)
@@ -383,14 +379,6 @@ export const IntegrationsSubPage = ({
     }
 
     const handleDisconnect = async () => {
-        if (
-            !confirm(
-                "Tem certeza que deseja desconectar sua conta do Mercado Pago? Você não poderá mais receber pagamentos online.",
-            )
-        ) {
-            return
-        }
-
         setIsLoading(true)
         const result = await disconnectMercadoPagoAction()
 
@@ -549,7 +537,7 @@ export const IntegrationsSubPage = ({
                                                 if (checked) {
                                                     handleConnectClick()
                                                 } else {
-                                                    handleDisconnect()
+                                                    setConfirmMpDisconnectOpen(true)
                                                 }
                                             }}
                                             className={isLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
@@ -679,7 +667,7 @@ export const IntegrationsSubPage = ({
                                                     }
                                                     setEvoModalOpen(true)
                                                 } else {
-                                                    handleEvoDisconnect()
+                                                    setConfirmEvoDisconnectOpen(true)
                                                 }
                                             }}
                                             className={evoIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
@@ -900,7 +888,7 @@ export const IntegrationsSubPage = ({
                                             </div>
                                         }
                                     />
-                                    <Button variant="destructive" onClick={handleEvoDisconnect} disabled={evoIsLoading} className="w-full h-[42px]">
+                                    <Button variant="destructive" onClick={() => setConfirmEvoDisconnectOpen(true)} disabled={evoIsLoading} className="w-full h-[42px]">
                                         Desconectar WhatsApp
                                     </Button>
                                 </div>
@@ -1197,6 +1185,51 @@ export const IntegrationsSubPage = ({
                         </div>
                     </div>
                 </DefaultModal>
+
+                {/* Confirm Disconnect WhatsApp Evolution */}
+                <AlertModal
+                    isOpen={confirmEvoDisconnectOpen}
+                    onClose={() => setConfirmEvoDisconnectOpen(false)}
+                    onConfirm={() => {
+                        setConfirmEvoDisconnectOpen(false)
+                        handleEvoDisconnect()
+                    }}
+                    title="Desconectar WhatsApp"
+                    message="Tem certeza que deseja desconectar o WhatsApp (Evolution)?"
+                    confirmText="Desconectar"
+                    variant="danger"
+                    isDestructive
+                />
+
+                {/* Confirm Disconnect WhatsApp */}
+                <AlertModal
+                    isOpen={confirmWaDisconnectOpen}
+                    onClose={() => setConfirmWaDisconnectOpen(false)}
+                    onConfirm={() => {
+                        setConfirmWaDisconnectOpen(false)
+                        handleDisconnectWa()
+                    }}
+                    title="Desconectar WhatsApp"
+                    message="Tem certeza que deseja desconectar o WhatsApp? Suas mensagens automáticas deixarão de ser enviadas."
+                    confirmText="Desconectar"
+                    variant="danger"
+                    isDestructive
+                />
+
+                {/* Confirm Disconnect Mercado Pago */}
+                <AlertModal
+                    isOpen={confirmMpDisconnectOpen}
+                    onClose={() => setConfirmMpDisconnectOpen(false)}
+                    onConfirm={() => {
+                        setConfirmMpDisconnectOpen(false)
+                        handleDisconnect()
+                    }}
+                    title="Desconectar Mercado Pago"
+                    message="Tem certeza que deseja desconectar sua conta do Mercado Pago? Você não poderá mais receber pagamentos online."
+                    confirmText="Desconectar"
+                    variant="danger"
+                    isDestructive
+                />
 
                 {/* Mobile Bottom Action Bar */}
                 <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">

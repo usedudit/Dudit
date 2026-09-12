@@ -1064,7 +1064,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto px-4 max-w-[1400px] mt-12 lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+        <div className="container mx-auto md:px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -1476,7 +1476,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                     <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
                                                 )}
                                                 onSeeAll={() => openCategory(group.id)}
-                                                itemWidthClass="w-[200px] md:w-[230px]"
+                                                itemWidthClass="w-[150px] md:w-[230px]"
                                             />
                                         </div>
                                     ))}
@@ -1711,7 +1711,8 @@ function GalleryTab({ gallery = [] }: GalleryTabProps) {
             {gallery.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-12">
                     <IconPlaceholder
-                        icon={ImageIcon}
+                        placeholderType="image"
+                        imageSrc="https://img.dudit.com.br/static/mascots/Galeria.png"
                         title="Galeria de imagens vazia"
                         subtitle="Este vendedor ainda não adicionou fotos ao perfil."
                     />

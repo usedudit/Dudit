@@ -599,9 +599,7 @@ export default function MarketplaceHome({
 
     if (hasNoLocation || hasNoProductsOrVitrines) {
         content = (
-            <div className="w-full bg-white flex-grow flex flex-col dark:bg-dark-surface">
-                <HeroBanner />
-
+            <div className="w-full flex-grow flex flex-col">
                 <MarketplaceLandingView
                     user={user}
                     userProfile={userProfile}

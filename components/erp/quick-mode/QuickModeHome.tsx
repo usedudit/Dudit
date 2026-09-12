@@ -265,7 +265,7 @@ function HelpCard() {
 
     const helpItems = [
         { label: "Central de Ajuda", description: "Artigos, tutoriais e dúvidas", href: "/ajuda", icon: "HelpCircleIcon" },
-        { label: "Fale Conosco", description: "Suporte via chat ou WhatsApp", href: "/ajuda/contato", icon: "MailIcon" },
+        { label: "Fale Conosco", description: "Suporte via chat ou WhatsApp", href: "/institucional/contato", icon: "MailIcon" },
     ];
 
     return (

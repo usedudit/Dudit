@@ -53,6 +53,7 @@ export enum RateLimitCategory {
   COLLECTION_CREATE = "COLLECTION_CREATE",
   COMMUNITY_VIDEO_UPLOAD = "COMMUNITY_VIDEO_UPLOAD",
   FEEDBACK_CREATE = "FEEDBACK_CREATE",
+  SUPPORT_CREATE = "SUPPORT_CREATE",
   DEFAULT = "DEFAULT",
 }
 
@@ -315,6 +316,12 @@ export const RATE_LIMIT_CONFIGS: Record<RateLimitCategory, RateLimitConfig> = {
   },
   [RateLimitCategory.FEEDBACK_CREATE]: {
     maxRequests: 10,
+    window: "10 m",
+    identifierType: IdentifierType.USER_PLUS_IP,
+    failClosed: false,
+  },
+  [RateLimitCategory.SUPPORT_CREATE]: {
+    maxRequests: 5,
     window: "10 m",
     identifierType: IdentifierType.USER_PLUS_IP,
     failClosed: false,

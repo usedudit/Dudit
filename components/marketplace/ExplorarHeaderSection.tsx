@@ -1,7 +1,10 @@
 "use client"
 
 import { Button } from "@/components/reusable"
+import { GridIcon, ListIcon } from "@/lib/icons"
 import { ChevronLeft } from "lucide-react"
+
+type ViewMode = "grid" | "list"
 
 interface ExplorarHeaderSectionProps {
     title: string
@@ -9,6 +12,8 @@ interface ExplorarHeaderSectionProps {
     showBackButton?: boolean
     onBack?: () => void
     isLoading?: boolean
+    viewMode?: ViewMode
+    onViewModeChange?: (mode: ViewMode) => void
 }
 
 export function ExplorarHeaderSection({
@@ -17,6 +22,8 @@ export function ExplorarHeaderSection({
     showBackButton = false,
     onBack,
     isLoading = false,
+    viewMode,
+    onViewModeChange,
 }: ExplorarHeaderSectionProps) {
     return (
         <div className="mb-6">
@@ -32,7 +39,7 @@ export function ExplorarHeaderSection({
                         </Button>
                     </div>
                 )}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <h1 className="text-lg lg:text-2xl font-medium text-brand-dark dark:text-dark-heading mb-1">
                         {title}
                     </h1>
@@ -46,6 +53,33 @@ export function ExplorarHeaderSection({
                         </p>
                     )}
                 </div>
+
+                {viewMode && onViewModeChange && (
+                    <div className="flex items-center shrink-0 lg:hidden">
+                        <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[34px] scale-80 origin-right">
+                            <button
+                                onClick={() => onViewModeChange("list")}
+                                className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                                    ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                    : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
+                                    }`}
+                                title="Vista em lista"
+                            >
+                                <ListIcon className="w-[15px] h-[15px]" />
+                            </button>
+                            <button
+                                onClick={() => onViewModeChange("grid")}
+                                className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                                    ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                    : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
+                                    }`}
+                                title="Vista em grade"
+                            >
+                                <GridIcon className="w-[15px] h-[15px]" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

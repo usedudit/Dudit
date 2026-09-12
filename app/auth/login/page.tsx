@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useLayoutEffect, Suspense, useRef } from "react"
+import { useState, useEffect, useLayoutEffect, Suspense, useRef, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { motion, AnimatePresence } from "framer-motion"
@@ -74,6 +74,12 @@ function AuthContent() {
   const verifiedParam = searchParams.get("verified")
   const isPartnerMode = rawModeParam === "partner"
   const nextParam = searchParams.get("next") || "/"
+
+  const updateUrlMode = useCallback((newMode: string) => {
+    const params = new URLSearchParams(window.location.search)
+    params.set("mode", newMode)
+    router.replace(`/auth/login?${params.toString()}`)
+  }, [router])
 
   /**
    * Logged-in + mode=partner: `null` = ainda decidir (mostrar loading);
@@ -205,7 +211,7 @@ function AuthContent() {
           <AuthView
             initialMode={rawModeParam === "verify-email" ? "verify-email" : rawModeParam === "forgot-password" ? "forgot-password" : "login"}
             email={emailParam}
-            onSwitchToPartner={() => setPageMode("partner")}
+            onSwitchToPartner={() => { setPageMode("partner"); updateUrlMode("partner") }}
           />
         </motion.div>
       ) : (
@@ -233,7 +239,7 @@ function AuthContent() {
                   />
                 </Link>
                 <button
-                  onClick={() => setPageMode("auth")}
+                  onClick={() => { setPageMode("auth"); updateUrlMode("login") }}
                   className="text-xs font-semibold text-gray-900 hover:text-brand-green transition-colors"
                 >
                   Já tem conta? Entrar
@@ -243,7 +249,7 @@ function AuthContent() {
               <div className="flex-1 flex flex-col justify-center overflow-y-auto scrollbar-hide px-2">
                 <div className="w-full max-w-md mx-auto">
                   <PartnerWizard
-                    onBack={() => setPageMode("auth")}
+                    onBack={() => { setPageMode("auth"); updateUrlMode("login") }}
                     isUserLoggedIn={!!user}
                   />
                 </div>

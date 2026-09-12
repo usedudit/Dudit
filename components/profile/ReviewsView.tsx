@@ -176,12 +176,15 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                     {reviews.map((review) => {
                         const isService = !!review.service_id
                         const item = isService ? review.services : review.products
+                        const store = Array.isArray(review.stores) ? review.stores[0] : review.stores
+
+                        const partnerWithAddress = { ...review.partners, ...(store || {}), addresses: store?.addresses }
 
                         let itemUrl = ""
                         if (isService && review.services) {
-                            itemUrl = getServiceUrl({ ...review.services, id: review.service_id, short_id: review.services?.short_id }, review.partners)
+                            itemUrl = getServiceUrl({ ...review.services, id: review.service_id, short_id: review.services?.short_id }, partnerWithAddress)
                         } else if (review.products) {
-                            itemUrl = getProductUrl({ ...review.products, id: review.product_id, short_id: review.products?.short_id }, review.partners)
+                            itemUrl = getProductUrl({ ...review.products, id: review.product_id, short_id: review.products?.short_id }, partnerWithAddress)
                         }
 
 
@@ -193,7 +196,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                         return (
                             <div
                                 key={review.id}
-                                className="p-5 md:p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl flex flex-col md:flex-row gap-5 items-start justify-between hover:shadow-sm transition-shadow"
+                                className="p-5 md:p-6 bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-xl flex flex-col md:flex-row gap-5 items-start justify-between hover:border-brand-green transition-all duration-300"
                             >
                                 {/* Item / Review Body */}
                                 <div className="flex gap-4 items-start w-full md:max-w-[80%]">
@@ -209,7 +212,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                         {itemUrl ? (
                                             <Link
                                                 href={itemUrl}
-                                                prefetch={true}
+                                                prefetch={false}
                                                 className="font-bold text-brand-dark dark:text-dark-heading text-sm hover:text-brand-green transition-colors line-clamp-2"
                                             >
                                                 {item?.name || "Item avaliado"}
@@ -221,7 +224,7 @@ export function ReviewsView({ navigate }: ReviewsViewProps) {
                                         )}
 
                                         <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                            Vendido por: <span className="font-semibold text-brand-dark dark:text-dark-heading">{review.partners?.stores?.[0]?.name || review.partners?.store_name || "Loja Parceira"}</span>
+                                            Vendido por: <span className="font-semibold text-brand-dark dark:text-dark-heading">{store?.name || review.partners?.store_name || "Loja Parceira"}</span>
                                         </p>
 
                                         {/* Rating stars */}

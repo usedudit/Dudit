@@ -59,7 +59,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                 </Link>
 
                 <nav className="hidden md:flex items-center gap-8 text-gray-300 font-medium text-sm">
-                    <button onClick={() => handleNav('home')} className="hover:text-brand-green transition-colors">Home</button>
+                    <button onClick={() => handleNav('home')} className="hover:text-brand-green transition-colors">Início</button>
                     <button onClick={() => handleNav('about')} className="hover:text-brand-green transition-colors">Sobre</button>
                     <button onClick={() => handleNav('segments')} className="hover:text-brand-green transition-colors">Segmentos</button>
                     <button onClick={() => handleNav('pricing')} className="hover:text-brand-green transition-colors">Planos</button>
@@ -109,7 +109,7 @@ export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                         className="md:hidden absolute top-full left-0 w-full bg-brand-dark border-t border-white/10 overflow-hidden"
                     >
                         <div className="p-4 flex flex-col gap-4">
-                            <button onClick={() => handleNav('home')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Home</button>
+                            <button onClick={() => handleNav('home')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Início</button>
                             <button onClick={() => handleNav('about')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Sobre</button>
                             <button onClick={() => handleNav('pricing')} className="text-gray-300 block py-2 hover:text-brand-green text-left">Planos</button>
                             <Button className="w-full justify-center bg-brand-green text-white" onClick={() => handleNav('start-selling')}>Começar agora</Button>
@@ -173,7 +173,7 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
                             <h4 className="text-sm font-medium text-white mb-6">Suporte</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
-                                <li><Link href="/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
+                                <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
                                 <li><Link href="/institucional/termos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Termos de uso</Link></li>
                                 <li><Link href="/institucional/privacidade" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Política de Privacidade</Link></li>
                             </ul>

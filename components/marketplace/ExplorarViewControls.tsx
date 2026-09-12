@@ -88,7 +88,7 @@ export function ExplorarViewControls({
                 </div>
             </div>
 
-            <div className="flex items-center shrink-0">
+            <div className="hidden lg:flex items-center shrink-0">
                 {/* View toggle - ERP Style */}
                 <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-1 h-[42px] shrink-0">
                     <button

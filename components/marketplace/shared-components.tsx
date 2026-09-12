@@ -18,6 +18,7 @@ import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { getLocationLabel, type LocationContext } from "@/lib/utils/location-label"
 import { calculateDistance, formatDistanceLabel, estimateDeliveryTimeRange, estimateAverageDeliveryTime, formatAverageDeliveryTimeFromRange, estimateDeliveryFeeLabel, formatServiceDuration } from "@/lib/services/location.service"
 import Button from "../reusable/Button"
+import { FormSection } from "../reusable"
 
 const HOME_BANNERS = [
     { id: 1, src: 'https://img.dudit.com.br/static/banners/Banner-1.png', alt: 'Venda aqui' },
@@ -326,7 +327,7 @@ function getCachedPartnerPromotions(partnerId: string) {
     return promotionsCache[partnerId]
 }
 
-export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[200px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null }) => {
+export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, showSeller = true, className = "w-[150px] md:w-[230px]", promotions: preloadedPromotions, hidePromoBadge, hideSalesCount, locationContext = null }) => {
     const { user } = useSupabase()
     const router = useRouter()
     const { isFavorited, toggleFavorite } = useFavorites()
@@ -830,41 +831,39 @@ export const HorizontalCarousel = ({
     return (
         <div className="mb-10 w-full animate-fade-in">
             <div className="flex items-end justify-between mb-6">
-                <div>
-                    <h2 className="text-lg lg:text-2xl font-medium text-brand-dark mb-1 dark:text-dark-heading">{title}</h2>
-                    {subtitle && <p className="text-brand-inactive-text text-sm md:text-base dark:text-dark-body">{subtitle}</p>}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                    {onSeeAll && (
-                        <Button
-                            variant="link"
-                            onClick={onSeeAll}
-                            className="text-[13px] px-2 py-1 select-none"
-                        >
-                            Ver tudo
-                        </Button>
-                    )}
-                    <div className="hidden lg:flex items-center gap-1.5">
-                        {showLeftArrow && (
+                <FormSection title={title} description={subtitle ? subtitle : undefined}>
+                    <div className="flex items-center gap-3 shrink-0">
+                        {onSeeAll && (
                             <Button
-                                onClick={() => scroll('left')}
-                                variant="filled"
-                                className="w-8 h-8"
+                                variant="link"
+                                onClick={onSeeAll}
+                                className="text-xs md:text-sm px-2 py-1 select-none"
                             >
-                                <ChevronLeftIcon size={16} />
+                                Ver tudo
                             </Button>
                         )}
-                        {showRightArrow && (
-                            <Button
-                                onClick={() => scroll('right')}
-                                variant="filled"
-                                className="w-8 h-8"
-                            >
-                                <ChevronRightIcon size={16} />
-                            </Button>
-                        )}
+                        <div className="hidden lg:flex items-center gap-1.5">
+                            {showLeftArrow && (
+                                <Button
+                                    onClick={() => scroll('left')}
+                                    variant="filled"
+                                    size="icon"
+                                >
+                                    <ChevronLeftIcon size={18} />
+                                </Button>
+                            )}
+                            {showRightArrow && (
+                                <Button
+                                    onClick={() => scroll('right')}
+                                    variant="filled"
+                                    size="icon"
+                                >
+                                    <ChevronRightIcon size={18} />
+                                </Button>
+                            )}
+                        </div>
                     </div>
-                </div>
+                </FormSection>
             </div>
 
             <div

@@ -378,18 +378,18 @@ export function PlanDetailsPageClient({
         const sales = partner.vendas_totais || 0
         const rating = partner.rating || 5.0
         if (sales >= 2000 && rating >= 4.7) {
-            return { name: "Diamante", badge: "<img src='https://img.dudit.com.br/static/selos/Diamante.png' alt='Diamante' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
+            return { name: "Diamante", badge: <img src="https://img.dudit.com.br/static/selos/Diamante.png" alt="Diamante" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
         }
         if (sales >= 500 && rating >= 4.5) {
-            return { name: "Platina", badge: "<img src='https://img.dudit.com.br/static/selos/Platina.png' alt='Platina' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
+            return { name: "Platina", badge: <img src="https://img.dudit.com.br/static/selos/Platina.png" alt="Platina" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
         }
         if (sales >= 100 && rating >= 4.3) {
-            return { name: "Ouro", badge: "<img src='https://img.dudit.com.br/static/selos/Ouro.png' alt='Ouro' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
+            return { name: "Ouro", badge: <img src="https://img.dudit.com.br/static/selos/Ouro.png" alt="Ouro" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
         }
         if (sales >= 20 && rating >= 4.0) {
-            return { name: "Prata", badge: "<img src='https://img.dudit.com.br/static/selos/Prata.png' alt='Prata' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Prata consistente na plataforma.", level: 2 }
+            return { name: "Prata", badge: <img src="https://img.dudit.com.br/static/selos/Prata.png" alt="Prata" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Prata consistente na plataforma.", level: 2 }
         }
-        return { name: "Bronze", badge: "<img src='https://img.dudit.com.br/static/selos/Bronze.png' alt='Bronze' />", color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
+        return { name: "Bronze", badge: <img src="https://img.dudit.com.br/static/selos/Bronze.png" alt="Bronze" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
     }, [partner])
 
     const displayRating = useMemo(() => {
@@ -406,7 +406,7 @@ export function PlanDetailsPageClient({
                 </div>
             </div>
 
-            <h1 className="text-xl md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
+            <h1 className="text-lg md:text-3xl leading-[1.1] font-medium text-brand-dark dark:text-dark-heading mb-6 tracking-tight">
                 {plan.name}
             </h1>
 

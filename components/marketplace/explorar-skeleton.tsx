@@ -81,7 +81,7 @@ function ViewControlsSkeleton() {
                 <SkeletonLoader width={90} height={38} className="rounded-full shrink-0 hidden lg:block" />
                 <SkeletonLoader width={90} height={38} className="rounded-full shrink-0 hidden lg:block" />
             </div>
-            <SkeletonLoader width={80} height={38} className="rounded-full shrink-0" />
+            <SkeletonLoader width={80} height={38} className="rounded-full shrink-0 hidden lg:block" />
         </div>
     )
 }
@@ -91,10 +91,11 @@ function HeaderSectionSkeleton() {
         <div className="mb-6">
             <div className="flex items-start gap-3">
                 <SkeletonLoader width={36} height={36} className="rounded-lg shrink-0 hidden md:block" />
-                <div className="space-y-2">
+                <div className="flex-1 space-y-2">
                     <SkeletonLoader width={180} height={24} className="rounded" />
                     <SkeletonLoader width={140} height={16} className="rounded" />
                 </div>
+                <SkeletonLoader width={34} height={34} className="rounded-full shrink-0 lg:hidden" />
             </div>
         </div>
     )

@@ -177,7 +177,7 @@ export default function CheckoutFulfillmentPage({
                   Ver Minhas Assinaturas
                 </Button>
                 <Button variant="outline" onClick={() => router.push("/")} className="w-full sm:w-auto">
-                  Ir para a Home
+                  Ir para o Início
                 </Button>
               </div>
             </motion.div>

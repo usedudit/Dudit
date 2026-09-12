@@ -9,6 +9,7 @@ import { MarketplaceFooter } from "@/components/marketplace/MarketplaceFooter"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
 import { getPasswordRecoveryClient } from "@/lib/supabase/password-recovery-client"
 import { Button, PasswordInput, PasswordStrengthMeter, InfoCard, Spinner } from "@/components/reusable"
+import { SupportModal } from "@/components/support/SupportModal"
 import { calculatePasswordScore } from "@/lib/utils"
 import { getErrorMessage } from "@/lib/utils/error-handlers"
 
@@ -36,6 +37,7 @@ function UpdatePasswordContent() {
     const [isLoading, setIsLoading] = useState(false)
     const [countdown, setCountdown] = useState(3)
     const [activeAuthClient, setActiveAuthClient] = useState<any>(null)
+    const [isSupportOpen, setIsSupportOpen] = useState(false)
 
     useEffect(() => {
         let isMounted = true
@@ -322,7 +324,7 @@ function UpdatePasswordContent() {
 
                                 <div className="pt-4 border-t border-gray-100 dark:border-dark-border w-full text-center">
                                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Precisa de ajuda? <a href="mailto:contato@dudit.com.br" className="text-brand-green font-bold hover:underline">Fale com o suporte</a>
+                                        Precisa de ajuda? <button type="button" onClick={() => setIsSupportOpen(true)} className="text-brand-green font-bold hover:underline">Fale com o suporte</button>
                                     </p>
                                 </div>
                             </motion.div>
@@ -437,6 +439,11 @@ function UpdatePasswordContent() {
             </main>
 
             <MarketplaceFooter />
+
+            <SupportModal
+                isOpen={isSupportOpen}
+                onClose={() => setIsSupportOpen(false)}
+            />
         </div>
     )
 }
