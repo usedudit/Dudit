@@ -830,26 +830,29 @@ export const HorizontalCarousel = ({
 
     return (
         <div className="mb-10 w-full animate-fade-in">
-            <div className="flex items-end justify-between mb-6">
-                <FormSection title={title} description={subtitle ? subtitle : undefined}>
-                    <div className="flex items-center gap-3 shrink-0">
+            <FormSection
+                title={title}
+                description={subtitle}
+                headerRight={
+                    <div className="flex items-center gap-2">
                         {onSeeAll && (
                             <Button
                                 variant="link"
                                 onClick={onSeeAll}
-                                className="text-xs md:text-sm px-2 py-1 select-none"
+                                className="text-xs px-2 py-1 select-none"
                             >
                                 Ver tudo
                             </Button>
                         )}
-                        <div className="hidden lg:flex items-center gap-1.5">
+                        <div className="hidden lg:flex items-center gap-1">
                             {showLeftArrow && (
                                 <Button
                                     onClick={() => scroll('left')}
                                     variant="filled"
                                     size="icon"
+                                    className="!w-8 !h-8"
                                 >
-                                    <ChevronLeftIcon size={18} />
+                                    <ChevronLeftIcon size={16} />
                                 </Button>
                             )}
                             {showRightArrow && (
@@ -857,14 +860,15 @@ export const HorizontalCarousel = ({
                                     onClick={() => scroll('right')}
                                     variant="filled"
                                     size="icon"
+                                    className="!w-8 !h-8"
                                 >
-                                    <ChevronRightIcon size={18} />
+                                    <ChevronRightIcon size={16} />
                                 </Button>
                             )}
                         </div>
                     </div>
-                </FormSection>
-            </div>
+                }
+            />
 
             <div
                 ref={scrollContainerRef}

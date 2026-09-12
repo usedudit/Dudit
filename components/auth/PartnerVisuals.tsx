@@ -38,32 +38,32 @@ const slides = [
   {
     title: "Tá perdendo pedido no WhatsApp?",
     subtitle: "Organize seus pedidos sem bagunça. Tudo num só lugar.",
-    image: "/images/dino-gerente.png",
-  },
-  {
-    title: "Seus clientes sempre perguntam se tem horário?",
-    subtitle: "Sua vitrine fica aberta 24h, sem precisar responder cada mensagem.",
-    image: "/images/dino-sucesso.png",
+    image: "https://img.dudit.com.br/static/mascots/Carousel1.png",
   },
   {
     title: "Quer vender sem pagar taxa?",
     subtitle: "Fique com todo o lucro. Sem comissão, sem surpresa.",
-    image: "/images/dino-vitrine.png",
-  },
-  {
-    title: "Só vende pelo Instagram?",
-    subtitle: "Mais uma vitrine pra ser encontrado. Cadastro grátis.",
-    image: "/images/dino-vitrine.png",
+    image: "https://img.dudit.com.br/static/mascots/Carousel2.png",
   },
   {
     title: "É profissional autônomo?",
     subtitle: "Divulgue o que faz, organize seus clientes. Sem complicação.",
-    image: "/images/dino-vitrine.png",
+    image: "https://img.dudit.com.br/static/mascots/Carousel3.png",
   },
   {
-    title: "Quer mais visibilidade?",
-    subtitle: "Seja achado por mais clientes na sua cidade.",
-    image: "/images/dino-vitrine.png",
+    title: "Só vende pelo Instagram?",
+    subtitle: "Mais uma vitrine pra ser encontrado. Cadastro grátis.",
+    image: "https://img.dudit.com.br/static/mascots/Carousel4.png",
+  },
+  {
+    title: "Seus clientes sempre perguntam se tem horário?",
+    subtitle: "Sua vitrine fica aberta 24h, sem precisar responder cada mensagem.",
+    image: "https://img.dudit.com.br/static/mascots/Carousel5.png",
+  },
+  {
+    title: "Tem coisa parada em casa?",
+    subtitle: "Anuncia na Dudit de graça",
+    image: "https://img.dudit.com.br/static/mascots/Carousel6.png",
   },
 ]
 

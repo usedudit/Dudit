@@ -465,8 +465,10 @@ const Header: React.FC<HeaderProps> = ({
     }, [user, profile?.full_name])
 
     const userLocation = useMemo(() => {
-        return profile?.address ?? null
-    }, [profile?.address])
+        if (profile?.address) return profile.address
+        if (citySlug) return formatCitySlugForDisplay(citySlug)
+        return null
+    }, [profile?.address, citySlug])
 
     const searchContainerRef = useRef<HTMLDivElement>(null)
     const closeMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -836,23 +838,31 @@ const Header: React.FC<HeaderProps> = ({
                     {/* Delivery Info */}
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
                         <div className="flex items-center justify-between mt-2.5 px-1">
-                            <Link
-                                href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
-                                prefetch={false}
-                                onClick={(e) => {
-                                    if (!user || !userLocation) {
-                                        e.preventDefault()
-                                        setIsVisitorModalOpen(true)
-                                    }
-                                }}
-                                className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
-                            >
-                                <MapPinIcon size={14} className="shrink-0 text-white" />
-                                <span className="text-[12px] font-normal truncate ml-0.5 text-white">
-                                    {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
-                                </span>
-                                <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
-                            </Link>
+                            {user && userLocation ? (
+                                <Link
+                                    href="/perfil?tab=enderecos"
+                                    prefetch={false}
+                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
+                                >
+                                    <MapPinIcon size={14} className="shrink-0 text-white" />
+                                    <span className="text-[12px] font-normal truncate ml-0.5 text-white">
+                                        Você está em {userLocation}
+                                    </span>
+                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+                                </Link>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsVisitorModalOpen(true)}
+                                    className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
+                                >
+                                    <MapPinIcon size={14} className="shrink-0 text-white" />
+                                    <span className="text-[12px] font-normal truncate ml-0.5 text-white">
+                                        {userLocation ? `Você está em ${userLocation}` : "Cadastrar endereço"}
+                                    </span>
+                                    <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={handleOpenAnnounceModal}
@@ -1075,29 +1085,41 @@ const Header: React.FC<HeaderProps> = ({
                         />
                     </Link>
 
-                    <Link
-                        href={user && userLocation ? "/perfil?tab=enderecos" : "#"}
-                        prefetch={false}
-                        onClick={(e) => {
-                            if (!user || !userLocation) {
-                                e.preventDefault()
-                                setIsVisitorModalOpen(true)
-                            }
-                        }}
-                        className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
-                    >
-                        {userLocation ? (
+                    {user && userLocation ? (
+                        <Link
+                            href="/perfil?tab=enderecos"
+                            prefetch={false}
+                            className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
+                        >
                             <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
                                 Você está em
                             </span>
-                        ) : null}
-                        <div className="flex items-center gap-1">
-                            <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
-                            <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
-                                {userLocation || "Cadastrar endereço"}
-                            </span>
-                        </div>
-                    </Link>
+                            <div className="flex items-center gap-1">
+                                <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
+                                <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
+                                    {userLocation}
+                                </span>
+                            </div>
+                        </Link>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setIsVisitorModalOpen(true)}
+                            className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
+                        >
+                            {userLocation ? (
+                                <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
+                                    Você está em
+                                </span>
+                            ) : null}
+                            <div className="flex items-center gap-1">
+                                <MapPinIcon size={16} className="text-white shrink-0" strokeWidth={2.5} />
+                                <span className="text-[13px] font-bold leading-none truncate max-w-[160px]">
+                                    {userLocation || "Cadastrar endereço"}
+                                </span>
+                            </div>
+                        </button>
+                    )}
 
                     <div className="flex-1 relative z-[110] mx-4 h-[42px]" ref={searchContainerRef}>
                         <div className="relative flex items-center w-full h-full bg-white rounded-full transition-all duration-200 shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:shadow-[0_2px_12px_rgba(0,0,0,0.12)]">
