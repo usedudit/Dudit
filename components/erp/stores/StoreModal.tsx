@@ -16,7 +16,9 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
-  TabsContent
+  TabsContent,
+  ListItem,
+  RadioButton
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
@@ -25,6 +27,8 @@ import { createStoreAction, updateStoreAction } from "@/app/actions/erp/stores"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import { isGifFile } from "@/lib/security/file-validator"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { TrashIcon } from "@/lib/icons"
+import { Clock } from "lucide-react"
 
 interface StoreModalProps {
   isOpen: boolean
@@ -67,6 +71,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
 
   // --- Opening Hours State (Exact BusinessHoursSelector pattern) ---
   const [hours, setHours] = useState(() => normalizeOpeningHours({}))
+  const [acceptOrdersWhenClosed, setAcceptOrdersWhenClosed] = useState<boolean>(true)
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -103,6 +108,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
 
         const effHours = store.opening_hours || {}
         setHours(normalizeOpeningHours(effHours))
+        setAcceptOrdersWhenClosed(store.accept_orders_when_closed ?? true)
       } else {
         setName("")
         setDescription("")
@@ -123,6 +129,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
           longitude: null,
         })
         setHours(normalizeOpeningHours({}))
+        setAcceptOrdersWhenClosed(true)
       }
     }
   }, [isOpen, store])
@@ -148,6 +155,12 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
   const handleCropComplete = (url: string) => {
     setCropModalOpen(false)
     setImagePreview(url)
+    setTempImageFile(null)
+  }
+
+  const handleRemoveImage = () => {
+    setImagePreview(null)
+    setImageUrl(null)
     setTempImageFile(null)
   }
 
@@ -220,6 +233,7 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
         state: addresses.state.trim() || undefined,
         complement: addresses.complement.trim() || undefined,
         opening_hours: hours as any,
+        accept_orders_when_closed: acceptOrdersWhenClosed,
         latitude: addresses.latitude ?? null,
         longitude: addresses.longitude ?? null,
       }
@@ -300,11 +314,25 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
-                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
-                  </div>
-                  <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
+                   <div className="flex-1">
+                     <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Logo da Empresa</p>
+                     <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 3MB (PNG, JPG, WEBP)</p>
+                   </div>
+                   {imagePreview && (
+                     <Button
+                       variant="ghostred"
+                       size="icon"
+                       className="w-8 h-8"
+                       onClick={(e) => {
+                         e.stopPropagation()
+                         e.preventDefault()
+                         handleRemoveImage()
+                       }}
+                     >
+                       <TrashIcon size={14} />
+                     </Button>
+                   )}
+                   <input ref={fileInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp, image/avif" onChange={handleImageChange} />
                 </div>
               </FormSection>
 
@@ -427,6 +455,41 @@ export function StoreModal({ isOpen, onClose, partnerId, store, onSaved }: Store
             <TabsContent value="horarios" className="space-y-4 pt-4">
               <FormSection title="Horários de Funcionamento">
                 <BusinessHoursSelector value={hours as any} onChange={setHours as any} />
+              </FormSection>
+
+              <FormSection title="Pedidos fora do horário de funcionamento" hasSeparator>
+                <div className="grid gap-3">
+                  <ListItem
+                    title="Receber pedidos normalmente"
+                    description="Clientes podem fazer pedidos mesmo quando a loja estiver fora do horário de funcionamento."
+                    icon={<Clock className="text-brand-green" size={20} />}
+                    onClick={() => setAcceptOrdersWhenClosed(true)}
+                    right={
+                      <RadioButton
+                        name="modalAcceptOrdersWhenClosed"
+                        value="allow"
+                        checked={acceptOrdersWhenClosed}
+                        onChange={() => setAcceptOrdersWhenClosed(true)}
+                      />
+                    }
+                    className="py-4 px-6 gap-4 cursor-pointer"
+                  />
+                  <ListItem
+                    title="Bloquear pedidos com loja fechada"
+                    description="A vitrine não permitirá a realização de novos pedidos enquanto a loja estiver fora do horário de funcionamento."
+                    icon={<Clock className="text-brand-inactive-text" size={20} />}
+                    onClick={() => setAcceptOrdersWhenClosed(false)}
+                    right={
+                      <RadioButton
+                        name="modalAcceptOrdersWhenClosed"
+                        value="block"
+                        checked={!acceptOrdersWhenClosed}
+                        onChange={() => setAcceptOrdersWhenClosed(false)}
+                      />
+                    }
+                    className="py-4 px-6 gap-4 cursor-pointer"
+                  />
+                </div>
               </FormSection>
             </TabsContent>
           </Tabs>

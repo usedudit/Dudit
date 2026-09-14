@@ -4,13 +4,14 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, TruckIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon, CalendarIcon, ClockIcon, MapPinIcon, BoxIcon, SparklesIcon, AwardIcon, ShieldIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon, ClockIcon, BoxIcon, SparklesIcon, AwardIcon, ShieldIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormDropdown, IconPlaceholder, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
+import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
 import { AddToCollectionModal } from "./AddToCollectionModal"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
@@ -34,7 +35,7 @@ import { useFavorites } from "@/providers/favorites-provider"
 import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, getProductUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
-import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
+import { createCategorySlug } from "@/lib/utils/slugify"
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { SponsoredAdDetailSlot } from "@/components/marketplace/ads/SponsoredAdsSlot"
@@ -215,9 +216,13 @@ export function ProductDetailsPageClient({
         const storeId = store?.id || p?.store_id || product.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Vendedor da Dudit"
         const isShowcaseActive = (store?.is_showcase_active ?? p?.is_showcase_active ?? true) !== false
+        const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p?.accept_orders_when_closed ?? true) !== false
+        const timezone = store?.timezone || p?.timezone || "America/Sao_Paulo"
 
         return {
             isShowcaseActive,
+            acceptOrdersWhenClosed,
+            timezone,
             id: realPartnerId,
             short_id: store?.short_id || p?.short_id || product.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
@@ -247,6 +252,12 @@ export function ProductDetailsPageClient({
             created_at: store?.created_at || p?.created_at,
         }
     }, [product])
+
+    const isStoreOpenNow = useMemo(() => {
+        return isStoreOpen(partner.openingHours, undefined, partner.timezone)
+    }, [partner.openingHours, partner.timezone])
+
+    const isClosedAndBlocking = partner.acceptOrdersWhenClosed === false && !isStoreOpenNow
 
     const [canBuyState, setCanBuyState] = useState<{ canBuy: boolean; isOwner: boolean; isTeamMember: boolean; reason?: string }>(() => {
         const isOwner = !!(userId && partner?.user_id && userId === partner.user_id)
@@ -957,6 +968,10 @@ export function ProductDetailsPageClient({
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
             return
         }
+        if (isClosedAndBlocking) {
+            notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
 
         if (!userId) return router.push("/auth/login?next=" + encodeURIComponent(window.location.pathname))
         if (isActionInProgress.current) return
@@ -986,11 +1001,15 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, partner.isShowcaseActive, notifySuccess, notifyError])
+    }, [userId, router, product.id, quantity, selectedVariant, productAddons, validateAddons, selectedAddonsList, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError])
 
     const handleBuyNow = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+        if (isClosedAndBlocking) {
+            notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
             return
         }
 
@@ -1078,7 +1097,7 @@ export function ProductDetailsPageClient({
             setLoading(false)
             isActionInProgress.current = false
         }
-    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset, deliveryConfig, notifyError])
+    }, [userId, router, partner, product, selectedVariant, pricing.current, quantity, productImages, activeImgIndex, videoOffset, deliveryConfig, isClosedAndBlocking, notifyError])
 
 
     const shareMessage = useMemo(() => {
@@ -1583,6 +1602,14 @@ export function ProductDetailsPageClient({
                     className="mb-8"
                 />
             )}
+            {!isProductOwner && partner.isShowcaseActive !== false && isClosedAndBlocking && (
+                <InfoCard
+                    title="Loja Fechada"
+                    message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
             {!isProductOwner && (
                 !showPrice ? (
                     <div className="hidden lg:block">
@@ -1611,11 +1638,11 @@ export function ProductDetailsPageClient({
                     </div>
                 ) : (
                     <div className="hidden lg:block">
-                        <Button disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
-                            {partner.isShowcaseActive === false ? "Vitrine Inativa" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                        <Button disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleBuyNow} className="w-full mb-4 h-[46px]">
+                            {partner.isShowcaseActive === false ? "Vitrine Inativa" : isClosedAndBlocking ? "Loja Fechada" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
                         </Button>
                         <Button variant="outline" className="w-full border-brand-green text-brand-green hover:bg-green-50 h-[46px] mb-8"
-                            disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleAddToCart}>
+                            disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleAddToCart}>
                             {loading ? "Adicionando..." : "Adicionar à sacola"}
                         </Button>
                     </div>
@@ -2606,7 +2633,7 @@ export function ProductDetailsPageClient({
 
                                 return (
                                     <div className="mb-10">
-                                        <FormSection title="Detalhes" hasSeparator>
+                                        <FormSection title="Detalhes" hasSeparator className="mb-8">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 pt-2">
                                                 {detailsList.map((detail) => (
                                                     <ListItem
@@ -2681,11 +2708,11 @@ export function ProductDetailsPageClient({
                             ) : (
                                 <>
                                     <Button variant="outline" className="w-12 h-12 rounded-full border-brand-green text-brand-green"
-                                        disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleAddToCart}>
+                                        disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleAddToCart}>
                                         <ShoppingCartIcon size={20} />
                                     </Button>
-                                    <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading || partner.isShowcaseActive === false} onClick={handleBuyNow}>
-                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
+                                    <Button className="flex-1 rounded-full" disabled={isOutOfStock || loading || partner.isShowcaseActive === false || isClosedAndBlocking} onClick={handleBuyNow}>
+                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isClosedAndBlocking ? "Loja Fechada" : isOutOfStock ? "Esgotado" : "Comprar Agora"}
                                     </Button>
                                 </>
                             )}

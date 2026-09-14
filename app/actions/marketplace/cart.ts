@@ -28,6 +28,7 @@ import { resolveCheckoutCartLinesFresh } from "@/lib/cache/checkout-cache"
 import { fulfillMarketplaceOrder } from "@/lib/services/marketplace-checkout-fulfillment"
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
+import { isStoreOpen } from "@/lib/utils/opening-hours"
 
 export type MarketplaceCartPageData = {
   itemsByPartner: Record<string, any>
@@ -117,11 +118,11 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, allow_sell_without_stock, is_active),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, allow_sell_without_stock, is_active, short_id, slug),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options, is_active),
-      services(id, name, price, promotional_price, duration_minutes, is_active),
+      services(id, name, price, promotional_price, duration_minutes, is_active, short_id, slug),
       recurring_plans(
-        id, name, status,
+        id, name, status, short_id, slug,
         recurring_plan_items(unit_price, quantity)
       ),
       partners(
@@ -129,7 +130,9 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         user_id,
         mp_user_id,
         mp_public_key,
-        is_showcase_active
+        is_showcase_active,
+        short_id,
+        slug
       )
     `)
       .eq("user_id", userId)
@@ -201,13 +204,13 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       storeIds.length > 0
         ? supabase
           .from("stores")
-          .select("id, partner_id, name, slug, logo_url, opening_hours, phone, description, is_showcase_active, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, partner_id, name, slug, short_id, logo_url, opening_hours, phone, description, is_showcase_active, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .in("id", storeIds)
         : Promise.resolve({ data: [] as any[] }),
       partnerIds.length > 0
         ? supabase
           .from("stores")
-          .select("id, partner_id, is_showcase_active")
+          .select("id, partner_id, is_showcase_active, accept_orders_when_closed, opening_hours, timezone")
           .in("partner_id", partnerIds)
         : Promise.resolve({ data: [] as any[] }),
     ])
@@ -276,6 +279,15 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         : (partnerStore?.is_showcase_active !== undefined
           ? partnerStore.is_showcase_active
           : (partner?.is_showcase_active ?? true))
+      const acceptOrdersWhenClosed = store?.accept_orders_when_closed !== undefined
+        ? store.accept_orders_when_closed
+        : (partnerStore?.accept_orders_when_closed !== undefined
+          ? partnerStore.accept_orders_when_closed
+          : true)
+      const openingHours = store?.opening_hours || partnerStore?.opening_hours || partner?.opening_hours || null
+      const timezone = store?.timezone || partnerStore?.timezone || partner?.timezone || "America/Sao_Paulo"
+      const isStoreCurrentlyOpen = isStoreOpen(openingHours, new Date(), timezone)
+      const isAcceptingOrders = isShowcaseActive && (acceptOrdersWhenClosed || isStoreCurrentlyOpen)
 
       acc[storeKey] = {
         storeId,
@@ -283,6 +295,11 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         partner,
         store,
         isShowcaseActive,
+        acceptOrdersWhenClosed,
+        openingHours,
+        timezone,
+        isStoreOpen: isStoreCurrentlyOpen,
+        isAcceptingOrders,
         items: [],
         products: [],
         services: [],
@@ -470,10 +487,10 @@ export async function addToCartAction(
 
   // 3.0. Validação de Vitrine Ativa
   const effectiveStoreId = storeId || (variantId ? (entity.products as any)?.store_id : entity.store_id)
-  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
-  const showcaseActive = await isStoreShowcaseActive(adminClient, { storeId: effectiveStoreId, partnerId })
-  if (!showcaseActive) {
-    return { error: INACTIVE_SHOWCASE_ERROR }
+  const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const acceptance = await canStoreAcceptOrders(adminClient, { storeId: effectiveStoreId, partnerId })
+  if (!acceptance.allowed) {
+    return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
   }
 
   // 3.1. Validação de Estoque e Status Ativo
@@ -902,11 +919,11 @@ export async function checkoutCartAction(
 
   const { lines: resolvedLines, partnerId, hasProducts, hasDeliveryLines } = resolved
 
-  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
   const checkoutStoreId = storeId || resolvedLines.find((l: any) => l.storeId)?.storeId || null
-  const isShowcaseActive = await isStoreShowcaseActive(adminClient, { storeId: checkoutStoreId, partnerId })
-  if (!isShowcaseActive) {
-    return { error: INACTIVE_SHOWCASE_ERROR }
+  const acceptance = await canStoreAcceptOrders(adminClient, { storeId: checkoutStoreId, partnerId })
+  if (!acceptance.allowed) {
+    return { error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
   }
   const capabilities = await getPartnerCapabilities(partnerId, { storeId })
   addMonitoringBreadcrumb({

@@ -59,6 +59,73 @@ export function parseTimeToMinutes(timeStr: string): number {
 }
 
 /**
+ * Verifica se uma loja está aberta no momento.
+ * Retorna true se não houver horários configurados (considera aberto).
+ * Retorna true se o momento atual estiver dentro do intervalo de funcionamento hoje (ou da virada de ontem).
+ */
+export function isStoreOpen(
+  openingHours: OpeningHoursData | null | undefined,
+  nowDate: Date = new Date(),
+  tz?: string
+): boolean {
+  if (!openingHours || typeof openingHours !== "object") {
+    return true
+  }
+
+  const hasAnySchedule = Object.values(openingHours).some(
+    (daySchedule) => daySchedule?.enabled && daySchedule.from && daySchedule.to
+  )
+  if (!hasAnySchedule) {
+    return true
+  }
+
+  const resolvedTz = tz || getDefaultTimezone()
+  const { dayOfWeek: currentDayIndex, hour, minute } = getDateComponents(nowDate, resolvedTz)
+  const currentMinutes = hour * 60 + minute
+
+  // 1. Verifica horário de hoje
+  const todayKey = DAYS_OF_WEEK[currentDayIndex]
+  const todaySchedule = openingHours[todayKey]
+
+  if (todaySchedule?.enabled && todaySchedule.from && todaySchedule.to) {
+    const fromMins = parseTimeToMinutes(todaySchedule.from)
+    const toMins = parseTimeToMinutes(todaySchedule.to)
+
+    if (fromMins >= 0 && toMins >= 0) {
+      if (toMins <= fromMins) {
+        // Horário cruza a meia-noite (ex: 18:00 às 02:00)
+        if (currentMinutes >= fromMins) {
+          return true
+        }
+      } else {
+        // Horário dentro do mesmo dia (ex: 09:00 às 18:00)
+        if (currentMinutes >= fromMins && currentMinutes < toMins) {
+          return true
+        }
+      }
+    }
+  }
+
+  // 2. Verifica se ontem tinha horário que cruzava a meia-noite até hoje
+  const yesterdayDayIndex = (currentDayIndex + 6) % 7
+  const yesterdayKey = DAYS_OF_WEEK[yesterdayDayIndex]
+  const yesterdaySchedule = openingHours[yesterdayKey]
+
+  if (yesterdaySchedule?.enabled && yesterdaySchedule.from && yesterdaySchedule.to) {
+    const yFrom = parseTimeToMinutes(yesterdaySchedule.from)
+    const yTo = parseTimeToMinutes(yesterdaySchedule.to)
+
+    if (yFrom >= 0 && yTo >= 0 && yTo <= yFrom) {
+      if (currentMinutes < yTo) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * Resolve o status de horário de funcionamento de uma loja
  */
 export function getOpeningStatus(
@@ -70,11 +137,30 @@ export function getOpeningStatus(
     return "Informações de horário não disponíveis";
   }
 
+  const hasAnySchedule = Object.values(openingHours).some(
+    (daySchedule) => daySchedule?.enabled && daySchedule.from && daySchedule.to
+  )
+  if (!hasAnySchedule) {
+    return "Informações de horário não disponíveis";
+  }
+
   const resolvedTz = tz || getDefaultTimezone()
   const { dayOfWeek: currentDayIndex, hour, minute } = getDateComponents(nowDate, resolvedTz)
   const currentMinutes = hour * 60 + minute
 
-  // Verifica horários válidos hoje
+  // 1. Verifica se está aberto pela virada de ontem
+  const yesterdayDayIndex = (currentDayIndex + 6) % 7
+  const yesterdayKey = DAYS_OF_WEEK[yesterdayDayIndex]
+  const yesterdaySchedule = openingHours[yesterdayKey]
+  if (yesterdaySchedule?.enabled && yesterdaySchedule.from && yesterdaySchedule.to) {
+    const yFrom = parseTimeToMinutes(yesterdaySchedule.from)
+    const yTo = parseTimeToMinutes(yesterdaySchedule.to)
+    if (yFrom >= 0 && yTo >= 0 && yTo <= yFrom && currentMinutes < yTo) {
+      return `Aberto até ${yesterdaySchedule.to}`
+    }
+  }
+
+  // 2. Verifica horários válidos hoje
   const todayKey = DAYS_OF_WEEK[currentDayIndex];
   const todaySchedule = openingHours[todayKey];
 

@@ -526,6 +526,7 @@ function processProduct(item: RawProduct, extra?: Record<string, any>) {
     return {
         id: item.id,
         short_id: (item as any).short_id || null,
+        store_id: item.store_id || rawStore?.id || null,
         name: item.name,
         price: effectivePrice,
         originalPrice,
@@ -582,7 +583,11 @@ const getSharedHomeProductsPool = cache(async (allIdsKey: string, allIds: string
     const { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, marketplace_score, condition, created_at, category_id, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
+        // Products can use either the legacy Portuguese status or the newer
+        // normalized value. Services already accept both; keep the homepage
+        // consistent so branch products are not filtered out.
+        .in("status", ["ativo", "active"])
+        .is("deleted_at", null)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .order("created_at", { ascending: false })
@@ -774,7 +779,8 @@ async function fetchEndingSoon(tiers: PartnerTiers, ctx: DiscoverCtx): Promise<H
     let { data: products, error: prodErr } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
+        .in("status", ["ativo", "active"])
+        .is("deleted_at", null)
         .eq("show_in_marketplace", true)
         .in("id", [...productIds])
         .limit(30)
@@ -1188,7 +1194,8 @@ async function fetchPersonalizedUncached(tiers: PartnerTiers, ctx: DiscoverCtx):
     let { data, error } = await supabase
         .from("products")
         .select(`${BASE_FIELDS}, ${STATS_FIELDS}, category_id, ${PARTNER_JOIN}`)
-        .eq("is_active", true)
+        .in("status", ["ativo", "active"])
+        .is("deleted_at", null)
         .eq("show_in_marketplace", true)
         .in("partner_id", allIds)
         .in("category_id", preferredCatIds)

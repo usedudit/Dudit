@@ -138,7 +138,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     targetStoreId
       ? admin
           .from("stores")
-          .select("id, is_showcase_active, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
+          .select("id, is_showcase_active, accept_orders_when_closed, timezone, short_id, name, slug, logo_url, phone, pickup_payment_policy, opening_hours, addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default)")
           .eq("id", targetStoreId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -196,10 +196,10 @@ export async function getMarketplaceCheckoutContextAction(input: {
     })(),
   ])
 
-  const { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
-  const isShowcaseActive = await isStoreShowcaseActive(admin, { storeId: targetStoreId, partnerId: resolved.partnerId })
-  if (!isShowcaseActive) {
-    return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+  const { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } = await import("@/lib/commerce/store-showcase")
+  const orderAcceptance = await canStoreAcceptOrders(admin, { storeId: targetStoreId || undefined, partnerId: resolved.partnerId })
+  if (!orderAcceptance.allowed) {
+    return { success: false, error: orderAcceptance.message || INACTIVE_SHOWCASE_ERROR }
   }
 
   const partnerPromotions = promosMap?.[resolved.partnerId] || []

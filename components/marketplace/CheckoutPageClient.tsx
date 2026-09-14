@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon } from "@/lib/icons"
+import { MapPinIcon, PlusIcon, XIcon, MoneyIcon, TagIcon, InfoIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CheckCircleIcon, LockIcon, CrownIcon, TruckIcon } from "@/lib/icons"
 import { Button, Spinner, DefaultModal, CepInput, StateComboBox, RadioButton, ListItem, InfoCard, Separator, Badge, Tooltip, FormDropdown, NumberInputWithCheckbox, FormSection, MoneyInput, Tabs, TabsList, TabsTrigger, TabsContent, FormTextarea } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { Input } from "@/components/reusable"
@@ -431,6 +431,7 @@ export function CheckoutPageClient() {
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [showPaymentModal, setShowPaymentModal] = useState(false)
     const [showOutsideRadiusModal, setShowOutsideRadiusModal] = useState(false)
+    const [showServiceUnavailableModal, setShowServiceUnavailableModal] = useState(false)
 
     const [couponCode, setCouponCode] = useState("")
     const [couponDiscount, setCouponDiscount] = useState(0)
@@ -443,7 +444,7 @@ export function CheckoutPageClient() {
     const [serviceAvailability, setServiceAvailability] = useState<Record<string, { available: boolean; checked: boolean }>>({})
     const [serviceAvailLoading, setServiceAvailLoading] = useState(false)
 
-    const displayableCoupons = availableCoupons
+    const displayableCoupons = useMemo(() => availableCoupons.filter((c) => !c.blocked), [availableCoupons])
 
     const [formData, setFormData] = useState({
         deliveryType: "delivery" as "delivery" | "pickup",
@@ -870,11 +871,19 @@ export function CheckoutPageClient() {
         !requirements?.hasSubscriptionLines
     )
 
-    const hasUnavailableServices = useMemo(() => {
+const hasUnavailableServices = useMemo(() => {
         return Object.values(serviceAvailability).some(
             (s) => s.checked && !s.available
         )
     }, [serviceAvailability])
+
+    const unavailableServiceLines = useMemo(() => {
+        return (checkoutContext?.lines || []).filter((l) => {
+            if (l.lineKind !== "service_booking") return false
+            const avail = serviceAvailability[l.lineId]
+            return avail && avail.checked && !avail.available
+        })
+    }, [checkoutContext?.lines, serviceAvailability])
 
     const showTraditionalPaymentOption = !checkoutContext?.deposit.available && (checkoutContext?.partner?.orderFlow === "whatsapp" || (!pickupRequiresOnlinePayment && !isOnlyServicesWithDeposit && Boolean(
         requirements?.allowPayOnDelivery ||
@@ -1176,6 +1185,12 @@ export function CheckoutPageClient() {
 
             // Payment preview
             if (shouldPreviewTraditionalPayment) {
+                if (checkoutChargeTotal <= 0 && activeCartItemIds.length > 0) {
+                    setPaymentPreviewLoading(true)
+                    setPaymentError(null)
+                    setPaymentPreview(null)
+                    return
+                }
                 setPaymentPreviewLoading(true)
                 setPaymentError(null)
                 const result = await previewMarketplacePaymentAction({
@@ -1213,6 +1228,7 @@ export function CheckoutPageClient() {
         formData.paymentMethod,
         formData.installments,
         checkoutChargeTotal,
+        activeCartItemIds.length,
     ])
 
     useEffect(() => {
@@ -1364,7 +1380,7 @@ export function CheckoutPageClient() {
                 {checkoutContext?.lines && checkoutContext.lines.length > 0 ? (
                     <>
                         {checkoutContext.lines.some((l) => l.lineKind === "product") && (
-                            <p className="text-xs font-bold uppercase text-brand-inactive-text dark:text-dark-body tracking-wide mb-2">Produtos</p>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-2">Produtos</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "product")
@@ -1429,7 +1445,7 @@ export function CheckoutPageClient() {
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "service_booking") && (
-                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body pt-2 mb-2">Serviços</p>
+                            <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-bodymb-2">Serviços</p>
                         )}
                         {checkoutContext.lines
                             .filter((l) => l.lineKind === "service_booking")
@@ -1473,33 +1489,7 @@ export function CheckoutPageClient() {
                                             formatCurrency(line.lineTotal)
                                         )}
                                     </div>
-                                    {serviceAvailability[line.lineId]?.checked && !serviceAvailability[line.lineId]?.available && (
-                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-brand-orange dark:text-orange-400 font-medium">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
-                                            <span>Este horário não está mais disponível</span>
-                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                            <button
-                                                onClick={() => {
-                                                    const service = { id: line.serviceId, name: line.baseName || line.displayName }
-                                                    const p = checkoutContext?.partner
-                                                    if (service.id && p) window.location.href = getServiceUrl(service, p)
-                                                }}
-                                                className="font-semibold text-brand-green hover:underline"
-                                            >
-                                                Remarcar
-                                            </button>
-                                            <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>
-                                            <button
-                                                onClick={async () => {
-                                                    await deleteCartItemsAction([line.lineId])
-                                                    setRemovedCartItems((prev) => new Set(prev).add(line.lineId))
-                                                }}
-                                                className="font-semibold text-brand-red hover:underline"
-                                            >
-                                                Remover
-                                            </button>
-                                        </div>
-                                    )}
+
                                 </div>
                             ))}
                         {checkoutContext.lines.some((l) => l.lineKind === "subscription") && (
@@ -3112,6 +3102,18 @@ export function CheckoutPageClient() {
 
                         {mobileStep === 2 && (
                             <div className="space-y-6 pb-28">
+                                {hasUnavailableServices && (
+                                    <InfoCard
+                                        message="Alguns horários não estão mais disponíveis."
+                                        color="orange"
+                                        rightElement={
+                                            <ChevronRightIcon
+                                                className="text-brand-inactive-text cursor-pointer"
+                                                onClick={() => setShowServiceUnavailableModal(true)}
+                                            />
+                                        }
+                                    />
+                                )}
                                 {renderFreeDeliveryProgressCard()}
                                 {availableStoreCredit > 0 && (
                                     <div className="p-4 rounded-2xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface space-y-3">
@@ -4253,7 +4255,55 @@ export function CheckoutPageClient() {
                 </div>
             </DefaultModal>
 
-            {/* New Cash Change Modal */}
+            <DefaultModal
+                isOpen={showServiceUnavailableModal}
+                onClose={() => setShowServiceUnavailableModal(false)}
+                title="Horários Indisponíveis"
+                maxWidth="lg"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                        Os seguintes horários não estão mais disponíveis. Você pode remarcar ou remover os serviços:
+                    </p>
+                    {unavailableServiceLines.map((line) => {
+                        const service = { id: line.serviceId, name: line.baseName || line.displayName }
+                        const p = checkoutContext?.partner
+                        return (
+                            <div key={line.lineId} className="flex items-center justify-between p-3 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface gap-3">
+                                <div>
+                                    <p className="font-bold text-brand-dark dark:text-dark-heading">{line.displayName}</p>
+                                    {line.bookingSummary && (
+                                        <p className="text-sm text-brand-inactive-text mt-0.5">{line.bookingSummary}</p>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            if (service.id && p) window.location.href = getServiceUrl(service, p)
+                                        }}
+                                    >
+                                        Remarcar
+                                    </Button>
+                                    <Button
+                                        variant="outlinered"
+                                        size="sm"
+                                        onClick={async () => {
+                                            await deleteCartItemsAction([line.lineId])
+                                            setRemovedCartItems((prev) => new Set(prev).add(line.lineId))
+                                            setShowServiceUnavailableModal(false)
+                                        }}
+                                    >
+                                        Remover
+                                    </Button>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </DefaultModal>
+
             <DefaultModal
                 isOpen={showChangeModal}
                 onClose={() => setShowChangeModal(false)}

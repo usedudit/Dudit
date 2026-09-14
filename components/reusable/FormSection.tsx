@@ -40,9 +40,6 @@ export const FormSection: React.FC<FormSectionProps> = ({
                     {headerRight && <div className="shrink-0 ml-4">{headerRight}</div>}
                 </div>
             )}
-            {!headerRight && description && (
-                <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">{description}</p>
-            )}
             {children && <div className="space-y-6">{children}</div>}
         </div>
     </>

@@ -4,14 +4,14 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, TagIcon, MapPinIcon, CheckIcon, WhatsappIcon, InfoIcon, ShieldIcon, CheckCircleIcon, ArrowLeftIcon, XIcon } from "@/lib/icons"
+import { ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, MapPinIcon, CheckIcon, CheckCircleIcon, XIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormSection, CepInput, Spinner, RadioButton, DefaultModal } from "@/components/reusable"
-import { InfoCard } from "@/components/reusable/InfoCard"
+import { Button, Input, CepInput, Spinner, InfoCard } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
+import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
 import { UserProfileImage, getAvatarColor, getBannerUrlByColor } from "@/lib/utils/UserProfileImage"
 import { getDefaultBannerSeeded } from "@/lib/utils/banner"
@@ -21,7 +21,6 @@ import { addSubscriptionToCartAction, checkCanUserBuyFromStoreAction } from "@/a
 import { invalidateCartCache } from "@/hooks/use-cart"
 import { getStoreUrl, getPlanUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
-
 
 interface PlanDetailsPageClientProps {
     plan: any
@@ -92,9 +91,13 @@ export function PlanDetailsPageClient({
         const storeId = store?.id || p.store_id || plan.store_id || p.id || plan.partner_id || "1"
         const storeName = store?.name || p?.name || p?.storeName || "Vendedor da Dudit"
         const isShowcaseActive = (store?.is_showcase_active ?? p.is_showcase_active ?? plan.is_showcase_active ?? true) !== false
+        const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p.accept_orders_when_closed ?? plan.accept_orders_when_closed ?? true) !== false
+        const timezone = store?.timezone || p.timezone || plan.timezone || "America/Sao_Paulo"
 
         return {
             isShowcaseActive,
+            acceptOrdersWhenClosed,
+            timezone,
             id: storeId,
             short_id: store?.short_id || p.short_id || plan.store_short_id || p?.store?.short_id,
             slug: store?.slug || p.slug,
@@ -112,11 +115,18 @@ export function PlanDetailsPageClient({
             vendas_totais: store?.vendas_totais ?? p.vendas_totais ?? 0,
             created_at: store?.created_at || p.created_at,
             phone: store?.phone || p.phone || null,
+            opening_hours: store?.opening_hours || p.opening_hours || plan.opening_hours || null,
             addresses: store?.addresses || p.addresses || [],
             mp_user_id: p.mp_user_id || null,
             mp_public_key: p.mp_public_key || null,
         }
     }, [plan])
+
+    const isStoreOpenNow = useMemo(() => {
+        return isStoreOpen(partner.opening_hours, undefined, partner.timezone)
+    }, [partner.opening_hours, partner.timezone])
+
+    const isClosedAndBlocking = partner.acceptOrdersWhenClosed === false && !isStoreOpenNow
 
     const planImages = useMemo(() => {
         const imgs = (plan.images || []).filter((img: any) => typeof img === "string" && img.trim()).map((img: string) => getR2ImageUrl(img))
@@ -260,6 +270,10 @@ export function PlanDetailsPageClient({
     const handleSubscribe = async () => {
         if (partner.isShowcaseActive === false) {
             notifyError("Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+        if (isClosedAndBlocking) {
+            notifyError("Esta loja está fechada no momento e não está aceitando novos pedidos.")
             return
         }
 
@@ -445,6 +459,14 @@ export function PlanDetailsPageClient({
                     className="mb-8"
                 />
             )}
+            {!isPlanOwner && partner.isShowcaseActive !== false && isClosedAndBlocking && (
+                <InfoCard
+                    title="Loja Fechada"
+                    message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
             {!isPlanOwner && (
                 <>
                     {/* Delivery Options */}
@@ -602,11 +624,13 @@ export function PlanDetailsPageClient({
                     {/* Subscribe button */}
                     <button
                         onClick={handleSubscribe}
-                        disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false}
+                        disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
                         className="w-full py-4 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-[15px]"
                     >
                         {partner.isShowcaseActive === false ? (
                             "Vitrine Inativa"
+                        ) : isClosedAndBlocking ? (
+                            "Loja Fechada"
                         ) : submitting ? (
                             <>
                                 <Spinner size={16} className="text-white" />
@@ -1046,11 +1070,13 @@ export function PlanDetailsPageClient({
                         </div>
                         <button
                             onClick={handleSubscribe}
-                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false}
+                            disabled={submitting || (deliveryType === "delivery" && !selectedAddressId && !showAddressForm) || partner.isShowcaseActive === false || isClosedAndBlocking}
                             className="px-6 py-3.5 bg-brand-green text-white font-bold rounded-full flex items-center justify-center gap-2 hover:bg-[#047857] transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm shrink-0"
                         >
                             {partner.isShowcaseActive === false ? (
                                 "Vitrine Inativa"
+                            ) : isClosedAndBlocking ? (
+                                "Loja Fechada"
                             ) : submitting ? (
                                 <>
                                     <Spinner size={14} className="text-white animate-spin" />

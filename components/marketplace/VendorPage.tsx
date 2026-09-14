@@ -15,7 +15,7 @@ import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
 import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
-import { normalizeOpeningHours } from "@/lib/utils/opening-hours"
+import { normalizeOpeningHours, isStoreOpen } from "@/lib/utils/opening-hours"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
@@ -661,6 +661,10 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const isShowcaseActive = propIsShowcaseActive !== undefined
         ? propIsShowcaseActive
         : (partner?.isShowcaseActive ?? partner?.is_showcase_active ?? true)
+    const isStoreOpenNow = useMemo(() => {
+        return isStoreOpen(partner?.openingHours, undefined, partner?.timezone)
+    }, [partner?.openingHours, partner?.timezone])
+    const isClosedAndBlocking = partner?.acceptOrdersWhenClosed === false && !isStoreOpenNow
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
         if (calculatedReviewsCount === 0) return 0
@@ -1109,9 +1113,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
-                    {!isShowcaseActive && (
+                    {!isShowcaseActive ? (
                         <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" className="mb-4" />
-                    )}
+                    ) : isClosedAndBlocking ? (
+                        <InfoCard title="Loja Fechada" message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento." color="orange" className="mb-4" />
+                    ) : null}
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -1383,6 +1389,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {!isShowcaseActive && categoryView && (
                         <div className="mb-4 lg:hidden">
                             <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" />
+                        </div>
+                    )}
+                    {isShowcaseActive && isClosedAndBlocking && categoryView && (
+                        <div className="mb-4 lg:hidden">
+                            <InfoCard title="Loja Fechada" message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento." color="orange" />
                         </div>
                     )}
                     {activeSection === "products" && (

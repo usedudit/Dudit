@@ -25,7 +25,7 @@ import {
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
 import { updateStoreAction } from "@/app/actions/erp/stores"
-import { ChevronLeftIcon, SaveIcon, Store, ShoppingBagIcon, HomeIcon, WrenchIcon, ChevronRightIcon, UserIcon, StoreIcon, TagIcon, BriefcaseIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, Store, ChevronRightIcon, UserIcon, StoreIcon, TagIcon, BriefcaseIcon, ClockIcon } from "@/lib/icons"
 import PartnerCategoryModal from "./PartnerCategoryModal"
 import { getPartnerCategoryPathClient } from "@/lib/data/partner-categories-client"
 import { useNotification } from "@/hooks/use-notification"
@@ -198,6 +198,7 @@ export const BusinessDataSubPage = ({
 
     const [hours, setHours] = useState(() => normalizeOpeningHours(effectiveHours))
     const [timezone, setTimezone] = useState<string>(store?.timezone || partner?.timezone || "America/Sao_Paulo")
+    const [acceptOrdersWhenClosed, setAcceptOrdersWhenClosed] = useState<boolean>(store?.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true)
 
     const [initialState, setInitialState] = useState(() => ({
         generalInfo: { ...generalInfo },
@@ -205,6 +206,7 @@ export const BusinessDataSubPage = ({
         fiscalInfo: { ...fiscalInfo },
         hours: { ...hours },
         timezone: store?.timezone || partner?.timezone || "America/Sao_Paulo",
+        acceptOrdersWhenClosed: store?.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
     }))
 
     const isDirty = useMemo(() => {
@@ -212,8 +214,9 @@ export const BusinessDataSubPage = ({
             JSON.stringify(initialState.addresses) !== JSON.stringify(addresses) ||
             JSON.stringify(initialState.fiscalInfo) !== JSON.stringify(fiscalInfo) ||
             JSON.stringify(initialState.hours) !== JSON.stringify(hours) ||
-            initialState.timezone !== timezone
-    }, [initialState, generalInfo, addresses, fiscalInfo, hours, timezone])
+            initialState.timezone !== timezone ||
+            initialState.acceptOrdersWhenClosed !== acceptOrdersWhenClosed
+    }, [initialState, generalInfo, addresses, fiscalInfo, hours, timezone, acceptOrdersWhenClosed])
 
     const { showConfirmDialog, confirmNavigation, cancelNavigation, handleNavigation } = useUnsavedChanges(isDirty)
 
@@ -347,6 +350,7 @@ export const BusinessDataSubPage = ({
                         phone: generalInfo.phone || undefined,
                         business_info: businessInfoData as any,
                         opening_hours: normalizeOpeningHours(hours) as any,
+                        accept_orders_when_closed: acceptOrdersWhenClosed,
                         category_id: generalInfo.categoryId,
                         subcategory_id: generalInfo.subcategoryId,
                         zip_code: addresses.zipCode,
@@ -399,6 +403,7 @@ export const BusinessDataSubPage = ({
                         fiscalInfo: { ...fiscalInfo },
                         hours: { ...hours },
                         timezone: timezone || "America/Sao_Paulo",
+                        acceptOrdersWhenClosed: acceptOrdersWhenClosed,
                     })
                     setTimeout(() => {
                         onBack()
@@ -868,6 +873,41 @@ export const BusinessDataSubPage = ({
 
                                         <FormSection title="Horários de Funcionamento" hasSeparator>
                                             <BusinessHoursSelector value={hours as any} onChange={setHours} />
+                                        </FormSection>
+
+                                        <FormSection title="Pedidos fora do horário de funcionamento" hasSeparator>
+                                            <div className="grid gap-3 max-w-2xl">
+                                                <ListItem
+                                                    title="Receber pedidos normalmente"
+                                                    description="Clientes podem fazer pedidos mesmo quando a loja estiver fora do horário de funcionamento."
+                                                    icon={<ClockIcon className="text-brand-green" size={20} />}
+                                                    onClick={() => setAcceptOrdersWhenClosed(true)}
+                                                    right={
+                                                        <RadioButton
+                                                            name="acceptOrdersWhenClosed"
+                                                            value="allow"
+                                                            checked={acceptOrdersWhenClosed}
+                                                            onChange={() => setAcceptOrdersWhenClosed(true)}
+                                                        />
+                                                    }
+                                                    className="py-4 px-6 gap-4 cursor-pointer"
+                                                />
+                                                <ListItem
+                                                    title="Bloquear pedidos com loja fechada"
+                                                    description="A vitrine não permitirá a realização de novos pedidos enquanto a loja estiver fora do horário de funcionamento."
+                                                    icon={<ClockIcon className="text-brand-inactive-text" size={20} />}
+                                                    onClick={() => setAcceptOrdersWhenClosed(false)}
+                                                    right={
+                                                        <RadioButton
+                                                            name="acceptOrdersWhenClosed"
+                                                            value="block"
+                                                            checked={!acceptOrdersWhenClosed}
+                                                            onChange={() => setAcceptOrdersWhenClosed(false)}
+                                                        />
+                                                    }
+                                                    className="py-4 px-6 gap-4 cursor-pointer"
+                                                />
+                                            </div>
                                         </FormSection>
                                     </motion.div>
                                 </TabsContent>

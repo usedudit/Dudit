@@ -599,6 +599,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             notifyError("Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
             return
         }
+        if (partnerData?.isAcceptingOrders === false) {
+            notifyError("Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
 
         const hasSelected = partnerData?.items.some((item: any) => getItemSelected(item))
 
@@ -618,6 +622,10 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
             if (isQuantityExceedingStock(item)) {
                 const max = getItemMaxStock(item)
                 notifyError(`O item "${getItemName(item)}" possui apenas ${max} unidade(s) disponível(is). Ajuste a quantidade para continuar.`)
+                return
+            }
+            if (item.item_type === "service_booking" && serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) {
+                notifyError(`O serviço "${getItemName(item)}" não está mais disponível no horário selecionado. Remarque ou remova-o da sacola para prosseguir.`)
                 return
             }
         }
@@ -913,14 +921,21 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                             className="overflow-hidden"
                                                         >
                                                             <div className="pt-2 pb-6">
-                                                                {data.isShowcaseActive === false && (
+                                                                {data.isShowcaseActive === false ? (
                                                                     <InfoCard
                                                                         title="Vitrine Inativa"
                                                                         message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos."
                                                                         color="orange"
                                                                         className="mb-4"
                                                                     />
-                                                                )}
+                                                                ) : data.isAcceptingOrders === false ? (
+                                                                    <InfoCard
+                                                                        title="Loja Fechada"
+                                                                        message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento."
+                                                                        color="orange"
+                                                                        className="mb-4"
+                                                                    />
+                                                                ) : null}
                                                                 {[
                                                                     { title: "Produtos", items: data.products?.length ? data.products : data.items.filter((i: any) => (i.item_type || "product") === "product") },
                                                                     { title: "Serviços", items: data.services || [] },
@@ -1028,7 +1043,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     </p>
                                                                                                 )}
 
-                                                                                                <div className="flex flex-col items-center gap-2 md:hidden mt-2">
+                                                                                                <div className="flex flex-col items-start gap-2 md:hidden mt-2">
                                                                                                     {isOutOfStock ? (
                                                                                                         <Badge variant="red" className="whitespace-nowrap scale-90 shrink-0">
                                                                                                             Esgotado
@@ -1343,19 +1358,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                 {/* Mobile/Tablet: resumo inline + botão */}
                                                                 <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border md:hidden space-y-3">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
-                                                                    <div className="flex items-center justify-between gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1">
-                                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                                            <MapPinIcon size={13} className="text-brand-green shrink-0" />
-                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress ? `${selectedAddress.city} - ${selectedAddress.state}` : "Não definido"}</strong></span>
-                                                                        </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setShowAddressModal(true)}
-                                                                            className="text-[11px] font-semibold text-brand-green hover:underline shrink-0"
-                                                                        >
-                                                                            {selectedAddress ? "Trocar" : "Definir"}
-                                                                        </button>
-                                                                    </div>
                                                                     <div className="flex justify-between items-center text-sm">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -1374,9 +1376,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     <Button
                                                                         onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full"
-                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false}
+                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false || data.isAcceptingOrders === false}
                                                                     >
-                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : "Finalizar pedido"}
+                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : data.isAcceptingOrders === false ? "Loja Fechada" : "Finalizar pedido"}
                                                                     </Button>
                                                                 </div>
                                                             </div>
@@ -1406,19 +1408,6 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                             >
                                                                 <div className="p-6 space-y-4">
                                                                     {renderPromoBanners(storeKey, partnerItemsTotal)}
-                                                                    <div className="flex items-center justify-between gap-1.5 text-xs text-brand-inactive-text dark:text-dark-body pb-1 border-b border-brand-border/60 dark:border-dark-border/60">
-                                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                                            <MapPinIcon size={13} className="text-brand-green shrink-0" />
-                                                                            <span className="truncate">Entrega em: <strong className="text-brand-dark dark:text-dark-heading">{selectedAddress ? `${selectedAddress.city} - ${selectedAddress.state}` : "Não definido"}</strong></span>
-                                                                        </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setShowAddressModal(true)}
-                                                                            className="text-[11px] font-semibold text-brand-green hover:underline shrink-0"
-                                                                        >
-                                                                            {selectedAddress ? "Trocar" : "Definir"}
-                                                                        </button>
-                                                                    </div>
                                                                     <div className="flex justify-between items-center text-sm font-medium">
                                                                         <span className="text-brand-inactive-text dark:text-dark-body">Total dos itens</span>
                                                                         <span className="text-brand-dark dark:text-dark-heading">{formatCurrency(partnerItemsTotal)}</span>
@@ -1437,9 +1426,9 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                     <Button
                                                                         onClick={() => handleOpenCheckout(storeKey)}
                                                                         className="w-full h-[46px]"
-                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false}
+                                                                        disabled={partnerItemsTotal === 0 || data.isShowcaseActive === false || data.isAcceptingOrders === false}
                                                                     >
-                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : "Finalizar Pedido"}
+                                                                        {data.isShowcaseActive === false ? "Vitrine Inativa" : data.isAcceptingOrders === false ? "Loja Fechada" : "Finalizar Pedido"}
                                                                     </Button>
                                                                 </div>
                                                             </motion.div>

@@ -79,7 +79,7 @@ const PricingCards = () => {
             "Tudo do plano Começar +",
             "Receba pedidos direto pelo sistema",
             "Pagamentos online com Mercado Pago",
-            "Cupons e promoções para vender mais",
+            "Cupons para vender mais",
             "Variações de produtos (cor, tamanho e mais)",
             "Complementos e adicionais",
             "Gestão de trocas e devoluções",

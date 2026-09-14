@@ -28,7 +28,7 @@ import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
-import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon, TrashIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -270,6 +270,12 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
             console.error("Erro ao processar imagem recortada", error)
         }
     }, [])
+
+    const handleRemoveImage = () => {
+        setImagePreview("")
+        setImageUrl("")
+        setImageFile(null)
+    }
 
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
@@ -580,6 +586,20 @@ const NewCustomerPage: FC<NewCustomerPageProps> = ({ onBack, partnerId, customer
                                                             <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Imagem do Cliente</h3>
                                                             <p className="text-xs text-brand-inactive-text mt-0.5">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
                                                         </div>
+                                                        {imagePreview && (
+                                                            <Button
+                                                              variant="ghostred"
+                                                              size="icon"
+                                                              className="w-8 h-8"
+                                                              onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                e.preventDefault()
+                                                                handleRemoveImage()
+                                                              }}
+                                                            >
+                                                              <TrashIcon size={14} />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -1033,6 +1053,20 @@ onAddressFetched={(data) => {
                                                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Imagem</p>
                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 5MB (PNG, JPG, WEBP)</p>
                                                         </div>
+                                                        {imagePreview && (
+                                                            <Button
+                                                              variant="ghostred"
+                                                              size="icon"
+                                                              className="w-8 h-8"
+                                                              onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                e.preventDefault()
+                                                                handleRemoveImage()
+                                                              }}
+                                                            >
+                                                              <TrashIcon size={14} />
+                                                            </Button>
+                                                        )}
                                                         <input ref={imageInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp" onChange={(e) => {
                                                             const file = e.target.files?.[0]
                                                             if (file) {

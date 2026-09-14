@@ -7,6 +7,7 @@ import { Check, MapPin } from "lucide-react"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
 import { motion, AnimatePresence } from "framer-motion"
+import { useMediaQuery } from "@/components/erp/hooks"
 
 const RADIUS_OPTIONS = [
     { value: "", label: "Toda a cidade (sem limite)" },
@@ -78,6 +79,7 @@ export function ExplorarFiltersBottomSheet({
     userProfile,
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
 }: ExplorarFiltersBottomSheetProps) {
+    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     const [draftType, setDraftType] = useState(currentType)
     const [draftCategories, setDraftCategories] = useState<string[]>(selectedCategories)
@@ -338,54 +340,79 @@ export function ExplorarFiltersBottomSheet({
 
     return (
         <Portal>
-            <AnimatePresence>
-                {isOpen && (
-                    <>
-                        {/* Overlay */}
-                        <motion.div
-                            className="fixed inset-0 z-[100] bg-black/50"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={onClose}
-                        />
-
-                        {/* Panel - bottom on mobile, right-side on desktop */}
-                        <motion.div
-                            className="fixed bottom-0 left-0 right-0 lg:top-4 lg:bottom-4 lg:left-auto lg:right-4 lg:w-96 lg:max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden z-[101] lg:rounded-2xl max-h-[85vh] lg:max-h-none"
-                            initial={{ y: "100%", opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: "100%", opacity: 0 }}
-                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {/* Mobile drag handle */}
-                            <div className="lg:hidden shrink-0 flex justify-center pt-3 pb-1">
-                                <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
-                            </div>
-
-                            <header className="shrink-0 border-b border-brand-border p-6 flex justify-between items-center">
-                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
-                                <Button variant="filled" onClick={onClose} size="icon">
-                                    <XIcon className="w-5 h-5" />
-                                </Button>
-                            </header>
-
-                            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="space-y-6 py-4 px-6">
-                                    {bodySections}
+            {isMobile ? (
+                <AnimatePresence>
+                    {isOpen && (
+                        <>
+                            <motion.div
+                                className="fixed inset-0 z-[100] bg-black/50"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={onClose}
+                            />
+                            <motion.div
+                                className="fixed bottom-0 left-0 right-0 z-[101] bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden rounded-t-3xl max-h-[85vh]"
+                                initial={{ y: "100%" }}
+                                animate={{ y: 0 }}
+                                exit={{ y: "100%" }}
+                                transition={{ type: "spring", stiffness: 260, damping: 30 }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="shrink-0 flex justify-center pt-3 pb-1">
+                                    <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
                                 </div>
-                            </div>
-
-                            <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
-                                <div className="flex items-center gap-4">
-                                    {footerButtons}
+                                <header className="shrink-0 border-b border-brand-border p-6 flex justify-between items-center">
+                                    <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
+                                    <Button variant="filled" onClick={onClose} size="icon">
+                                        <XIcon className="w-5 h-5" />
+                                    </Button>
+                                </header>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                    <div className="space-y-6 py-4 px-6">
+                                        {bodySections}
+                                    </div>
                                 </div>
-                            </footer>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+                                <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
+                                    <div className="flex items-center gap-4">
+                                        {footerButtons}
+                                    </div>
+                                </footer>
+                            </motion.div>
+                        </>
+                    )}
+                </AnimatePresence>
+            ) : (
+                <>
+                    <div
+                        className={`fixed inset-0 z-[100] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                        onClick={onClose}
+                    />
+                    <div
+                        className={`fixed right-4 top-4 bottom-4 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col z-[101] ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <header className="border-b border-brand-border p-6 flex justify-between items-center shrink-0">
+                            <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
+                            <Button variant="filled" onClick={onClose} size="icon">
+                                <XIcon className="w-5 h-5" />
+                            </Button>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="space-y-6 py-4 px-6">
+                                {bodySections}
+                            </div>
+                        </div>
+
+                        <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
+                            <div className="flex items-center gap-4">
+                                {footerButtons}
+                            </div>
+                        </footer>
+                    </div>
+                </>
+            )}
         </Portal>
     )
 }

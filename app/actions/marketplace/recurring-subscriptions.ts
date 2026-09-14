@@ -9,7 +9,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { mapPlanRow, mapSubscriptionRow, getRecurringStatusLabel, getRecurringFrequencyLabel } from "@/lib/types/recurring"
 import { isUuid } from "@/lib/utils/short-id"
-import { isStoreShowcaseActive, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
+import { canStoreAcceptOrders, INACTIVE_SHOWCASE_ERROR } from "@/lib/commerce/store-showcase"
 
 
 export async function listMarketplaceRecurringPlansAction(partnerId: string) {
@@ -58,9 +58,9 @@ export async function subscribeToRecurringPlanAction(input: {
     const user = await requireUser()
     const admin = getAdminClient()
 
-    const showcaseActive = await isStoreShowcaseActive(admin, { partnerId: input.partnerId })
-    if (!showcaseActive) {
-      return { success: false, error: INACTIVE_SHOWCASE_ERROR }
+    const acceptance = await canStoreAcceptOrders(admin, { partnerId: input.partnerId })
+    if (!acceptance.allowed) {
+      return { success: false, error: acceptance.message || INACTIVE_SHOWCASE_ERROR }
     }
 
     // Block owner or team member from subscribing

@@ -32,6 +32,7 @@ import { MarketplaceHeader } from "./MarketplaceHeader"
 import { useFavorites } from "@/providers/favorites-provider"
 import { fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { checkCanUserBuyFromStoreAction } from "@/app/actions/marketplace/cart-extensions"
 import { InfoCard } from "@/components/reusable/InfoCard"
 import { Button, Input, FormSection, IconPlaceholder, DefaultModal, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
@@ -245,9 +246,13 @@ export function ServiceDetailsPageClient({
         const storeId = store?.id || p?.store_id || service.store_id || realPartnerId
         const storeName = store?.name || p?.name || p?.store_name || "Profissional"
         const isShowcaseActive = (store?.is_showcase_active ?? p?.is_showcase_active ?? true) !== false
+        const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p?.accept_orders_when_closed ?? true) !== false
+        const timezone = store?.timezone || p?.timezone || "America/Sao_Paulo"
 
         return {
             isShowcaseActive,
+            acceptOrdersWhenClosed,
+            timezone,
             id: realPartnerId,
             short_id: store?.short_id || p?.short_id || service.store_short_id || p?.store?.short_id,
             slug: store?.slug || p?.slug,
@@ -272,6 +277,12 @@ export function ServiceDetailsPageClient({
             created_at: store?.created_at || p?.created_at,
         }
     }, [service])
+
+    const isStoreOpenNow = useMemo(() => {
+        return isStoreOpen(partner.opening_hours, undefined, partner.timezone)
+    }, [partner.opening_hours, partner.timezone])
+
+    const isClosedAndBlocking = partner.acceptOrdersWhenClosed === false && !isStoreOpenNow
 
     const [activePromotions, setActivePromotions] = useState<any[]>([])
 
@@ -853,6 +864,10 @@ export function ServiceDetailsPageClient({
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
             return
         }
+        if (isClosedAndBlocking) {
+            notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
+            return
+        }
 
         if (!userId) {
             router.push("/auth/login?next=" + encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : ""))
@@ -925,11 +940,15 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, service, partner, pricing.bestPrice, isClosedAndBlocking, notifyError])
 
     const handleAddBookingToCart = useCallback(async () => {
         if (partner.isShowcaseActive === false) {
             notifyError("Erro", "Esta vitrine está temporariamente inativa e não está aceitando novos pedidos.")
+            return
+        }
+        if (isClosedAndBlocking) {
+            notifyError("Erro", "Esta loja está fechada no momento e não está aceitando novos pedidos.")
             return
         }
 
@@ -963,7 +982,7 @@ export function ServiceDetailsPageClient({
         } finally {
             setIsBooking(false)
         }
-    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, partner.isShowcaseActive, notifySuccess, notifyError])
+    }, [userId, router, selectedDate, selectedTime, selectedStaffId, buildBookingPayload, partner.isShowcaseActive, isClosedAndBlocking, notifySuccess, notifyError])
 
     const handleRequestQuoteClick = useCallback(() => {
         if (isProductOwner) return
@@ -1381,6 +1400,14 @@ export function ServiceDetailsPageClient({
                     className="mb-8"
                 />
             )}
+            {!isProductOwner && partner.isShowcaseActive !== false && isClosedAndBlocking && (
+                <InfoCard
+                    title="Loja Fechada"
+                    message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento."
+                    color="orange"
+                    className="mb-8"
+                />
+            )}
             {!isProductOwner && (
                 !showPrice ? (
                     <div className="hidden lg:block mb-4">
@@ -1417,12 +1444,14 @@ export function ServiceDetailsPageClient({
                 ) : (
                     <div className="hidden lg:block space-y-2 mb-4">
                         <Button
-                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false || isClosedAndBlocking}
                             onClick={handleBookNowCheckout}
                             className="w-full h-[46px]"
                         >
                             {partner.isShowcaseActive === false ? (
                                 "Vitrine Inativa"
+                            ) : isClosedAndBlocking ? (
+                                "Loja Fechada"
                             ) : isBooking ? (
                                 <span className="flex items-center gap-2">
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1437,7 +1466,7 @@ export function ServiceDetailsPageClient({
                         </Button>
                         <Button
                             variant="outline"
-                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                            disabled={!selectedTime || isBooking || partner.isShowcaseActive === false || isClosedAndBlocking}
                             onClick={handleAddBookingToCart}
                             className="w-full h-[46px]"
                         >
@@ -2276,17 +2305,17 @@ export function ServiceDetailsPageClient({
                                     <Button
                                         variant="outline"
                                         className="rounded-full px-3"
-                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false || isClosedAndBlocking}
                                         onClick={handleAddBookingToCart}
                                     >
                                         Sacola
                                     </Button>
                                     <Button
                                         className="flex-1 rounded-full min-w-[120px]"
-                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false}
+                                        disabled={!selectedTime || isBooking || partner.isShowcaseActive === false || isClosedAndBlocking}
                                         onClick={handleBookNowCheckout}
                                     >
-                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isBooking ? "..." : "Reservar"}
+                                        {partner.isShowcaseActive === false ? "Vitrine Inativa" : isClosedAndBlocking ? "Loja Fechada" : isBooking ? "..." : "Reservar"}
                                     </Button>
                                 </>
                             </>

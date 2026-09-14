@@ -221,33 +221,9 @@ export function SalesSettingsSubPage({
                                             onCheckedChange={(v) => updateField("requireSeller", Boolean(v))}
                                         />
                                     </div>
-
-                                    <div className="max-w-md">
-                                        <FormDropdown
-                                            label="Validade padrão de orçamentos"
-                                            value={String(settings.quoteValidityDays ?? 15)}
-                                            setValue={(v) => updateField("quoteValidityDays", Number(v))}
-                                            options={QUOTE_VALIDITY_OPTIONS}
-                                        />
-                                    </div>
                                 </div>
                             </FormSection>
 
-                            {/* Cancelamento Automático de Pedidos */}
-                            <FormSection
-                                title="Cancelamento Automático de Pedidos Pendentes"
-                                description="Configure a expiração automática de pedidos manuais não pagos para liberar o estoque reservado."
-                                hasSeparator
-                            >
-                                <div className="max-w-md">
-                                    <FormDropdown
-                                        label="Expiração de Pedidos Manuais / Balcão pendentes"
-                                        value={String(settings.autoCancelManualOrdersHours ?? 0)}
-                                        setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
-                                        options={MANUAL_ORDER_EXPIRATION_OPTIONS}
-                                    />
-                                </div>
-                            </FormSection>
                         </div>
 
                         {/* Right Column / Sidebar */}
@@ -257,31 +233,19 @@ export function SalesSettingsSubPage({
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">
                                     Cancelamento Automático e Prazos
                                 </h3>
-                                <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Desconto Máximo:</strong>{" "}
-                                        Protege sua margem de lucro impedindo descontos excessivos no PDV e nos pedidos manuais.
-                                    </p>
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Margem Padrão:</strong>{" "}
-                                        Define a margem de lucro base para o cálculo automático de preços nos produtos.
-                                    </p>
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Controle de Estoque:</strong>{" "}
-                                        Produtos individuais com "Permitir venda sem estoque" ativo continuarão liberados. Os demais serão bloqueados se o saldo for insuficiente.
-                                    </p>
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Vendedor Obrigatório:</strong>{" "}
-                                        Evita vendas avulsas sem responsável e garante relatórios de comissão 100% consistentes.
-                                    </p>
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Validade de Orçamentos:</strong>{" "}
-                                        Orçamentos expiram automaticamente após o prazo configurado, evitando compromissos desatualizados.
-                                    </p>
-                                    <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Cancelamento de Pedidos:</strong>{" "}
-                                        Pedidos não pagos são cancelados automaticamente pelo sistema após o prazo configurado, devolvendo o estoque ao catálogo.
-                                    </p>
+                                <div className="space-y-4">
+                                    <FormDropdown
+                                        label="Expiração de Pedidos Manuais / Balcão"
+                                        value={String(settings.autoCancelManualOrdersHours ?? 0)}
+                                        setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
+                                        options={MANUAL_ORDER_EXPIRATION_OPTIONS}
+                                    />
+                                    <FormDropdown
+                                        label="Validade padrão de orçamentos"
+                                        value={String(settings.quoteValidityDays ?? 15)}
+                                        setValue={(v) => updateField("quoteValidityDays", Number(v))}
+                                        options={QUOTE_VALIDITY_OPTIONS}
+                                    />
                                 </div>
                             </div>
                         </div>

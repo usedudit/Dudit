@@ -253,6 +253,8 @@ export default async function VendorPage({
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',
     isShowcaseActive: store.is_showcase_active ?? partner?.is_showcase_active ?? true,
+    acceptOrdersWhenClosed: store.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
+    timezone: store.timezone || "America/Sao_Paulo",
   }
 
   return (

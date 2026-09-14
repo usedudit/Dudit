@@ -28,7 +28,7 @@ import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { CpfCnpjInput } from "@/components/reusable/Inputs/CpfCnpjInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
 import { NumberInputWithCheckbox } from "@/components/reusable/Inputs/NumberInputWithCheckbox"
-import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, EditIcon, UserIcon, StoreIcon, TrashIcon } from "@/lib/icons"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -201,6 +201,12 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
             console.error("Erro ao processar imagem recortada", error)
         }
     }, [])
+
+    const handleRemoveImage = () => {
+        setImagePreview("")
+        setImageUrl("")
+        setImageFile(null)
+    }
 
     const handleBack = useCallback(() => handleNavigation(onBack), [handleNavigation, onBack])
 
@@ -483,11 +489,25 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                             </span>
                                                         </div>
                                                     </label>
-                                                    <div className="min-w-0 flex-1">
-                                                        <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Imagem do Fornecedor</h3>
-                                                        <p className="text-xs text-brand-inactive-text mt-0.5">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
-                                                    </div>
-                                                </div>
+                                                     <div className="min-w-0 flex-1">
+                                                         <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Imagem do Fornecedor</h3>
+                                                         <p className="text-xs text-brand-inactive-text mt-0.5">Formatos aceitos: PNG, JPG ou WEBP (máx. 5MB)</p>
+                                                     </div>
+                                                     {imagePreview && (
+                                                         <Button
+                                                           variant="ghostred"
+                                                           size="icon"
+                                                           className="w-8 h-8"
+                                                           onClick={(e) => {
+                                                             e.stopPropagation()
+                                                             e.preventDefault()
+                                                             handleRemoveImage()
+                                                           }}
+                                                         >
+                                                           <TrashIcon size={14} />
+                                                         </Button>
+                                                     )}
+                                                 </div>
 
                                                 {/* Identificação */}
                                                 <FormSection title="Dados Gerais">
@@ -819,18 +839,32 @@ const NewSupplierPage: FC<NewSupplierPageProps> = ({ onBack, partnerId, supplier
                                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                                                             </div>
                                                         </div>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Imagem</p>
-                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 5MB (PNG, JPG, WEBP)</p>
-                                                        </div>
-                                                        <input ref={imageInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp" onChange={(e) => {
-                                                            const file = e.target.files?.[0]
-                                                            if (file) {
-                                                                setSelectedImageForCrop(file)
-                                                                setShowImageCropper(true)
-                                                            }
-                                                            e.target.value = ""
-                                                        }} />
+                                                         <div className="flex-1">
+                                                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading">Imagem</p>
+                                                             <p className="text-xs text-brand-inactive-text dark:text-dark-body">Máx 5MB (PNG, JPG, WEBP)</p>
+                                                         </div>
+                                                         {imagePreview && (
+                                                             <Button
+                                                               variant="ghostred"
+                                                               size="icon"
+                                                               className="w-8 h-8"
+                                                               onClick={(e) => {
+                                                                 e.stopPropagation()
+                                                                 e.preventDefault()
+                                                                 handleRemoveImage()
+                                                               }}
+                                                             >
+                                                               <TrashIcon size={14} />
+                                                             </Button>
+                                                         )}
+                                                         <input ref={imageInputRef} type="file" hidden accept="image/png, image/jpeg, image/webp" onChange={(e) => {
+                                                             const file = e.target.files?.[0]
+                                                             if (file) {
+                                                                 setSelectedImageForCrop(file)
+                                                                 setShowImageCropper(true)
+                                                             }
+                                                             e.target.value = ""
+                                                         }} />
                                                     </div>
                                                 </SidebarCard>
 

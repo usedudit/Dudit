@@ -135,6 +135,7 @@ interface CreateStoreInput {
     description?: string
     opening_hours?: Record<string, unknown>
     logo_url?: string
+    accept_orders_when_closed?: boolean
     // Address fields
     zip_code?: string
     street?: string
@@ -190,6 +191,7 @@ export async function createStoreAction(input: CreateStoreInput): Promise<Action
                 logo_url: input.logo_url || null,
                 banner_url: getRandomDefaultBanner(),
                 is_active: true,
+                accept_orders_when_closed: input.accept_orders_when_closed ?? true,
             })
             .select("id")
             .single()
@@ -252,6 +254,7 @@ interface UpdateStoreInput {
     is_headquarters?: boolean
     // F5.4a: Showcase / storefront fields
     is_showcase_active?: boolean
+    accept_orders_when_closed?: boolean
     // F5.4b: Business data fields
     business_info?: Record<string, unknown>
     category_id?: string | null
@@ -318,6 +321,7 @@ export async function updateStoreAction(input: UpdateStoreInput): Promise<Action
         if (input.is_headquarters !== undefined) updateData.is_headquarters = input.is_headquarters
         // F5.4a: Showcase fields
         if (input.is_showcase_active !== undefined) updateData.is_showcase_active = input.is_showcase_active
+        if (input.accept_orders_when_closed !== undefined) updateData.accept_orders_when_closed = input.accept_orders_when_closed
         // F5.4b: Business data fields
         if (input.business_info !== undefined) updateData.business_info = input.business_info
         if (input.category_id !== undefined) updateData.category_id = input.category_id
