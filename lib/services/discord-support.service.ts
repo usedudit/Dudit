@@ -71,8 +71,11 @@ export async function sendDiscordSupportNotification(
   try {
     const config = CATEGORY_CONFIG[payload.category] || CATEGORY_CONFIG.outro
 
+    const tz = payload.partnerId
+      ? await import("@/lib/date").then(m => m.getPartnerTimezone(payload.partnerId!)).catch(() => "America/Sao_Paulo")
+      : "America/Sao_Paulo"
     const formattedDate = new Date(payload.createdAt || Date.now()).toLocaleString("pt-BR", {
-      timeZone: "America/Sao_Paulo",
+      timeZone: tz,
     })
 
     const fields: Array<{ name: string; value: string; inline?: boolean }> = []

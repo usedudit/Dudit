@@ -5,16 +5,11 @@ export const useMediaQuery = (query: string): boolean => {
 
     useEffect(() => {
         const media = window.matchMedia(query);
+        setMatches(media.matches);
         const listener = () => setMatches(media.matches);
-        
-        // Set the initial state
-        if (media.matches !== matches) {
-            setMatches(media.matches);
-        }
-
         media.addEventListener('change', listener);
         return () => media.removeEventListener('change', listener);
-    }, [matches, query]);
+    }, [query]);
 
     return matches;
 };

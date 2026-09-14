@@ -5,7 +5,7 @@ interface FormSectionProps {
     titleRight?: React.ReactNode
     headerRight?: React.ReactNode
     description?: string
-    children: React.ReactNode
+    children?: React.ReactNode
     className?: string
     hasSeparator?: boolean
 }
@@ -43,7 +43,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
             {!headerRight && description && (
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-6">{description}</p>
             )}
-            <div className="space-y-6">{children}</div>
+            {children && <div className="space-y-6">{children}</div>}
         </div>
     </>
 )

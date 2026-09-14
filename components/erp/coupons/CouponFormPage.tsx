@@ -66,10 +66,12 @@ const SidebarCard = ({
     title,
     children,
     hasTopStrip = true,
+    hasSeparator = false,
 }: {
     title?: React.ReactNode
     children: React.ReactNode
     hasTopStrip?: boolean
+    hasSeparator?: boolean
 }) => (
     <>
         {/* Desktop: card */}
@@ -79,7 +81,7 @@ const SidebarCard = ({
             {children}
         </div>
         {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator className="lg:hidden">
+        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
             {children}
         </FormSection>
     </>

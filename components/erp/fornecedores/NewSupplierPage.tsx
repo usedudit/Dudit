@@ -60,7 +60,7 @@ const REQUIRED_FIELDS = [
     { field: "cep", tab: "address" },
 ]
 
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
     <>
         {/* Desktop: card */}
         <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
@@ -69,7 +69,7 @@ const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: {
             {children}
         </div>
         {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator className="lg:hidden">
+        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
             {children}
         </FormSection>
     </>

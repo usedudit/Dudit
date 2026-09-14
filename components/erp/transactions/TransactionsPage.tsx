@@ -56,6 +56,7 @@ import { ChevronLeftIcon } from "@/lib/icons"
 import { useErpExport } from "@/hooks/use-erp-export"
 import ExportSelectionModal from "@/components/erp/export/ExportSelectionModal"
 import ExportColumnSelectionModal from "@/components/erp/export/ExportColumnSelectionModal"
+import { usePartnerTimezone } from "@/lib/store-context"
 
 function ymdFromRaw(raw: string | null | undefined): string | null {
     if (!raw) return null
@@ -64,18 +65,18 @@ function ymdFromRaw(raw: string | null | undefined): string | null {
     return msToBrazilYmd(t)
 }
 
-function formatDateFromRaw(raw: string | null | undefined): string | null {
+function formatDateFromRaw(raw: string | null | undefined, tz?: string): string | null {
     if (!raw) return null
     const dt = new Date(raw)
     if (Number.isNaN(dt.getTime())) return null
-    return dt.toLocaleDateString("pt-BR")
+    return dt.toLocaleDateString("pt-BR", { timeZone: tz })
 }
 
-function formatTimeFromRaw(raw: string | null | undefined): string | null {
+function formatTimeFromRaw(raw: string | null | undefined, tz?: string): string | null {
     if (!raw) return null
     const dt = new Date(raw)
     if (Number.isNaN(dt.getTime())) return null
-    return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    return dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: tz })
 }
 
 /** Tabs of the main Transações page (Todas / Entradas / Saídas): show settled movements by payment date. */
@@ -181,6 +182,7 @@ export default function TransactionsPage({
 }) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const tz = usePartnerTimezone()
     const { planSlug } = usePermissions()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
@@ -490,8 +492,8 @@ export default function TransactionsPage({
         const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
             const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
             const daysUntilDue = diffCalendarDaysInSaoPaulo(occ.occurrenceDate)
-            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
-            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: tz })
+            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: tz })
             return {
                 id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
                 displayId: "",
@@ -861,8 +863,8 @@ export default function TransactionsPage({
         const virtualItems: ERPTransaction[] = recurringOccurrences.map((occ) => {
             const dateObj = new Date(`${occ.occurrenceDate}T12:00:00`)
             const daysUntilDue = diffCalendarDaysInSaoPaulo(occ.occurrenceDate)
-            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" })
-            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+            const dateLabel = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: tz })
+            const dateShort = dateObj.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: tz })
             return {
                 id: `virt-${occ.recurringId}-${occ.occurrenceDate}`,
                 displayId: "",

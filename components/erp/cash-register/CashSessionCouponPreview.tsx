@@ -2,6 +2,7 @@
 
 import { formatCurrency } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
+import { usePartnerTimezone } from "@/lib/store-context"
 
 const DASH = "-".repeat(60)
 
@@ -53,13 +54,14 @@ function Row({ left, right, bold }: { left: string; right: string; bold?: boolea
     )
 }
 
-const formatShortDateTime = (iso: string) => {
+const formatShortDateTime = (iso: string, tz?: string) => {
     try {
-        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz })
     } catch { return iso }
 }
 
 export default function CashSessionCouponPreview({ data, type, printMode = false }: CashSessionCouponPreviewProps) {
+    const tz = usePartnerTimezone()
     const partnerAddressFormatted = data.partnerAddress
         .split('\n')
         .filter(line => line.trim() && !line.trim().startsWith('CEP:'))
@@ -89,9 +91,9 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
 
                 <div className="text-[10px] space-y-0.5 mb-2">
                     <Row left="Sessão:" right={data.sessionId.slice(0, 8).toUpperCase()} />
-                    <Row left="Abertura:" right={formatShortDateTime(data.openedAt)} />
+                    <Row left="Abertura:" right={formatShortDateTime(data.openedAt, tz)} />
                     <Row left="Operador:" right={data.openOperator} />
-                    {data.closedAt && <Row left="Fechamento:" right={formatShortDateTime(data.closedAt)} />}
+                    {data.closedAt && <Row left="Fechamento:" right={formatShortDateTime(data.closedAt, tz)} />}
                     {data.closeOperator && <Row left="Fechado por:" right={data.closeOperator} />}
                 </div>
 

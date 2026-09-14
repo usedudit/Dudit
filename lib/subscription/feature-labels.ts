@@ -35,7 +35,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   invoice_integration: "Importação de XML (NF-e)",
   promotions_campaigns: "Campanhas promocionais",
   goals_management: "Metas e desempenho da equipe",
-  reminders: "Lembretes automáticos via WhatsApp",
+  reminders: "Lembretes e envios automáticos via WhatsApp",
 }
 
 export const TIER_SLUGS_ORDERED = ["free", "crescer", "escalar"] as const
@@ -87,15 +87,16 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Variações de produtos (cor, tamanho e mais)",
       "Complementos e adicionais",
       "Gestão de trocas e devoluções",
-      "Configuração simples de entregas",
       "Controle financeiro com visão do lucro",
       "Relatórios do negócio",
       "Gestão organizada de fornecedores",
       "Ordens de serviço em um só lugar",
+      "Importação XML (NF-e) - até 20/mês",
     ],
     limits: [
       "Até 100 itens no catálogo",
       "Até 150 pedidos por mês",
+      "Até 20 importações XML por mês",
       "3 usuários",
     ],
   },
@@ -108,13 +109,14 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
       "Controle de expedição e entregas",
       "Campanhas promocionais",
       "Metas e desempenho da equipe",
-      "Lembretes automáticos via WhatsApp",
-      "Importação de XML (NF-e)",
+      "Lembretes e envios automáticos via WhatsApp",
+      "Importação XML (NF-e) ilimitada",
     ],
     limits: [
       "Itens e pedidos ilimitados",
       "Ordens de serviço ilimitadas",
       "Agendamentos ilimitados",
+      "Importações XML ilimitadas",
       "Até 15 imagens por item",
       "10 usuários",
     ],

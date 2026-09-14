@@ -264,6 +264,7 @@ export function ExplorarPageClient({
     })
     const [minPrice, setMinPrice] = useState<number | string>("")
     const [maxPrice, setMaxPrice] = useState<number | string>("")
+    const [selectedCondition, setSelectedCondition] = useState<string>("")
 
     const [isFilterLoading, setIsFilterLoading] = useState(false)
     const filterLoadingTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -799,6 +800,23 @@ export function ExplorarPageClient({
         if (maxPrice) filtered = filtered.filter((p) => p.price && p.price <= Number(maxPrice))
         if (promoOn) filtered = filtered.filter((p) => p.originalPrice !== undefined)
 
+        // Filtragem por Condição (Novos / Usados / Desapegos)
+        if (selectedCondition) {
+            if (selectedCondition === "novo") {
+                filtered = filtered.filter(p => {
+                    if (p.itemType !== 'produto') return true
+                    const c = (p.condition || p.condicao || "Novo").toLowerCase()
+                    return c === "novo" || c === "new"
+                })
+            } else if (selectedCondition === "usado") {
+                filtered = filtered.filter(p => {
+                    if (p.itemType !== 'produto') return true
+                    const c = (p.condition || p.condicao || "Novo").toLowerCase()
+                    return c !== "novo" && c !== "new"
+                })
+            }
+        }
+
         // Filtragem por Seção
         if (selectedSection) {
             if (selectedSection === "promos") {
@@ -823,17 +841,18 @@ export function ExplorarPageClient({
             )
         }
         return filtered
-    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, sortBy, selectedSection, isStandardCategory])
+    }, [dataToFilter, selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, selectedSection, isStandardCategory])
 
     const activeFiltersCount = useMemo(() => {
         let count = 0
         if (selectedCategories.length > 0) count++
         if (minPrice || maxPrice) count++
         if (promoOn) count++
+        if (selectedCondition) count++
         if (sortBy !== "relevancia") count++
         if (currentType !== "tudo") count++
         return count
-    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType])
 
     const categoryShowcases = useMemo(() => {
         if (selectedCategories.length === 0) return []
@@ -1205,6 +1224,7 @@ export function ExplorarPageClient({
         setMinPrice("")
         setMaxPrice("")
         setPromoOn(false)
+        setSelectedCondition("")
         setSortBy("relevancia")
         setCurrentType("tudo")
         setSelectedRadius(null)
@@ -1218,6 +1238,7 @@ export function ExplorarPageClient({
         maxPrice: string | number
         promoOn: boolean
         radius: number | null
+        condition?: string
     }) => {
         triggerFilterLoading()
         setCurrentType(filters.type as any)
@@ -1226,6 +1247,7 @@ export function ExplorarPageClient({
         setMaxPrice(filters.maxPrice)
         setPromoOn(filters.promoOn)
         setSelectedRadius(filters.radius)
+        setSelectedCondition(filters.condition || "")
         updateUrl(selectedCitySlug, filters.categories, query, filters.type, filters.radius, selectedSection)
     }
 
@@ -1284,6 +1306,17 @@ export function ExplorarPageClient({
                 },
             })
         }
+        if (selectedCondition) {
+            chips.push({
+                key: "condition",
+                label: "Condição",
+                value: selectedCondition === "novo" ? "Apenas Novos" : "Usados / Desapegos",
+                onRemove: () => {
+                    triggerFilterLoading()
+                    setSelectedCondition("")
+                },
+            })
+        }
         if (selectedRadius) {
             chips.push({
                 key: "radius",
@@ -1322,7 +1355,7 @@ export function ExplorarPageClient({
             })
         }
         return chips
-    }, [selectedCategories, minPrice, maxPrice, promoOn, sortBy, currentType, selectedCitySlug, query, selectedRadius, resolveCategoryName, triggerFilterLoading])
+    }, [selectedCategories, minPrice, maxPrice, promoOn, selectedCondition, sortBy, currentType, selectedCitySlug, query, selectedRadius, resolveCategoryName, triggerFilterLoading])
 
     const getItemUrl = (item: any) => {
         if (item.itemType === "loja") return getStoreUrl(item.partners || item)
@@ -2005,6 +2038,7 @@ export function ExplorarPageClient({
                 currentType={currentType}
                 selectedCategories={selectedCategories}
                 selectedRadius={selectedRadius}
+                selectedCondition={selectedCondition}
                 minPrice={minPrice}
                 maxPrice={maxPrice}
                 promoOn={promoOn}

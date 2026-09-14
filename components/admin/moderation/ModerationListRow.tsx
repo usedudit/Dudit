@@ -10,6 +10,7 @@ import {
     CancelCircleIcon,
     ChevronsUpDown,
 } from "@/lib/icons"
+import { usePartnerTimezone } from "@/lib/store-context"
 import type { ModerationItem } from "@/lib/admin/types"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
@@ -26,6 +27,7 @@ const ModerationListRow = React.memo(({
     onDetail,
     onApprove
 }: ModerationListRowProps) => {
+    const tz = usePartnerTimezone()
     const [showLightbox, setShowLightbox] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
 
@@ -151,10 +153,10 @@ const ModerationListRow = React.memo(({
                 <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                     <div className="flex flex-col items-center">
                         <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                            {new Date(item.created_at).toLocaleDateString("pt-BR")}
+                            {new Date(item.created_at).toLocaleDateString("pt-BR", { timeZone: tz })}
                         </span>
                         <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
-                            {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', timeZone: tz })}
                         </span>
                     </div>
                 </td>

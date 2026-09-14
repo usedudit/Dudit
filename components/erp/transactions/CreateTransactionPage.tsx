@@ -186,7 +186,7 @@ const FormCombobox = ({
     )
 }
 
-const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactNode; children: React.ReactNode; className?: string }) => (
+const SidebarCard = ({ title, children, className = "", hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasSeparator?: boolean }) => (
     <>
         {/* Desktop: card */}
         <div className={`hidden lg:block p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 ${className}`}>
@@ -194,7 +194,7 @@ const SidebarCard = ({ title, children, className = "" }: { title?: React.ReactN
             {children}
         </div>
         {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator className="lg:hidden">
+        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
             {children}
         </FormSection>
     </>

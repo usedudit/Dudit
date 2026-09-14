@@ -85,57 +85,6 @@ const COMMON_CITY_ACCENTS: Record<string, string> = {
 import { ShoppingBagIcon, XIcon, SearchIcon, WhatsappIcon, MapPinIcon, CheckIcon } from "@/lib/icons"
 import type { LocationContext } from "@/lib/utils/location-label"
 
-function HomeValueProps() {
-    const items = [
-        {
-            icon: SearchIcon,
-            title: "Encontre o que precisa",
-            desc: "Comprar novos ou usados, encontrar serviços, descobrir negócios próximos ou resolver uma necessidade do dia a dia. Quando precisar de alguma coisa, dê uma olhada na Dudit.",
-        },
-        {
-            icon: ShoppingBagIcon,
-            title: "Produtos & Serviços",
-            desc: "De eletrônicos a roupas, de marmitas a encanadores. Tudo organizado para você encontrar rápido o que precisa, perto de você.",
-        },
-        {
-            icon: WhatsappIcon,
-            title: "Contato direto",
-            desc: "Tire dúvidas no WhatsApp de quem vende, compare opções e feche o negócio sem burocracia. Direto com o vendedor.",
-        },
-    ]
-
-    return (
-        <section className="my-6 sm:my-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-0">
-                {items.map((item, idx) => {
-                    const Icon = item.icon
-                    return (
-                        <div
-                            key={idx}
-                            className={`px-6 md:px-8 flex flex-col justify-start ${idx < items.length - 1
-                                ? "md:border-r md:border-dashed md:border-gray-200 dark:md:border-dark-border"
-                                : ""
-                                }`}
-                        >
-                            <div className="flex items-center gap-3.5 mb-3">
-                                <div className="w-10 h-10 bg-brand-dark rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm dark:bg-brand-green">
-                                    <Icon className="w-5 h-5 text-white" />
-                                </div>
-                                <h3 className="text-base md:text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                    {item.title}
-                                </h3>
-                            </div>
-                            <p className="text-brand-inactive-text text-sm leading-relaxed dark:text-dark-body">
-                                {item.desc}
-                            </p>
-                        </div>
-                    )
-                })}
-            </div>
-        </section>
-    )
-}
-
 import { QuickAnnounceModal } from "@/components/marketplace/QuickAnnounceModal"
 
 interface MarketplaceHomeProps {
@@ -668,9 +617,6 @@ export default function MarketplaceHome({
                             itemWidthClass="w-[270px] sm:w-[320px]"
                         />
                     )}
-
-                    {/* 6. Value Props Institucionais (3 Cards) */}
-                    <HomeValueProps />
 
                     {/* 7. Outras seções eventuais */}
                     {otherSections.map((section) => {

@@ -6,11 +6,8 @@ export type DeliveryPlanCapability = {
 
 export function resolveDeliveryPlanCapability(planSlug: string): DeliveryPlanCapability {
   const normalized = String(planSlug || "free").toLowerCase()
-  if (normalized === "free") {
+  if (normalized === "free" || normalized === "crescer") {
     return { planSlug: normalized, deliveryEnabled: false, advancedEnabled: false }
-  }
-  if (normalized === "crescer") {
-    return { planSlug: normalized, deliveryEnabled: true, advancedEnabled: false }
   }
   if (normalized === "escalar") {
     return { planSlug: normalized, deliveryEnabled: true, advancedEnabled: true }

@@ -30,24 +30,41 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
 
   const fetcher = useCallback(async () => {
     if (!user) return null
-    const [profileRes, addressRes] = await Promise.all([
-      supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
-      supabase.from("addresses").select("city, state")
-        .eq("user_id", user.id)
-        .eq("is_default", true)
-        .maybeSingle()
-    ])
-    
-    let addressStr: string | null = null
-    if (profileRes.data && addressRes.data) {
-      addressStr = `${addressRes.data.city} - ${addressRes.data.state}`
+
+    const fetchWithRetry = async (attempt = 0): Promise<{ full_name: string | null; address: string | null; avatar_url: string | null } | null> => {
+      try {
+        const [profileRes, addressRes] = await Promise.all([
+          supabase.from("user_profiles").select("full_name, avatar_url").eq("user_id", user.id).maybeSingle(),
+          supabase.from("addresses").select("city, state")
+            .eq("user_id", user.id)
+            .eq("is_default", true)
+            .maybeSingle()
+        ])
+
+        if (profileRes.error || addressRes.error) {
+          throw profileRes.error || addressRes.error
+        }
+        
+        let addressStr: string | null = null
+        if (profileRes.data && addressRes.data) {
+          addressStr = `${addressRes.data.city} - ${addressRes.data.state}`
+        }
+
+        return {
+          full_name: profileRes.data?.full_name || null,
+          address: addressStr,
+          avatar_url: profileRes.data?.avatar_url || null
+        }
+      } catch (err) {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 800 * (attempt + 1)))
+          return fetchWithRetry(attempt + 1)
+        }
+        throw err
+      }
     }
 
-    return {
-      full_name: profileRes.data?.full_name || null,
-      address: addressStr,
-      avatar_url: profileRes.data?.avatar_url || null
-    }
+    return fetchWithRetry()
   }, [user, supabase])
 
   const key = user ? `user-profile-${user.id}` : null
@@ -63,6 +80,15 @@ export function useUserProfile(fallbackData?: UserProfileData | null): UserProfi
       revalidateOnMount: false,
       dedupingInterval: 60000,
       keepPreviousData: true,
+      errorRetryCount: 2,
+      errorRetryInterval: 1500,
+      onErrorRetry: (error, key, config, revalidate, { retryCount }) => {
+        // Only retry on network/transient errors, not on auth errors
+        if (retryCount >= 2) return
+        if (error?.message?.includes("unexpected response") || error?.message?.includes("Failed to fetch") || error?.message?.includes("NetworkError")) {
+          setTimeout(() => revalidate({ retryCount }), 1500 * (retryCount + 1))
+        }
+      },
     }
   )
 

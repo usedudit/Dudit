@@ -297,7 +297,7 @@ export function StorePlaqueModal({
                         <label className="text-sm text-brand-dark dark:text-dark-heading block mb-2">
                             Fundo da Imagem
                         </label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid gap-2">
                             <ListItem
                                 className="px-4 py-3"
                                 title="Sem Fundo (PNG)"

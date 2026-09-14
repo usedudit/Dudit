@@ -744,6 +744,8 @@ export async function middleware(request: NextRequest) {
           })
           url.searchParams.delete("mode")
           url.searchParams.delete("verified")
+          url.searchParams.delete("error")
+          url.searchParams.delete("error_description")
 
           return NextResponse.redirect(url)
         }

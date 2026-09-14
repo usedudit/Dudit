@@ -8,6 +8,38 @@ import { SearchIcon, FilterIcon, PlusIcon, TruckIcon, BlockedIcon, SparklesIcon,
 import type { DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { EMPTY_DATE_PERIOD, isDatePeriodFilterActive, summarizeDatePeriodFilter } from "@/lib/utils/filter-date-period"
 
+interface BadgeListProps {
+    filters: { status: string[]; datePeriod: DatePeriodFilterValue }
+    setFilters: React.Dispatch<React.SetStateAction<{ status: string[]; datePeriod: DatePeriodFilterValue }>>
+}
+
+function BadgeList({ filters, setFilters }: BadgeListProps) {
+    return (
+        <AnimatePresence>
+            {filters.status.length > 0 && (
+                <FilterChip
+                    key="status"
+                    label="Status"
+                    value={filters.status.join(", ")}
+                    icon={<CalendarIcon size={12} />}
+                    onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
+                />
+            )}
+            {isDatePeriodFilterActive(filters.datePeriod) && (
+                <FilterChip
+                    key="period"
+                    label="Período"
+                    value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
+                    icon={<CalendarIcon size={12} />}
+                    onRemove={() =>
+                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
+                    }
+                />
+            )}
+        </AnimatePresence>
+    )
+}
+
 interface DeliveryPageControlsProps {
     activeTab: "active" | "closed"
     onActiveTabChange: (tab: "active" | "closed") => void
@@ -58,29 +90,6 @@ export default function DeliveryPageControls({
         window.addEventListener("resize", checkFilterScroll)
         return () => window.removeEventListener("resize", checkFilterScroll)
     }, [checkFilterScroll, filters])
-
-    const BadgeList = () => (
-        <AnimatePresence>
-            {filters.status.length > 0 && (
-                <FilterChip
-                    label="Status"
-                    value={filters.status.join(", ")}
-                    icon={<CalendarIcon size={12} />}
-                    onRemove={() => setFilters((prev) => ({ ...prev, status: [] }))}
-                />
-            )}
-            {isDatePeriodFilterActive(filters.datePeriod) && (
-                <FilterChip
-                    label="Período"
-                    value={summarizeDatePeriodFilter(filters.datePeriod) || ""}
-                    icon={<CalendarIcon size={12} />}
-                    onRemove={() =>
-                        setFilters((prev) => ({ ...prev, datePeriod: { ...EMPTY_DATE_PERIOD } }))
-                    }
-                />
-            )}
-        </AnimatePresence>
-    )
 
     return (
         <>
@@ -186,7 +195,7 @@ export default function DeliveryPageControls({
                             onScroll={checkFilterScroll}
                             className="overflow-x-auto hide-scrollbar flex items-center gap-2 w-full"
                         >
-                            <BadgeList />
+                            <BadgeList filters={filters} setFilters={setFilters} />
                         </div>
                         <div
                             className={`absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-dark-background to-transparent z-10 pointer-events-none transition-opacity duration-300 ${filterScrollState.right ? "opacity-100" : "opacity-0"}`}
@@ -198,7 +207,7 @@ export default function DeliveryPageControls({
             {/* MOBILE CHIPS */}
             <div className="md:hidden w-full overflow-x-auto hide-scrollbar mb-4 flex-none px-4">
                 <div className="flex items-center gap-2">
-                    <BadgeList />
+                    <BadgeList filters={filters} setFilters={setFilters} />
                 </div>
             </div>
         </>

@@ -3,8 +3,8 @@ import "server-only"
 import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/server"
 import { requirePermission } from "@/lib/permissions/access"
-import { getTodayYmdSaoPaulo, formatQuantityWithUnit } from "@/lib/utils/formatters"
-import { getDateComponents } from "@/lib/date"
+import { formatQuantityWithUnit } from "@/lib/utils/formatters"
+import { getDateComponents, startOfDay, getPartnerTimezone, getTodayYmd } from "@/lib/date"
 import type { Period } from "@/lib/period-types"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
 import { cache } from "react"
@@ -15,28 +15,30 @@ const addDays = (ymd: string, days: number) => {
 }
 
 // Per-request loaders to consolidate overlapping database queries during parallel renders
-const loadRawOrdersGeneralTab = cache(async (partnerId: string, todayYmd: string) => {
+const loadRawOrdersGeneralTab = cache(async (partnerId: string, todayYmd: string, tz: string) => {
   const fromYmd = addDays(todayYmd, -59)
   const supabase = createAdminClient()
+  const fromIso = startOfDay(fromYmd, tz).toISOString()
   const { data, error } = await supabase
     .from("orders")
     .select("id, total_amount, order_number, customer_name, situation, created_at, order_source")
     .eq("partner_id", partnerId)
-    .gte("created_at", `${fromYmd}T00:00:00`)
+    .gte("created_at", fromIso)
     .order("created_at", { ascending: false })
   if (error) throw error
   return data || []
 })
 
-const loadRawTransactionsGeneralTab = cache(async (partnerId: string, todayYmd: string) => {
+const loadRawTransactionsGeneralTab = cache(async (partnerId: string, todayYmd: string, tz: string) => {
   const fromYmd = addDays(todayYmd, -59)
   const supabase = createAdminClient()
+  const fromIso = startOfDay(fromYmd, tz).toISOString()
   const { data, error } = await supabase
     .from("transactions")
     .select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind")
     .eq("partner_id", partnerId)
     .or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
-    .or(`created_at.gte.${fromYmd}T00:00:00,due_date.gte.${todayYmd}`)
+    .or(`created_at.gte.${fromIso},due_date.gte.${todayYmd}`)
     .order("created_at", { ascending: false })
   if (error) throw error
   return data || []
@@ -93,12 +95,22 @@ const generalRevenueOriginCacheMap = new Map<string, any>()
 const generalActivityCacheMap = new Map<string, any>()
 const generalTopCategoriesCacheMap = new Map<string, any>()
 const productsDashboardCacheMap = new Map<string, any>()
+
+// Per-request timezone resolved from the partner's store configuration.
+// Set by the exported getDashboard* functions before calling cached loaders.
+let _requestTimezone = "America/Sao_Paulo"
+
+/** Returns today's YYYY-MM-DD in the current request's timezone. */
+const getTodayYmdInTz = () => getTodayYmd(_requestTimezone)
+
+/** Converts a YYYY-MM-DD string to ISO start-of-day in the request timezone. */
+const toStartOfDayIso = (ymd: string) => startOfDay(ymd, _requestTimezone).toISOString()
 const servicesDashboardCacheMap = new Map<string, any>()
 const financialDashboardCacheMap = new Map<string, any>()
 const operationsDashboardCacheMap = new Map<string, any>()
 
 function getDateRangeForPeriod(period: Period, todayOverride?: string) {
-  const today = todayOverride || getTodayYmdSaoPaulo()
+  const today = todayOverride || getTodayYmdInTz()
   switch (period) {
     case "daily":
       return { today, from: today, previousFrom: addDays(today, -1) }
@@ -241,7 +253,7 @@ const dateLabel = (value?: string | null) => {
   return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
-    timeZone: "America/Sao_Paulo",
+    timeZone: _requestTimezone,
   })
 }
 
@@ -263,7 +275,7 @@ const percentTrend = (current: number, previous: number) => {
 }
 
 const bucketByDate = (rows: any[], dateKey: string, valueKey: string, days = 14) => {
-  const today = getTodayYmdSaoPaulo()
+  const today = getTodayYmdInTz()
   const map = new Map<string, number>()
   for (let i = 0; i < days; i++) {
     map.set(dateLabel(addDays(today, -i)), 0)
@@ -280,7 +292,7 @@ const bucketByDate = (rows: any[], dateKey: string, valueKey: string, days = 14)
 }
 
 const bucketCashflowByDate = (rows: any[], days = 14) => {
-  const today = getTodayYmdSaoPaulo()
+  const today = getTodayYmdInTz()
   const map = new Map<string, { label: string; value: number; secondary: number }>()
   for (let i = 0; i < days; i++) {
     const dStr = addDays(today, -i)
@@ -310,20 +322,21 @@ const topFromMap = (map: Map<string, number>, limit = 5) => {
     .map(([label, value]) => ({ label, value }))
 }
 
-async function getCachedGeneral(partnerId: string, storeId = ""): Promise<GeneralDashboardData> {
+async function getCachedGeneral(partnerId: string, storeId = "", tz?: string): Promise<GeneralDashboardData> {
+  const resolvedTz = tz || "America/Sao_Paulo"
   let cachedFn = generalDashboardCacheMap.get(partnerId)
   if (!cachedFn) {
     cachedFn = unstable_cache(
       async () => {
-        const today = getTodayYmdSaoPaulo()
+        const today = getTodayYmdInTz()
         const from = addDays(today, -29)
         const previousFrom = addDays(today, -59)
         const next7 = addDays(today, 7)
 
         const [allOrders, allAppointments, allTransactions, allProducts] = await Promise.all([
-          loadRawOrdersGeneralTab(partnerId, today),
+          loadRawOrdersGeneralTab(partnerId, today, resolvedTz),
           loadRawAppointmentsFuture(partnerId, today),
-          loadRawTransactionsGeneralTab(partnerId, today),
+          loadRawTransactionsGeneralTab(partnerId, today, resolvedTz),
           loadRawProductsGeneralTab(partnerId),
         ])
 
@@ -413,8 +426,8 @@ async function getCachedProducts(partnerId: string, storeId = ""): Promise<Produ
         const supabase = createAdminClient()
         const [products, orders, items] = await Promise.all([
           scopeActiveOnly(supabase.from("products").select("id, name, stock_quantity, unit, category:product_categories!category_id(name), price, is_active").eq("partner_id", partnerId)).limit(300),
-          supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).order("created_at", { ascending: false }).limit(400),
-          supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${addDays(getTodayYmdSaoPaulo(), -29)}T00:00:00`).limit(600),
+          supabase.from("orders").select("id, total_amount, situation, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).order("created_at", { ascending: false }).limit(400),
+          supabase.from("order_items").select("product_name, quantity, net_item_value, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(getTodayYmdInTz(), -29))).limit(600),
         ])
         if (products.error) throw products.error
         if (orders.error) throw orders.error
@@ -476,7 +489,7 @@ async function getCachedServices(partnerId: string, storeId = ""): Promise<Servi
     cachedFn = unstable_cache(
       async () => {
         const supabase = createAdminClient()
-        const today = getTodayYmdSaoPaulo()
+        const today = getTodayYmdInTz()
         const from = addDays(today, -29)
         const [appointments, services] = await Promise.all([
           supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, duration_minutes, staff_name, status, price, source").eq("partner_id", partnerId).gte("start_date", from).order("start_date", { ascending: false }).order("start_time").limit(400),
@@ -556,11 +569,11 @@ async function getCachedFinancial(partnerId: string, storeId = ""): Promise<Fina
     cachedFn = unstable_cache(
       async () => {
         const supabase = createAdminClient()
-        const today = getTodayYmdSaoPaulo()
+        const today = getTodayYmdInTz()
         const from = addDays(today, -120)
         const [accounts, transactions] = await Promise.all([
           supabase.from("finance_accounts").select("id, current_balance, initial_balance, is_active").eq("partner_id", partnerId).eq("is_active", true),
-          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${from}T00:00:00,due_date.gte.${from},payment_date.gte.${from}`).order("created_at", { ascending: false }).limit(1000),
+          supabase.from("transactions").select("id, description, amount, due_date, payment_date, created_at, status, category, transaction_type, kind").eq("partner_id", partnerId).or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback").or(`created_at.gte.${toStartOfDayIso(from)},due_date.gte.${from},payment_date.gte.${from}`).order("created_at", { ascending: false }).limit(1000),
         ])
         if (accounts.error) throw accounts.error
         if (transactions.error) throw transactions.error
@@ -738,9 +751,9 @@ async function getCachedOperations(partnerId: string, storeId = ""): Promise<Ope
     cachedFn = unstable_cache(
       async () => {
         const supabase = createAdminClient()
-        const today = getTodayYmdSaoPaulo()
+        const today = getTodayYmdInTz()
         const [deliveries, appointments] = await Promise.all([
-          supabase.from("deliveries").select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at").eq("partner_id", partnerId).gte("created_at", `${addDays(today, -7)}T00:00:00`).order("created_at", { ascending: false }).limit(120),
+          supabase.from("deliveries").select("id, status, started_at, delivered_at, estimated_duration_minutes, created_at").eq("partner_id", partnerId).gte("created_at", toStartOfDayIso(addDays(today, -7))).order("created_at", { ascending: false }).limit(120),
           supabase.from("appointments").select("id, customer_name, service_name, start_date, start_time, status, staff_name, duration_minutes, source").eq("partner_id", partnerId).gte("start_date", addDays(today, -7)).order("start_date", { ascending: false }).limit(120),
         ])
         if (deliveries.error) throw deliveries.error
@@ -791,7 +804,9 @@ async function getCachedOperations(partnerId: string, storeId = ""): Promise<Ope
 
 export async function getDashboardGeneralData(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
-  return getCachedGeneral(partnerId, storeId)
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
+  return getCachedGeneral(partnerId, storeId, tz)
 }
 
 export async function getDashboardProductsData(partnerId: string, storeId = "") {
@@ -827,8 +842,8 @@ async function getCachedGeneralMetrics(partnerId: string, storeId = "", period: 
         const { today, from, previousFrom } = getDateRangeForPeriod(period, todayOverride)
 
         const [allOrders, allTransactions] = await Promise.all([
-          loadRawOrdersGeneralTab(partnerId, today),
-          loadRawTransactionsGeneralTab(partnerId, today),
+          loadRawOrdersGeneralTab(partnerId, today, _requestTimezone),
+          loadRawTransactionsGeneralTab(partnerId, today, _requestTimezone),
         ])
 
         const orderRows = allOrders.filter((o: any) => String(o.created_at).slice(0, 10) >= previousFrom).slice(0, 300)
@@ -865,16 +880,16 @@ async function getCachedGeneralAlerts(partnerId: string, storeId = "", activeRes
     cachedFn = unstable_cache(
       async () => {
         const supabase = createAdminClient()
-        const today = getTodayYmdSaoPaulo()
+        const today = getTodayYmdInTz()
         const next7 = addDays(today, 7)
         const alerts: AlertItem[] = []
 
         const [allTransactions, allOrders, allProducts, allAppointments, delRes] = await Promise.all([
-          loadRawTransactionsGeneralTab(partnerId, today),
-          loadRawOrdersGeneralTab(partnerId, today),
+          loadRawTransactionsGeneralTab(partnerId, today, _requestTimezone),
+          loadRawOrdersGeneralTab(partnerId, today, _requestTimezone),
           loadRawProductsGeneralTab(partnerId),
           loadRawAppointmentsFuture(partnerId, today),
-          supabase.from("deliveries").select("id, status, created_at").eq("partner_id", partnerId).in("status", ["pending", "not_sent", "preparing", "sent"]).lt("created_at", `${today}T00:00:00`).limit(20)
+          supabase.from("deliveries").select("id, status, created_at").eq("partner_id", partnerId).in("status", ["pending", "not_sent", "preparing", "sent"]).lt("created_at", toStartOfDayIso(today)).limit(20)
         ])
 
         const pendingAccounts = allTransactions.filter((tx: any) => tx.due_date && tx.due_date >= today && tx.due_date <= next7 && statusPending(tx.status)).slice(0, 100)
@@ -926,7 +941,7 @@ async function getCachedGeneralRevenueChart(partnerId: string, storeId = "", per
         const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
         const prevFrom = addDays(from, -daysInPeriod)
 
-        const allTransactions = await loadRawTransactionsGeneralTab(partnerId, today)
+        const allTransactions = await loadRawTransactionsGeneralTab(partnerId, today, _requestTimezone)
         const data = allTransactions.filter((tx: any) => tx.transaction_type === "income" && String(tx.created_at).slice(0, 10) >= prevFrom).slice(0, 800)
 
         const paidIncome = data.filter((tx: any) => isPaid(tx.status))
@@ -964,7 +979,7 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", pe
     cachedFn = unstable_cache(
       async () => {
         const { today, from } = getDateRangeForPeriod(period)
-        const allOrders = await loadRawOrdersGeneralTab(partnerId, today)
+        const allOrders = await loadRawOrdersGeneralTab(partnerId, today, _requestTimezone)
         const data = allOrders.filter((o: any) => String(o.created_at).slice(0, 10) >= from).slice(0, 300)
 
         const originMap = new Map<string, number>()
@@ -1123,7 +1138,7 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", ac
         const categoryMap = new Map<string, number>()
 
         if (activeResources.includes("products")) {
-          const { data } = await supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", `${from}T00:00:00`).limit(300)
+          const { data } = await supabase.from("order_items").select("product_name, quantity, created_at, orders!inner(partner_id)").eq("orders.partner_id", partnerId).gte("created_at", toStartOfDayIso(from)).limit(300)
           // Get product categories
           const productNames = [...new Set((data || []).map((i: any) => i.product_name).filter(Boolean))]
           if (productNames.length > 0) {
@@ -1169,30 +1184,42 @@ async function getCachedGeneralTopCategories(partnerId: string, storeId = "", ac
 
 export async function getGeneralMetrics(partnerId: string, period: Period = "monthly", todayOverride?: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralMetrics(partnerId, storeId, period, todayOverride)
 }
 
 export async function getGeneralAlerts(partnerId: string, activeResources: string[] = ["products", "services"], storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralAlerts(partnerId, storeId, activeResources)
 }
 
 export async function getGeneralRevenueChart(partnerId: string, period: Period = "monthly", todayOverride?: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralRevenueChart(partnerId, storeId, period, todayOverride)
 }
 
 export async function getGeneralRevenueOrigin(partnerId: string, period: Period = "monthly", storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralRevenueOrigin(partnerId, storeId, period)
 }
 
 export async function getGeneralActivity(partnerId: string, storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralActivity(partnerId, storeId)
 }
 
 export async function getGeneralTopCategories(partnerId: string, activeResources: string[] = ["products", "services"], period: Period = "monthly", storeId = "") {
   await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
   return getCachedGeneralTopCategories(partnerId, storeId, activeResources, period)
 }

@@ -62,13 +62,13 @@ const MODE_OPTIONS: Array<{
         {
             value: "quick",
             icon: Store,
-            title: "Vitrine Online & WhatsApp",
-            description: "Catálogo e vitrine profissional com minha marca para vender no WhatsApp e Marketplace",
+            title: "Vitrine Online",
+            description: "Crie uma vitrine com sua marca para divulgar e vender seus produtos",
         },
         {
             value: "erp",
             icon: BriefcaseIcon,
-            title: "Gerenciar meu negócio (ERP)",
+            title: "Gerenciar meu negócio",
             description: "Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios",
         },
     ]

@@ -42,6 +42,7 @@ import PromotionFormPage from "./PromotionFormPage"
 import PromotionGridCard from "./PromotionGridCard"
 import PromotionBulkEditModal from "./PromotionBulkEditModal"
 import PromotionPageControls from "./PromotionPageControls"
+import { usePartnerTimezone } from "@/lib/store-context"
 import {
   PlusIcon,
   SearchIcon,
@@ -142,6 +143,7 @@ export default function PromotionsPage({
   planGate?: any
 }) {
   const { toast } = useToast()
+  const tz = usePartnerTimezone()
   const { openPlanUpgrade } = usePlanUpgrade()
   const isMobile = useMediaQuery("(max-width: 767px)")
   const isTabletOrMobile = useMediaQuery("(max-width: 1024px)")
@@ -724,8 +726,8 @@ export default function PromotionsPage({
                                             <td className="p-2 border-b border-brand-border dark:border-dark-border">
                                               {camp.starts_at && camp.ends_at ? (
                                                 <div className="flex flex-col text-[13px] text-brand-inactive-text dark:text-dark-body">
-                                                  <span>{new Date(camp.starts_at).toLocaleDateString()}</span>
-                                                  <span className="text-xs text-gray-400">{new Date(camp.ends_at).toLocaleDateString()}</span>
+                                                  <span>{new Date(camp.starts_at).toLocaleDateString("pt-BR", { timeZone: tz })}</span>
+                                                  <span className="text-xs text-gray-400">{new Date(camp.ends_at).toLocaleDateString("pt-BR", { timeZone: tz })}</span>
                                                 </div>
                                               ) : (
                                                 <span className="text-[13px] text-brand-inactive-text dark:text-dark-body">Indeterminado</span>

@@ -91,6 +91,7 @@ export async function getDashboardLayout(
       .limit(1)
       .maybeSingle(),
 
+    // Busca endereço vinculado ao partner (fallback será feito depois via store_id)
     supabase
       .from("addresses")
       .select("city, state")
@@ -194,7 +195,18 @@ export async function getDashboardLayout(
 
   const hasPhone = !!store?.phone;
   const hasCategory = !!(store?.category_id || partner.category_id);
-  const addressData = addressRes.data || [];
+  let addressData = addressRes.data || [];
+  // Fallback: se não encontrou endereço via partner_id, busca via store_id
+  if ((!addressData || addressData.length === 0) && store?.id) {
+    const { data: storeAddress } = await supabase
+      .from("addresses")
+      .select("city, state")
+      .eq("store_id", store.id)
+      .limit(1)
+    if (storeAddress && storeAddress.length > 0) {
+      addressData = storeAddress
+    }
+  }
   const hasAddress = Array.isArray(addressData) ? addressData.length > 0 : !!addressData;
 
   // Verifica se pelo menos 1 dia está habilitado nos horários

@@ -75,7 +75,7 @@ const ProductListItem = React.memo(
                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 flex items-center gap-1.5">
                                     <span className="truncate max-w-[200px] xl:max-w-[300px]">{product.name}</span>
                                     {product.moderation_status === 'pending_moderation' && (
-                                        <Tooltip text="Aguardando aprovação para exibição pública.">
+                                        <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                             <Badge variant="orange" className="shrink-0" />
                                         </Tooltip>
                                     )}

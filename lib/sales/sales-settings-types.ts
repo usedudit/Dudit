@@ -1,5 +1,6 @@
 export interface SalesSettings {
   maxDiscountPercent: number | null
+  defaultMarginPercent: number | null
   allowNegativeStock: boolean
   requireSeller: boolean
   allowCustomItemPrice: boolean
@@ -10,6 +11,7 @@ export interface SalesSettings {
 
 export const DEFAULT_SALES_SETTINGS: SalesSettings = {
   maxDiscountPercent: 100,
+  defaultMarginPercent: 30,
   allowNegativeStock: false,
   requireSeller: false,
   allowCustomItemPrice: true,

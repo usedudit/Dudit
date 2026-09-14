@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
+import { usePartnerTimezone } from "@/lib/store-context"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { downloadPdf } from "@/lib/pdf/download"
 import { ChevronLeftIcon, MoneyIcon, CreditCardIcon, QRCodeIcon, MoreHorizontalIcon, MoneyBagIcon, ShoppingCartIcon, ArrowUpDownIcon, ArrowDownIcon, ArrowUpIcon, EyeIcon, ReturnIcon, CheckCircleIcon } from "@/lib/icons"
@@ -31,15 +32,15 @@ const MOVEMENT_COLUMNS: { id: string; label: string; align: "left" | "center" | 
     { id: "actions", label: "Ações", align: "center", width: "120px" },
 ]
 
-const formatShortDateTime = (iso: string) => {
+const formatShortDateTime = (iso: string, tz?: string) => {
     try {
-        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " às")
+        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: tz }).replace(",", " às")
     } catch { return iso }
 }
 
-const formatLongDateTime = (iso: string) => {
+const formatLongDateTime = (iso: string, tz?: string) => {
     try {
-        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: tz })
     } catch { return iso }
 }
 
@@ -47,6 +48,7 @@ const getDifferenceTone = (value: number | null) => value == null ? "text-brand-
 
 export default function CashSessionDetailPage({ partnerId, details: initialDetails, isLoading, onBack }: { partnerId: string; details: DetailPayload | null; isLoading?: boolean; onBack?: () => void }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const tz = usePartnerTimezone()
     const isMobileDevice = useMediaQuery("(max-width: 1023px)")
     const [details, setDetails] = useState<DetailPayload | null>(initialDetails)
     const [activeTab, setActiveTab] = useState<"summary" | "movements" | "returns">("summary")
@@ -115,7 +117,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                 statusColor: reversed ? "gray" : "green",
                 deliveryStatusLabel: m.creator_name || "Sem responsável",
                 deliveryStatusColor: "gray",
-                formattedDate: formatShortDateTime(m.created_at),
+                formattedDate: formatShortDateTime(m.created_at, tz),
                 formattedTime: "",
                 created_at_time: new Date(m.created_at).getTime(),
                 situation: reversed ? "cancelled" : "open",
@@ -319,7 +321,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                         </h1>
 
                                         <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
-                                            Aberto em {formatLongDateTime(session.opened_at)} - {details.operators.open_name}
+                                            Aberto em {formatLongDateTime(session.opened_at, tz)} - {details.operators.open_name}
                                         </div>
                                     </div>
 
@@ -468,14 +470,14 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                     </div>
 
                                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                        <InfoCard title={isOpen ? "Caixa em operação" : "Caixa encerrado"} message={isOpen ? `Sessão aberta em ${formatLongDateTime(session.opened_at)} por ${details.operators.open_name}.` : `Sessão encerrada em ${session.closed_at ? formatLongDateTime(session.closed_at) : "-"} por ${details.operators.close_name || "Não informado"}.`} color={isOpen ? "green" : "orange"} />
+                                        <InfoCard title={isOpen ? "Caixa em operação" : "Caixa encerrado"} message={isOpen ? `Sessão aberta em ${formatLongDateTime(session.opened_at, tz)} por ${details.operators.open_name}.` : `Sessão encerrada em ${session.closed_at ? formatLongDateTime(session.closed_at, tz) : "-"} por ${details.operators.close_name || "Não informado"}.`} color={isOpen ? "green" : "orange"} />
                                         {!isOpen && details.totals.difference != null && <InfoCard title="Conferência do fechamento" message={`Valor informado: ${details.totals.informedDrawerTotal != null ? formatCurrency(details.totals.informedDrawerTotal) : "-"}
 Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.totals.difference === 0 ? "green" : "orange"} />}
                                         <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden">
                                             <div className="p-5 border-b border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/30"><h3 className="font-bold text-brand-dark dark:text-dark-heading">Dados da sessão</h3></div>
                                             <div className="p-5 space-y-4 bg-white dark:bg-dark-surface">
-                                                <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Abertura</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatLongDateTime(session.opened_at)}</span></div>
-                                                {!isOpen && <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Fechamento</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{session.closed_at ? formatLongDateTime(session.closed_at) : "-"}</span></div>}
+                                                <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Abertura</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatLongDateTime(session.opened_at, tz)}</span></div>
+                                                {!isOpen && <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Fechamento</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{session.closed_at ? formatLongDateTime(session.closed_at, tz) : "-"}</span></div>}
                                                 <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo calculado</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.calculatedDrawerTotal)}</span></div>
                                                 <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Devoluções</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalRefunds)}</span></div>
                                                 <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
@@ -794,14 +796,14 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                 <div className="flex justify-between items-center gap-4">
                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data e hora</span>
                                     <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
-                                        {formatLongDateTime(detailMovement.created_at)}
+                                        {formatLongDateTime(detailMovement.created_at, tz)}
                                     </span>
                                 </div>
                                 {detailMovement.reversed_at ? (
                                     <div className="flex justify-between items-center gap-4">
                                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Estornado em</span>
                                         <span className="font-semibold text-brand-dark dark:text-dark-heading text-right">
-                                            {formatLongDateTime(detailMovement.reversed_at)}
+                                            {formatLongDateTime(detailMovement.reversed_at, tz)}
                                         </span>
                                     </div>
                                 ) : null}

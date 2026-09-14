@@ -51,7 +51,7 @@ const ProductMobileItem = React.memo(
                             <h3 className="font-bold text-[15px] text-brand-dark dark:text-dark-heading truncate">
                                 <span className="truncate">{product.name}</span>
                                 {product.moderation_status === 'pending_moderation' && (
-                                    <Tooltip text="Aguardando aprovação para exibição pública.">
+                                    <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                         <Badge variant="orange" className="w-2.5 h-2.5 p-0 min-w-0 min-h-0 rounded-full shrink-0" />
                                     </Tooltip>
                                 )}

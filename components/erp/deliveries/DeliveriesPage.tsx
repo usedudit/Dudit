@@ -6,7 +6,7 @@ import { useEntityState } from "@/hooks/use-entity-state"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button, IconPlaceholder, AlertModal, FormDropdown, Input } from "@/components/reusable"
 import FilterSheet, { type FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import { resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
+import { EMPTY_DATE_PERIOD, resolveDatePeriodBounds, isDatePeriodFilterActive, type DatePeriodFilterValue } from "@/lib/utils/filter-date-period"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ExportFileIcon, PlusIcon, SparklesIcon, MapPinIcon } from "@/lib/icons"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
@@ -97,7 +97,7 @@ export default function DeliveriesPage({
     const [debouncedSearch, setDebouncedSearch] = useState(initialSearch)
     const [filters, setFilters] = useState<{ status: string[]; datePeriod: DatePeriodFilterValue }>({
         status: [],
-        datePeriod: { presets: ["Últimos 3 dias"], from: "", to: "" },
+        datePeriod: { ...EMPTY_DATE_PERIOD },
     })
     const [isFilterOpen, setIsFilterOpen] = useState(false)
     const [viewMode, setViewMode] = useState<"kanban">("kanban")
@@ -418,6 +418,7 @@ export default function DeliveriesPage({
     }
 
     return (
+        <>
         <AnimatePresence mode="wait">
             {wrapper === "create" || wrapper === "edit" ? (
                 <FadeIn key={wrapper} className="w-full h-full">
@@ -512,8 +513,8 @@ export default function DeliveriesPage({
                                             }
                                             itemButton={
                                                 planGate ? {
-                                                    text: "Ver Plano Crescer",
-                                                    action: () => openPlanUpgrade("crescer"),
+                                                    text: "Ver Plano Escalar",
+                                                    action: () => openPlanUpgrade("escalar"),
                                                 } : isDelivery ? undefined : {
                                                     text: "Adicionar primeira entrega",
                                                     action: () => openEntity("create"),
@@ -773,15 +774,16 @@ export default function DeliveriesPage({
                 }}
                 variant="info"
             />
-
-            <FilterSheet
-                isOpen={isFilterOpen}
-                onClose={() => setIsFilterOpen(false)}
-                sections={filterSections}
-                filters={filters}
-                setFilters={setFilters}
-                onClear={() => setFilters({ status: [], datePeriod: { presets: [], from: "", to: "" } })}
-            />
         </AnimatePresence>
+
+        <FilterSheet
+            isOpen={isFilterOpen}
+            onClose={() => setIsFilterOpen(false)}
+            sections={filterSections}
+            filters={filters}
+            setFilters={setFilters}
+            onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
+        />
+        </>
     )
 }

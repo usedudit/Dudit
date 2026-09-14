@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissions/access"
 import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { revalidatePath } from "next/cache"
+import { safeRevalidateTag } from "@/lib/utils/revalidation"
 import { redirect } from "next/navigation"
 import { getDashboardLayout } from "@/lib/dashboard-engine/engine"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
@@ -138,6 +139,8 @@ export async function switchBusinessModeAction(partnerId: string, targetMode: Bu
         if (updateError) throw updateError
 
         revalidatePath("/erp")
+        // Invalidar o cache de acesso do usuário para que o businessInfo atualizado seja carregado
+        await safeRevalidateTag(TAGS.userAccess(user.id))
         return { success: true }
 
     } catch (e: any) {

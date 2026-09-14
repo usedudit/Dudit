@@ -66,7 +66,15 @@ const REQUIRED_FIELDS = [
         },
         message: "Preço inválido"
     },
-    { field: "stock", tab: "general", validate: (v: any) => v !== undefined && v !== null, message: "Estoque é obrigatório" },
+    {
+        field: "stock",
+        tab: "general",
+        validate: (v: any, data: any) => {
+            if (data?.businessInfo?.mode === "desapego" || data?.mode === "desapego") return true
+            return v !== undefined && v !== null
+        },
+        message: "Estoque é obrigatório"
+    },
     { field: "sku", tab: "general", validate: () => true, message: "" },
     { field: "gtin", tab: "general", validate: () => true, message: "" },
     { field: "costPrice", tab: "general", validate: () => true, message: "" },
@@ -629,20 +637,20 @@ const AddProductPage: FC<AddProductPageProps> = ({
                 location_id: d.location_id || null,
                 category: d.category,
                 subcategory: d.subcategory,
-                condition: d.condicao,
+                condition: d.condicao || d.condition || "Novo",
                 unit: d.unidade,
                 subcategory_id: d.subcategory_id || null,
                 productType: d.productType,
                 location: d.localizacao || d.location || null,
                 deliveryFormat: d.digital_format,
-                costPrice: hasVariants ? 0 : (Number(d.costPrice) || 0),
+                costPrice: (hasVariants || isDesapego) ? 0 : (Number(d.costPrice) || 0),
                 price: hasVariants ? 0 : Number(d.price),
-                promotionalPrice: hasVariants ? null : (d.promotional_price ? Number(d.promotional_price) : null),
-                minStock: Number(d.minStock) || 0,
-                maxStock: Number(d.maxStock) || 0,
-                stockQuantity: Number(d.stock),
-                isActive: d.is_active,
-                isOnPromotion: hasVariants ? false : !!d.promotional_price,
+                promotionalPrice: (hasVariants || isDesapego) ? null : (d.promotional_price ? Number(d.promotional_price) : null),
+                minStock: isDesapego ? 0 : (Number(d.minStock) || 0),
+                maxStock: isDesapego ? 0 : (Number(d.maxStock) || 0),
+                stockQuantity: isDesapego ? (Number(d.stock) > 0 ? Number(d.stock) : 1) : Number(d.stock),
+                isActive: isDesapego ? true : d.is_active,
+                isOnPromotion: (hasVariants || isDesapego) ? false : !!d.promotional_price,
                 showPriceInStore: !!d.show_price_in_store,
                 showInMarketplace: d.show_in_marketplace !== false,
                 images: cleanedFinalImages,
@@ -872,7 +880,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                                 </Badge>
                                             )}
                                             {productData.moderation_status === 'pending_moderation' && (
-                                                <Tooltip text="Aguardando aprovação para exibição pública.">
+                                                <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                                     <Badge variant="orange" className="shrink-0 hidden md:inline-flex" />
                                                 </Tooltip>
                                             )}

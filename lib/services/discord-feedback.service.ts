@@ -72,8 +72,11 @@ export async function sendDiscordFeedbackNotification(
     const config = TYPE_CONFIG[payload.type] || TYPE_CONFIG.general
     const sentimentInfo = payload.sentiment ? SENTIMENT_CONFIG[payload.sentiment] : null
 
+    const tz = payload.partnerId
+      ? await import("@/lib/date").then(m => m.getPartnerTimezone(payload.partnerId!)).catch(() => "America/Sao_Paulo")
+      : "America/Sao_Paulo"
     const formattedDate = new Date(payload.createdAt || Date.now()).toLocaleString("pt-BR", {
-      timeZone: "America/Sao_Paulo",
+      timeZone: tz,
     })
 
     const fields: Array<{ name: string; value: string; inline?: boolean }> = []

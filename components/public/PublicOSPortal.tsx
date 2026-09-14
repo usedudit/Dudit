@@ -6,6 +6,7 @@ import {
     getPublicPresignedUploadUrlAction,
     signPublicServiceOrderAction
 } from "@/app/actions/erp/service-orders"
+import { useTimezone } from "@/lib/date"
 import {
     Button,
     Badge,
@@ -47,6 +48,7 @@ interface PublicOSPortalProps {
 }
 
 export default function PublicOSPortal({ token, data: initialData, ip, userAgent }: PublicOSPortalProps) {
+    const tz = useTimezone()
     // ─── STATE MANAGEMENT ────────────────────────────────────────────────────
     const [order, setOrder] = useState(initialData.serviceOrder)
     const [services, setServices] = useState(initialData.services)
@@ -130,13 +132,13 @@ export default function PublicOSPortal({ token, data: initialData, ip, userAgent
         }
         const d = new Date(dateStr)
         if (isNaN(d.getTime())) return dateStr
-        return d.toLocaleDateString("pt-BR")
+        return d.toLocaleDateString("pt-BR", { timeZone: tz })
     }
 
     const formatDateTime = (dateVal: string | Date) => {
         const d = new Date(dateVal)
         if (isNaN(d.getTime())) return ""
-        return `${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+        return `${d.toLocaleDateString("pt-BR", { timeZone: tz })} às ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: tz })}`
     }
 
     const formatFileSize = (size: any) => {

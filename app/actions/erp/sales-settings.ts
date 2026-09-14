@@ -27,6 +27,15 @@ function sanitizeSalesSettings(input: Partial<SalesSettings>): Partial<SalesSett
     }
   }
 
+  if (input.defaultMarginPercent !== undefined) {
+    if (input.defaultMarginPercent === null) {
+      sanitized.defaultMarginPercent = 30
+    } else {
+      const parsed = Number(input.defaultMarginPercent)
+      sanitized.defaultMarginPercent = isNaN(parsed) ? 30 : Math.max(0, Math.min(100, parsed))
+    }
+  }
+
   if (input.allowNegativeStock !== undefined) {
     sanitized.allowNegativeStock = Boolean(input.allowNegativeStock)
   }
@@ -91,6 +100,9 @@ export async function getSalesSettingsAction(partnerId: string) {
       maxDiscountPercent: typeof rawSettings?.maxDiscountPercent === "number"
         ? Math.max(0, Math.min(100, rawSettings.maxDiscountPercent))
         : DEFAULT_SALES_SETTINGS.maxDiscountPercent,
+      defaultMarginPercent: typeof rawSettings?.defaultMarginPercent === "number"
+        ? Math.max(0, Math.min(100, rawSettings.defaultMarginPercent))
+        : DEFAULT_SALES_SETTINGS.defaultMarginPercent,
       allowNegativeStock: typeof rawSettings?.allowNegativeStock === "boolean"
         ? rawSettings.allowNegativeStock
         : DEFAULT_SALES_SETTINGS.allowNegativeStock,

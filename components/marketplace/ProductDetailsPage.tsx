@@ -319,7 +319,6 @@ export function ProductDetailsPageClient({
 
     const [giftDetails, setGiftDetails] = useState<{ name: string; image_url: string | null; isProduct: boolean } | null>(null)
 
-    // Addons & Classifieds (iFood & OLX / Marketplace style)
     const productAddons = useMemo<any[]>(() => {
         const raw = (Array.isArray(product.addon_groups) && product.addon_groups.length > 0)
             ? product.addon_groups
@@ -1590,7 +1589,11 @@ export function ProductDetailsPageClient({
                         {(() => {
                             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                            const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" na Dudit e gostaria de saber o preço.`)
+                            const whatsappMsg = encodeURIComponent(
+                                showPrice && pricing?.bestPrice
+                                    ? `Olá! Vi seu anúncio do produto "${product.name}" por ${formatMoney(pricing.bestPrice)} na Dudit. Ainda está disponível?`
+                                    : `Olá! Vi seu anúncio do produto "${product.name}" na Dudit. Ainda está disponível?`
+                            )
                             const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                             return (
                                 <a
@@ -2513,7 +2516,6 @@ export function ProductDetailsPageClient({
                                 )}
                             </FormSection>
 
-                            {/* Detalhes do Produto - Estilo OLX com ListItem sem bordas */}
                             {(() => {
                                 const detailsList: Array<{
                                     key: string
@@ -2623,19 +2625,18 @@ export function ProductDetailsPageClient({
 
                             {/* Technical specs */}
                             {Array.isArray(product.technical_specs) && product.technical_specs.length > 0 && (
-                                <div className="mb-10">
-                                    <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Especificações</h3>
+                                <FormSection title="Especificações" hasSeparator>
                                     <div className="border border-brand-border rounded-xl overflow-hidden">
                                         {product.technical_specs.map((spec: any, i: number, arr: any[]) => (
                                             <div key={i} className={`flex justify-between items-center px-4 py-3
-                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"}
+                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"}
                         ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{spec.label || spec.name || ""}</span>
                                                 <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">{spec.value || ""}</span>
                                             </div>
                                         ))}
                                     </div>
-                                </div>
+                                </FormSection>
                             )}
 
                             {/* Reviews */}
@@ -2659,7 +2660,11 @@ export function ProductDetailsPageClient({
                                 (() => {
                                     const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
                                     const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
-                                    const whatsappMsg = encodeURIComponent(`Olá! Vi o produto "${product.name}" na Dudit e gostaria de saber o preço.`)
+                                    const whatsappMsg = encodeURIComponent(
+                                        showPrice && pricing?.bestPrice
+                                            ? `Olá! Vi seu anúncio do produto "${product.name}" por ${formatMoney(pricing.bestPrice)} na Dudit. Ainda está disponível?`
+                                            : `Olá! Vi seu anúncio do produto "${product.name}" na Dudit. Ainda está disponível?`
+                                    )
                                     const whatsappUrl = `https://wa.me/${formattedPhone}?text=${whatsappMsg}`
                                     return (
                                         <a

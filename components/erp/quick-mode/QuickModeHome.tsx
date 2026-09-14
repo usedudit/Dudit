@@ -18,6 +18,7 @@ import {
     Package,
     WrenchIcon,
     Store,
+    BriefcaseIcon,
 } from "@/lib/icons";
 import { Button, ListItem, FormSection, DefaultModal, InfoCard, RadioButton } from "@/components/reusable";
 import { useToast } from "@/hooks/use-toast";
@@ -544,7 +545,6 @@ function PlanUpgradeCard({ planSlug, onUpgrade }: { planSlug: string; onUpgrade:
             className="px-4 py-3"
             right={
                 <Button
-                    size="sm"
                     onClick={() => onUpgrade(nextSlug as "crescer" | "escalar")}
                 >
                     Ativar plano
@@ -575,8 +575,8 @@ function ModeCard({
             const res = await switchBusinessModeAction(partnerId, modeToSet);
             if (res.success) {
                 toast({
-                    title: modeToSet === "erp" ? "Modo ERP ativado!" : "Vitrine Online ativada!",
-                    description: modeToSet === "erp" ? "Bem-vindo ao modo ERP completo." : "Sua vitrine online e catálogo comercial estão prontos."
+                    title: modeToSet === "erp" ? "Gestão completa ativada!" : "Vitrine Online ativada!",
+                    description: modeToSet === "erp" ? "Bem-vindo ao modo Gestão completa." : "Sua vitrine online e catálogo comercial estão prontos."
                 });
                 setModalOpen(false);
                 if (typeof window !== "undefined") {
@@ -596,20 +596,6 @@ function ModeCard({
     if (isDesapego) {
         return (
             <>
-                <ListItem
-                    title="Evoluir negócio"
-                    description="Ative o modo Quick, ideal para pequenos comércios com vendas presenciais."
-                    icon={<SparklesIcon className="text-brand-green w-5 h-5 shrink-0" />}
-                    className="px-4 py-3"
-                    right={
-                        <Button
-                            size="sm"
-                            onClick={() => setModalOpen(true)}
-                        >
-                            Evoluir
-                        </Button>
-                    }
-                />
                 <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
                         <RocketIcon size={20} className="text-brand-green" />
@@ -643,8 +629,8 @@ function ModeCard({
                 >
                     <div className="space-y-4">
                         <ListItem
-                            title="Vitrine Online & WhatsApp"
-                            description="Catálogo e vitrine profissional com sua marca para vender no WhatsApp e Marketplace."
+                            title="Vitrine Online"
+                            description="Crie uma vitrine com sua marca para divulgar e vender seus produtos"
                             icon={<Store className="text-brand-green w-5 h-5" />}
                             onClick={() => setSelectedMode("quick")}
                             left={
@@ -659,7 +645,7 @@ function ModeCard({
                         />
 
                         <ListItem
-                            title="Gerenciar meu negócio (ERP)"
+                            title="Gerenciar meu negócio"
                             description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
                             icon={<RocketIcon className="text-brand-green w-5 h-5" />}
                             onClick={() => setSelectedMode("erp")}
@@ -690,28 +676,19 @@ function ModeCard({
 
     return (
         <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                <RocketIcon size={20} className="text-brand-green" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                        Modo ERP
-                    </span>
-                    <p className="text-sm text-brand-dark dark:text-dark-heading">
-                        Migre para o modo ERP completo com dashboard financeiro, fluxo de caixa e relatórios detalhados.
-                    </p>
-                </div>
-            </div>
-            <Button
-                variant="default"
-                size="sm"
-                className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-4 text-xs font-bold shrink-0"
-                onClick={() => handleUpgrade("erp")}
-                disabled={loading}
-            >
-                {loading ? "Ativando..." : "Ativar"}
-            </Button>
+            <ListItem
+                title="Gestão completa"
+                description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
+                icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
+                className="px-4 py-3"
+                right={
+                    <Button
+                        onClick={() => handleUpgrade("erp")}
+                    >
+                        {loading ? "Ativando..." : "Ativar"}
+                    </Button>
+                }
+            />
         </div>
     );
 }

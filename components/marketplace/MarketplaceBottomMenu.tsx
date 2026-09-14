@@ -82,7 +82,7 @@ export function MarketplaceBottomMenu() {
             try {
                 localStorage.setItem("dudit_city", profile.citySlug)
                 document.cookie = `dudit_city=${profile.citySlug}; path=/; max-age=${60 * 60 * 24 * 30}`
-            } catch {}
+            } catch { }
             return
         }
 
@@ -100,7 +100,7 @@ export function MarketplaceBottomMenu() {
                 try {
                     localStorage.setItem("dudit_city", slug)
                     document.cookie = `dudit_city=${slug}; path=/; max-age=${60 * 60 * 24 * 30}`
-                } catch {}
+                } catch { }
                 return
             }
         }
@@ -141,7 +141,7 @@ export function MarketplaceBottomMenu() {
                 try {
                     localStorage.setItem("dudit_city", stored)
                     document.cookie = `dudit_city=${stored}; path=/; max-age=${60 * 60 * 24 * 30}`
-                } catch {}
+                } catch { }
             }
         }
     }, [pathname, profile, user])
@@ -343,7 +343,7 @@ export function MarketplaceBottomMenu() {
                                     <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-brand-red shrink-0 group-hover:scale-105 transition-transform duration-200">
                                         <LogoutIcon size={20} className="text-brand-red" />
                                     </div>
-                                    <span className="text-[14px]">Sair da sessão</span>
+                                    <span className="text-[14px] text-brand-red">Sair da sessão</span>
                                 </button>
                             </div>
                         )}

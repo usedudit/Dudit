@@ -107,7 +107,7 @@ const PricingCards = () => {
             "Controle de expedição e entregas",
             "Campanhas promocionais",
             "Metas e desempenho da equipe",
-            "Lembretes automáticos via WhatsApp",
+            "Lembretes e envios automáticos via WhatsApp",
             "Importação de XML (NF-e)"
          ],
          limits: [

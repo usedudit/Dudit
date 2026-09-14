@@ -293,7 +293,7 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     useEffect(() => {
         const fetchDetails = async () => {
             if (mode === 'create' || mode === 'duplicate') {
-                const res = await getNextQuoteNumberAction(partnerId);
+                const res = await getNextQuoteNumberAction(partnerId, selectedStore?.id);
                 if (res.success) setRealQuoteNumber(res.data);
                 if (mode === 'create') return;
             }
@@ -1082,35 +1082,35 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
     const headerContent = (
         <div className="hidden lg:flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-                <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center shrink-0">
+                <Button variant="filled" onClick={handleBack} className={`w-10 h-10 p-0 flex items-center justify-center shrink-0 ${isScrolled ? "scale-90" : "scale-100"}`}>
                     <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                 </Button>
 
                 <div className="min-w-0">
-                    <h1 className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate">
+                    <h1 className={`text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading flex items-center gap-3 truncate ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                         <span className="truncate">{pageTitle}</span>
                         {mode === "edit" && (
                             <Badge variant="gray" icon={<EditIcon />}>Editando</Badge>
                         )}
                     </h1>
-                    <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-0.5 truncate flex items-center gap-1.5">
-                        <span>{mode === 'create' && "Crie uma proposta comercial para seu cliente"}
-                            {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
-                            {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}</span>
-                    </p>
+                    <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-300 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
+                        {mode === 'create' && "Crie uma proposta comercial para seu cliente"}
+                        {mode === 'duplicate' && "Crie uma nova proposta a partir de uma existente"}
+                        {mode === 'edit' && "Edite os detalhes da sua proposta comercial"}
+                    </div>
                 </div>
             </div>
 
             {/* Action buttons */}
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                <Button variant="outline" onClick={handleBack} disabled={isSaving || isEditLoadingLocked} className={isScrolled ? "h-9 px-3 text-xs" : ""}>
+                <Button variant="outline" onClick={handleBack} disabled={isSaving || isEditLoadingLocked} className="h-9">
                     Cancelar
                 </Button>
-                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving} leftIcon={<SaveIcon size={16} />} className={isScrolled ? "h-9 px-4 text-xs" : ""}>
+                <Button onClick={handleSave} disabled={isSaving || isEditLoadingLocked} isLoading={isSaving} leftIcon={<SaveIcon size={16} />} className="h-9">
                     {mode === 'edit' ? "Salvar" : "Salvar"}
                 </Button>
             </div>
-        </div>
+        </div >
     )
 
     return (
@@ -1121,12 +1121,12 @@ const CreateQuote = ({ partnerId, onBack, existingQuote, mode }: CreateQuoteProp
                     {/* LEFT SIDE - HEADER & CONTENT */}
                     <div className="w-1/2 flex flex-col flex-1 min-h-0 shrink-0 h-full border-r border-brand-border dark:border-dark-border bg-white dark:bg-dark-background relative">
                         {/* Header confined to Left Half */}
-                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 px-6 ${isScrolled ? "py-2.5 shadow-sm" : "py-4"}`}>
+                        <div className={`shrink-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-300 px-6 ${isScrolled ? "py-2.5" : "py-4"}`}>
                             {headerContent}
                         </div>
 
                         {/* Scrollable details */}
-                        <div className="flex-1 overflow-y-auto no-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar relative" ref={scrollContainerRef} onScroll={handleScroll}>
                             {isEditLoadingLocked && (
                                 <div className="flex items-center justify-center h-[calc(100vh-65px)] w-full">
                                     <ThreeDotsLoader />

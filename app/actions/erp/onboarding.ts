@@ -56,9 +56,17 @@ export async function completeERPOnboardingWizardAction(input: ERPOnboardingWiza
             onboardingCompletedAt: new Date().toISOString(),
         }
 
+        // Determinar order_flow padrão baseado no modo de negócio
+        const businessMode = rawBusinessInfo.mode || "erp"
+        const isQuickMode = businessMode === "quick" || businessMode === "showcase"
+        const defaultOrderFlow = isQuickMode ? "whatsapp" : "dudit"
+
         // 2. Atualiza partners table (e stores table se houver)
         const updatePromises: Promise<any>[] = [
-            admin.from("partners").update({ business_info: updatedBusinessInfo }).eq("id", partnerId),
+            admin.from("partners").update({ 
+                business_info: updatedBusinessInfo,
+                order_flow: defaultOrderFlow,
+            }).eq("id", partnerId),
         ]
 
         if (storeRes.data?.id) {

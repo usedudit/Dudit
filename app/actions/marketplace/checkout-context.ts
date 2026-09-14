@@ -131,7 +131,7 @@ export async function getMarketplaceCheckoutContextAction(input: {
     admin
       .from("partners")
       .select(
-        "id, is_showcase_active, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, addresses(id, street, number, neighborhood, city, state, zip_code)",
+        "id, is_showcase_active, service_deposit_enabled, service_deposit_percentage, mp_user_id, mp_accepted_payment_methods, order_flow, business_info, addresses(id, street, number, neighborhood, city, state, zip_code)",
       )
       .eq("id", resolved.partnerId)
       .maybeSingle(),
@@ -414,7 +414,15 @@ export async function getMarketplaceCheckoutContextAction(input: {
       pixKey: pixMethod?.pix_key || null,
       pixKeyType: pixMethod?.pix_key_type || null,
       pickupPaymentPolicy: (partnerRow as any)?.pickup_payment_policy || "require_online_payment",
-      orderFlow: (partnerRow as any)?.order_flow || "dudit",
+      orderFlow: (() => {
+        const explicitFlow = (partnerRow as any)?.order_flow
+        if (explicitFlow) return explicitFlow
+        // Fallback: no modo quick/vitrine, o fluxo padrão é WhatsApp
+        const rawBizInfo = (partnerRow as any)?.business_info
+        const bizInfo = rawBizInfo && typeof rawBizInfo === "object" ? rawBizInfo : {}
+        const mode = typeof bizInfo.mode === "string" ? bizInfo.mode.toLowerCase() : ""
+        return (mode === "quick" || mode === "showcase") ? "whatsapp" : "dudit"
+      })(),
       planSlug: plan?.slug || "free",
     },
     delivery: {

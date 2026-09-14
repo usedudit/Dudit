@@ -3,8 +3,8 @@
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { MailIcon, PhoneIcon, ClockIcon, CheckCircleIcon } from "@/lib/icons"
-import { Button, EmailInput, FormDropdown, FormTextarea, InfoCard, Spinner } from "@/components/reusable"
+import { MailIcon, PhoneIcon, ClockIcon } from "@/lib/icons"
+import { AlertModal, Button, EmailInput, FormDropdown, FormTextarea, InfoCard, Spinner } from "@/components/reusable"
 import { GridLines, Navbar, Footer, CTA } from "@/components/InstitucionalShared"
 import { submitSupportTicketAction, type SupportCategory } from "@/app/actions/support"
 
@@ -18,7 +18,7 @@ const SUPPORT_CATEGORIES = [
     { value: "outro", label: "Outro" },
 ]
 
-const WHATSAPP_NUMBER = "5511999999999"
+const WHATSAPP_NUMBER = "5518996229347"
 
 export default function ContatoPage() {
     const router = useRouter()
@@ -167,32 +167,15 @@ export default function ContatoPage() {
                                         </Button>
                                     </form>
                                 ) : (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-2xl p-8 text-center space-y-4"
-                                    >
-                                        <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
-                                            <CheckCircleIcon className="w-8 h-8 text-green-600" />
-                                        </div>
-                                        <h3 className="text-xl font-bold text-brand-dark">Mensagem Enviada!</h3>
-                                        <p className="text-brand-inactive-text text-sm">
-                                            Seu ticket <strong className="text-brand-dark">{ticketId}</strong> foi registrado.
-                                            Responderemos no e-mail <strong>{email}</strong>.
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => {
-                                                setIsSuccess(false)
-                                                setTicketId(null)
-                                                setEmail("")
-                                                setCategory("")
-                                                setDescription("")
-                                            }}
-                                        >
-                                            Enviar outra mensagem
-                                        </Button>
-                                    </motion.div>
+                                    <AlertModal
+                                        isOpen={isSuccess}
+                                        onClose={() => setIsSuccess(false)}
+                                        onConfirm={() => setIsSuccess(false)}
+                                        title="Mensagem Enviada!"
+                                        description={`Seu ticket #${ticketId} foi registrado. Responderemos no e-mail ${email}.`}
+                                        confirmText="Ok, entendi"
+                                        variant="success"
+                                    />
                                 )}
                             </motion.div>
 

@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Badge, Checkbox } from "@/components/reusable"
 import { ClockIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
+import { usePartnerTimezone } from "@/lib/store-context"
 
 interface ColumnDef {
     id: string
@@ -32,6 +33,8 @@ const CashSessionListItem = React.memo(
         showCheckbox = false,
     }: CashSessionListItemProps) => {
 
+        const tz = usePartnerTimezone()
+
         const renderCellContent = (colId: string) => {
             switch (colId) {
                 case "session":
@@ -54,14 +57,14 @@ const CashSessionListItem = React.memo(
                 case "open_date":
                     return (
                         <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                            {new Date(session.opened_at).toLocaleString("pt-BR")}
+                            {new Date(session.opened_at).toLocaleString("pt-BR", { timeZone: tz })}
                         </span>
                     )
 
                 case "close_date":
                     return (
                         <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading">
-                            {session.closed_at ? new Date(session.closed_at).toLocaleString("pt-BR") : "-"}
+                            {session.closed_at ? new Date(session.closed_at).toLocaleString("pt-BR", { timeZone: tz }) : "-"}
                         </span>
                     )
                 

@@ -4,8 +4,6 @@ import React, { type ReactNode } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Portal from "@/components/Portal"
 import { XIcon } from "@/lib/icons"
-import { useMediaQuery } from "@/components/erp/hooks"
-import BottomSheet from "@/components/BottomSheet"
 import { Button } from "@/components/reusable"
 import { cn } from "@/lib/utils"
 
@@ -63,8 +61,6 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
     className = "",
     leftAction,
 }) => {
-    const isMobile = useMediaQuery("(max-width: 1023px)")
-
     const handleClose = () => {
         onClose()
     }
@@ -80,35 +76,12 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
         "5xl": "max-w-5xl",
     }
 
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={handleClose}>
-                <div className="flex flex-col gap-4 pt-2">
-                    {!hideHeader && (
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                {leftAction}
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex flex-col gap-4">{children}</div>
-                    {footer && (
-                        <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3 -mx-4 -mb-6 mt-2">
-                            {renderMobileFooter(footer)}
-                        </footer>
-                    )}
-                </div>
-            </BottomSheet>
-        )
-    }
-
     return (
         <Portal>
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+                        className="fixed inset-0 z-[110] flex items-end lg:items-center justify-center p-0 lg:p-4"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -120,19 +93,29 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                         />
 
                         <motion.div
-                            className={`relative bg-white dark:bg-dark-surface rounded-2xl shadow-xl w-full ${maxWidthClasses[maxWidth]} flex flex-col overflow-hidden max-h-[90vh] ${className}`}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className={cn(
+                                "relative bg-white dark:bg-dark-surface shadow-xl w-full flex flex-col overflow-hidden",
+                                "rounded-t-3xl max-h-[85vh] lg:max-h-[90vh] lg:rounded-2xl",
+                                maxWidthClasses[maxWidth],
+                                className
+                            )}
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 50 }}
+                            transition={{ duration: 0.25, ease: "easeOut" }}
                         >
+                            {/* Mobile drag handle */}
+                            <div className="lg:hidden shrink-0 flex justify-center pt-3 pb-1">
+                                <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
+                            </div>
+
                             {!hideHeader && (
-                                <div className="flex items-center justify-between p-6 pb-2">
+                                <div className="flex items-center justify-between px-6 pt-2 pb-2 lg:p-6 lg:pb-2">
                                     <div className="flex items-center gap-3">
                                         {leftAction}
-                                        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+                                        <h3 className="text-lg lg:text-xl font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
                                     </div>
-                                    <Button variant="filled" onClick={handleClose} className="w-[40px] h-[40px] p-0 flex items-center justify-center shrink-0">
+                                    <Button variant="filled" onClick={handleClose} className="w-[36px] h-[36px] lg:w-[40px] lg:h-[40px] p-0 flex items-center justify-center shrink-0">
                                         <XIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
@@ -141,8 +124,10 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                             <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">{children}</div>
 
                             {footer && (
-                                <div className="flex items-center justify-end gap-3 p-6 pt-2">
-                                    {footer}
+                                <div className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface flex gap-3 -mx-0 lg:-mx-0 -mb-0 lg:mb-0">
+                                    <div className="flex items-center justify-end gap-3 w-full lg:px-0">
+                                        {footer}
+                                    </div>
                                 </div>
                             )}
                         </motion.div>

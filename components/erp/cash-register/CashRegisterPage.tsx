@@ -35,6 +35,7 @@ import {
 } from "@/app/actions/erp/cash-register"
 
 import { useNotification } from "@/hooks/use-notification"
+import { usePartnerTimezone } from "@/lib/store-context"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { useInfiniteList } from "@/hooks/use-infinite-list"
 import { useErpExport } from "@/hooks/use-erp-export"
@@ -80,17 +81,18 @@ const INITIAL_FILTERS: FilterState = {
     dateClosedPeriod: { ...EMPTY_DATE_PERIOD },
 }
 
-function formatDateTime(value: string | null | undefined) {
+function formatDateTime(value: string | null | undefined, tz?: string) {
     if (!value) return "-"
-    return new Date(value).toLocaleString("pt-BR")
+    return new Date(value).toLocaleString("pt-BR", { timeZone: tz })
 }
 
-function formatShortDate(value: string | null | undefined) {
+function formatShortDate(value: string | null | undefined, tz?: string) {
     if (!value) return "-"
     return new Date(value).toLocaleDateString("pt-BR", {
         day: "2-digit",
         month: "short",
         year: "numeric",
+        timeZone: tz,
     })
 }
 
@@ -124,6 +126,7 @@ export default function CashRegisterPage({
     initialViewId?: string | null
 }) {
     const { success: notifySuccess, error: notifyError } = useNotification()
+    const tz = usePartnerTimezone()
     const { planSlug } = usePermissions()
     const { exportData, isExporting, columnSelectionModal, closeColumnSelectionModal, handleColumnConfirm } = useErpExport(planSlug)
     const isMobile = useMediaQuery("(max-width: 768px)")

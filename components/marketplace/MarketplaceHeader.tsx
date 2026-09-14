@@ -1038,7 +1038,7 @@ const Header: React.FC<HeaderProps> = ({
                                 className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                 onClick={handleSignOut}
                             >
-                                <span className="text-[15px] font-normal text-brand-inactive-text dark:text-dark-body">Sair da sessão</span>
+                                <span className="text-[15px] font-normal text-brand-red">Sair da sessão</span>
                             </div>
                         </div>
                     </div>
@@ -1247,7 +1247,7 @@ const Header: React.FC<HeaderProps> = ({
                                             className="px-6 py-3 hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer transition-colors"
                                             onClick={handleSignOut}
                                         >
-                                            <span className="text-[14px] font-normal text-brand-inactive-text dark:text-dark-body">Sair da sessão</span>
+                                            <span className="text-[14px] font-normal text-brand-red">Sair da sessão</span>
                                         </div>
                                     </div>
                                 </div>

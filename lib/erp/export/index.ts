@@ -105,7 +105,7 @@ export async function generateErpExport(params: {
     format,
   })
 
-  const filename = formatExportFilename(module, file.extension)
+  const filename = await formatExportFilename(module, file.extension, partnerId)
 
   return {
     filename,

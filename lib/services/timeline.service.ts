@@ -471,7 +471,7 @@ function replaceTechnicalTerms(text: string) {
     .replace(/\border\b/g, "pedido")
 }
 
-export function formatTimelineEntry(entry: UserTimelineEntry | AdminTimelineEntry) {
+export function formatTimelineEntry(entry: UserTimelineEntry | AdminTimelineEntry, tz?: string) {
   const formattedLines = entry.change_lines.map(line => {
     let fmt = String(line).trim()
     fmt = replaceTechnicalTerms(fmt)
@@ -482,12 +482,13 @@ export function formatTimelineEntry(entry: UserTimelineEntry | AdminTimelineEntr
     return fmt
   })
 
-  // Format date correctly in pt-BR
+  // Format date correctly in pt-BR using the provided timezone
   let formattedDate = entry.created_at
   try {
     formattedDate = new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
+      timeZone: tz || "America/Sao_Paulo",
     }).format(new Date(entry.created_at))
   } catch (e) { }
 

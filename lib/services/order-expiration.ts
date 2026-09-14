@@ -71,12 +71,14 @@ export async function checkAndExpireOrder(
 
   const now = new Date().toISOString()
   
-  // Format Sao Paulo localized datetime for Brazil locale
-  const formatDateTime = (date: Date) => {
-    return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+  // Format localized datetime using the partner's timezone
+  const formatDateTime = async (date: Date) => {
+    const { getPartnerTimezone } = await import("@/lib/date")
+    const tz = await getPartnerTimezone(order.partner_id)
+    return date.toLocaleString("pt-BR", { timeZone: tz })
   }
   const baseNotes = (order.notes || "").replace(/\n*Pedido cancelado por:[\s\S]*$/, "").trim()
-  const cancelLine = `Pedido cancelado por: Sistema as ${formatDateTime(new Date())} - O tempo limite de pagamento expirou.`
+  const cancelLine = `Pedido cancelado por: Sistema as ${await formatDateTime(new Date())} - O tempo limite de pagamento expirou.`
   const nextNotes = [baseNotes, cancelLine].filter(Boolean).join("\n")
 
   const { error: updateError } = await client

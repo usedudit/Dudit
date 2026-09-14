@@ -407,7 +407,7 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                             { label: "Minha Assinatura", href: "/erp/configuracoes?tab=assinatura", icon: <CreditCardIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                             { label: "Central de Ajuda", href: "/ajuda", icon: <HelpCircleIcon className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
                             { label: "Enviar Feedback", onClick: () => { setIsProfileOpen(false); setIsFeedbackOpen(true); }, icon: <MessageSquare className="w-4 h-4 text-brand-inactive-text dark:text-dark-body" /> },
-                            { label: "Sair da sessão", className: "text-brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
+                            { label: "Sair da sessão", className: "brand-red", onClick: handleSignOut, icon: <LogoutIcon className="w-4 h-4 text-brand-red dark:text-brand-red" /> }
                         ] as any[]).map((item, idx) => {
                             const ItemWrapper: any = item.href ? Link : "div";
                             const wrapProps = item.href

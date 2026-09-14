@@ -60,6 +60,7 @@ export function NotificationPanel({
 			icon={BellIcon}
 			title="Receber alertas no aparelho"
 			description="Ative para ser avisado sobre pedidos e vendas"
+			className="px-4 py-3 border-0"
 			right={
 				<Button
 					variant="link"

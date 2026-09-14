@@ -258,7 +258,7 @@ export function MarketplaceLandingView({
                     {/* Imagem */}
                     <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center order-2 md:order-1">
                         <img
-                            src="https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                            src="https://img.dudit.com.br/static/mascots/Carousel1.png"
                             alt="Venda na Dudit"
                             className="w-full h-auto object-contain select-none"
                         />
@@ -311,7 +311,7 @@ export function MarketplaceLandingView({
                     {/* Imagem */}
                     <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center">
                         <img
-                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            src="https://img.dudit.com.br/static/mascots/Carousel6.png"
                             alt="Encontre perto de você"
                             className="w-full h-auto object-contain select-none"
                         />
@@ -382,7 +382,7 @@ export function MarketplaceLandingView({
                     {/* Imagem */}
                     <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center">
                         <img
-                            src="https://img.dudit.com.br/static/mascots/HappyDino.png"
+                            src="https://img.dudit.com.br/static/mascots/Carousel2.png"
                             alt="Convide quem vende"
                             className="w-full h-auto object-contain select-none"
                         />

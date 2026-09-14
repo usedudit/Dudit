@@ -351,7 +351,7 @@ async function getQuoteItemsForValidation(
 
 // ─── GET NEXT QUOTE NUMBER ──────────────────────────────────────────────────
 
-export async function getNextQuoteNumberAction(partnerId: string) {
+export async function getNextQuoteNumberAction(partnerId: string, storeId?: string | null) {
     return withTelemetry("getNextQuoteNumberAction", async () => {
         try {
             const user = await requireUser()
@@ -359,14 +359,18 @@ export async function getNextQuoteNumberAction(partnerId: string) {
 
             const supabase = await getSupabaseServerClient()
 
-            // Fetch the latest quote number for this partner
-            const { data, error } = await supabase
+            // Fetch the latest quote number scoped to this partner + store
+            let query = supabase
                 .from("quotes")
                 .select("quote_number")
                 .eq("partner_id", partnerId)
+            if (storeId) {
+                query = query.eq("store_id", storeId)
+            }
+            const { data, error } = await query
                 .order("quote_number", { ascending: false })
                 .limit(1)
-                .single()
+                .maybeSingle()
 
             if (error && error.code !== 'PGRST116') { // PGRST116 is 'no rows found'
                 console.error("[getNextQuoteNumberAction] Error:", error)
@@ -2225,6 +2229,17 @@ export async function getSalespeopleAction(partnerId: string): Promise<{ success
         await requirePermission(partnerId, "quotes", "view", user)
 
         const admin = getAdminClient()
+
+        // Include partner owner from partners table
+        const { data: partner, error: partnerError } = await admin
+            .from("partners")
+            .select("user_id")
+            .eq("id", partnerId)
+            .single()
+
+        if (partnerError) throw partnerError
+
+        // Include invited users from partner_users table
         const { data: partnerUsers, error: puError } = await admin
             .from("partner_users")
             .select("user_id")
@@ -2232,7 +2247,12 @@ export async function getSalespeopleAction(partnerId: string): Promise<{ success
 
         if (puError) throw puError
 
-        const userIds = Array.from(new Set((partnerUsers || []).map((row: any) => row.user_id).filter(Boolean)))
+        const allUserIds = [
+            partner?.user_id,
+            ...(partnerUsers || []).map((row: any) => row.user_id)
+        ].filter(Boolean)
+        const userIds = Array.from(new Set(allUserIds))
+
         if (userIds.length === 0) return { success: true, sellers: [] }
 
         const { data: profiles, error: pError } = await admin

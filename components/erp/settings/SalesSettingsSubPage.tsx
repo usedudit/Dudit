@@ -61,21 +61,21 @@ export function SalesSettingsSubPage({
 
     useEffect(() => {
         let cancelled = false
-        ;(async () => {
-            setLoading(true)
-            const salesRes = await getSalesSettingsAction(partnerId)
+            ; (async () => {
+                setLoading(true)
+                const salesRes = await getSalesSettingsAction(partnerId)
 
-            if (cancelled) return
+                if (cancelled) return
 
-            if (salesRes.success && salesRes.data) {
-                setSettings(salesRes.data)
-                setInitialSettings(salesRes.data)
-            } else {
-                notifyError(salesRes.error || "Erro ao carregar configurações de vendas")
-            }
+                if (salesRes.success && salesRes.data) {
+                    setSettings(salesRes.data)
+                    setInitialSettings(salesRes.data)
+                } else {
+                    notifyError(salesRes.error || "Erro ao carregar configurações de vendas")
+                }
 
-            setLoading(false)
-        })()
+                setLoading(false)
+            })()
         return () => {
             cancelled = true
         }
@@ -112,45 +112,27 @@ export function SalesSettingsSubPage({
 
     return (
         <FadeIn className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-500 ease-in-out">
-            <div
-                ref={scrollContainerRef}
-                onScroll={handleScroll}
-                className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar"
-            >
+            <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth custom-scrollbar">
+
                 {/* Sticky Header */}
-                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-500 ease-in-out">
-                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 py-4">
+                <div className="sticky top-0 z-30 w-full bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                    <div className="max-w-[1300px] mx-auto relative px-4 md:px-6">
+
                         {/* Back button - desktop only */}
-                        <div
-                            className={`absolute -left-12 top-4 h-full hidden xl:flex justify-center transition-all duration-500 ${
-                                isScrolled ? "scale-90" : "scale-100"
-                            }`}
-                        >
-                            <Button
-                                variant="filled"
-                                onClick={handleBack}
-                                className="w-10 h-10 p-0 flex items-center justify-center"
-                            >
+                        <div className={`absolute -left-12 top-3 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                            <Button variant="filled" onClick={handleBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                 <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                             </Button>
                         </div>
 
                         {/* Title row */}
-                        <div className="hidden md:flex items-start justify-between">
+                        <div className="hidden md:flex items-start justify-between mb-4">
                             <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                <h1
-                                    className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${
-                                        isScrolled ? "text-xl" : "text-xl md:text-3xl"
-                                    }`}
-                                >
+                                <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
                                     <span className="truncate">Configurações Gerais de Vendas</span>
                                 </h1>
 
-                                <div
-                                    className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${
-                                        isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"
-                                    }`}
-                                >
+                                <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
                                     Defina as regras globais da empresa para descontos, controle de estoque, orçamentos e cancelamentos de pedidos.
                                 </div>
                             </div>
@@ -190,9 +172,22 @@ export function SalesSettingsSubPage({
                                             placeholder="Ex: 15"
                                             suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
                                         />
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                            Limite percentual de desconto que operadores e vendedores podem aplicar diretamente no PDV ou em vendas manuais (100% = sem limite).
-                                        </p>
+                                    </div>
+
+                                    <div className="max-w-md">
+                                        <Input
+                                            label="Margem padrão de lucro (%)"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={settings.defaultMarginPercent !== null ? String(settings.defaultMarginPercent) : "30"}
+                                            onChange={(e) => {
+                                                const val = e.target.value === "" ? null : Math.min(100, Math.max(0, Number(e.target.value)))
+                                                updateField("defaultMarginPercent", val)
+                                            }}
+                                            placeholder="Ex: 30"
+                                            suffix={<span className="text-brand-inactive-text text-sm font-medium">%</span>}
+                                        />
                                     </div>
 
                                     <div className="pt-2">
@@ -201,9 +196,6 @@ export function SalesSettingsSubPage({
                                             checked={settings.allowCustomItemPrice}
                                             onCheckedChange={(v) => updateField("allowCustomItemPrice", Boolean(v))}
                                         />
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body ml-7 mt-1">
-                                            Quando desativado, vendedores não podem alterar o preço de tabela de produtos cadastrados no carrinho, permitindo ajustes apenas via desconto.
-                                        </p>
                                     </div>
                                 </div>
                             </FormSection>
@@ -216,9 +208,6 @@ export function SalesSettingsSubPage({
                                         checked={settings.allowNegativeStock}
                                         onCheckedChange={(v) => updateField("allowNegativeStock", Boolean(v))}
                                     />
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body ml-7">
-                                        Se desativado, o sistema bloqueia vendas de produtos que não possuem saldo suficiente em estoque, exceto se o produto específico estiver configurado individualmente para permitir venda sem estoque.
-                                    </p>
                                 </div>
                             </FormSection>
 
@@ -231,9 +220,6 @@ export function SalesSettingsSubPage({
                                             checked={settings.requireSeller}
                                             onCheckedChange={(v) => updateField("requireSeller", Boolean(v))}
                                         />
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body ml-7 mt-1">
-                                            Garante que toda venda seja vinculada obrigatoriamente a um vendedor/atendente para cálculo preciso de comissões e métricas.
-                                        </p>
                                     </div>
 
                                     <div className="max-w-md">
@@ -243,9 +229,6 @@ export function SalesSettingsSubPage({
                                             setValue={(v) => updateField("quoteValidityDays", Number(v))}
                                             options={QUOTE_VALIDITY_OPTIONS}
                                         />
-                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                            Prazo sugerido de validade para novos orçamentos emitidos antes da expiração.
-                                        </p>
                                     </div>
                                 </div>
                             </FormSection>
@@ -263,9 +246,6 @@ export function SalesSettingsSubPage({
                                         setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
                                         options={MANUAL_ORDER_EXPIRATION_OPTIONS}
                                     />
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">
-                                        Pedidos criados manualmente que permaneçam com pagamento pendente após esse prazo serão cancelados e os itens voltarão ao estoque. (Pix online já possui expiração padrão de 30 minutos).
-                                    </p>
                                 </div>
                             </FormSection>
                         </div>
@@ -275,12 +255,16 @@ export function SalesSettingsSubPage({
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">
-                                    Regras Globais do Negócio
+                                    Cancelamento Automático e Prazos
                                 </h3>
                                 <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
                                     <p>
                                         <strong className="text-brand-dark dark:text-dark-heading">Desconto Máximo:</strong>{" "}
                                         Protege sua margem de lucro impedindo descontos excessivos no PDV e nos pedidos manuais.
+                                    </p>
+                                    <p>
+                                        <strong className="text-brand-dark dark:text-dark-heading">Margem Padrão:</strong>{" "}
+                                        Define a margem de lucro base para o cálculo automático de preços nos produtos.
                                     </p>
                                     <p>
                                         <strong className="text-brand-dark dark:text-dark-heading">Controle de Estoque:</strong>{" "}
@@ -291,7 +275,11 @@ export function SalesSettingsSubPage({
                                         Evita vendas avulsas sem responsável e garante relatórios de comissão 100% consistentes.
                                     </p>
                                     <p>
-                                        <strong className="text-brand-dark dark:text-dark-heading">Liberação de Estoque:</strong>{" "}
+                                        <strong className="text-brand-dark dark:text-dark-heading">Validade de Orçamentos:</strong>{" "}
+                                        Orçamentos expiram automaticamente após o prazo configurado, evitando compromissos desatualizados.
+                                    </p>
+                                    <p>
+                                        <strong className="text-brand-dark dark:text-dark-heading">Cancelamento de Pedidos:</strong>{" "}
                                         Pedidos não pagos são cancelados automaticamente pelo sistema após o prazo configurado, devolvendo o estoque ao catálogo.
                                     </p>
                                 </div>

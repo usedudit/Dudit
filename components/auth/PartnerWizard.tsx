@@ -52,18 +52,18 @@ const MODE_OPTIONS: Array<{
             value: "desapego",
             icon: Tag,
             title: "Anúncio Rápido / Desapego",
-            description: "Vender itens pontuais, desapegos ou serviços simples sem burocracia",
+            description: "Venda itens ou serviços de forma rápida e sem burocracia",
         },
         {
             value: "quick",
             icon: Store,
-            title: "Vitrine Online & WhatsApp",
-            description: "Catálogo e vitrine profissional com minha marca para vender no WhatsApp e Marketplace",
+            title: "Vitrine Online",
+            description: "Crie uma vitrine com sua marca para divulgar e vender seus produtos",
         },
         {
             value: "erp",
             icon: Briefcase,
-            title: "Gerenciar meu negócio (ERP)",
+            title: "Gerenciar meu negócio",
             description: "Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios",
         },
     ]
@@ -123,8 +123,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
             const nextPath = announce === "product"
                 ? "/erp/produtos?create=true"
                 : announce === "service"
-                ? "/erp/servicos?create=true"
-                : "/erp/inicio"
+                    ? "/erp/servicos?create=true"
+                    : "/erp/inicio"
 
             const { error: resendErr } = await supabase.auth.resend({
                 type: "signup",
@@ -223,10 +223,11 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
     const handleGoogleAuth = async () => {
         setIsLoading(true)
         try {
+            const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br")
             await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
-                    redirectTo: `https://dudit.com.br/auth/callback?next=/erp/inicio`,
+                    redirectTo: `${origin}/auth/callback?next=/erp/inicio`,
                     queryParams: { access_type: "offline", prompt: "consent" },
                 },
             })
@@ -347,8 +348,8 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                 const nextPath = announce === "product"
                     ? "/erp/produtos?create=true"
                     : announce === "service"
-                    ? "/erp/servicos?create=true"
-                    : "/erp/inicio"
+                        ? "/erp/servicos?create=true"
+                        : "/erp/inicio"
 
                 const { data: signUp, error: signErr } = await supabase.auth.signUp({
                     email: cleanEmail,
@@ -575,7 +576,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         icon={opt.icon}
                                         title={opt.title}
                                         description={opt.description}
-                                        className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                        className="px-4 py-3 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
                                         onClick={() => setMode(opt.value)}
                                         left={
                                             <RadioButton

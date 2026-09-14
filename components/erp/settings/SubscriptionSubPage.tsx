@@ -29,8 +29,6 @@ const CANCELLATION_REASONS = [
     { id: "other", label: "Outra coisa" },
 ]
 import Dropdown, { DropdownItem } from "@/components/reusable/Dropdown"
-import { getNextPlanTarget } from "@/lib/subscription/limit-upgrade"
-import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { PixQrDisplayModal } from "@/components/erp/payments/shared"
 import { toast } from "@/hooks/use-notification"
 import {
@@ -270,7 +268,6 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const effectivePartnerId = partnerId || subData?.partner_id
-    const { openPlanUpgrade } = usePlanUpgrade()
 
     // Wrapper state for Upgrade Plan
     const [plansOpen, setPlansOpen] = useState(false)
@@ -797,15 +794,8 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             }
                                             align="right"
                                             showChevron={false}
+                                            fullWidth={false}
                                         >
-                                            {displayPlanSlug !== "escalar" && (
-                                                <DropdownItem onClick={() => {
-                                                    const next = getNextPlanTarget(displayPlanSlug)
-                                                    if (next) openPlanUpgrade(next)
-                                                }}>
-                                                    <ArrowUpIcon size={18} /> Fazer upgrade
-                                                </DropdownItem>
-                                            )}
                                             {hasActivePaidSub && !isScheduledToCancel && subData?.subscription?.status !== "past_due" && (
                                                 <DropdownItem onClick={() => {
                                                     setCancelReason("")
@@ -857,6 +847,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 isLoading={manualPaymentModal.loading}
                                             >
                                                 Pagar fatura atrasada
+                                            </Button>
+                                        )}
+
+                                        {displayPlanSlug !== "escalar" && (
+                                            <Button
+                                                variant="default"
+                                                className="h-11"
+                                                onClick={() => setPlansOpen(true)}
+                                            >
+                                                <ArrowUpIcon size={16} className="mr-1.5" /> Fazer upgrade
                                             </Button>
                                         )}
 

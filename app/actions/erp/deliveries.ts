@@ -109,8 +109,7 @@ async function logOrderDeliveryEvent(input: {
 
 function resolveDeliveryLimitByPlanSlug(slug: string) {
   const normalized = String(slug || "").toLowerCase()
-  if (normalized === "free") return { blocked: true, maxOrders: 0 as const }
-  if (normalized === "crescer") return { blocked: false, maxOrders: 1 as const }
+  if (normalized === "free" || normalized === "crescer") return { blocked: true, maxOrders: 0 as const }
   return { blocked: false, maxOrders: Number.MAX_SAFE_INTEGER }
 }
 
@@ -256,17 +255,18 @@ async function getPartnerUserNameByIdMap(
   if (uniqueIds.length === 0) return new Map<string, string>()
 
   const admin = getAdminClient()
-  const { data: partnerUsers } = await admin
-    .from("partner_users")
-    .select("id, user_id")
-    .eq("partner_id", partnerId)
-    .in("id", uniqueIds)
-
-  const { data: partnerUsersByUserId } = await admin
-    .from("partner_users")
-    .select("id, user_id")
-    .eq("partner_id", partnerId)
-    .in("user_id", uniqueIds)
+  const [{ data: partnerUsers }, { data: partnerUsersByUserId }] = await Promise.all([
+    admin
+      .from("partner_users")
+      .select("id, user_id")
+      .eq("partner_id", partnerId)
+      .in("id", uniqueIds),
+    admin
+      .from("partner_users")
+      .select("id, user_id")
+      .eq("partner_id", partnerId)
+      .in("user_id", uniqueIds),
+  ])
 
   const allPartnerUsers = [...(partnerUsers || []), ...(partnerUsersByUserId || [])]
   const userIdByPartnerUserId = new Map<string, string>()
@@ -1172,24 +1172,7 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
       const nameByUserId = new Map<string, string>()
       const emailByUserId = new Map<string, string>()
 
-      // Parallel batch query for auth metadata/emails
-      const userResults = await Promise.allSettled(
-        allUserIds.map((uid: string) => admin.auth.admin.getUserById(uid))
-      )
-      for (let i = 0; i < allUserIds.length; i++) {
-        const res = userResults[i]
-        if (res.status === "fulfilled" && res.value.data?.user) {
-          const u = res.value.data.user
-          if (u.email) emailByUserId.set(allUserIds[i], u.email)
-          const meta = u.user_metadata || {}
-          const metaName = meta.full_name || meta.name || meta.display_name
-          if (metaName && typeof metaName === "string" && metaName.trim()) {
-            nameByUserId.set(allUserIds[i], metaName.trim())
-          }
-        }
-      }
-
-      // Query user_profiles and delivery_drivers in parallel
+      // Query user_profiles and delivery_drivers in parallel first
       const [{ data: profiles }, { data: driversData }] = await Promise.all([
         admin.from("user_profiles").select("user_id, full_name").in("user_id", allUserIds),
         linkedDriverUserIds.length > 0
@@ -1200,6 +1183,26 @@ export async function fetchDeliveryPeopleBucketAction(partnerId: string) {
       for (const p of profiles || []) {
         if (p?.full_name && typeof p.full_name === "string" && p.full_name.trim()) {
           nameByUserId.set(p.user_id, p.full_name.trim())
+        }
+      }
+
+      // Only call Auth API for users missing names (to get email as fallback)
+      const missingNameUserIds = allUserIds.filter((uid) => !nameByUserId.has(uid))
+      if (missingNameUserIds.length > 0) {
+        const userResults = await Promise.allSettled(
+          missingNameUserIds.map((uid: string) => admin.auth.admin.getUserById(uid))
+        )
+        for (let i = 0; i < missingNameUserIds.length; i++) {
+          const res = userResults[i]
+          if (res.status === "fulfilled" && res.value.data?.user) {
+            const u = res.value.data.user
+            if (u.email) emailByUserId.set(missingNameUserIds[i], u.email)
+            const meta = u.user_metadata || {}
+            const metaName = meta.full_name || meta.name || meta.display_name
+            if (metaName && typeof metaName === "string" && metaName.trim()) {
+              nameByUserId.set(missingNameUserIds[i], metaName.trim())
+            }
+          }
         }
       }
 
@@ -1420,10 +1423,10 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
       await getAdminClient().from("delivery_orders").delete().eq("delivery_id", finalDeliveryId)
 
-      for (let i = 1; i < prevDeliveryIds.length; i++) {
-        const otherId = prevDeliveryIds[i]
-        await getAdminClient().from("delivery_orders").delete().eq("delivery_id", otherId)
-        await supabase.from("deliveries").delete().eq("id", otherId).eq("partner_id", payload.partnerId)
+      if (prevDeliveryIds.length > 1) {
+        const otherIds = prevDeliveryIds.slice(1)
+        await getAdminClient().from("delivery_orders").delete().in("delivery_id", otherIds)
+        await supabase.from("deliveries").delete().in("id", otherIds).eq("partner_id", payload.partnerId)
       }
     } else {
       deliveryNumber = await allocatePartnerDeliveryNumber(supabase, payload.partnerId)
@@ -1466,13 +1469,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         .in("order_id", orderIds)
         .in("status", ["available", "requested", "assigned"])
 
-      const { data: orderRows } = await getAdminClient()
-        .from("orders")
-        .select("id, delivery_fee")
-        .in("id", orderIds)
-        .eq("partner_id", payload.partnerId)
-
-      const assignmentRows = (orderRows || []).map((ord: any) => ({
+      const assignmentRows = (selectedOrders || []).map((ord: any) => ({
         order_id: ord.id,
         delivery_id: finalDeliveryId,
         partner_id: payload.partnerId,
@@ -1588,9 +1585,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
     | { success: false; error: string }
   > {
     try {
-      const user = await requireUser()
-      const actor = await getDeliveryActorScope(partnerId)
-      const planCheck = await enforceDeliveryPlanAccess(partnerId, 1)
+      const [user, actor, planCheck] = await Promise.all([
+        requireUser(),
+        getDeliveryActorScope(partnerId),
+        enforceDeliveryPlanAccess(partnerId, 1),
+      ])
       if (!planCheck.allowed) {
         const slug = String(planCheck.planSlug || "").toLowerCase()
         // Plano Free: página deve carregar com CTA de upgrade (evita AccessDenied enganoso).

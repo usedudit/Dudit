@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
 import { Button, Input, FormDropdown } from "@/components/reusable"
 import { Check, MapPin } from "lucide-react"
-import { Separator } from "@/components/reusable/Separator"
-import { useMediaQuery } from "@/components/erp/hooks"
 import { XIcon } from "@/lib/icons"
 import type { FilterConfig } from "./contextual-filters"
+import { motion, AnimatePresence } from "framer-motion"
 
 const RADIUS_OPTIONS = [
     { value: "", label: "Toda a cidade (sem limite)" },
@@ -19,6 +17,12 @@ const RADIUS_OPTIONS = [
     { value: "100", label: "Até 100 km" },
 ]
 
+const CONDITION_FILTER_OPTIONS = [
+    { value: "", label: "Todos os estados" },
+    { value: "novo", label: "Apenas Novos" },
+    { value: "usado", label: "Usados / Desapegos" },
+]
+
 export interface AppliedFilters {
     type: string
     categories: string[]
@@ -26,6 +30,7 @@ export interface AppliedFilters {
     maxPrice: string | number
     promoOn: boolean
     radius: number | null
+    condition?: string
 }
 
 interface ExplorarFiltersBottomSheetProps {
@@ -39,6 +44,7 @@ interface ExplorarFiltersBottomSheetProps {
     currentType: string
     selectedCategories: string[]
     selectedRadius?: number | null
+    selectedCondition?: string
     minPrice: string | number
     maxPrice: string | number
     promoOn: boolean
@@ -61,6 +67,7 @@ export function ExplorarFiltersBottomSheet({
     currentType,
     selectedCategories,
     selectedRadius,
+    selectedCondition,
     minPrice,
     maxPrice,
     promoOn,
@@ -71,7 +78,6 @@ export function ExplorarFiltersBottomSheet({
     userProfile,
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
 }: ExplorarFiltersBottomSheetProps) {
-    const isMobile = useMediaQuery("(max-width: 1023px)")
 
     const [draftType, setDraftType] = useState(currentType)
     const [draftCategories, setDraftCategories] = useState<string[]>(selectedCategories)
@@ -79,6 +85,7 @@ export function ExplorarFiltersBottomSheet({
     const [draftMaxPrice, setDraftMaxPrice] = useState<string | number>(maxPrice)
     const [draftPromo, setDraftPromo] = useState(promoOn)
     const [draftRadius, setDraftRadius] = useState<number | null>(selectedRadius ?? null)
+    const [draftCondition, setDraftCondition] = useState(selectedCondition || "")
 
     useEffect(() => {
         if (!isOpen) return
@@ -88,6 +95,7 @@ export function ExplorarFiltersBottomSheet({
         setDraftMaxPrice(maxPrice)
         setDraftPromo(promoOn)
         setDraftRadius(selectedRadius ?? null)
+        setDraftCondition(selectedCondition || "")
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
@@ -97,6 +105,7 @@ export function ExplorarFiltersBottomSheet({
         || !!draftMaxPrice
         || draftPromo
         || !!draftRadius
+        || !!draftCondition
 
     const draftCategoryList = useMemo(() => {
         if (draftType === "servicos") return serviceCategories
@@ -112,6 +121,7 @@ export function ExplorarFiltersBottomSheet({
             maxPrice: draftMaxPrice,
             promoOn: draftPromo,
             radius: draftRadius,
+            condition: draftCondition,
         })
         onClose()
     }
@@ -129,20 +139,6 @@ export function ExplorarFiltersBottomSheet({
     const handleToggleCategory = (cat: string) => {
         setDraftCategories(prev => prev.includes(cat) ? [] : [cat])
     }
-
-    const headerRow = (
-        <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">Filtros</h3>
-            {hasDraftFilters && (
-                <button
-                    onClick={handleClear}
-                    className="text-xs font-bold text-brand-green hover:underline"
-                >
-                    Limpar Tudo
-                </button>
-            )}
-        </div>
-    )
 
     const bodySections = (
         <>
@@ -195,6 +191,30 @@ export function ExplorarFiltersBottomSheet({
                             >
                                 <span>{option.label}</span>
                                 {draftType === option.value && (
+                                    <Check className="h-4 w-4" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* Condition Section */}
+            {draftType !== "servicos" && draftType !== "vitrines" && (
+                <section>
+                    <h4 className="mb-3 text-sm font-bold text-brand-dark dark:text-dark-heading">Condição</h4>
+                    <div className="space-y-2">
+                        {CONDITION_FILTER_OPTIONS.map((option) => (
+                            <button
+                                key={option.value}
+                                onClick={() => setDraftCondition(option.value)}
+                                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${draftCondition === option.value
+                                    ? "bg-[#ecfdf5] dark:bg-brand-dark/10 text-brand-green"
+                                    : "text-brand-dark dark:text-dark-heading hover:bg-gray-50 dark:hover:bg-dark-border/30"
+                                    }`}
+                            >
+                                <span>{option.label}</span>
+                                {draftCondition === option.value && (
                                     <Check className="h-4 w-4" />
                                 )}
                             </button>
@@ -316,54 +336,56 @@ export function ExplorarFiltersBottomSheet({
         </>
     )
 
-    if (isMobile) {
-        return (
-            <BottomSheet isOpen={isOpen} onClose={onClose} title="Filtros">
-                <div className="space-y-6 py-4 px-4">
-                    {headerRow}
-
-                    <Separator />
-
-                    {bodySections}
-
-                    <div className="flex gap-3 pt-4">
-                        {footerButtons}
-                    </div>
-                </div>
-            </BottomSheet>
-        )
-    }
-
     return (
         <Portal>
-            <div
-                className={`fixed inset-0 z-[100] bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                onClick={onClose}
-            >
-                <div
-                    className={`fixed right-4 top-4 bottom-4 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden flex flex-col ${isOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <header className="border-b border-brand-border p-6 flex justify-between items-center shrink-0">
-                        <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
-                        <Button variant="filled" onClick={onClose} size="icon">
-                            <XIcon className="w-5 h-5" />
-                        </Button>
-                    </header>
+            <AnimatePresence>
+                {isOpen && (
+                    <>
+                        {/* Overlay */}
+                        <motion.div
+                            className="fixed inset-0 z-[100] bg-black/50"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={onClose}
+                        />
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <div className="space-y-6 py-4 px-6">
-                            {bodySections}
-                        </div>
-                    </div>
+                        {/* Panel - bottom on mobile, right-side on desktop */}
+                        <motion.div
+                            className="fixed bottom-0 left-0 right-0 lg:top-4 lg:bottom-4 lg:left-auto lg:right-4 lg:w-96 lg:max-w-[calc(100vw-2rem)] bg-white dark:bg-dark-surface shadow-2xl flex flex-col overflow-hidden z-[101] lg:rounded-2xl max-h-[85vh] lg:max-h-none"
+                            initial={{ y: "100%", opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: "100%", opacity: 0 }}
+                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Mobile drag handle */}
+                            <div className="lg:hidden shrink-0 flex justify-center pt-3 pb-1">
+                                <div className="w-10 h-1.5 bg-gray-300 dark:bg-dark-border rounded-full" />
+                            </div>
 
-                    <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
-                        <div className="flex items-center gap-4">
-                            {footerButtons}
-                        </div>
-                    </footer>
-                </div>
-            </div>
+                            <header className="shrink-0 border-b border-brand-border p-6 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Filtros</h2>
+                                <Button variant="filled" onClick={onClose} size="icon">
+                                    <XIcon className="w-5 h-5" />
+                                </Button>
+                            </header>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <div className="space-y-6 py-4 px-6">
+                                    {bodySections}
+                                </div>
+                            </div>
+
+                            <footer className="shrink-0 border-t border-brand-border bg-white dark:bg-dark-surface p-4">
+                                <div className="flex items-center gap-4">
+                                    {footerButtons}
+                                </div>
+                            </footer>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
         </Portal>
     )
 }

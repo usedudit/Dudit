@@ -43,7 +43,7 @@ export const ShowcaseSubPage = ({
     partnerId: string
     onBack: () => void
 }) => {
-    const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
+    const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
         <>
             {/* Desktop: card */}
             <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
@@ -52,7 +52,7 @@ export const ShowcaseSubPage = ({
                 {children}
             </div>
             {/* Mobile/Tablet: FormSection */}
-            <FormSection title={title} hasSeparator className="lg:hidden">
+            <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
                 {children}
             </FormSection>
         </>
@@ -67,6 +67,7 @@ export const ShowcaseSubPage = ({
 
     const businessInfo = normalizeBusinessInfo(contextBusinessInfo || store?.business_info)
     const isDesapego = businessInfo.mode === "desapego"
+    const isQuickMode = businessInfo.mode === "quick" || businessInfo.mode === "showcase"
     const [activeTab, setActiveTab] = useState<"general" | "address">("general")
 
     const handleScroll = useCallback(() => {
@@ -78,7 +79,7 @@ export const ShowcaseSubPage = ({
         bannerUrl: store.banner_url || "",
         isShowcaseActive: store.is_showcase_active ?? true,
         gallery: store.gallery || [],
-        orderFlow: store.order_flow || "dudit",
+        orderFlow: store.order_flow || (isQuickMode ? "whatsapp" : "dudit"),
     })
 
     const initialStoreAddr = store.addresses?.[0] || store.address || {}

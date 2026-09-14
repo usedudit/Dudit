@@ -37,11 +37,18 @@ export const MODULE_FILENAME_NAMES: Record<string, string> = {
   quotes: "orcamentos",
 }
 
-export function formatExportFilename(module: string, extension: string): string {
+export async function formatExportFilename(module: string, extension: string, partnerId?: string): Promise<string> {
   const name = MODULE_FILENAME_NAMES[module] || module
   const now = new Date()
+  let tz = "America/Sao_Paulo"
+  if (partnerId) {
+    try {
+      const { getPartnerTimezone } = await import("@/lib/date")
+      tz = await getPartnerTimezone(partnerId)
+    } catch {}
+  }
   const brazil = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

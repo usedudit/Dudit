@@ -28,6 +28,8 @@ interface ExplorarFilterSidebarProps {
     onClearFilters: () => void
     selectedRadius?: number | null
     onRadiusChange?: (radius: number | null) => void
+    selectedCondition?: string
+    onConditionChange?: (condition: string) => void
     userProfile?: any
     filterConfig?: FilterConfig
     pageMode?: PageMode
@@ -42,6 +44,12 @@ const RADIUS_OPTIONS = [
     { value: "25", label: "Até 25 km" },
     { value: "50", label: "Até 50 km" },
     { value: "100", label: "Até 100 km" },
+]
+
+const CONDITION_FILTER_OPTIONS = [
+    { value: "", label: "Todos os estados" },
+    { value: "novo", label: "Apenas Novos" },
+    { value: "usado", label: "Usados / Desapegos" },
 ]
 
 export function ExplorarFilterSidebar({
@@ -67,6 +75,8 @@ export function ExplorarFilterSidebar({
     onClearFilters,
     selectedRadius,
     onRadiusChange,
+    selectedCondition,
+    onConditionChange,
     userProfile,
     filterConfig = { showType: true, showCategory: true, showPrice: true, showSort: true, showPromo: true, showRadius: true },
     pageMode,
@@ -138,6 +148,19 @@ export function ExplorarFilterSidebar({
                             value={currentType}
                             setValue={onTypeChange}
                             options={typeOptions.map(o => ({ value: o.value, label: o.label }))}
+                        />
+                    </section>
+                )}
+
+                {/* Condition Section */}
+                {currentType !== "servicos" && currentType !== "vitrines" && onConditionChange && (
+                    <section>
+                        <Separator className="my-6" />
+                        <FormDropdown
+                            label="Condição"
+                            value={selectedCondition || ""}
+                            setValue={onConditionChange}
+                            options={CONDITION_FILTER_OPTIONS}
                         />
                     </section>
                 )}

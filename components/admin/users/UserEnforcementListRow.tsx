@@ -11,6 +11,7 @@ import {
     AlertTriangleIcon,
     StoreIcon
 } from "@/lib/icons"
+import { usePartnerTimezone } from "@/lib/store-context"
 import type { EnforcementUser } from "@/lib/admin/types"
 
 interface UserEnforcementListRowProps {
@@ -29,6 +30,7 @@ const UserEnforcementListRow = React.memo(({
     onView
 }: UserEnforcementListRowProps) => {
 
+    const tz = usePartnerTimezone()
     const initials = user.full_name ? user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : "?"
 
     return (
@@ -73,10 +75,10 @@ const UserEnforcementListRow = React.memo(({
             <td className="p-2 border-b border-brand-border dark:border-dark-border text-center">
                 <div className="flex flex-col items-center">
                     <span className="font-medium text-[13px] text-brand-dark dark:text-dark-heading">
-                        {new Date(user.created_at).toLocaleDateString("pt-BR")}
+                        {new Date(user.created_at).toLocaleDateString("pt-BR", { timeZone: tz })}
                     </span>
                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body opacity-70">
-                        {new Date(user.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(user.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', timeZone: tz })}
                     </span>
                 </div>
             </td>

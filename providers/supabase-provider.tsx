@@ -48,11 +48,23 @@ export function SupabaseProvider({
         // When initialUser is available (the common case), this avoids a redundant
         // Supabase GoTrue API round-trip (~50-150ms) on every page load.
         if (!initialUser) {
-            supabase.auth.getUser().then(({ data }: any) => {
-                if (data?.user) {
-                    setUser(data.user)
+            const fetchUserWithRetry = async (attempt = 0) => {
+                try {
+                    const { data, error } = await supabase.auth.getUser()
+                    if (error) throw error
+                    if (data?.user) {
+                        setUser(data.user)
+                    }
+                } catch (err) {
+                    // Transient network errors are common on mobile - retry up to 2 times
+                    if (attempt < 2) {
+                        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+                        return fetchUserWithRetry(attempt + 1)
+                    }
+                    console.warn("[SupabaseProvider] getUser failed after retries:", err)
                 }
-            })
+            }
+            fetchUserWithRetry()
         }
 
         const {

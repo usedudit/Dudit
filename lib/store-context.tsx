@@ -5,6 +5,7 @@ import type React from "react"
 import { useRouter } from "next/navigation"
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
+import { getDefaultTimezone } from "@/lib/date"
 
 interface Store {
   id: string
@@ -33,6 +34,7 @@ interface Store {
   inscricao_estadual: string | null
   ie_isento: boolean | null
   inscricao_municipal: string | null
+  timezone?: string | null
   created_at: string
   updated_at: string
   /** User's effective role for this specific store (from store_members or partner_users) */
@@ -42,6 +44,7 @@ interface Store {
 interface StoreContextType {
   selectedStore: Store | null
   stores: Store[]
+  partnerTimezone: string
   isLoading: boolean
   hasError: boolean
   selectStore: (storeId: string) => void
@@ -251,6 +254,7 @@ export function StoreProvider({
   const contextValue = useMemo(() => ({
     selectedStore,
     stores,
+    partnerTimezone: selectedStore?.timezone || getDefaultTimezone(),
     isLoading,
     hasError,
     selectStore,
@@ -270,4 +274,9 @@ export function useStore() {
     throw new Error("useStore deve ser usado dentro de um StoreProvider")
   }
   return context
+}
+
+export function usePartnerTimezone(): string {
+  const context = useContext(StoreContext)
+  return context?.partnerTimezone || getDefaultTimezone()
 }

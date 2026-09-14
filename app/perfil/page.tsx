@@ -15,15 +15,23 @@ export default async function ProfilePage({
   const user = await requireUser()
   const supabase = await getSupabaseServerClient()
 
-  const [profileResponse, addressesResponse, passwordInfo] = await Promise.all([
-    supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }).limit(5),
-    getPasswordSecurityInfo(),
-  ])
+  let profile = null
+  let addresses: any[] = []
+  let passwordInfo = { hasPassword: true, provider: "email", isSessionFresh: false }
 
-  const profile = profileResponse.data
-  const addresses = addressesResponse.data || []
-  const defaultAddress = addresses[0] || null
+  try {
+    const [profileResponse, addressesResponse, pwInfo] = await Promise.all([
+      supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at", { ascending: false }).limit(5),
+      getPasswordSecurityInfo(),
+    ])
+
+    profile = profileResponse.data
+    addresses = addressesResponse.data || []
+    passwordInfo = pwInfo
+  } catch (err) {
+    console.error("[Perfil] Error fetching profile data:", err)
+  }
 
   // Decrypt CPF for display if it exists
   let decryptedCpf = ""
@@ -37,6 +45,7 @@ export default async function ProfilePage({
   }
 
   // Build profile with decrypted CPF and address data for the client
+  const defaultAddress = addresses[0] || null
   const profileForClient = profile ? {
     ...profile,
     cpf: decryptedCpf,

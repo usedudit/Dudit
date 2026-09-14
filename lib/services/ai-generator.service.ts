@@ -49,11 +49,13 @@ function hashInput(title: string, itemType: string): string {
   return crypto.createHash("sha256").update(`${title.trim().toLowerCase()}:${itemType}`).digest("hex")
 }
 
-// Helper para obter data no fuso de Brasília (America/Sao_Paulo)
-function getSaoPauloDateStr(): string {
+// Helper para obter data no fuso horário do parceiro
+async function getPartnerDateStr(partnerId: string): Promise<string> {
+  const { getPartnerTimezone } = await import("@/lib/date")
+  const tz = await getPartnerTimezone(partnerId)
   const now = new Date()
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
+    timeZone: tz,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -99,7 +101,7 @@ export class AiGeneratorService {
 
     const hashed = hashInput(title, itemType)
     const cacheKey = `ai:cache:prod_details:${partnerId}:${hashed}`
-    const todayStr = getSaoPauloDateStr()
+    const todayStr = await getPartnerDateStr(partnerId)
     const rateLimitKey = `ai:rate_limit:${partnerId}:${todayStr}`
 
     // 1. Verificar plano e limite de taxa diário

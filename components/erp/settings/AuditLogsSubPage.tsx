@@ -5,6 +5,7 @@ import { Button, ThreeDotsLoader } from "@/components/reusable"
 import { ChevronLeftIcon, ClockIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getAuditLogsAction } from "@/app/actions/erp/audit-logs"
+import { usePartnerTimezone } from "@/lib/store-context"
 
 interface LogEntry {
   id: string
@@ -18,11 +19,12 @@ interface LogEntry {
   createdAt: string
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, tz?: string): string {
   try {
     return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
+      timeZone: tz,
     }).format(new Date(iso))
   } catch {
     return iso
@@ -81,6 +83,7 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
+  const tz = usePartnerTimezone()
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -181,7 +184,7 @@ export function AuditLogsSubPage({ onBack }: { onBack: () => void }) {
                             <SourceBadge source={entry.source} />
                           </div>
                           <span className="text-xs text-brand-inactive-text shrink-0 whitespace-nowrap">
-                            {formatDate(entry.createdAt)}
+                            {formatDate(entry.createdAt, tz)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs text-brand-inactive-text mb-2">

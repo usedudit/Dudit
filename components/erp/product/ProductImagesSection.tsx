@@ -161,7 +161,7 @@ function ProductImagesSection({
                                 {/* Badge de Moderação Bloqueada - só aparece se a imagem foi bloqueada */}
                                 {blockedImages.has(index) && !uploadingImages.has(index) && (
                                     <div className={`absolute top-2 ${index === 0 ? "right-10" : "right-2"} z-10`}>
-                                        <Tooltip text="Aguardando aprovação para exibição pública.">
+                                        <Tooltip text="Aguardando aprovação pela moderação para exibição na vitrine online.">
                                             <div className="bg-orange-50 dark:bg-orange-900/40 rounded-full p-1.5 shadow-lg border border-orange-100 dark:border-orange-900/50 flex items-center justify-center">
                                                 <AlertTriangleIcon className="w-4 h-4 text-brand-orange dark:text-orange-400" />
                                             </div>

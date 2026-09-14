@@ -19,6 +19,15 @@ import { ProductAddonsSection } from "./ProductAddonsSection"
 import { usePermissions } from "@/lib/permission-context"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
+const CONDITION_OPTIONS = [
+    { value: "Novo", label: "Novo" },
+    { value: "Usado - Como novo", label: "Usado - Como novo" },
+    { value: "Usado - Bom", label: "Usado - Bom" },
+    { value: "Usado - Marcas de uso", label: "Usado - Marcas de uso" },
+    { value: "Recondicionado", label: "Recondicionado" },
+    { value: "Para conserto / peças", label: "Para conserto / peças" },
+]
+
 const FormCombobox = ({
     label,
     value,
@@ -259,27 +268,54 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 </h1>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                                <div>
-                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {productData.is_active ? "Ativo" : "Inativo"}
-                                        </span>
+                            {!isDesapego ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                                    <div>
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                {productData.is_active ? "Ativo" : "Inativo"}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {productData.show_in_marketplace !== false ? "Sim" : "Não"}
-                                        </span>
+                                    <div>
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                {productData.show_in_marketplace !== false ? "Sim" : "Não"}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="space-y-3 pt-2">
+                                    <div>
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Condição do Item</span>
+                                        <div className="mt-1">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-green/10 text-brand-green border border-brand-green/20">
+                                                {productData.condicao || productData.condition || "Novo"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {(productData.accepts_offers || productData.accepts_trades) && (
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            {productData.accepts_offers && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                    🤝 Aceita Propostas
+                                                </span>
+                                            )}
+                                            {productData.accepts_trades && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                                    🔄 Aceita Trocas
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </FormSection>
 
@@ -291,7 +327,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 message="Este produto possui variações. Os preços individuais de cada variação podem ser configurados na aba Variações."
                             />
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-2">
+                            <div className={`grid grid-cols-1 ${isDesapego ? "sm:grid-cols-1" : isQuickMode ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-4 sm:gap-6 mb-2`}>
                                 <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
                                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
                                         Preço de Venda
@@ -299,14 +335,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
                                         {showPrice ? formatCurrency(productData.price || 0) : "Sob consulta"}
                                     </div>
-                                    {showPrice && Number(productData.costPrice) > 0 && (
+                                    {showPrice && !isDesapego && Number(productData.costPrice) > 0 && (
                                         <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 block">
                                             Margem: {margin}% ({formatCurrency(profit)})
                                         </span>
                                     )}
                                 </div>
 
-                                {!isQuickMode && (
+                                {!isQuickMode && !isDesapego && (
                                     <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
                                         <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
                                             Preço de Custo
@@ -317,14 +353,16 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     </div>
                                 )}
 
-                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                        Preço Promocional
-                                    </span>
-                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                        {productData.promotional_price ? formatCurrency(productData.promotional_price) : "-"}
+                                {!isDesapego && (
+                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
+                                            Preço Promocional
+                                        </span>
+                                        <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                            {productData.promotional_price ? formatCurrency(productData.promotional_price) : "-"}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         )}
 
@@ -549,33 +587,64 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 />
                             </div>
 
-                            <div className={`col-span-12 sm:col-span-6`}>
-                                <FormDropdown
-                                    label="Status"
-                                    options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
-                                    value={String(productData.is_active)}
-                                    setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                />
-                            </div>
+                            {!isDesapego ? (
+                                <>
+                                    <div className={`col-span-12 sm:col-span-6`}>
+                                        <FormDropdown
+                                            label="Status"
+                                            options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}
+                                            value={String(productData.is_active)}
+                                            setValue={(v) => handleFieldChange({ target: { name: "is_active", value: v === "true" } })}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                        />
+                                    </div>
 
-                            <div className="col-span-12 sm:col-span-6">
-                                <FormDropdown
-                                    label="Exibir na Vitrine"
-                                    options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
-                                    value={showInMarketplaceValue}
-                                    setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
-                                    disabled={!isEditing}
-                                    width="w-full"
-                                />
-                            </div>
+                                    <div className="col-span-12 sm:col-span-6">
+                                        <FormDropdown
+                                            label="Exibir na Vitrine"
+                                            options={[{ value: "true", label: "Sim" }, { value: "false", label: "Não" }]}
+                                            value={showInMarketplaceValue}
+                                            setValue={(v) => handleFieldChange({ target: { name: "show_in_marketplace", value: v === "true" } })}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="col-span-12 space-y-4">
+                                    <FormDropdown
+                                        label="Condição do Item"
+                                        options={CONDITION_OPTIONS}
+                                        value={productData.condicao || productData.condition || "Novo"}
+                                        setValue={(v) => handleFieldChange({ target: { name: "condicao", value: v } })}
+                                        disabled={!isEditing}
+                                        width="w-full"
+                                    />
+                                    <div className="flex flex-wrap items-center gap-6 pt-1">
+                                        <Checkbox
+                                            checked={!!productData.accepts_offers}
+                                            label="Aceita proposta de preço (negociação)"
+                                            onChange={(checked) => handleFieldChange({ target: { name: "accepts_offers", value: checked } })}
+                                            name="accepts_offers"
+                                            disabled={!isEditing}
+                                        />
+                                        <Checkbox
+                                            checked={!!productData.accepts_trades}
+                                            label="Aceita troca por outro item"
+                                            onChange={(checked) => handleFieldChange({ target: { name: "accepts_trades", value: checked } })}
+                                            name="accepts_trades"
+                                            disabled={!isEditing}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </FormSection>
 
                 {/* PREÇO */}
-                <FormSection hasSeparator title={isQuickMode ? "Preço e Estoque" : "Preço"}>
+                <FormSection hasSeparator title={isDesapego ? "Preço" : isQuickMode ? "Preço e Estoque" : "Preço"}>
                     {hasVariants && (
                         <div className="mb-5">
                             <InfoCard
@@ -585,8 +654,8 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </div>
                     )}
                     {!hasVariants && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                            {!isQuickMode && (
+                        <div className={`grid grid-cols-1 ${isDesapego ? "sm:grid-cols-1" : isQuickMode ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-4 sm:gap-6 mb-6`}>
+                            {!isQuickMode && !isDesapego && (
                                 <MoneyInput
                                     label="Preço de Custo"
                                     name="costPrice"
@@ -615,7 +684,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     errorMessage={fieldErrors?.has("price") ? "Preço de venda é obrigatório" : undefined}
                                     dataField="price"
                                 />
-                                {isEditing && showPrice && (
+                                {isEditing && showPrice && !isDesapego && (
                                     <SalePriceCalculator
                                         costPrice={Number(productData.costPrice || 0)}
                                         sellingPrice={Number(productData.price || 0)}
@@ -627,15 +696,17 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     />
                                 )}
                             </div>
-                            <MoneyInput
-                                label="Preço Promocional"
-                                name="promotional_price"
-                                value={productData.promotional_price || ""}
-                                onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
-                                disabled={!isEditing || !showPrice}
-                            />
+                            {!isDesapego && (
+                                <MoneyInput
+                                    label="Preço Promocional"
+                                    name="promotional_price"
+                                    value={productData.promotional_price || ""}
+                                    onChange={(val) => handleFieldChange({ target: { name: "promotional_price", value: val } })}
+                                    disabled={!isEditing || !showPrice}
+                                />
+                            )}
 
-                            {isQuickMode && (
+                            {isQuickMode && !isDesapego && (
                                 mode === "add" || mode === "duplicate" ? (
                                     <Input
                                         label="Estoque Atual"
@@ -698,27 +769,23 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                     {isQuickMode && (
                         <>
-                            <div className="mt-10">
-                                <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
+                            <FormSection title="Descrição Detalhada" hasSeparator>
                                 <RichTextEditor
                                     label="Descrição Detalhada"
                                     value={productData?.description || ""}
                                     onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
                                     disabled={!isEditing}
                                 />
-                            </div>
+                            </FormSection>
 
                             {!isDesapego && (
-                                <div className="mt-10">
-                                    <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                                    <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Complementos e Adicionais</h3>
+                                <FormSection title="Complementos e Adicionais" hasSeparator>
                                     <ProductAddonsSection
                                         addonGroups={productData?.addon_groups || []}
                                         onChange={(groups) => handleInputChange({ target: { name: "addon_groups", value: groups } })}
                                         isEditing={isEditing}
                                     />
-                                </div>
+                                </FormSection>
                             )}
                         </>
                     )}

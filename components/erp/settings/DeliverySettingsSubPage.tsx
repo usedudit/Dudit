@@ -524,9 +524,9 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                             <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2 inline-flex items-center gap-2">
-                                        Quem paga a entrega
-                                        {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
-                                    </h3>
+                                    Quem paga a entrega
+                                    {isFree && <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />}
+                                </h3>
                                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">Define se a taxa de entrega é repassada ao cliente ou absorvida pela loja</p>
                                 <div className="flex gap-2">
                                     <button

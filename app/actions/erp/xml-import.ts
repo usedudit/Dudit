@@ -13,7 +13,7 @@ import { decryptCPF } from "@/lib/crypto"
 import { validateCPF, validateCNPJ, sanitizeInput } from "@/lib/input-validator"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getPartnerCapabilities } from "@/lib/services/partner-capabilities"
-import { checkLimit, canUseFeature } from "@/lib/services/subscription.service"
+import { checkLimit, canUseFeature, getPartnerPlan, increment_usage_counter } from "@/lib/services/subscription.service"
 import { enrichAddressData } from "@/lib/services/location.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { uploadBufferToR2, generateSignedDownloadUrl } from "@/lib/r2/server"
@@ -482,6 +482,18 @@ export async function uploadXMLAction(
     const allowedFeature = await canUseFeature(partnerId, "xml_import")
     if (!allowedFeature) {
       return { success: false, error: "A importação de XML requer o plano Crescer ou superior." }
+    }
+
+    // Check monthly XML import limit (Crescer: 20/month, Escalar: unlimited)
+    const plan = await getPartnerPlan(partnerId)
+    if (plan.slug.toLowerCase() !== "escalar") {
+      const xmlLimitCheck = await checkLimit(partnerId, "monthly_xml_imports")
+      if (!xmlLimitCheck.allowed) {
+        return {
+          success: false,
+          error: `Limite de importações XML atingido (${xmlLimitCheck.limit}/mês). Faça upgrade para o plano Escalar para importações ilimitadas.`,
+        }
+      }
     }
 
     const capabilities = await getPartnerCapabilities(partnerId, { storeId })
@@ -1085,6 +1097,18 @@ export async function confirmImportAction(
       return { success: false, error: "A importação de XML requer o plano Crescer ou superior." }
     }
 
+    // Check monthly XML import limit (Crescer: 20/month, Escalar: unlimited)
+    const plan = await getPartnerPlan(partnerId)
+    if (plan.slug.toLowerCase() !== "escalar") {
+      const xmlLimitCheck = await checkLimit(partnerId, "monthly_xml_imports")
+      if (!xmlLimitCheck.allowed) {
+        return {
+          success: false,
+          error: `Limite de importações XML atingido (${xmlLimitCheck.limit}/mês). Faça upgrade para o plano Escalar para importações ilimitadas.`,
+        }
+      }
+    }
+
     if (!capabilities.hasProducts) {
       return { success: false, error: "O catálogo de produtos não está ativo nas configurações." }
     }
@@ -1322,6 +1346,11 @@ export async function confirmImportAction(
       metadata: { imported: result.imported, skipped: result.skipped },
       source: "manual",
     }).catch(() => { })
+
+    // Increment monthly XML import counter (only for non-Escalar plans)
+    if (plan.slug.toLowerCase() !== "escalar") {
+      increment_usage_counter(partnerId, "xml_imports_month_count").catch(() => { })
+    }
 
     await revalidateStockMovements(partnerId)
     await revalidateProducts(partnerId)

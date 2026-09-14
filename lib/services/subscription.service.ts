@@ -57,6 +57,8 @@ export interface UsageCounters {
   appointments_month_reset: string | null
   service_orders_month_count: number
   service_orders_month_reset: string | null
+  xml_imports_month_count: number
+  xml_imports_month_reset: string | null
 }
 
 export interface LimitCheckResult {
@@ -479,6 +481,7 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
   const ordersReset = counters.orders_month_reset ? new Date(counters.orders_month_reset).getTime() : 0
   const appointmentsReset = counters.appointments_month_reset ? new Date(counters.appointments_month_reset).getTime() : 0
   const serviceOrdersReset = counters.service_orders_month_reset ? new Date(counters.service_orders_month_reset).getTime() : 0
+  const xmlImportsReset = counters.xml_imports_month_reset ? new Date(counters.xml_imports_month_reset).getTime() : 0
 
   if (quotesReset < monthStartUtc) {
     updates.quotes_month_count = 0
@@ -495,6 +498,10 @@ export const getUsageCounters = cache(async (partnerId: string): Promise<UsageCo
   if (serviceOrdersReset < monthStartUtc) {
     updates.service_orders_month_count = 0
       ; (updates as any).service_orders_month_reset = now.toISOString()
+  }
+  if (xmlImportsReset < monthStartUtc) {
+    updates.xml_imports_month_count = 0
+      ; (updates as any).xml_imports_month_reset = now.toISOString()
   }
 
   if (Object.keys(updates).length > 0) {
@@ -521,6 +528,7 @@ const LIMIT_TO_COUNTER_MAP: Record<string, keyof UsageCounters> = {
   monthly_quotes: "quotes_month_count",
   monthly_appointments: "appointments_month_count",
   monthly_service_orders: "service_orders_month_count",
+  monthly_xml_imports: "xml_imports_month_count",
   users: "users_count",
 
   // Back-compat aliases (older code/DB rows)
@@ -532,6 +540,7 @@ const LIMIT_TO_COUNTER_MAP: Record<string, keyof UsageCounters> = {
   orders_per_month: "orders_month_count",
   appointments_per_month: "appointments_month_count",
   service_orders: "service_orders_month_count",
+  xml_imports: "xml_imports_month_count",
 }
 
 const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
@@ -541,6 +550,7 @@ const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
   monthly_quotes: "orçamentos/mês",
   monthly_appointments: "agendamentos/mês",
   monthly_service_orders: "ordens de serviço/mês",
+  monthly_xml_imports: "importações XML/mês",
   users: "usuários",
   customers: "clientes",
   // Aliases
@@ -551,6 +561,7 @@ const LIMIT_NAME_TO_RESOURCE_LABEL: Record<string, string> = {
   orders_per_month: "pedidos/mês",
   appointments_per_month: "agendamentos/mês",
   service_orders: "ordens de serviço/mês",
+  xml_imports: "importações XML/mês",
 }
 
 /**

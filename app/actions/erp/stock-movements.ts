@@ -386,17 +386,19 @@ export async function getStockMovementDetails(id: string) {
             reason = data.reference_name;
         }
 
+        const { getPartnerTimezone } = await import("@/lib/date")
+        const tz = await getPartnerTimezone(ctx.partnerId)
         const dateObj = new Date(data.created_at);
         const dateStr = dateObj.toLocaleDateString("pt-BR", {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
-            timeZone: 'America/Sao_Paulo'
+            timeZone: tz
         });
         const timeStr = dateObj.toLocaleTimeString("pt-BR", {
             hour: '2-digit',
             minute: '2-digit',
-            timeZone: 'America/Sao_Paulo'
+            timeZone: tz
         });
 
         const items = (itemsData || []).map((item: any) => {

@@ -16,6 +16,9 @@ import {
   CameraIcon,
   PinIcon,
   PackageIcon,
+  MegaphoneIcon,
+  Users,
+  ChartIcon,
 } from "@/lib/icons"
 import { ListItem } from "@/components/reusable/ListItem"
 import { Checkbox } from "@/components/reusable/Checkbox"
@@ -351,81 +354,77 @@ export function ERPOnboardingWizard({
                           {/* MODO VITRINE (QUICK / SHOWCASE) */}
                           {!isDesapego && !isERP && (
                             <>
+                              <ListItem
+                                icon={ShoppingBagIcon}
+                                title="Receber pedidos pela Dudit"
+                                description="Ativar fluxo de pedidos direto pela plataforma, sem precisar repassar no WhatsApp."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("dudit_orders")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("dudit_orders")}
+                                    onChange={() => toggleGoal("dudit_orders")}
+                                  />
+                                }
+                              />
+
+                              <ListItem
+                                icon={MoneyIcon}
+                                title="Configurar formas de pagamento"
+                                description="Mostrar aos clientes seus meios de pagamento aceitos (Pix, cartão, dinheiro)."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("payment_methods")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("payment_methods")}
+                                    onChange={() => toggleGoal("payment_methods")}
+                                  />
+                                }
+                              />
+
+                              <ListItem
+                                icon={MegaphoneIcon}
+                                title="Gerenciar cupons e promoções"
+                                description="Criar cupons de desconto e campanhas para atrair mais clientes."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("coupons_promotions")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("coupons_promotions")}
+                                    onChange={() => toggleGoal("coupons_promotions")}
+                                  />
+                                }
+                              />
+
+                              <ListItem
+                                icon={Users}
+                                title="Gerenciar clientes"
+                                description="Acompanhar cadastros, histórico de compras e fidelizar seu público."
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                                onClick={() => toggleGoal("customers_management")}
+                                right={
+                                  <Checkbox
+                                    checked={selectedGoals.includes("customers_management")}
+                                    onChange={() => toggleGoal("customers_management")}
+                                  />
+                                }
+                              />
+
                               {sellsServices && (
-                                <>
-                                  <ListItem
-                                    icon={CalendarIcon}
-                                    title="Organizar agendamentos e horários"
-                                    description="Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp."
-                                    className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                    onClick={() => toggleGoal("appointments")}
-                                    right={
-                                      <Checkbox
-                                        checked={selectedGoals.includes("appointments")}
-                                        onChange={() => toggleGoal("appointments")}
-                                      />
-                                    }
-                                  />
-
-                                  <ListItem
-                                    icon={WhatsappIcon}
-                                    title="Divulgar catálogo de serviços com preços"
-                                    description="Mandar link onde o cliente vê duração, fotos e valores de cada atendimento."
-                                    className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                    onClick={() => toggleGoal("whatsapp_services")}
-                                    right={
-                                      <Checkbox
-                                        checked={selectedGoals.includes("whatsapp_services")}
-                                        onChange={() => toggleGoal("whatsapp_services")}
-                                      />
-                                    }
-                                  />
-                                </>
-                              )}
-
-                              {sellsProducts && (
                                 <ListItem
-                                  icon={ShoppingBagIcon}
-                                  title="Montar catálogo online para pedidos"
-                                  description="Enviar link dos produtos e receber pedidos prontos e organizados no WhatsApp."
+                                  icon={CalendarIcon}
+                                  title="Organizar agendamentos e horários"
+                                  description="Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp."
                                   className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                  onClick={() => toggleGoal("whatsapp_catalog")}
+                                  onClick={() => toggleGoal("appointments")}
                                   right={
                                     <Checkbox
-                                      checked={selectedGoals.includes("whatsapp_catalog")}
-                                      onChange={() => toggleGoal("whatsapp_catalog")}
+                                      checked={selectedGoals.includes("appointments")}
+                                      onChange={() => toggleGoal("appointments")}
                                     />
                                   }
                                 />
                               )}
-
-                              <ListItem
-                                icon={MoneyIcon}
-                                title="Receber pagamentos via Pix direto"
-                                description="Facilitar o acerto dos clientes exibindo chave Pix direto no pedido."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("pix_payments")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("pix_payments")}
-                                    onChange={() => toggleGoal("pix_payments")}
-                                  />
-                                }
-                              />
-
-                              <ListItem
-                                icon={StoreIcon}
-                                title="Personalizar minha marca e vitrine"
-                                description="Colocar logo, banner e horários de funcionamento para passar credibilidade."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("customize_storefront")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("customize_storefront")}
-                                    onChange={() => toggleGoal("customize_storefront")}
-                                  />
-                                }
-                              />
                             </>
                           )}
 
@@ -493,15 +492,15 @@ export function ERPOnboardingWizard({
                               )}
 
                               <ListItem
-                                icon={StoreIcon}
-                                title="Vitrine online conectada ao estoque"
-                                description="Receber pedidos pela internet com baixa automática no estoque do sistema."
+                                icon={ChartIcon}
+                                title="Desempenho e relatórios"
+                                description="Acompanhar visão geral, metas, comissões e estatísticas da equipe."
                                 className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("integrated_storefront")}
+                                onClick={() => toggleGoal("performance_reports")}
                                 right={
                                   <Checkbox
-                                    checked={selectedGoals.includes("integrated_storefront")}
-                                    onChange={() => toggleGoal("integrated_storefront")}
+                                    checked={selectedGoals.includes("performance_reports")}
+                                    onChange={() => toggleGoal("performance_reports")}
                                   />
                                 }
                               />
