@@ -73,7 +73,7 @@ export async function checkAndExpireOrder(
   
   // Format localized datetime using the partner's timezone
   const formatDateTime = async (date: Date) => {
-    const { getPartnerTimezone } = await import("@/lib/date")
+    const { getPartnerTimezone } = await import("@/lib/date/server")
     const tz = await getPartnerTimezone(order.partner_id)
     return date.toLocaleString("pt-BR", { timeZone: tz })
   }

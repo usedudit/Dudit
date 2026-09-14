@@ -386,7 +386,7 @@ export async function getStockMovementDetails(id: string) {
             reason = data.reference_name;
         }
 
-        const { getPartnerTimezone } = await import("@/lib/date")
+        const { getPartnerTimezone } = await import("@/lib/date/server")
         const tz = await getPartnerTimezone(ctx.partnerId)
         const dateObj = new Date(data.created_at);
         const dateStr = dateObj.toLocaleDateString("pt-BR", {

@@ -17,12 +17,8 @@ export function NotificationBell({
   buttonClassName,
   variant = "erp",
 }: NotificationBellProps) {
-  const {
-    user,
-    panelOpen,
-    setPanelOpen,
-    unreadCount,
-  } = useNotifications()
+  const notifications = useNotifications()
+  const { user, panelOpen, setPanelOpen, unreadCount } = notifications
 
   if (!user) return null
 
@@ -66,6 +62,7 @@ export function NotificationBell({
       <NotificationsSheet
         isOpen={panelOpen}
         onClose={() => setPanelOpen(false)}
+        notifications={notifications}
       />
     </div>
   )

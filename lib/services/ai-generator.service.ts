@@ -51,7 +51,7 @@ function hashInput(title: string, itemType: string): string {
 
 // Helper para obter data no fuso horário do parceiro
 async function getPartnerDateStr(partnerId: string): Promise<string> {
-  const { getPartnerTimezone } = await import("@/lib/date")
+  const { getPartnerTimezone } = await import("@/lib/date/server")
   const tz = await getPartnerTimezone(partnerId)
   const now = new Date()
   return new Intl.DateTimeFormat("en-CA", {

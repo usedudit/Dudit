@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { XIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
@@ -8,14 +8,15 @@ import Portal from "@/components/Portal"
 import BottomSheet from "@/components/BottomSheet"
 import { useMediaQuery } from "@/components/erp/hooks"
 import { NotificationPanel } from "./NotificationPanel"
-import { useNotifications } from "@/hooks/use-notifications"
+import type { NotificationsController } from "@/hooks/use-notifications"
 
 interface NotificationsSheetProps {
   isOpen: boolean
   onClose: () => void
+  notifications: NotificationsController
 }
 
-export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps) {
+export function NotificationsSheet({ isOpen, onClose, notifications }: NotificationsSheetProps) {
   const {
     grouped,
     isLoading,
@@ -23,14 +24,9 @@ export function NotificationsSheet({ isOpen, onClose }: NotificationsSheetProps)
     hasMore,
     fetchMore,
     registerVisible,
-    setPanelOpen,
     markAllAsRead,
     unreadCount,
-  } = useNotifications()
-
-  useEffect(() => {
-    setPanelOpen(isOpen)
-  }, [isOpen, setPanelOpen])
+  } = notifications
 
   const isMobile = useMediaQuery("(max-width: 1023px)")
 

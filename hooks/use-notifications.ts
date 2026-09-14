@@ -1,14 +1,18 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query"
 import {
   getNotificationsAction,
   getUnreadNotificationCountAction,
   markAllNotificationsReadAction,
   markNotificationsReadAction,
 } from "@/app/actions/notifications"
-import type { NotificationPageCursor, NotificationRecord } from "@/lib/notifications/types"
+import type {
+  NotificationPageCursor,
+  NotificationRecord,
+  NotificationsPageResult,
+} from "@/lib/notifications/types"
 import { useSupabase } from "@/providers/supabase-provider"
 
 const READ_DELAY_MS = 2000
@@ -53,19 +57,29 @@ export function useNotifications() {
   const [panelOpen, setPanelOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const visibleTimestampsRef = useRef<Map<string, number>>(new Map())
+  const unreadQueryKey = useMemo(
+    () => ["notifications", "unread-count", user?.id] as const,
+    [user?.id],
+  )
+  const listQueryKey = useMemo(
+    () => ["notifications", "list", user?.id] as const,
+    [user?.id],
+  )
 
   const unreadQuery = useQuery({
-    queryKey: ["notifications", "unread-count", user?.id],
+    queryKey: unreadQueryKey,
     queryFn: async () => {
       const result = await getUnreadNotificationCountAction()
       return result.count ?? 0
     },
     enabled: Boolean(user?.id),
     staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   })
 
   const listQuery = useInfiniteQuery({
-    queryKey: ["notifications", "list", user?.id],
+    queryKey: listQueryKey,
     queryFn: async ({ pageParam }) => {
       const result = await getNotificationsAction({
         cursor: (pageParam as NotificationPageCursor | null) ?? null,
@@ -79,12 +93,39 @@ export function useNotifications() {
     staleTime: 60_000,
   })
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count", user?.id] })
-    queryClient.invalidateQueries({ queryKey: ["notifications", "list", user?.id] })
-  }, [queryClient, user?.id])
+  const updateReadCache = useCallback(
+    (ids: string[] | null, updatedCount?: number) => {
+      const readAt = new Date().toISOString()
+      const idSet = ids ? new Set(ids) : null
 
+      queryClient.setQueryData<number>(unreadQueryKey, (current) => {
+        if (!idSet) return 0
+        return Math.max(0, (current ?? 0) - (updatedCount ?? idSet.size))
+      })
 
+      queryClient.setQueryData<
+        InfiniteData<NotificationsPageResult, NotificationPageCursor | null> | undefined
+      >(listQueryKey, (current) => {
+        if (!current) return current
+
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            items: page.items.map((item) => {
+              if (idSet && !idSet.has(item.id)) return item
+              return {
+                ...item,
+                is_read: true,
+                read_at: item.read_at ?? readAt,
+              }
+            }),
+          })),
+        }
+      })
+    },
+    [listQueryKey, queryClient, unreadQueryKey],
+  )
 
   const allItems = useMemo(
     () => listQuery.data?.pages.flatMap((p) => p.items) ?? [],
@@ -113,12 +154,14 @@ export function useNotifications() {
   const markAsRead = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return
     try {
-      await markNotificationsReadAction(ids)
-      invalidate()
+      const result = await markNotificationsReadAction(ids)
+      if ("success" in result && result.success) {
+        updateReadCache(ids, result.updated)
+      }
     } catch (e) {
       console.error("[notifications] markAsRead error:", e)
     }
-  }, [invalidate])
+  }, [updateReadCache])
 
   useEffect(() => {
     if (!panelOpen) {
@@ -159,12 +202,14 @@ export function useNotifications() {
 
   const markAllAsRead = useCallback(async () => {
     try {
-      await markAllNotificationsReadAction()
-      invalidate()
+      const result = await markAllNotificationsReadAction()
+      if ("success" in result && result.success) {
+        updateReadCache(null, result.updated)
+      }
     } catch (e) {
       console.error("[notifications] markAllAsRead error:", e)
     }
-  }, [invalidate])
+  }, [updateReadCache])
 
   return {
     user,
@@ -178,7 +223,8 @@ export function useNotifications() {
     hasMore: listQuery.hasNextPage ?? false,
     fetchMore: () => listQuery.fetchNextPage(),
     registerVisible,
-    invalidate,
     markAllAsRead,
   }
 }
+
+export type NotificationsController = ReturnType<typeof useNotifications>

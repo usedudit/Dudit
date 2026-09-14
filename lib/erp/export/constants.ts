@@ -43,7 +43,7 @@ export async function formatExportFilename(module: string, extension: string, pa
   let tz = "America/Sao_Paulo"
   if (partnerId) {
     try {
-      const { getPartnerTimezone } = await import("@/lib/date")
+      const { getPartnerTimezone } = await import("@/lib/date/server")
       tz = await getPartnerTimezone(partnerId)
     } catch {}
   }

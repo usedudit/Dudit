@@ -1,4 +1,4 @@
-export { getDefaultTimezone, getPartnerTimezone } from "./tz"
+export { getDefaultTimezone } from "./tz"
 export { nowUTC, parseInTz, getDateComponents, getTodayYmd, startOfDay, endOfDay, msToYmd } from "./convert"
 export { formatInTz, formatDate, formatDateTime, formatTime, formatFullDate, formatDateShort, formatDateTimeWithBullet, formatBrazilDateFromDbInput, toDateTimeInputValue } from "./format"
 export { diffCalendarDays, addCalendarDays } from "./calendar"
