@@ -663,41 +663,8 @@ CREATE POLICY "transactions_update_own" ON public."transactions" FOR UPDATE TO p
    FROM partners
   WHERE (partners.user_id = (SELECT auth.uid())))) AND ((store_id IS NULL) OR user_has_store_access(store_id))));
 
-DROP POLICY IF EXISTS "store_product_kits_delete" ON public."store_product_kits";
-
-CREATE POLICY "store_product_kits_delete" ON public."store_product_kits" FOR DELETE TO public USING ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
-
-DROP POLICY IF EXISTS "store_product_kits_insert" ON public."store_product_kits";
-
-CREATE POLICY "store_product_kits_insert" ON public."store_product_kits" FOR INSERT TO public WITH CHECK ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
-
-DROP POLICY IF EXISTS "store_product_kits_update" ON public."store_product_kits";
-
-CREATE POLICY "store_product_kits_update" ON public."store_product_kits" FOR UPDATE TO public USING ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
+-- store_product_kits bridge table was dropped by 20260728_simplify_multi_store_architecture.sql.
+-- product_kits now uses direct store_id. No policies needed here.
 
 DROP POLICY IF EXISTS "whatsapp_templates_partner" ON public."whatsapp_templates";
 
@@ -1921,41 +1888,8 @@ CREATE POLICY "partner_isolation" ON public."service_order_attachments" FOR ALL 
      JOIN partner_users pu ON ((pu.partner_id = so.partner_id)))
   WHERE ((so.id = service_order_attachments.service_order_id) AND (pu.user_id = (SELECT auth.uid()))))));
 
-DROP POLICY IF EXISTS "store_suppliers_delete" ON public."store_suppliers";
-
-CREATE POLICY "store_suppliers_delete" ON public."store_suppliers" FOR DELETE TO public USING ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
-
-DROP POLICY IF EXISTS "store_suppliers_insert" ON public."store_suppliers";
-
-CREATE POLICY "store_suppliers_insert" ON public."store_suppliers" FOR INSERT TO public WITH CHECK ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
-
-DROP POLICY IF EXISTS "store_suppliers_update" ON public."store_suppliers";
-
-CREATE POLICY "store_suppliers_update" ON public."store_suppliers" FOR UPDATE TO public USING ((store_id IN ( SELECT stores.id
-   FROM stores
-  WHERE (stores.partner_id IN ( SELECT partner_users.partner_id
-           FROM partner_users
-          WHERE ((partner_users.user_id = (SELECT auth.uid())) AND (partner_users.role_id = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text])))
-        UNION
-         SELECT partners.id
-           FROM partners
-          WHERE (partners.user_id = (SELECT auth.uid())))))));
+-- store_suppliers bridge table was dropped by 20260728_simplify_multi_store_architecture.sql.
+-- suppliers now uses direct store_id. No policies needed here.
 
 DROP POLICY IF EXISTS "return_requests_select_partner_or_customer" ON public."return_requests";
 

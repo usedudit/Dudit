@@ -1,27 +1,20 @@
--- ============================================================
--- Fase 4.3 - Drop legacy store_id columns
--- ============================================================
--- Pré-requisitos (validados):
---   ✓ Nenhuma view referencia store_id nestas tabelas
---   ✓ Nenhum trigger referencia store_id
---   ✓ Nenhuma function/RPC referencia legacy store_id
---   ✓ Nenhuma RLS policy referencia store_id nestas tabelas
---   ✓ Nenhum index sobre store_id
---   ✓ Bridge tables (store_products, store_services, store_customers,
---     store_suppliers, store_product_kits) populadas e coverage 100%
--- ============================================================
-
-ALTER TABLE products      DROP COLUMN store_id;
-ALTER TABLE services      DROP COLUMN store_id;
-ALTER TABLE customers     DROP COLUMN store_id;
-ALTER TABLE suppliers     DROP COLUMN store_id;
-ALTER TABLE product_kits  DROP COLUMN store_id;
-
--- ============================================================
--- Rollback (if needed):
+-- ============================================================================
+-- Fase 4.3 - Drop legacy store_id columns (DEPRECATED)
+-- 
+-- IMPORTANTE: Esta migration era parte da arquitetura antiga onde store_id
+-- era considerado "legacy" em tabelas base (products, services, etc.).
+-- 
+-- A arquitetura foi revertida pela migração 20260728_simplify_multi_store_architecture.sql
+-- e f20_direct_store_id.sql, que adicionam store_id diretamente nas tabelas base
+-- como parte do modelo multi-store simplificado.
+-- 
+-- NÃO drope store_id - é necessária para o funcionamento atual.
+-- Esta migration é um no-op preservado para histórico.
+-- 
+-- Rollback (se realmente necessário em ambiente legado):
 --   ALTER TABLE products      ADD COLUMN store_id UUID REFERENCES stores(id);
 --   ALTER TABLE services      ADD COLUMN store_id UUID REFERENCES stores(id);
 --   ALTER TABLE customers     ADD COLUMN store_id UUID REFERENCES stores(id);
 --   ALTER TABLE suppliers     ADD COLUMN store_id UUID REFERENCES stores(id);
 --   ALTER TABLE product_kits  ADD COLUMN store_id UUID REFERENCES stores(id);
--- ============================================================
+-- ============================================================================

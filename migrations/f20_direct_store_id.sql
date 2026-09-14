@@ -2,9 +2,12 @@
 -- F20: Direct store_id on base tables
 -- 
 -- Adiciona store_id diretamente em products, services, product_kits, suppliers
--- com backfill a partir das bridges existentes.
+-- com backfill a partir da primeira loja do partner (store_products bridge foi
+-- dropada pela migração 20260728_simplify_multi_store_architecture.sql).
 -- 
--- NÃO dropa as bridges ainda - primeiro validamos os dados.
+-- NOTA: Esta migration substitui as versões antigas (f4_1c, f4_1d, f4_3)
+-- que migravam para/from bridge tables. Na nova arquitetura, store_id
+-- é mantido direto na tabela base.
 -- ============================================================================
 
 BEGIN;
@@ -14,14 +17,7 @@ BEGIN;
 -- ============================================================================
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
 
--- Backfill a partir de store_products
-UPDATE public.products p
-SET store_id = sp.store_id
-FROM public.store_products sp
-WHERE sp.product_id = p.id
-  AND p.store_id IS NULL;
-
--- Fallback: produtos sem bridge → primeira loja do partner
+-- Backfill: produtos sem store_id → primeira loja do partner
 UPDATE public.products p
 SET store_id = (
   SELECT s.id FROM public.stores s
@@ -38,12 +34,6 @@ CREATE INDEX IF NOT EXISTS idx_products_store_id ON public.products(store_id);
 -- 2. services
 -- ============================================================================
 ALTER TABLE public.services ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
-
-UPDATE public.services sv
-SET store_id = ss.store_id
-FROM public.store_services ss
-WHERE ss.service_id = sv.id
-  AND sv.store_id IS NULL;
 
 UPDATE public.services sv
 SET store_id = (
@@ -63,12 +53,6 @@ CREATE INDEX IF NOT EXISTS idx_services_store_id ON public.services(store_id);
 ALTER TABLE public.product_kits ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
 
 UPDATE public.product_kits pk
-SET store_id = spk.store_id
-FROM public.store_product_kits spk
-WHERE spk.kit_id = pk.id
-  AND pk.store_id IS NULL;
-
-UPDATE public.product_kits pk
 SET store_id = (
   SELECT s.id FROM public.stores s
   WHERE s.partner_id = pk.partner_id
@@ -84,12 +68,6 @@ CREATE INDEX IF NOT EXISTS idx_product_kits_store_id ON public.product_kits(stor
 -- 4. suppliers
 -- ============================================================================
 ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
-
-UPDATE public.suppliers sp
-SET store_id = ss.store_id
-FROM public.store_suppliers ss
-WHERE ss.supplier_id = sp.id
-  AND sp.store_id IS NULL;
 
 UPDATE public.suppliers sp
 SET store_id = (

@@ -1,12 +1,6 @@
 -- ============================================================================
--- Fase 5 - Rollback
+-- Fase 5 - Rollback (DEPRECATED)
+--
+-- store_products foi dropado pela migração 20260728_simplify_multi_store_architecture.sql
+-- e não foi recriado desde então. Este rollback é um no-op preservado para histórico.
 -- ============================================================================
--- Reverte todas as alterações da Fase 5 (Store Products).
--- Perde os dados de store_products.
--- ============================================================================
-
-BEGIN;
-
-DROP TABLE IF EXISTS store_products CASCADE;
-
-COMMIT;

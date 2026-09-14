@@ -1,12 +1,6 @@
 -- ============================================================================
--- Fase 6 - Rollback
+-- Fase 6 - Rollback (DEPRECATED)
+--
+-- store_services foi dropado pela migração 20260728_simplify_multi_store_architecture.sql
+-- e não foi recriado desde então. Este rollback é um no-op preservado para histórico.
 -- ============================================================================
--- Reverte todas as alterações da Fase 6 (Store Services).
--- Perde os dados de store_services.
--- ============================================================================
-
-BEGIN;
-
-DROP TABLE IF EXISTS store_services CASCADE;
-
-COMMIT;
