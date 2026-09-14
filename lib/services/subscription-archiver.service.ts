@@ -1,4 +1,3 @@
-import "server-only"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { buildArchivePayload } from "@/lib/supabase/query-helpers"
 import { removeFromExploreRedis } from "@/lib/redis-sync"
