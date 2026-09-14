@@ -20,6 +20,8 @@ interface ProcessErpPaymentRequest {
   description?: string
   orderId?: string
   deviceId?: string | null
+  isDepositCharge?: boolean
+  depositMeta?: Record<string, unknown>
 }
 
 /**
@@ -341,6 +343,25 @@ async function handler(request: NextRequest) {
     if (!mpPaymentId) {
       SecureLogger.error("MP returned no payment ID for ERP payment", { status: mpPaymentResponse.status })
       return NextResponse.json({ error: "Erro ao processar pagamento - ID não retornado." }, { status: 500 })
+    }
+
+    // If this is a deposit charge against an existing order, persist deposit metadata
+    if (body.isDepositCharge && orderId && body.depositMeta) {
+      const { buildDepositCheckoutMeta } = await import("@/lib/services/marketplace-checkout-amounts")
+      const depositCheckout = body.depositMeta
+      await adminClient
+        .from("orders")
+        .update({
+          mp_payment_id: mpPaymentId.toString(),
+          payment_provider: "Mercado Pago",
+          checkout_fulfillment: {
+            ...(depositCheckout as Record<string, unknown>),
+            depositCheckout,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", orderId)
+        .eq("partner_id", partnerId)
     }
 
     // Extrair dados de Pix

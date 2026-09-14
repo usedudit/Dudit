@@ -102,6 +102,7 @@ interface Order {
     payment_breakdown?: any;
     payment_provider?: string;
     has_items_to_restore?: boolean;
+    checkout_fulfillment?: Record<string, unknown> | null;
 }
 
 interface FilterState {
@@ -401,6 +402,7 @@ export default function OrdersPage({
                     payment_breakdown: o.payment_breakdown || null,
                     payment_provider: o.payment_provider || "",
                     has_items_to_restore: Boolean(o.has_items_to_restore),
+                    checkout_fulfillment: o.checkout_fulfillment || null,
                 }
             })
             .filter((o: Order) => {
@@ -897,6 +899,7 @@ export default function OrdersPage({
                                         payment_method: order.payment_method || "",
                                         payment_breakdown: order.payment_breakdown || [],
                                         payment_provider: order.payment_provider || "",
+                                        checkout_fulfillment: order.checkout_fulfillment || null,
                                     })
                                 } else {
                                     router.push(`/erp/pedidos?edit=${order.id}&payment=1`)

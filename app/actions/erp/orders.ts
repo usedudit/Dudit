@@ -102,6 +102,7 @@ export type ERPOrderPayload = {
     skipPostCreateRevalidation?: boolean
     paymentProvider?: string | null
     mpPaymentId?: string | null
+    checkoutFulfillment?: Record<string, unknown> | null
 }
 
 type OrderStockItem = {
@@ -1977,6 +1978,7 @@ export async function createERPOrderAction(data: ERPOrderPayload) {
         payment_breakdown: adjustedPaymentBreakdown,
         payment_provider: data.paymentProvider || null,
         mp_payment_id: data.mpPaymentId || null,
+        checkout_fulfillment: data.checkoutFulfillment || null,
         delivery_address: deliveryAddressStr || null,
         finance_account_id: data.financeAccountId,
         created_by: user.id,
@@ -3158,6 +3160,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         finance_account_id: data.financeAccountId,
         payment_provider: data.paymentProvider !== undefined ? data.paymentProvider : ((currentOrder as any).payment_provider || null),
         mp_payment_id: data.mpPaymentId !== undefined ? data.mpPaymentId : ((currentOrder as any).mp_payment_id || null),
+        checkout_fulfillment: data.checkoutFulfillment !== undefined ? data.checkoutFulfillment : ((currentOrder as any).checkout_fulfillment || null),
         ...(deliveryAddressStr ? { delivery_address: deliveryAddressStr } : {}),
         ...(preparationEstimate || {}),
     }
@@ -4601,7 +4604,8 @@ export async function getERPOrdersPageAction(
                         customers(id, name, email, phone),
                         return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                         order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
-                        payment_method, payment_breakdown, payment_provider
+                        payment_method, payment_breakdown, payment_provider,
+                        checkout_fulfillment
                     `
                 const selectWithPosSale = `${baseSelect}, is_pos_sale`
                 const buildQuery = (selectClause: string) => {
@@ -4757,6 +4761,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
     }>
     paymentProvider?: string | null
     mpPaymentId?: string | null
+    checkoutFulfillment?: Record<string, unknown> | null
     financeAccountId?: string | null
     notes?: string
     servicePrice?: number
@@ -4843,6 +4848,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             payment_breakdown: payload.paymentBreakdown || null,
             payment_provider: payload.paymentProvider || null,
             mp_payment_id: payload.mpPaymentId || null,
+            checkout_fulfillment: (payload as any).checkoutFulfillment || null,
             finance_account_id: payload.financeAccountId || null,
             total_amount: totalAmountToSave,
             payment_method_discount_amount: paymentMethodDiscountAmount,

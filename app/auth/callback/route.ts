@@ -5,12 +5,26 @@ import { getAdminClient } from "@/lib/supabase/admin"
 import { ensureLegalConsents } from "@/app/actions/auth/legal-consent"
 import type { EmailOtpType } from "@supabase/supabase-js"
 
+// Debounce/cache de códigos PKCE consumidos.
+// Evita erro falso quando o browser ou extensão fazem prefetch duplicado do callback:
+// o primeiro request consome o code; o segundo chega aqui, vê que o code já foi processado
+// e propaga a mesma resposta de sucesso (cookies de sessão já estabelecidos).
+const pkceCache = new Map<string, { consumedAt: number }>()
+const PKCE_CACHE_TTL_MS = 30_000
+
 /**
  * Supabase Auth PKCE and Email Confirmation Callback Route.
  * This route is called by Supabase after a user clicks on an email confirmation
  * link or completes an OAuth login. It exchanges the "code" or "token_hash" parameter for a session
  * and sets auth and context cookies directly on the redirect response.
  */
+
+// Garante que a rota de callback nunca seja cacheada nem pré-carregada pelo browser.
+// O Supabase PKCE code é de uso único -- um prefetch duplicado (browser, extensão, etc.)
+// chegará com um code já consumido e sem cookies de sessão, causando erro falso.
+// `force-dynamic` desativa o cache automático do Next.js nível edge.
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 // Só aceita caminhos internos para evitar open-redirect
 function getSafeNext(rawNext: string | null): string {
@@ -29,7 +43,17 @@ export async function GET(request: NextRequest) {
   const errorParam = searchParams.get("error")
   const errorDescription = searchParams.get("error_description")
 
-  const origin = request.nextUrl.origin || process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+  // NEXT_PUBLIC_APP_URL é a fonte de verdade configurada (hardcoded no .env).
+  // Priorizamos ela pra evitar que proxies internos (localhost:8080, containers, etc.)
+  // sobreponham o origin com um host interno.
+  // request.nextUrl.origin é usado só quando NEXT_PUBLIC_APP_URL estiver vazio.
+  const envOrigin = process.env.NEXT_PUBLIC_APP_URL
+  const requestOrigin = request.nextUrl.origin
+  const origin = envOrigin || requestOrigin || "https://dudit.com.br"
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[AUTH CALLBACK] origin resolution:", { envOrigin, requestOrigin, final: origin })
+  }
 
   if (errorParam) {
     console.error("[AUTH CALLBACK] Error param received from provider:", errorParam, errorDescription)
@@ -87,20 +111,43 @@ export async function GET(request: NextRequest) {
     } else {
       authSuccess = true
     }
-  } else if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (error) {
-      console.warn("[AUTH CALLBACK] exchangeCodeForSession warning:", error.message)
-      // Se o código já foi consumido (requisição duplicada, prefetch do browser/extensão)
-      // ou se o usuário já possui sessão válida estabelecida, consideramos sucesso
-      const { data: { user: existingUser } } = await supabase.auth.getUser()
-      if (existingUser) {
+    } else if (code) {
+    // Debounce: se esse code PKCE já foi processado há menos de 30s, o request anterior
+    // estabeleceu a sessão. Propagamos sucesso para o request duplicado sem tentar trocar o code de novo.
+    const existing = pkceCache.get(code)
+    const now = Date.now()
+    if (existing && now - existing.consumedAt < PKCE_CACHE_TTL_MS) {
+      console.warn("[AUTH CALLBACK] PKCE code already consumed (duplicate request), propagating previous session result")
+      // Checa se a sessão foi estabelecida pelo request original:
+      const { data: { user: cachedUser } } = await supabase.auth.getUser()
+      if (cachedUser) {
         authSuccess = true
       }
     } else {
-      authSuccess = true
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      pkceCache.set(code, { consumedAt: now })
+      if (error) {
+        console.warn("[AUTH CALLBACK] exchangeCodeForSession warning:", error.message)
+        // Se o código já foi consumido (requisição duplicada, prefetch do browser/extensão)
+        // ou se o usuário já possui sessão válida estabelecida, consideramos sucesso.
+        // Usa getSession() que faz refresh automático do refresh_token se disponível.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.warn("[AUTH CALLBACK] getSession fallback also failed:", sessionError.message)
+        }
+        if (sessionData?.session?.user) {
+          authSuccess = true
+        } else {
+          const { data: { user: existingUser } } = await supabase.auth.getUser()
+          if (existingUser) {
+            authSuccess = true
+          }
+        }
+      } else {
+        authSuccess = true
+      }
     }
-  } else {
+    } else {
     // Se não veio code nem token_hash, checa se há sessão já ativa nos cookies
     const { data: { user: existingUser } } = await supabase.auth.getUser()
     if (existingUser) {
@@ -109,7 +156,8 @@ export async function GET(request: NextRequest) {
   }
 
   if (authSuccess) {
-    // Garantir que todos os cookies de sessão gerados pelo GoTrue no cookieStore estejam na resposta
+    // O createServerClient já propagou todos os cookies de sessão via setAll para o redirectResponse.
+    // Garantimos aqui qualquer cookie "sb-" que possa ter ficado apenas no cookieStore (edge runtime):
     cookieStore.getAll().forEach((c) => {
       if (c.name.startsWith("sb-") && !redirectResponse.cookies.has(c.name)) {
         redirectResponse.cookies.set(c.name, c.value, { path: "/" })

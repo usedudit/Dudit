@@ -28,6 +28,7 @@ import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, checkMercadoPagoPaymentStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { getServiceCheckoutSettingsAction } from '@/app/actions/marketplace/service-checkout-settings';
+import { buildDepositCheckoutMeta } from '@/lib/services/marketplace-checkout-amounts';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';
@@ -480,6 +481,8 @@ const PaymentModal = ({
 
     const [depositMpPixData, setDepositMpPixData] = useState<{ qrCode: string; qrCodeBase64: string } | null>(null);
     const [depositMpPaymentId, setDepositMpPaymentId] = useState<string | null>(null);
+    const [depositMeta, setDepositMeta] = useState<Record<string, unknown> | null>(null);
+    const [depositPaid, setDepositPaid] = useState(false);
     const [generatingDepositPix, setGeneratingDepositPix] = useState(false);
     const [showDepositPixModal, setShowDepositPixModal] = useState(false);
     const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
@@ -494,7 +497,21 @@ const PaymentModal = ({
                     toast({ title: "Sinal Pago!", description: "O pagamento do sinal foi confirmado." });
                     setShowDepositPixModal(false);
                     setDepositMpPixData(null);
-                    setDepositMpPaymentId(null);
+                    setDepositPaid(true);
+
+                    // If the order already exists (edit flow), sync the deposit payment
+                    // to update paid_amount, situation, and checkout_fulfillment.depositCheckout
+                    if (orderId) {
+                        try {
+                            await fetchJSONWithCSRF<any>("/api/orders/sync-payment-status", {
+                                method: "POST",
+                                body: { orderId },
+                                headers: { "Content-Type": "application/json" },
+                            });
+                        } catch (syncErr) {
+                            console.error("Error syncing deposit payment:", syncErr);
+                        }
+                    }
                     invalidate();
                 } else {
                     toast({ title: "Aguardando pagamento", description: "O Pix do sinal ainda não consta como pago." });
@@ -589,11 +606,28 @@ const PaymentModal = ({
                     amount: depositChargeAmount,
                     paymentQuote: mpPaymentQuoteRef.current,
                     description: `Sinal - ${customerName || "Cliente"}`,
+                    isDepositCharge: true,
+                    depositMeta: buildDepositCheckoutMeta({
+                        payDepositOnly: true,
+                        depositPercent: Number(effectiveDepositPercent || propsDepositPercentage || 0),
+                        serviceDepositAmount: depositChargeAmount,
+                        fullOrderTotal: total,
+                        initialChargeAmount: depositChargeAmount,
+                        paymentProvider: "Mercado Pago",
+                    }),
                 },
             });
             if (res?.pixData?.qrCode) {
                 setDepositMpPixData({ qrCode: res.pixData.qrCode, qrCodeBase64: res.pixData.qrCodeBase64 });
                 setDepositMpPaymentId(res.mpPaymentId);
+                setDepositMeta(buildDepositCheckoutMeta({
+                    payDepositOnly: true,
+                    depositPercent: Number(effectiveDepositPercent || propsDepositPercentage || 0),
+                    serviceDepositAmount: depositChargeAmount,
+                    fullOrderTotal: total,
+                    initialChargeAmount: depositChargeAmount,
+                    paymentProvider: "Mercado Pago",
+                }));
                 setShowDepositPixModal(true);
                 toast({ title: "Pix gerado", description: "Cobrança de sinal criada via Mercado Pago." });
             } else {
@@ -2046,13 +2080,73 @@ const PaymentModal = ({
 
         const isUnderpaid = paidToRegister < chargeTarget - 0.005;
 
+        // Incorporate deposit payment into the payload when it was generated and confirmed
+        let finalPaidAmount = paidToRegister;
+        let finalPaymentStatus = isUnpaidRegister ? 'unpaid' : (isUnderpaid ? (paidToRegister <= 0.005 ? 'unpaid' : 'partially_paid') : 'paid');
+        let finalPaymentBreakdown = mergedPaymentBreakdown;
+        let finalMpPaymentId: string | undefined = undefined;
+        let finalPaymentProvider: string | undefined = undefined;
+        let finalCheckoutFulfillment: Record<string, unknown> | null = null;
+
+        if (depositPaid && depositMpPaymentId && depositMeta) {
+            const depositLeg = {
+                method: "Pix (Mercado Pago)",
+                amount: depositChargeAmount,
+                amountReceived: depositChargeAmount,
+                adjustmentType: 'none',
+                adjustmentPercent: 0,
+                adjustmentAmount: 0,
+                effectiveAmount: depositChargeAmount,
+                netAmount: depositChargeAmount,
+                feeBearer: 'merchant',
+                paymentMethodDiscountAmount: 0,
+                interestAmount: 0,
+                feeAmount: 0,
+                fixedFeeAmount: 0,
+                paymentMethodId: null,
+                installmentNumber: 1,
+                provider: "Mercado Pago",
+                paymentStatus: "approved",
+                mpPaymentMethodId: "pix",
+            };
+
+            // Add deposit leg to breakdown (prepend since it was paid first)
+            finalPaymentBreakdown = [depositLeg, ...mergedPaymentBreakdown.filter(
+                (e: any) => !(e?.provider && String(e.provider).toLowerCase().includes("mercado pago"))
+            )];
+
+            finalPaidAmount = existingPaidAmount + depositChargeAmount + singleRegisterAmount;
+
+            const remainingAfterAll = finalPaidAmount - total;
+            if (remainingAfterAll >= -0.005) {
+                finalPaymentStatus = 'paid';
+            } else if (finalPaidAmount > 0.005) {
+                finalPaymentStatus = 'partially_paid';
+            } else {
+                finalPaymentStatus = 'unpaid';
+            }
+
+            finalMpPaymentId = depositMpPaymentId;
+            finalPaymentProvider = "Mercado Pago";
+            finalCheckoutFulfillment = {
+                ...(depositMeta as Record<string, unknown>),
+                depositCheckout: {
+                    ...depositMeta,
+                    depositStatus: "paid",
+                },
+            } as Record<string, unknown>;
+        }
+
         return {
             paymentMethod: paymentMethod || 'Método não definido',
-            paymentBreakdown: mergedPaymentBreakdown,
+            paymentBreakdown: finalPaymentBreakdown,
             splitPayments: view === 'split' ? payments : [],
-            paymentStatus: isUnpaidRegister ? 'unpaid' : (isUnderpaid ? (paidToRegister <= 0.005 ? 'unpaid' : 'partially_paid') : 'paid'),
+            paymentStatus: finalPaymentStatus,
             isPendingDelivery,
-            paidAmount: paidToRegister
+            paidAmount: finalPaidAmount,
+            ...(finalMpPaymentId ? { mpPaymentId: finalMpPaymentId } : {}),
+            ...(finalPaymentProvider ? { paymentProvider: finalPaymentProvider } : {}),
+            ...(finalCheckoutFulfillment ? { checkoutFulfillment: finalCheckoutFulfillment } : {}),
         };
     };
 
@@ -2128,7 +2222,63 @@ const PaymentModal = ({
         }
 
         const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
-        const payload = forcedPayload || buildConfirmPayload(isUnpaidRegister);
+        let payload = forcedPayload || buildConfirmPayload(isUnpaidRegister);
+
+        // If a deposit was generated and paid (new-order flow), merge deposit
+        // metadata into the payload so the order is created with the deposit
+        // already recorded. The forcedPayload path (MP Pix/Boleto approval) bypasses
+        // buildConfirmPayload, so we must inject deposit info here.
+        if (depositPaid && depositMpPaymentId && depositMeta && !payload.checkoutFulfillment) {
+            const depositLeg = {
+                method: "Pix (Mercado Pago)",
+                amount: depositChargeAmount,
+                amountReceived: depositChargeAmount,
+                adjustmentType: 'none',
+                adjustmentPercent: 0,
+                adjustmentAmount: 0,
+                effectiveAmount: depositChargeAmount,
+                netAmount: depositChargeAmount,
+                feeBearer: 'merchant' as const,
+                paymentMethodDiscountAmount: 0,
+                interestAmount: 0,
+                feeAmount: 0,
+                fixedFeeAmount: 0,
+                paymentMethodId: null,
+                installmentNumber: 1,
+                provider: "Mercado Pago",
+                paymentStatus: "approved",
+                mpPaymentMethodId: "pix",
+            };
+
+            const existingBreakdown = Array.isArray(payload.paymentBreakdown) ? payload.paymentBreakdown : [];
+            const filteredBreakdown = existingBreakdown.filter((e: any) => {
+                const p = String(e?.provider || "").toLowerCase();
+                const m = String(e?.method || "").toLowerCase();
+                return !p.includes("mercado pago") && !m.includes("mercado pago");
+            });
+
+            payload = {
+                ...payload,
+                paymentBreakdown: [depositLeg, ...filteredBreakdown],
+                paidAmount: (Number(payload.paidAmount || 0) + depositChargeAmount),
+                mpPaymentId: payload.mpPaymentId || depositMpPaymentId,
+                paymentProvider: payload.paymentProvider || "Mercado Pago",
+                checkoutFulfillment: {
+                    ...(depositMeta as Record<string, unknown>),
+                    depositCheckout: {
+                        ...depositMeta,
+                        depositStatus: "paid",
+                    },
+                } as Record<string, unknown>,
+                paymentStatus: (() => {
+                    const totalPaid = Number(payload.paidAmount || 0) + depositChargeAmount;
+                    if (totalPaid >= total - 0.005) return 'paid';
+                    if (totalPaid > 0.005) return 'partially_paid';
+                    return 'unpaid';
+                })(),
+            };
+        }
+
         setLastPaymentPayload(payload);
 
         if (payload?.isPreCreate) {

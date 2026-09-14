@@ -1308,6 +1308,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         isPendingDelivery?: boolean
         paymentProvider?: string
         mpPaymentId?: string
+        checkoutFulfillment?: Record<string, unknown> | null
     }) => {
         const finalPaymentStatus = paymentOverrides?.paymentStatus || paymentStatus;
         let finalDeliveryStatus = deliveryStatus;
@@ -1370,6 +1371,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             csrf_token: csrfToken || undefined,
             paymentProvider: paymentOverrides?.paymentProvider || undefined,
             mpPaymentId: paymentOverrides?.mpPaymentId || undefined,
+            checkoutFulfillment: paymentOverrides?.checkoutFulfillment || undefined,
         }
     }
 
@@ -1441,6 +1443,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         isPendingDelivery?: boolean
         paymentProvider?: string
         mpPaymentId?: string
+        checkoutFulfillment?: Record<string, unknown> | null
     }) => {
         setIsSaving(true)
         try {
@@ -1542,6 +1545,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             isPendingDelivery: paymentData.isPendingDelivery,
             paymentProvider: paymentData.paymentProvider,
             mpPaymentId: paymentData.mpPaymentId,
+            checkoutFulfillment: paymentData.checkoutFulfillment || null,
         })
     }
 

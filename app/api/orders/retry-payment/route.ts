@@ -6,6 +6,7 @@ import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
 import { captureError } from "@/lib/monitoring/sentry"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { getExpectedMpChargeAmount, getOrderPaidAmount } from "@/lib/payments/order-financial-state"
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,8 +80,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "O vendedor não possui o Mercado Pago configurado para pagamentos online." }, { status: 400 })
     }
 
-    // Verificar se o pedido está com pagamento pendente
-    if (order.situation !== "pending") {
+    // Allow both "pending" and "partially_paid" (deposit-only flow): a partially_paid
+    // order still has a remaining balance that can be charged via retry-payment.
+    if (order.situation !== "pending" && order.situation !== "partially_paid") {
       return NextResponse.json(
         { error: "Este pedido não está com pagamento pendente" },
         { status: 400 },
@@ -88,8 +90,11 @@ export async function POST(request: NextRequest) {
     }
 
     const totalAmount = Number(order.total_amount || 0)
-    const paidAmount = Number(order.paid_amount ?? order.amount_paid ?? 0)
-    const chargeAmount = Math.round((Math.max(0, totalAmount - paidAmount) + Number.EPSILON) * 100) / 100
+    const paidAmount = getOrderPaidAmount(order)
+    // Use getExpectedMpChargeAmount which correctly accounts for deposits:
+    // - If nothing paid yet: returns initialChargeAmount (deposit amount) or full total
+    // - If deposit paid: returns remaining balance
+    const chargeAmount = Math.round((Math.max(0, getExpectedMpChargeAmount(order)) + Number.EPSILON) * 100) / 100
 
     if (chargeAmount <= 0) {
       await adminClient
@@ -116,11 +121,33 @@ export async function POST(request: NextRequest) {
         if (mpResponse.ok) {
           const fetched = await mpResponse.json()
           if (fetched.status === "approved") {
-            await adminClient
-              .from("orders")
-              .update({ situation: "paid", updated_at: new Date().toISOString() })
-              .eq("id", order.id)
-            return NextResponse.json({ success: true, alreadyPaid: true })
+            // The existing MP payment is approved. Determine if the order is
+            // FULLY paid (not just the deposit) — when the deposit was already
+            // synced (paidAmount > 0) the mp_payment_id is the deposit payment,
+            // so we must NOT treat it as fully paid. Only mark paid when either:
+            //  1. Nothing is paid yet and the MP payment covers the full total,
+            //  2. OR paidAmount already covers the full total (shouldn't reach here,
+            //     but defensive).
+            const mpTransactionAmount = Number(fetched.transaction_amount || 0)
+            if (paidAmount <= 0.009) {
+              // No payments recorded yet on the order — the MP payment should
+              // be the full amount. Sync it to "paid".
+              await adminClient
+                .from("orders")
+                .update({ situation: "paid", updated_at: new Date().toISOString() })
+                .eq("id", order.id)
+              return NextResponse.json({ success: true, alreadyPaid: true })
+            }
+            // paidAmount > 0 (e.g. deposit already synced) — the existing MP
+            // payment was the deposit. Fall through to create a NEW Pix for the
+            // remaining balance (computed as chargeAmount above).
+            SecureLogger.info("Order partially paid via approved MP payment, generating remaining balance charge", {
+              orderId: order.id,
+              mpPaymentId: order.mp_payment_id,
+              paidAmount,
+              mpTransactionAmount,
+              totalAmount,
+            })
           }
 
           const hasPixQr = Boolean(fetched.point_of_interaction?.transaction_data?.qr_code)
@@ -134,7 +161,14 @@ export async function POST(request: NextRequest) {
           const isPix = fetched.payment_method_id === "pix" || hasPixQr
 
           if (fetched.status === "pending" && ((isPix && hasPixQr) || (isTicket && hasBoletoData))) {
-            paymentData = fetched
+            // Only reuse an existing pending payment if its amount matches the
+            // expected charge amount. When the order is partially paid (deposit
+            // flow), the existing mp_payment_id may be the deposit Pix whose
+            // amount differs from the remaining balance.
+            const fetchedAmount = Number(fetched.transaction_amount || fetched.transaction_details?.amount || 0)
+            if (Math.abs(fetchedAmount - chargeAmount) <= 0.01) {
+              paymentData = fetched
+            }
           }
         }
       } catch (err: any) {
@@ -142,8 +176,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Se não encontrou dados e for staff do ERP, não gera novo pagamento
-    if (!paymentData && isPartnerStaff) {
+    // Se não encontrou dados e for staff do ERP, não gera novo pagamento.
+    // Exception: when the existing MP payment was approved (e.g. a paid deposit)
+    // and there's still a remaining balance (paidAmount > 0), we should still
+    // allow generating a new Pix for the remaining balance.
+    if (!paymentData && isPartnerStaff && !(order.mp_payment_id && paidAmount > 0.009)) {
       return NextResponse.json({
         error: "Cobrança não encontrada ou expirada no Mercado Pago.",
       }, { status: 404 })
