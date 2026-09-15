@@ -7,6 +7,7 @@ import {
 import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
   applyCustomerStatusFilter,
+  CUSTOMER_EXPORT_ALL_COLUMNS,
   CUSTOMER_EXPORT_COLUMNS,
   mapCustomerRow,
 } from "../mappers"
@@ -14,6 +15,9 @@ import type { CustomersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const CUSTOMER_SELECT =
+  "id, name, email, phone, status, person_type, cpf, cnpj, city, state, created_at"
+
+const CUSTOMER_SELECT_ALL =
   "id, name, email, phone, phone_fixed, birth_date, status, person_type, cpf, cnpj, inscricao_estadual, zip_code, street, number, complement, neighborhood, city, state, notes, created_at"
 
 export async function fetchCustomersExport(
@@ -21,6 +25,8 @@ export async function fetchCustomersExport(
   partnerId: string,
   filters: CustomersExportFilters,
 ): Promise<import("../types").ExportResult> {
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? CUSTOMER_SELECT_ALL : CUSTOMER_SELECT
   const statusLabels = [...(filters.status || [])]
   if (filters.activeTab && filters.activeTab !== "Todos") {
     statusLabels.push(filters.activeTab)
@@ -32,7 +38,7 @@ export async function fetchCustomersExport(
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query: any = (supabase as any).from("customers").select(CUSTOMER_SELECT).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("customers").select(select).eq("partner_id", partnerId)
 
       const dbStatuses = [...new Set(statusLabels.map(mapCustomerStatusToDb))]
       if (dbStatuses.length === 1) query = query.eq("status", dbStatuses[0])
@@ -70,6 +76,7 @@ export async function fetchCustomersExport(
       try { row.cpf = await decryptCPF(row.cpf) } catch { /* keep encrypted */ }
     }
   }
-  const rows = filtered.map((r) => mapCustomerRow(r))
-  return { columns: CUSTOMER_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = filtered.map((r) => mapCustomerRow(r, includeAllColumns))
+  const columns = includeAllColumns ? CUSTOMER_EXPORT_ALL_COLUMNS : CUSTOMER_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

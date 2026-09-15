@@ -120,6 +120,10 @@ export async function Dashboard({
   partnerId, sells, period = "monthly", compare = "none",
   compareFrom, compareTo,
 }: DashboardProps) {
+  const sellsSet = new Set(sells || [])
+  const hasProducts = sellsSet.has("products")
+  const hasOrders = sellsSet.has("orders")
+  const hasAppointments = sellsSet.has("appointments")
   const compareInfo = getCompareInfo(compare, period, compareFrom, compareTo)
 
   const [
@@ -205,60 +209,69 @@ export async function Dashboard({
         </div>
       </div>
 
-      {/* Row 2: Evolução de Receita (8) + Origem da Receita (4) */}
+      {/* Row 2: Faturamento (8) + Origem da Receita (4) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
             <CardHeader
               icon={TrendingUpIcon}
-              title="Evolução de Receita"
+              title="Faturamento"
               legendItems={[{ label: "Este Período", color: "#059669" }, { label: compareLabel || "Período Anterior", color: "#94a3b8" }]}
             />
             <DashboardLineChart data={evoData} format="currency" />
           </div>
         </div>
-        <div className="lg:col-span-4">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-            <CardHeader icon={CreditCardIcon} title="Origem da Receita" />
-            <DashboardDonutChart
-              data={originDonutData}
-              totalValue={brl(totalOrigin)}
-              totalLabel="Receita Total"
-              colors={CHART_COLORS_CATEGORY}
-              format="currency"
-            />
+        {originCount > 1 && (
+          <div className="lg:col-span-4">
+            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+              <CardHeader icon={CreditCardIcon} title="Origem da Receita" />
+              <DashboardDonutChart
+                data={originDonutData}
+                totalValue={brl(totalOrigin)}
+                totalLabel="Receita Total"
+                colors={CHART_COLORS_CATEGORY}
+                format="currency"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Row 3: Principais Categorias (8) + Atividades Recentes (4) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-        <div className="lg:col-span-8">
-          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-            <CardHeader icon={TagIcon} title="Principais Categorias" />
-            <DashboardBarChart data={categoriesBarData} colors={["#059669"]} />
+      {categoriesBarData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+          <div className="lg:col-span-8">
+            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+              <CardHeader icon={TagIcon} title="Principais Categorias" />
+              <DashboardBarChart data={categoriesBarData} colors={["#059669"]} />
+            </div>
+          </div>
+          <div className="lg:col-span-4">
+            <RecentActivities activities={activityData.activity} />
           </div>
         </div>
-        <div className="lg:col-span-4">
-          <RecentActivities activities={activityData.activity} />
-        </div>
-      </div>
+      )}
 
       {/* Row 4: Precisa de Atenção (4) + Últimos Pedidos (4) + Próximos Agendamentos/Estoque Crítico (4) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
         <div className="lg:col-span-4">
           <NeedsAttention alerts={alertsData.alerts} />
         </div>
-        <div className="lg:col-span-4">
-          <LatestOrdersCard items={generalData?.latestOrders || []} />
-        </div>
-        <div className="lg:col-span-4">
-          {sells.includes("services") ? (
+        {hasOrders && (
+          <div className="lg:col-span-4">
+            <LatestOrdersCard items={generalData?.latestOrders || []} />
+          </div>
+        )}
+        {hasAppointments && (
+          <div className="lg:col-span-4">
             <NextAppointmentsCard items={generalData?.nextAppointments || []} />
-          ) : (
+          </div>
+        )}
+        {hasProducts && !hasAppointments && (
+          <div className="lg:col-span-4">
             <CriticalStockCard items={generalData?.criticalStock || []} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

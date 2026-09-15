@@ -4,12 +4,16 @@ import { buildKeysetOrFilter, fetchAllPages } from "../paginate"
 import {
   applyProductStockFilter,
   mapProductRow,
+  PRODUCT_EXPORT_ALL_COLUMNS,
   PRODUCT_EXPORT_COLUMNS,
 } from "../mappers"
 import type { ProductsExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const PRODUCT_SELECT =
+  "id, name, stock_quantity, price, cost_price, is_active, sku, gtin, promotional_price, show_in_marketplace"
+
+const PRODUCT_SELECT_ALL =
   "id, name, description, stock_quantity, price, cost_price, min_stock, is_active, sku, created_at, show_in_marketplace, category_id, category:product_categories!category_id(name), brand, brand_id, brand_rel:brands!brand_id(name), product_type, condition, gtin, unit, promotional_price, product_fiscal_profiles(ncm, cest), product_logistics(weight_gross, weight_net, width, height, length)"
 
 const TAB_STOCK: Record<string, string> = {
@@ -23,6 +27,8 @@ export async function fetchProductsExport(
   partnerId: string,
   filters: ProductsExportFilters,
 ): Promise<import("../types").ExportResult> {
+  const includeAllColumns = filters.includeAllColumns === true
+  const select = includeAllColumns ? PRODUCT_SELECT_ALL : PRODUCT_SELECT
   const categoryNames = (filters.categories || []).filter(Boolean)
   let categoryIds: string[] = []
 
@@ -34,7 +40,8 @@ export async function fetchProductsExport(
       .in("name", categoryNames)
     categoryIds = (cats || []).map((c) => c.id)
     if (!categoryIds.length) {
-      return { columns: PRODUCT_EXPORT_COLUMNS, rows: [], rowCount: 0 }
+      const columns = includeAllColumns ? PRODUCT_EXPORT_ALL_COLUMNS : PRODUCT_EXPORT_COLUMNS
+      return { columns, rows: [], rowCount: 0 }
     }
   }
 
@@ -50,7 +57,7 @@ export async function fetchProductsExport(
   const rawRows = await fetchAllPages<any>({
     chunkSize: EXPORT_CHUNK_SIZE,
     fetchPage: async (cursor) => {
-      let query: any = (supabase as any).from("products").select(PRODUCT_SELECT).eq("partner_id", partnerId)
+      let query: any = (supabase as any).from("products").select(select).eq("partner_id", partnerId)
 
       if (filters.storeId) query = query.or(`store_id.eq.${filters.storeId},store_id.is.null`)
       if (filters.selectedIds?.length) query = query.in("id", filters.selectedIds)
@@ -90,6 +97,7 @@ export async function fetchProductsExport(
   })
 
   const filtered = rawRows.filter((row) => applyProductStockFilter(row, stockLabels))
-  const rows = filtered.map((row) => mapProductRow(row))
-  return { columns: PRODUCT_EXPORT_COLUMNS, rows, rowCount: rows.length }
+  const rows = filtered.map((row) => mapProductRow(row, includeAllColumns))
+  const columns = includeAllColumns ? PRODUCT_EXPORT_ALL_COLUMNS : PRODUCT_EXPORT_COLUMNS
+  return { columns, rows, rowCount: rows.length }
 }

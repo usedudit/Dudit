@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-import { ThemeProvider } from "@/components/theme-provider"
 import { PlanUpgradeProvider } from "@/components/erp/subscription/PlanUpgradeModal"
 import { StoreProvider } from "@/lib/store-context"
 import { PermissionProvider } from "@/lib/permission-context"
@@ -220,7 +219,6 @@ export default async function ERPLayout({
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ProductMetadataProvider>
         <NotificationsRealtimeProvider>
           <PermissionProvider
@@ -257,6 +255,5 @@ export default async function ERPLayout({
           </PermissionProvider>
         </NotificationsRealtimeProvider>
       </ProductMetadataProvider>
-    </ThemeProvider>
   )
 }

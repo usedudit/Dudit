@@ -70,7 +70,7 @@ export default async function ERPDashboardPage(props: { searchParams?: Promise<{
                         <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                             <div>
                                 <h1 className="text-[32px] font-bold tracking-tight text-brand-dark dark:text-dark-heading flex items-center gap-2">
-                                    Dashboard
+                                    Visão Geral
                                 </h1>
                                 <p className="mt-1 text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                     {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

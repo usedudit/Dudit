@@ -6,6 +6,7 @@ import { ActionsDropdown } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils"
 import { getDeliveryStatusMeta } from "@/lib/orders/status"
 import { ClockIcon, TruckIcon, UserIcon } from "@/lib/icons"
+import { Tooltip } from "@/components/reusable"
 
 interface DeliveryKanbanCardProps {
   delivery: any
@@ -117,17 +118,19 @@ export default function DeliveryKanbanCard({
         <div className="mt-3.5 space-y-1.5 text-[11px] font-medium text-brand-inactive-text dark:text-dark-body border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
           {delivery.deliveryPersonName ? (
             <div className="flex items-center gap-1.5 text-brand-dark dark:text-dark-heading min-w-0">
-              {delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver ? (
-                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+              {(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver) ? (
+                <Tooltip text="Entregador da Rede Dudit">
+                  <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                </Tooltip>
               ) : (
                 <UserIcon size={12} className="shrink-0 text-brand-inactive-text" />
               )}
               <span className="truncate">{delivery.deliveryPersonName}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <UserIcon size={12} className="shrink-0" />
-              <span>Sem entregador</span>
+            <div className="flex items-center gap-1 text-brand-primary dark:text-brand-primary/80">
+              <TruckIcon size={12} className="shrink-0" />
+              <span>Entrega própria</span>
             </div>
           )}
 

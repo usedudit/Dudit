@@ -118,11 +118,15 @@ export const PRODUCT_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "Preço de Custo", key: "cost", width: 14 },
   { header: "Preço Promocional", key: "promotionalPrice", width: 16 },
   { header: "Estoque Atual", key: "stock", width: 12 },
+  { header: "Status", key: "status", width: 12 },
+  { header: "Visibilidade na Loja", key: "visibility", width: 16 },
+]
+
+export const PRODUCT_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
+  ...PRODUCT_EXPORT_COLUMNS,
   { header: "Estoque Mínimo", key: "minStock", width: 14 },
   { header: "Unidade de Medida", key: "unit", width: 14 },
   { header: "Marca", key: "brand", width: 20 },
-  { header: "Status", key: "status", width: 12 },
-  { header: "Visibilidade na Loja", key: "visibility", width: 16 },
   { header: "Descrição", key: "description", width: 40 },
   { header: "Tipo de Produto", key: "productType", width: 16 },
   { header: "Condição", key: "condition", width: 14 },
@@ -136,8 +140,8 @@ export const PRODUCT_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "Comprimento (cm)", key: "length", width: 14 },
 ]
 
-export function mapProductRow(row: any): ExportRow {
-  return {
+export function mapProductRow(row: any, includeAllColumns?: boolean): ExportRow {
+  const base = {
     name: row.name || "-",
     sku: row.sku || "-",
     gtin: row.gtin || "-",
@@ -145,11 +149,17 @@ export function mapProductRow(row: any): ExportRow {
     cost: formatCurrency(Number(row.cost_price ?? 0)),
     promotionalPrice: row.promotional_price !== null && row.promotional_price !== undefined ? formatCurrency(Number(row.promotional_price)) : "-",
     stock: Number(row.stock_quantity ?? 0),
+    status: row.is_active ? "Ativo" : "Inativo",
+    visibility: row.show_in_marketplace === false ? "Não" : "Sim",
+  }
+
+  if (!includeAllColumns) return base
+
+  return {
+    ...base,
     minStock: Number(row.min_stock ?? 0),
     unit: row.unit || "-",
     brand: row.brand_rel?.name || row.brand || "-",
-    status: row.is_active ? "Ativo" : "Inativo",
-    visibility: row.show_in_marketplace === false ? "Não" : "Sim",
     description: row.description || "-",
     productType: row.product_type || "-",
     condition: row.condition || "-",
@@ -171,41 +181,51 @@ export const CUSTOMER_EXPORT_COLUMNS: ExportColumnDef[] = [
   { header: "CNPJ", key: "cnpj", width: 20 },
   { header: "E-mail", key: "email", width: 28 },
   { header: "Celular / WhatsApp", key: "phone", width: 18 },
+  { header: "Status", key: "status", width: 12 },
+  { header: "Cidade", key: "city", width: 20 },
+  { header: "Estado (UF)", key: "state", width: 10 },
+]
+
+export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
+  ...CUSTOMER_EXPORT_COLUMNS,
   { header: "Telefone Fixo", key: "phoneFixed", width: 18 },
   { header: "Data de Nascimento", key: "birthDate", width: 16 },
-  { header: "Status", key: "status", width: 12 },
   { header: "CEP", key: "zipCode", width: 12 },
   { header: "Logradouro (Rua/Av)", key: "street", width: 30 },
   { header: "Número", key: "number", width: 10 },
   { header: "Complemento", key: "complement", width: 16 },
   { header: "Bairro", key: "neighborhood", width: 20 },
-  { header: "Cidade", key: "city", width: 20 },
-  { header: "Estado (UF)", key: "state", width: 10 },
   { header: "Inscrição Estadual", key: "stateInscription", width: 18 },
   { header: "Observações", key: "notes", width: 30 },
 ]
 
-export function mapCustomerRow(row: any): ExportRow {
+export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow {
   const isPJ = String(row.person_type || "").toLowerCase() === "pj"
   const statusMap: Record<string, string> = { ativo: "Ativo", inativo: "Inativo", bloqueado: "Bloqueado" }
 
-  return {
+  const base = {
     name: row.name || "-",
     personType: isPJ ? "Jurídica" : "Física",
     cpf: row.cpf || "-",
     cnpj: row.cnpj || "-",
     email: row.email || "-",
     phone: row.phone || "-",
+    status: statusMap[row.status] || row.status || "Ativo",
+    city: row.city || "-",
+    state: row.state || "-",
+  }
+
+  if (!includeAllColumns) return base
+
+  return {
+    ...base,
     phoneFixed: row.phone_fixed || "-",
     birthDate: row.birth_date ? formatDate(row.birth_date) : "-",
-    status: statusMap[row.status] || row.status || "Ativo",
     zipCode: row.zip_code || "-",
     street: row.street || "-",
     number: row.number || "-",
     complement: row.complement || "-",
     neighborhood: row.neighborhood || "-",
-    city: row.city || "-",
-    state: row.state || "-",
     stateInscription: row.inscricao_estadual || "-",
     notes: row.notes || "-",
   }
@@ -621,13 +641,14 @@ export const SUPPLIER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
   { header: "CEP", key: "zipCode", width: 12 },
   { header: "Endereço", key: "address", width: 40 },
   { header: "Bairro", key: "neighborhood", width: 20 },
+  { header: "Número", key: "number", width: 10 },
   { header: "Complemento", key: "complement", width: 20 },
   { header: "Observações", key: "notes", width: 30 },
 ]
 
 export function mapSupplierRow(row: any, includeAllColumns?: boolean): ExportRow {
   const isPJ = String(row.person_type || "").toLowerCase() === "pj" || Boolean(row.cnpj)
-  const addressParts = [row.street, row.number, row.complement, row.neighborhood].filter(Boolean)
+
   const base = {
     name: row.name || "-",
     email: row.email || "-",
@@ -641,6 +662,7 @@ export function mapSupplierRow(row: any, includeAllColumns?: boolean): ExportRow
 
   if (!includeAllColumns) return base
 
+  const addressParts = [row.street, row.number, row.complement, row.neighborhood].filter(Boolean)
   return {
     ...base,
     supplierCode: row.supplier_code || "-",
@@ -652,6 +674,7 @@ export function mapSupplierRow(row: any, includeAllColumns?: boolean): ExportRow
     zipCode: row.zip_code || "-",
     address: addressParts.join(", ") || row.address || "-",
     neighborhood: row.neighborhood || "-",
+    number: row.number || "-",
     complement: row.complement || "-",
     notes: row.notes || "-",
   }

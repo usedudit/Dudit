@@ -1,8 +1,8 @@
 "use client"
 
-import { Button } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
-import { AlertCircleIcon } from "@/lib/icons"
+import { ListItem, Badge } from "@/components/reusable"
+import { AlertCircleIcon, ColumnsIcon, TableIcon } from "@/lib/icons"
 
 interface ExportColumnSelectionModalProps {
   isOpen: boolean
@@ -33,32 +33,37 @@ export default function ExportColumnSelectionModal({
         </div>
 
         <div className="flex flex-col gap-3 pt-2">
-          <Button
+          <ListItem
+            icon={ColumnsIcon}
+            title="Colunas padrão"
+            description="Colunas essenciais para análise rápida."
+            className="px-4 py-3"
+            right={<Badge variant="gray">Essenciais</Badge>}
             onClick={() => onConfirm(false)}
-            className="w-full"
-          >
-            <div className="flex items-center justify-between">
-              <span>Colunas padrão</span>
-              <span className="text-xs text-brand-muted">Essenciais</span>
-            </div>
-          </Button>
-          <Button
-            variant={canExportAllColumns ? "outline" : "outline"}
-            onClick={() => canExportAllColumns && onConfirm(true)}
-            className="w-full"
-            disabled={!canExportAllColumns}
-          >
-            <div className="flex items-center justify-between">
-              <span>Todas as colunas</span>
-              <span className="text-xs text-brand-muted">
-                {canExportAllColumns ? "Completa" : "Plano Crescer+"}
-              </span>
-            </div>
-          </Button>
+          />
+
+          <ListItem
+            icon={TableIcon}
+            title="Todas as colunas"
+            description={
+              canExportAllColumns
+                ? "Dados completos incluindo informações complementares."
+                : "Disponível a partir do plano Crescer."
+            }
+            right={
+              canExportAllColumns ? (
+                <Badge variant="blue">Completa</Badge>
+              ) : (
+                <Badge variant="orange">Plano Crescer+</Badge>
+              )
+            }
+            onClick={canExportAllColumns ? () => onConfirm(true) : undefined}
+            className={"px-4 py-3" + canExportAllColumns ? "" : "opacity-60 cursor-default"}
+          />
         </div>
 
         {!canExportAllColumns && (
-          <p className="text-xs text-brand-inactive-text dark:text-dark-muted text-center pt-2">
+          <p className="text-sm text-brand-inactive-text dark:text-dark-muted text-center pt-2">
             A exportação com todas as colunas está disponível a partir do plano <strong>Crescer</strong>.
           </p>
         )}

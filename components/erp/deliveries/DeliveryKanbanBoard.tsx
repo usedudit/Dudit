@@ -128,7 +128,6 @@ export default function DeliveryKanbanBoard({
                                             {col.items.length}
                                         </span>
                                     </div>
-                                    <PlusIcon className="w-3.5 h-3.5 opacity-60 shrink-0" />
                                 </div>
 
                                 {/* Column Body / Card Container with Drag & Drop */}
@@ -136,11 +135,10 @@ export default function DeliveryKanbanBoard({
                                     onDragOver={(e) => handleDragOver(e, col.id)}
                                     onDragLeave={handleDragLeave}
                                     onDrop={(e) => handleDrop(e, col.id)}
-                                    className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border transition-all duration-200 ${
-                                        dragOverCol === col.id
-                                            ? "bg-gray-100/70 border-brand-green/30 dark:bg-zinc-800/40 dark:border-brand-green/30"
-                                            : "border-transparent bg-gray-50/30 dark:bg-zinc-900/10"
-                                    } overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
+                                    className={`flex-1 flex flex-col gap-3.5 p-3 rounded-2xl border transition-all duration-200 ${dragOverCol === col.id
+                                        ? "bg-gray-100/70 border-brand-green/30 dark:bg-zinc-800/40 dark:border-brand-green/30"
+                                        : "border-transparent bg-gray-50/30 dark:bg-zinc-900/10"
+                                        } overflow-y-auto max-h-[calc(100vh-320px)] min-h-[400px] custom-scrollbar`}
                                 >
                                     <AnimatePresence mode="popLayout">
                                         {col.items.length === 0 ? (

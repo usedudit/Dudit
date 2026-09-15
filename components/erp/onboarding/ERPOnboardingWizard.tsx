@@ -12,7 +12,6 @@ import {
   CashierIcon,
   MoneyIcon,
   CopyIcon,
-  StoreIcon,
   CameraIcon,
   PinIcon,
   PackageIcon,

@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Badge, InfoCard, FormDropdown, Tabs, TabsContent, TabsList, TabsTrigger, CustomerCard, FormSection, ListItem, ActionsDropdown, IconPlaceholder, ThreeDotsLoader, Tooltip } from "@/components/reusable"
 import AlertModal from "@/components/reusable/AlertModal"
 import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
+import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon, BoxIcon, TruckIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
@@ -396,12 +397,24 @@ export default function DeliveryDetailPage({
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <Badge variant={paymentMeta.variant}>
-                                        {paymentMeta.label}
-                                    </Badge>
-                                    <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
-                                        {deliveryMeta.label}
-                                    </Badge>
+                                    <Tooltip text={paymentMeta.label}>
+                                        <span className="hidden lg:inline-flex">
+                                            <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                        </span>
+                                        <span className="lg:hidden">
+                                            <Badge variant={paymentMeta.variant} />
+                                        </span>
+                                    </Tooltip>
+                                    <Tooltip text={deliveryMeta.label}>
+                                        <span className="hidden lg:inline-flex">
+                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
+                                                {deliveryMeta.label}
+                                            </Badge>
+                                        </span>
+                                        <span className="lg:hidden">
+                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)} />
+                                        </span>
+                                    </Tooltip>
                                 </div>
                             </div>
                         )
@@ -490,7 +503,9 @@ export default function DeliveryDetailPage({
                     <p className="text-brand-inactive-text dark:text-dark-body text-xs md:text-sm mt-0.5 truncate flex items-center gap-1.5">
                         <span>Criado em {formatDateTime(delivery.created_at)} • </span>
                         {isPlatformDriver && (
-                            <TruckIcon className="w-3.5 h-3.5 text-brand-green inline-block shrink-0" />
+                            <Tooltip text="Entregador da Rede Dudit">
+                                <TruckIcon className="w-3.5 h-3.5 text-brand-green inline-block shrink-0 cursor-help" />
+                            </Tooltip>
                         )}
                         <span>{driverName}</span>
                     </p>
@@ -806,9 +821,9 @@ export default function DeliveryDetailPage({
                             </Button>
                         </header>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-32 relative">
-                            <Tabs defaultValue="dados_gerais" className="w-full flex flex-col h-full">
-                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-6 relative min-h-0">
+                            <Tabs defaultValue="dados_gerais" className="w-full h-full flex flex-col">
+                                <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-6 shrink-0">
                                     <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
                                         Dados Gerais
                                     </TabsTrigger>
@@ -817,7 +832,7 @@ export default function DeliveryDetailPage({
                                     </TabsTrigger>
                                 </TabsList>
 
-                                <div className="flex-1 overflow-y-auto space-y-6">
+                                <div className="flex-1 overflow-y-auto space-y-6 min-h-0">
                                     <TabsContent value="dados_gerais" className="mt-0 space-y-6">
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center text-sm">
@@ -847,14 +862,28 @@ export default function DeliveryDetailPage({
                                                 </span>
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
-                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Situação do Pagamento</span>
-                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Pagamento</span>
+                                                <Tooltip text={paymentMeta.label}>
+                                                    <span className="hidden lg:inline-flex">
+                                                        <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                    </span>
+                                                    <span className="lg:hidden">
+                                                        <Badge variant={paymentMeta.variant} />
+                                                    </span>
+                                                </Tooltip>
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
-                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
-                                                    {deliveryMeta.label}
-                                                </Badge>
+                                                <Tooltip text={deliveryMeta.label}>
+                                                    <span className="hidden lg:inline-flex">
+                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
+                                                            {deliveryMeta.label}
+                                                        </Badge>
+                                                    </span>
+                                                    <span className="lg:hidden">
+                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)} />
+                                                    </span>
+                                                </Tooltip>
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Data do Pedido</span>
@@ -954,54 +983,31 @@ export default function DeliveryDetailPage({
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                             <div className="flex gap-3 w-full">
-                                {selectedLink?.status !== "delivered" && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="flex-1 h-12"
-                                        onClick={() => {
-                                            setSimpleConfirmModal({
-                                                isOpen: true,
-                                                orderId: order.id,
-                                                nextStatus: "delivered"
-                                            })
-                                        }}
-                                    >
-                                        Marcar como Entregue
-                                    </Button>
-                                )}
-                                {selectedLink?.status !== "delivered" && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="flex-1 h-12"
-                                        onClick={() => {
-                                            setActiveLink(selectedLink)
-                                            setIsOrderPaymentModalOpen(true)
-                                        }}
-                                    >
-                                        Receber Pagamento
-                                    </Button>
-                                )}
-                                {selectedLink?.status !== "delivered" && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="flex-1 h-12"
-                                        onClick={() => {
-                                            setOrderStatusModal({
-                                                isOpen: true,
-                                                orderId: order.id,
-                                                currentStatus: selectedLink?.status || order.delivery_status || "not_sent"
-                                            })
-                                            setOrderNewStatus("")
-                                        }}
-                                    >
-                                        Alterar Status
-                                    </Button>
-                                )}
-                                <Button type="button" variant="filled" className="flex-1 h-12" onClick={handleClose}>
-                                    Fechar
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="flex-1 h-12"
+                                    onClick={() => {
+                                        setActiveLink(selectedLink)
+                                        setIsOrderPaymentModalOpen(true)
+                                    }}
+                                >
+                                    Status de Pagamento
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="flex-1 h-12"
+                                    onClick={() => {
+                                        setOrderStatusModal({
+                                            isOpen: true,
+                                            orderId: order.id,
+                                            currentStatus: selectedLink?.status || order.delivery_status || "not_sent"
+                                        })
+                                        setOrderNewStatus("")
+                                    }}
+                                >
+                                    Status de Entrega
                                 </Button>
                             </div>
                         </footer>
@@ -1014,17 +1020,29 @@ export default function DeliveryDetailPage({
                     </BottomSheet>
                 ) : (
                     <Portal>
-                        <div
-                            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                            onClick={handleClose}
-                        >
-                            <div
-                                className={`fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300 dark:bg-dark-surface ${isOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}`}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                {sheetContent}
-                            </div>
-                        </div>
+                        <AnimatePresence>
+                            {isOpen && (
+                                <motion.div
+                                    className="fixed inset-0 z-50"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+                                    <motion.div
+                                        className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface flex flex-col"
+                                        initial={{ x: "100%", opacity: 0 }}
+                                        animate={{ x: 0, opacity: 1 }}
+                                        exit={{ x: "100%", opacity: 0 }}
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        {sheetContent}
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </Portal>
                 );
             })()}

@@ -4,18 +4,19 @@ import { SkeletonLoader } from "@/components/reusable"
 
 export default function Loading() {
     return (
-        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300">
+        <div className="flex flex-col min-h-screen bg-white dark:bg-dark-surface transition-colors duration-300 font-sans">
             <MarketplaceHeader />
 
             <main className="pt-[72px] lg:pt-[110px] flex-grow">
-                <div className="container mx-auto px-4 max-w-[1300px] animate-fade-in mt-6">
+                <div className="container mx-auto px-4 max-w-[1400px]">
                     <div className="pt-[40px]">
                         {/* Banner Skeleton */}
-                        <div className="w-full h-[220px] lg:mb-4 lg:rounded-[24px] overflow-hidden relative">
+                        <div className="w-full h-[220px] lg:rounded-[24px] overflow-hidden mb-4 relative">
                             <SkeletonLoader width="100%" height="100%" />
                         </div>
 
-                        <div className="py-6 mb-2 lg:mb-4">
+                        {/* Store header */}
+                        <div className="py-6 mb-2">
                             <div className="flex items-center justify-between gap-5">
                                 <div className="flex items-center gap-5">
                                     {/* Profile Image Skeleton */}
@@ -31,26 +32,35 @@ export default function Loading() {
                                 </div>
                                 <div className="hidden lg:flex items-start gap-3">
                                     <SkeletonLoader width={42} height={42} circle />
-                                    <SkeletonLoader width={120} height={42} className="rounded-full" />
+                                    <SkeletonLoader width={120} height={42} />
                                 </div>
                             </div>
                         </div>
 
+                        {/* Desktop category tabs */}
+                        <div className="hidden lg:flex gap-3 mb-6">
+                            {[...Array(4)].map((_, i) => (
+                                <SkeletonLoader key={i} width={100} height={36} />
+                            ))}
+                        </div>
+
                         <div className="flex flex-col lg:flex-row gap-10 pb-20">
-                            {/* Sidebar Skeleton */}
-                            <aside className="hidden lg:block w-[280px] shrink-0 space-y-8">
+
+                            {/* Sidebar Skeleton (desktop) */}
+                            <aside className="hidden lg:block w-[260px] shrink-0 space-y-8">
                                 <div className="space-y-4">
                                     <SkeletonLoader width={100} height={20} />
                                     <div className="space-y-2">
-                                        <SkeletonLoader width="100%" height={36} className="rounded-[8px]" />
-                                        <SkeletonLoader width="100%" height={36} className="rounded-[8px]" />
+                                        {[...Array(3)].map((_, i) => (
+                                            <SkeletonLoader key={i} width="100%" height={36} />
+                                        ))}
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <SkeletonLoader width={100} height={20} />
                                     <div className="space-y-2">
                                         {[...Array(5)].map((_, i) => (
-                                            <SkeletonLoader key={i} width="100%" height={36} className="rounded-[8px]" />
+                                            <SkeletonLoader key={i} width="100%" height={36} />
                                         ))}
                                     </div>
                                 </div>
@@ -62,17 +72,20 @@ export default function Loading() {
                                     <SkeletonLoader width={150} height={24} />
                                     <SkeletonLoader width={120} height={16} />
                                 </div>
+
+                                {/* Section header */}
                                 <div className="hidden lg:flex items-center gap-4 mb-8">
                                     <div className="flex-1">
-                                        <SkeletonLoader width="100%" height={42} className="rounded-[12px]" />
+                                        <SkeletonLoader width="100%" height={42} />
                                     </div>
-                                    <SkeletonLoader width={220} height={42} className="rounded-[12px]" />
+                                    <SkeletonLoader width={220} height={42} />
                                 </div>
-                                {/* Grid Skeleton */}
+
+                                {/* Items Grid Skeleton */}
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 lg:gap-x-6 gap-y-10 lg:gap-y-12">
                                     {[...Array(8)].map((_, i) => (
                                         <div key={i} className="space-y-3">
-                                            <SkeletonLoader width="100%" height={180} className="rounded-[16px]" />
+                                            <SkeletonLoader width="100%" height={180} />
                                             <SkeletonLoader width="90%" height={16} />
                                             <SkeletonLoader width={80} height={18} />
                                         </div>

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { getCurrentUser } from "@/lib/auth/authorization"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { ThemeProvider } from "@/components/theme-provider"
 import { DeliveryPortalHeader } from "@/components/delivery/DeliveryPortalChrome"
 import { DeliverySidebar } from "@/components/delivery/DeliverySidebar"
 import { DeliveryAccessDenied } from "@/components/delivery/DeliveryAccessDenied"
@@ -37,25 +36,23 @@ export default async function DeliveryPortalLayout({ children }: { children: Rea
   const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <NotificationsRealtimeProvider>
-        <SidebarProvider initialExpanded={initialExpanded}>
-          <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
-            {isDriver && (
-              <DeliverySidebar
-                userProfile={userProfile}
-              />
-            )}
-            <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-              <DeliveryPortalHeader
-                userProfile={userProfile}
-                initialOnline={driverData?.availability_status === "available"}
-              />
-              {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
-            </div>
+    <NotificationsRealtimeProvider>
+      <SidebarProvider initialExpanded={initialExpanded}>
+        <div className="flex h-screen bg-brand-page-bg dark:bg-brand-page-bg text-brand-dark dark:text-white transition-colors duration-200">
+          {isDriver && (
+            <DeliverySidebar
+              userProfile={userProfile}
+            />
+          )}
+          <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+            <DeliveryPortalHeader
+              userProfile={userProfile}
+              initialOnline={driverData?.availability_status === "available"}
+            />
+            {isDriver ? children : <DeliveryAccessDenied userEmail={user.email || ""} />}
           </div>
-        </SidebarProvider>
-      </NotificationsRealtimeProvider>
-    </ThemeProvider>
+        </div>
+      </SidebarProvider>
+    </NotificationsRealtimeProvider>
   )
 }

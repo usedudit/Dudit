@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown } from "@/components/reusable"
+import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import { TruckIcon } from "@/lib/icons"
@@ -56,10 +56,12 @@ const DeliveryListItem = React.memo(({ delivery, columns, onDetails, onEdit, onQ
         return (
           <div className="flex items-center gap-1.5 min-w-0">
             {isPlatform && (
-              <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+              <Tooltip text="Entregador da Rede Dudit">
+                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+              </Tooltip>
             )}
             <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
-              {delivery.deliveryPersonName || "Não atribuído"}
+              {delivery.deliveryPersonName || "Entrega própria"}
             </span>
           </div>
         )

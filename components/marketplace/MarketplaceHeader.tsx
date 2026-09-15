@@ -368,29 +368,27 @@ const Header: React.FC<HeaderProps> = ({
                 maxWidth="md"
                 hideHeader={true}
             >
-                <div className="flex flex-col relative text-[#003229]">
+                <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
                     <button
                         onClick={() => setIsVisitorModalOpen(false)}
-                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
                         title="Fechar"
                     >
-                        <XIcon size={16} />
+                        <XIcon size={18} />
                     </button>
 
-                    {/* Header with gradient and mascot */}
-                    <div
-                        className="h-[200px] rounded-2xl flex items-end justify-center mb-6 relative overflow-hidden"
-                        style={{ background: "linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)" }}
-                    >
+                    {/* Header with Dual Squares */}
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
                             src="https://img.dudit.com.br/static/mascots/OndeVoceEsta.png"
                             alt="Onde você está?"
-                            className="w-48 h-auto object-contain transform translate-y-4"
+                            className="w-64 h-auto object-contain transform translate-y-7"
                         />
                     </div>
 
-                    <h4 className="text-xl font-bold text-brand-dark mb-4 text-center">Onde você está?</h4>
-                    <p className="text-gray-500 text-sm text-center mb-6 leading-relaxed">
+                    <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Onde você está?</h4>
+                    <p className="text-brand-inactive-text text-[15px] text-center mb-6 leading-relaxed dark:text-dark-body">
                         Informe sua cidade para ver os produtos, vitrines e serviços pertinho de você.
                     </p>
 

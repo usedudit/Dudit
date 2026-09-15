@@ -248,7 +248,7 @@ export default async function VendorPage({
     lat: address?.latitude || null,
     lng: address?.longitude || null,
     businessInfo: store.business_info || null,
-    paymentMethods: store.payment_methods?.length ? store.payment_methods : [],
+    paymentMethods: partner?.payment_methods?.length ? partner.payment_methods : store.payment_methods?.length ? store.payment_methods : [],
     banner_url: store.banner_url || null,
     gallery: store.gallery || [],
     planSlug: plan?.slug || 'free',

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
-import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon, ChevronsUpDown, ChevronRightIcon } from "@/lib/icons"
+import { MenuIcon, MoonIcon, LogoutIcon, ChevronDownIcon, ChevronLeftIcon, UserIcon, CreditCardIcon, HelpCircleIcon, AlertTriangleIcon, ChevronsUpDown, ChevronRightIcon, CashierIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
 import Dropdown from "../reusable/Dropdown"
 import { supabaseBrowser as supabase } from "@/lib/supabase/browser-client"
@@ -271,11 +271,20 @@ export function ERPHeader({ sidebarOpen, setSidebarOpen, pageTitle = "", backHre
                     <div className="flex items-center gap-3">
                         {isPDV && (
                             <button
-                                onClick={() => window.dispatchEvent(new CustomEvent('open-pos-shortcuts'))}
+                                onClick={() => router.push("/erp/caixa")}
                                 className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
+                                title="Controle de Caixa"
+                            >
+                                <CashierIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
+                            </button>
+                        )}
+                        {isPDV && (
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-pos-shortcuts'))}
+                                className="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full border border-brand-border bg-white text-brand-dark hover:bg-brand-gray dark:border-dark-border dark:bg-dark-surface dark:text-dark-heading dark:hover:bg-dark-border transition-colors cursor-pointer shrink-0"
                                 title="Atalhos e Ajuda"
                             >
-                                <HelpCircleIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                <HelpCircleIcon className="w-5 h-5 text-brand-dark dark:text-dark-heading" />
                             </button>
                         )}
                         <div className="hidden md:flex items-center gap-3">

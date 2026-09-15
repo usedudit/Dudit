@@ -253,7 +253,7 @@ export function MarketplaceLandingView({
                 HERO 2 — VOCÊ VENDE? (Situação: "Quero ser encontrado")
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-white dark:bg-dark-background">
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-8 md:py-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
 
                     {/* Imagem */}
                     <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center order-2 md:order-1">
@@ -288,7 +288,7 @@ export function MarketplaceLandingView({
                 HERO 3 — VOCÊ COMPRA? (Situação: "Preciso de algo")
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-brand-gray/40 dark:bg-dark-surface/50">
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-8 md:py-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
 
                     {/* Texto */}
                     <div className="flex-1 text-center md:text-left max-w-[580px]">
@@ -323,7 +323,7 @@ export function MarketplaceLandingView({
                 HERO 4 — PRECISA DE ALGO? (Situação: consumidor)
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-white dark:bg-dark-background">
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-8 md:py-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
 
                     {/* Imagem */}
                     <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center order-2 md:order-1">
@@ -357,9 +357,9 @@ export function MarketplaceLandingView({
             {/* ═══════════════════════════════════════════════════════════
                 HERO 5 — CONVIDE QUEM VENDE
             ═══════════════════════════════════════════════════════════ */}
-            <section className="py-16 px-4 bg-white dark:bg-dark-background relative">
+            <section className="py-10 px-4 bg-white dark:bg-dark-background relative">
                 <div className="max-w-[1200px] mx-auto relative z-10">
-                    <div className="bg-brand-dark dark:bg-[#0a2e24] rounded-3xl p-10 md:p-14 flex flex-col md:flex-row items-center gap-10 md:gap-16 overflow-hidden">
+                    <div className="bg-brand-dark dark:bg-[#0a2e24] rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-8 md:gap-12 overflow-hidden">
                         {/* Texto + Botão */}
                         <div className="flex-1 text-center md:text-left">
                             <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">

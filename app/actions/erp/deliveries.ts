@@ -54,6 +54,8 @@ function revalidateDeliveryDashboard(partnerId: string) {
   revalidateTag(DASHBOARD_TAGS.financial(partnerId), "max")
   // @ts-ignore
   revalidateTag(DASHBOARD_TAGS.operations(partnerId), "max")
+  // @ts-ignore
+  revalidateTag(TAGS.deliveries(partnerId), "max")
   revalidatePath("/erp/painel")
   revalidatePath("/erp/inicio")
   revalidatePath("/erp/entregas")
@@ -1611,231 +1613,407 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       const limit = Math.max(1, Math.min(250, Math.floor(Number(options?.limit || DEFAULT_PAGE_SIZE))))
       const fetchLimit = limit + 1
 
-      let q = supabase
-        .from("deliveries")
-        .select(`
-        id,
-        partner_id,
-        delivery_person_id,
-        status,
-        distance_km,
-        estimated_duration_minutes,
-        started_at,
-        delivered_at,
-        created_at,
-        notes,
-        delivery_orders(
-          order_id,
-          position,
-          status,
-          delivered_at,
-          orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
-        )
-      `)
-        .eq("partner_id", partnerId)
-
-      let validDeliveryPersonIds: string[] = []
-      let assignedDeliveryIds: string[] = []
-
       if (actor.roleId === "delivery") {
-        const pUserId = actor.partnerUserId
-        const uId = user.id
-
-        // 1. Buscar entregas atribuídas ao motorista via delivery_assignments
-        const { data: driverAssignments } = await getAdminClient()
-          .from("delivery_assignments")
-          .select("delivery_id")
-          .eq("partner_id", partnerId)
-          .eq("driver_id", uId)
-          .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
-          .not("delivery_id", "is", null)
-
-        assignedDeliveryIds = Array.from(
-          new Set((driverAssignments || []).map((a: any) => String(a.delivery_id)).filter(Boolean))
-        )
-        validDeliveryPersonIds = [pUserId, uId].filter(Boolean) as string[]
-
-        if (validDeliveryPersonIds.length === 0 && assignedDeliveryIds.length === 0) {
-          return {
-            success: true,
-            items: [],
-            nextCursor: null,
-            hasMore: false,
-            userRole: actor.roleId,
-          }
-        }
-
-        const orClauses: string[] = []
-        if (validDeliveryPersonIds.length > 0) {
-          orClauses.push(`delivery_person_id.in.(${validDeliveryPersonIds.join(",")})`)
-        }
-        if (assignedDeliveryIds.length > 0) {
-          orClauses.push(`id.in.(${assignedDeliveryIds.join(",")})`)
-        }
-
-        if (cursor) {
-          const qVal = (s: string) => `"${String(s).replace(/"/g, '""')}"`
-          const k1 = `created_at.lt.${qVal(cursor.createdAt)}`
-          const k2 = `and(created_at.eq.${qVal(cursor.createdAt)},id.lt.${qVal(cursor.id)})`
-          const combinedClauses: string[] = []
-          for (const rc of orClauses) {
-            combinedClauses.push(`and(${rc},${k1})`)
-            combinedClauses.push(`and(${rc},${k2})`)
-          }
-          q = q.or(combinedClauses.join(","))
-        } else {
-          q = q.or(orClauses.join(","))
-        }
-      } else {
-        if (cursor) q = q.or(buildKeysetFilter(cursor))
+        const result = await fetchDeliveriesUncached(partnerId, user, actor, cursor, limit, supabase)
+        return { ...result, userRole: actor.roleId }
       }
 
-      const { data, error } = await q
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(fetchLimit)
+      const result = await getCachedErpPage(
+        [
+          "erp-deliveries-page",
+          partnerId,
+          actor.roleId,
+          cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+          String(limit),
+        ],
+        [TAGS.deliveries(partnerId)],
+        async () => {
+          let q = supabase
+            .from("deliveries")
+            .select(`
+            id,
+            partner_id,
+            delivery_person_id,
+            status,
+            distance_km,
+            estimated_duration_minutes,
+            started_at,
+            delivered_at,
+            created_at,
+            notes,
+            delivery_orders(
+              order_id,
+              position,
+              status,
+              delivered_at,
+              orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
+            )
+          `)
+            .eq("partner_id", partnerId)
 
-      if (error) throw error
-      let rows = data || []
+          if (cursor) q = q.or(buildKeysetFilter(cursor))
 
-      // Filtro defensivo em memória para o cargo de entregador
-      if (actor.roleId === "delivery") {
-        rows = rows.filter((row: any) => {
-          const isPersonMatch = validDeliveryPersonIds.includes(String(row.delivery_person_id || ""))
-          const isIdMatch = assignedDeliveryIds.includes(String(row.id || ""))
-          return isPersonMatch || isIdMatch
+          const { data, error } = await q
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(fetchLimit)
+
+          if (error) throw error
+          const rows = data || []
+
+          const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
+          const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
+
+          const deliveryIds = rows.map((r: any) => r.id).filter(Boolean)
+          const platformAssignmentsByDeliveryId = new Map<string, any>()
+          const platformDriverUserIds = new Set<string>()
+
+          if (deliveryIds.length > 0) {
+            const { data: assignments } = await getAdminClient()
+              .from("delivery_assignments")
+              .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
+              .in("delivery_id", deliveryIds)
+              .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+              .order("assigned_at", { ascending: false })
+
+            for (const ass of assignments || []) {
+              if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
+                platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+                if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+              }
+            }
+          }
+
+          for (const row of rows) {
+            if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
+              platformDriverUserIds.add(String(row.delivery_person_id))
+            }
+          }
+
+          let driverProfileMap = new Map<string, any>()
+          if (platformDriverUserIds.size > 0) {
+            const driverIdsArray = Array.from(platformDriverUserIds)
+            const [{ data: profiles }, { data: driverRows }] = await Promise.all([
+              getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
+              getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
+            ])
+
+            const driverInfoByUserId = new Map<string, any>()
+            for (const dRow of driverRows || []) {
+              if (dRow?.user_id) driverInfoByUserId.set(String(dRow.user_id), dRow)
+            }
+
+            for (const prof of profiles || []) {
+              if (!prof?.user_id) continue
+              const dInfo = driverInfoByUserId.get(String(prof.user_id))
+              driverProfileMap.set(String(prof.user_id), {
+                id: String(prof.user_id),
+                fullName: prof.full_name || "Entregador Dudit",
+                phone: prof.phone || null,
+                avatarUrl: prof.avatar_url || null,
+                vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
+                vehiclePlate: dInfo?.vehicle_plate || null,
+                city: dInfo?.city || null,
+              })
+            }
+          }
+
+          const hasMore = rows.length > limit
+          const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+            const pAss = platformAssignmentsByDeliveryId.get(row.id)
+            let isPlatformDriver = false
+            let platformDriver: any = null
+            let driverName: string | null = null
+
+            if (pAss) {
+              isPlatformDriver = true
+              if (pAss.driver_id) {
+                const pInfo = driverProfileMap.get(String(pAss.driver_id))
+                platformDriver = {
+                  id: String(pAss.driver_id),
+                  fullName: pInfo?.fullName || "Entregador Dudit",
+                  phone: pInfo?.phone || null,
+                  avatarUrl: pInfo?.avatarUrl || null,
+                  vehicleType: pInfo?.vehicleType || null,
+                  vehiclePlate: pInfo?.vehiclePlate || null,
+                  city: pInfo?.city || null,
+                  status: pAss.status,
+                  isPlatformDriver: true,
+                  isPendingAcceptance: false,
+                }
+                driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
+              } else {
+                platformDriver = {
+                  id: "dudit_network",
+                  fullName: "Rede de Entregadores Dudit",
+                  status: pAss.status,
+                  isPlatformDriver: true,
+                  isPendingAcceptance: true,
+                }
+                driverName = "Rede de Entregadores (Aguardando aceite)"
+              }
+            } else if (row.delivery_person_id && driverProfileMap.has(String(row.delivery_person_id))) {
+              const pInfo = driverProfileMap.get(String(row.delivery_person_id))
+              isPlatformDriver = true
+              platformDriver = {
+                id: String(row.delivery_person_id),
+                fullName: pInfo?.fullName || "Entregador Dudit",
+                phone: pInfo?.phone || null,
+                avatarUrl: pInfo?.avatarUrl || null,
+                vehicleType: pInfo?.vehicleType || null,
+                vehiclePlate: pInfo?.vehiclePlate || null,
+                city: pInfo?.city || null,
+                status: "accepted",
+                isPlatformDriver: true,
+                isPendingAcceptance: false,
+              }
+              driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
+            } else if (row.delivery_person_id) {
+              driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
+            }
+
+            return {
+              ...row,
+              is_platform_driver: isPlatformDriver,
+              platform_driver: platformDriver,
+              delivery_person_name: driverName,
+              partner_users: driverName
+                ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
+                : null,
+            }
+          })
+          const last = items[items.length - 1]
+          const nextCursor = hasMore && last?.created_at && last?.id
+            ? { createdAt: String(last.created_at), id: String(last.id) }
+            : null
+
+          return { items, nextCursor, hasMore }
+        },
+        30,
+      )
+
+      return { ...result, success: true as const, userRole: actor.roleId }
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Erro ao carregar entregas." }
+    }
+  }
+
+  async function fetchDeliveriesUncached(
+    partnerId: string,
+    user: { id: string },
+    actor: { roleId: string; partnerUserId?: string | null },
+    cursor: ERPDeliveryListCursor | null,
+    limit: number,
+    supabase: any,
+  ) {
+    const fetchLimit = limit + 1
+
+    let q = supabase
+      .from("deliveries")
+      .select(`
+      id,
+      partner_id,
+      delivery_person_id,
+      status,
+      distance_km,
+      estimated_duration_minutes,
+      started_at,
+      delivered_at,
+      created_at,
+      notes,
+      delivery_orders(
+        order_id,
+        position,
+        status,
+        delivered_at,
+        orders(id, order_number, customer_name, total_amount, delivery_fee, delivery_address, buyer_id, order_source)
+      )
+    `)
+      .eq("partner_id", partnerId)
+
+    const pUserId = actor.partnerUserId
+    const uId = user.id
+
+    const { data: driverAssignments } = await getAdminClient()
+      .from("delivery_assignments")
+      .select("delivery_id")
+      .eq("partner_id", partnerId)
+      .eq("driver_id", uId)
+      .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+      .not("delivery_id", "is", null)
+
+    const assignedDeliveryIds = Array.from(
+      new Set((driverAssignments || []).map((a: any) => String(a.delivery_id)).filter(Boolean))
+    )
+    const validDeliveryPersonIds = [pUserId, uId].filter(Boolean) as string[]
+
+    if (validDeliveryPersonIds.length === 0 && assignedDeliveryIds.length === 0) {
+      return { success: true as const, items: [], nextCursor: null, hasMore: false }
+    }
+
+    const orClauses: string[] = []
+    if (validDeliveryPersonIds.length > 0) {
+      orClauses.push(`delivery_person_id.in.(${validDeliveryPersonIds.join(",")})`)
+    }
+    if (assignedDeliveryIds.length > 0) {
+      orClauses.push(`id.in.(${assignedDeliveryIds.join(",")})`)
+    }
+
+    if (cursor) {
+      const qVal = (s: string) => `"${String(s).replace(/"/g, '""')}"`
+      const k1 = `created_at.lt.${qVal(cursor.createdAt)}`
+      const k2 = `and(created_at.eq.${qVal(cursor.createdAt)},id.lt.${qVal(cursor.id)})`
+      const combinedClauses: string[] = []
+      for (const rc of orClauses) {
+        combinedClauses.push(`and(${rc},${k1})`)
+        combinedClauses.push(`and(${rc},${k2})`)
+      }
+      q = q.or(combinedClauses.join(","))
+    } else {
+      q = q.or(orClauses.join(","))
+    }
+
+    const { data, error } = await q
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(fetchLimit)
+
+    if (error) throw error
+    let rows = data || []
+
+    rows = rows.filter((row: any) => {
+      const isPersonMatch = validDeliveryPersonIds.includes(String(row.delivery_person_id || ""))
+      const isIdMatch = assignedDeliveryIds.includes(String(row.id || ""))
+      return isPersonMatch || isIdMatch
+    })
+
+    const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
+    const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
+
+    const deliveryIds = rows.map((r: any) => r.id).filter(Boolean)
+    let platformAssignmentsByDeliveryId = new Map<string, any>()
+    let platformDriverUserIds = new Set<string>()
+
+    if (deliveryIds.length > 0) {
+      const { data: assignments } = await getAdminClient()
+        .from("delivery_assignments")
+        .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
+        .in("delivery_id", deliveryIds)
+        .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
+        .order("assigned_at", { ascending: false })
+
+      for (const ass of assignments || []) {
+        if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
+          platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
+          if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
+        }
+      }
+    }
+
+    for (const row of rows) {
+      if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
+        platformDriverUserIds.add(String(row.delivery_person_id))
+      }
+    }
+
+    let driverProfileMap = new Map<string, any>()
+    if (platformDriverUserIds.size > 0) {
+      const driverIdsArray = Array.from(platformDriverUserIds)
+      const [{ data: profiles }, { data: driverRows }] = await Promise.all([
+        getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
+        getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
+      ])
+
+      const driverInfoByUserId = new Map<string, any>()
+      for (const dRow of driverRows || []) {
+        if (dRow?.user_id) driverInfoByUserId.set(String(dRow.user_id), dRow)
+      }
+
+      for (const prof of profiles || []) {
+        if (!prof?.user_id) continue
+        const dInfo = driverInfoByUserId.get(String(prof.user_id))
+        driverProfileMap.set(String(prof.user_id), {
+          id: String(prof.user_id),
+          fullName: prof.full_name || "Entregador Dudit",
+          phone: prof.phone || null,
+          avatarUrl: prof.avatar_url || null,
+          vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
+          vehiclePlate: dInfo?.vehicle_plate || null,
+          city: dInfo?.city || null,
         })
       }
-      const deliveryPersonIds = rows.map((row: any) => String(row.delivery_person_id || "")).filter(Boolean)
-      const deliveryPersonNameById = await getPartnerUserNameByIdMap(supabase, partnerId, deliveryPersonIds)
+    }
 
-      const deliveryIds = rows.map((r: any) => r.id).filter(Boolean)
-      let platformAssignmentsByDeliveryId = new Map<string, any>()
-      let platformDriverUserIds = new Set<string>()
+    const hasMore = rows.length > limit
+    const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
+      const pAss = platformAssignmentsByDeliveryId.get(row.id)
+      let isPlatformDriver = false
+      let platformDriver: any = null
+      let driverName: string | null = null
 
-      if (deliveryIds.length > 0) {
-        const { data: assignments } = await getAdminClient()
-          .from("delivery_assignments")
-          .select("id, delivery_id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at")
-          .in("delivery_id", deliveryIds)
-          .in("status", ["available", "requested", "assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
-          .order("assigned_at", { ascending: false })
-
-        for (const ass of assignments || []) {
-          if (ass.delivery_id && !platformAssignmentsByDeliveryId.has(ass.delivery_id)) {
-            platformAssignmentsByDeliveryId.set(ass.delivery_id, ass)
-            if (ass.driver_id) platformDriverUserIds.add(String(ass.driver_id))
-          }
-        }
-      }
-
-      for (const row of rows) {
-        if (row.delivery_person_id && !deliveryPersonNameById.has(String(row.delivery_person_id))) {
-          platformDriverUserIds.add(String(row.delivery_person_id))
-        }
-      }
-
-      let driverProfileMap = new Map<string, any>()
-      if (platformDriverUserIds.size > 0) {
-        const driverIdsArray = Array.from(platformDriverUserIds)
-        const [{ data: profiles }, { data: driverRows }] = await Promise.all([
-          getAdminClient().from("user_profiles").select("user_id, full_name, phone, avatar_url").in("user_id", driverIdsArray),
-          getAdminClient().from("delivery_drivers").select("user_id, vehicle_type, vehicle_plate, city").in("user_id", driverIdsArray),
-        ])
-
-        const driverInfoByUserId = new Map<string, any>()
-        for (const dRow of driverRows || []) {
-          if (dRow?.user_id) driverInfoByUserId.set(String(dRow.user_id), dRow)
-        }
-
-        for (const prof of profiles || []) {
-          if (!prof?.user_id) continue
-          const dInfo = driverInfoByUserId.get(String(prof.user_id))
-          driverProfileMap.set(String(prof.user_id), {
-            id: String(prof.user_id),
-            fullName: prof.full_name || "Entregador Dudit",
-            phone: prof.phone || null,
-            avatarUrl: prof.avatar_url || null,
-            vehicleType: dInfo?.vehicle_type === "moto" ? "Moto" : dInfo?.vehicle_type === "carro" ? "Carro" : (dInfo?.vehicle_type || null),
-            vehiclePlate: dInfo?.vehicle_plate || null,
-            city: dInfo?.city || null,
-          })
-        }
-      }
-
-      const hasMore = rows.length > limit
-      const items = (hasMore ? rows.slice(0, limit) : rows).map((row: any) => {
-        const pAss = platformAssignmentsByDeliveryId.get(row.id)
-        let isPlatformDriver = false
-        let platformDriver: any = null
-        let driverName: string | null = null
-
-        if (pAss) {
-          isPlatformDriver = true
-          if (pAss.driver_id) {
-            const pInfo = driverProfileMap.get(String(pAss.driver_id))
-            platformDriver = {
-              id: String(pAss.driver_id),
-              fullName: pInfo?.fullName || "Entregador Dudit",
-              phone: pInfo?.phone || null,
-              avatarUrl: pInfo?.avatarUrl || null,
-              vehicleType: pInfo?.vehicleType || null,
-              vehiclePlate: pInfo?.vehiclePlate || null,
-              city: pInfo?.city || null,
-              status: pAss.status,
-              isPlatformDriver: true,
-              isPendingAcceptance: false,
-            }
-            driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
-          } else {
-            platformDriver = {
-              id: "dudit_network",
-              fullName: "Rede de Entregadores Dudit",
-              status: pAss.status,
-              isPlatformDriver: true,
-              isPendingAcceptance: true,
-            }
-            driverName = "Rede de Entregadores (Aguardando aceite)"
-          }
-        } else if (row.delivery_person_id && driverProfileMap.has(String(row.delivery_person_id))) {
-          const pInfo = driverProfileMap.get(String(row.delivery_person_id))
-          isPlatformDriver = true
+      if (pAss) {
+        isPlatformDriver = true
+        if (pAss.driver_id) {
+          const pInfo = driverProfileMap.get(String(pAss.driver_id))
           platformDriver = {
-            id: String(row.delivery_person_id),
+            id: String(pAss.driver_id),
             fullName: pInfo?.fullName || "Entregador Dudit",
             phone: pInfo?.phone || null,
             avatarUrl: pInfo?.avatarUrl || null,
             vehicleType: pInfo?.vehicleType || null,
             vehiclePlate: pInfo?.vehiclePlate || null,
             city: pInfo?.city || null,
-            status: "accepted",
+            status: pAss.status,
             isPlatformDriver: true,
             isPendingAcceptance: false,
           }
           driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
-        } else if (row.delivery_person_id) {
-          driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
+        } else {
+          platformDriver = {
+            id: "dudit_network",
+            fullName: "Rede de Entregadores Dudit",
+            status: pAss.status,
+            isPlatformDriver: true,
+            isPendingAcceptance: true,
+          }
+          driverName = "Rede de Entregadores (Aguardando aceite)"
         }
-
-        return {
-          ...row,
-          is_platform_driver: isPlatformDriver,
-          platform_driver: platformDriver,
-          delivery_person_name: driverName,
-          partner_users: driverName
-            ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
-            : null,
+      } else if (row.delivery_person_id && driverProfileMap.has(String(row.delivery_person_id))) {
+        const pInfo = driverProfileMap.get(String(row.delivery_person_id))
+        isPlatformDriver = true
+        platformDriver = {
+          id: String(row.delivery_person_id),
+          fullName: pInfo?.fullName || "Entregador Dudit",
+          phone: pInfo?.phone || null,
+          avatarUrl: pInfo?.avatarUrl || null,
+          vehicleType: pInfo?.vehicleType || null,
+          vehiclePlate: pInfo?.vehiclePlate || null,
+          city: pInfo?.city || null,
+          status: "accepted",
+          isPlatformDriver: true,
+          isPendingAcceptance: false,
         }
-      })
-      const last = items[items.length - 1]
-      const nextCursor = hasMore && last?.created_at && last?.id
-        ? { createdAt: String(last.created_at), id: String(last.id) }
-        : null
+        driverName = pInfo?.vehicleType ? `${platformDriver.fullName} (${pInfo.vehicleType})` : platformDriver.fullName
+      } else if (row.delivery_person_id) {
+        driverName = deliveryPersonNameById.get(String(row.delivery_person_id)) || "Entregador"
+      }
 
-      return { success: true, items, nextCursor, hasMore, userRole: actor.roleId }
-    } catch (e: any) {
-      return { success: false, error: e?.message || "Erro ao carregar entregas." }
-    }
+      return {
+        ...row,
+        is_platform_driver: isPlatformDriver,
+        platform_driver: platformDriver,
+        delivery_person_name: driverName,
+        partner_users: driverName
+          ? { id: row.delivery_person_id, user_profiles: { full_name: driverName } }
+          : null,
+      }
+    })
+    const last = items[items.length - 1]
+    const nextCursor = hasMore && last?.created_at && last?.id
+      ? { createdAt: String(last.created_at), id: String(last.id) }
+      : null
+
+    return { success: true as const, items, nextCursor, hasMore }
   }
 
   export async function getERPDeliveryDetailsAction(deliveryId: string, partnerId: string) {

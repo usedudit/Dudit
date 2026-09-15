@@ -465,20 +465,28 @@ export async function getFinancialTransactionsAction(
 ): Promise<
     ({ success: true } & FinancialTransactionsPageSuccess) | { success: false; error: string }
 > {
-    const actionStart = performance.now()
     try {
-        const authStart = performance.now()
         await requirePermission(partnerId, "financial", "view")
-        // Use admin client after authz check so invited ERP users can read transactions.
-        const supabase = createAdminClient()
 
         const cursor = options?.cursor ?? null
         const storeId = options?.storeId ?? null
-        const fetchLimit = FINANCIAL_TX_PAGE_SIZE + 1
 
-        // ── Step 1: Keyset page (created_at DESC, id DESC) ──────────────
-        const t1 = performance.now()
-        let listQuery = supabase.from("transactions").select(FINANCIAL_TX_LIST_SELECT).eq("partner_id", partnerId)
+        const result = await getCachedErpPage(
+            [
+                "erp-transactions-page",
+                partnerId,
+                storeId || "all-stores",
+                cursor ? `${cursor.createdAt}:${cursor.id}` : "first",
+                String(FINANCIAL_TX_PAGE_SIZE),
+            ],
+            [TAGS.transactions(partnerId)],
+            async () => {
+                // Use admin client after authz check so invited ERP users can read transactions.
+                const supabase = createAdminClient()
+                const fetchLimit = FINANCIAL_TX_PAGE_SIZE + 1
+
+                // ── Step 1: Keyset page (created_at DESC, id DESC) ──────────────
+                let listQuery = supabase.from("transactions").select(FINANCIAL_TX_LIST_SELECT).eq("partner_id", partnerId)
 
         // Filter out legacy recognition and fee rows to prevent double display of past sales
         listQuery = listQuery.or("kind.is.null,kind.eq.settlement,kind.eq.refund,kind.eq.chargeback")
@@ -864,7 +872,12 @@ export async function getFinancialTransactionsAction(
             }
         })
 
-        return { success: true, items: mapped, nextCursor, hasMore }
+        return { success: true as const, items: mapped, nextCursor, hasMore }
+            },
+            30,
+        )
+
+        return result
     } catch (e: any) {
         return { success: false, error: e.message || "Erro ao carregar transações" }
     }

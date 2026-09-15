@@ -128,7 +128,7 @@ export function DashboardLineChart({
   return (
     <div className={cn("w-full mt-2", height)}>
       <ChartContainer config={config} className="h-full w-full">
-        <LineChart data={data} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+        <LineChart data={data} margin={{ top: 10, right: 10, bottom: 0, left: 10 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="currentColor" className="text-brand-border/60 dark:text-dark-border/40" />
           <XAxis
             dataKey="label"
@@ -139,10 +139,10 @@ export function DashboardLineChart({
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <YAxis
-            tickFormatter={valueFormatter}
+            tickFormatter={formatCompact}
             tickLine={false}
             axisLine={false}
-            width={60}
+            width={65}
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <Tooltip content={<CustomChartTooltip formatter={valueFormatter} />} />
@@ -200,7 +200,7 @@ export function DashboardBarChart({
   return (
     <div className={cn("w-full mt-2", height)}>
       <ChartContainer config={config} className="h-full w-full">
-        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 10 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="currentColor" className="text-brand-border/60 dark:text-dark-border/40" />
           <XAxis
             dataKey="label"
@@ -211,10 +211,10 @@ export function DashboardBarChart({
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <YAxis
-            tickFormatter={valueFormatter}
+            tickFormatter={formatCompact}
             tickLine={false}
             axisLine={false}
-            width={60}
+            width={65}
             tick={{ fill: 'currentColor', className: 'text-brand-inactive-text dark:text-dark-body text-[11px] font-semibold' }}
           />
           <Tooltip content={<CustomChartTooltip formatter={valueFormatter} />} />

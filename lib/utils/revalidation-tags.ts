@@ -32,6 +32,7 @@ export const TAGS = {
   storeStockMovements: (partnerId: string, storeId: string) => `partner-${partnerId}-store-${storeId}-stock-movements`,
   transactions: (partnerId?: string) => partnerId ? `partner-${partnerId}-transactions` : 'transactions',
   storeTransactions: (partnerId: string, storeId: string) => `partner-${partnerId}-store-${storeId}-transactions`,
+  deliveries: (partnerId?: string) => partnerId ? `partner-${partnerId}-deliveries` : 'deliveries',
   marketplace: 'marketplace',
   categories: 'marketplace-categories',
 

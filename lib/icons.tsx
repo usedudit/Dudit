@@ -47,6 +47,7 @@ import {
     ArrowLeftRightIcon as ArrowLeftRightIcon01,
     Archive03Icon,
     Location01Icon,
+    CardExchange01Icon,
     InstagramIcon as InstagramIcon01,
     NewTwitterIcon,
     SubnodeAddIcon,
@@ -324,6 +325,7 @@ export const OutProductsIcon = CreateIcon(PackageRemoveIcon)
 export const PackageReceiveIcon = CreateIcon(PackageReceiveIcon01)
 
 export const CreditCardIcon = CreateIcon(CreditCard)
+export const MultiplePaymentsIcon = CreateIcon(CardExchange01Icon)
 export const TruckIcon = CreateIcon(ShippingTruck01Icon)
 export const DeliverySentIcon = CreateIcon(DeliverySent01Icon)
 export const DeliveryPickupIcon = CreateIcon(DeliveryTracking01Icon)

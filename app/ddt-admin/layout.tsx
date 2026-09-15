@@ -3,7 +3,6 @@ import { Suspense } from "react"
 import type { Metadata } from "next"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import SkeletonLoader from "@/components/erp/SkeletonLoader"
-import { ThemeProvider } from "@/components/theme-provider"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { requireAdmin } from "@/lib/auth/admin-authorization"
@@ -35,15 +34,13 @@ export default async function AdminLayout({
     const initialExpanded = sidebarCookie ? sidebarCookie.value === "expanded" : true
 
     return (
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            <SidebarProvider initialExpanded={initialExpanded}>
-                <div className="flex h-screen bg-[var(--brand-page-bg)] dark:bg-[var(--brand-page-bg)] text-[var(--brand-dark)] dark:text-white transition-colors duration-200">
-                    <AdminSidebar initialExpanded={initialExpanded} />
-                    <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-                        <Suspense fallback={<SkeletonLoader />}>{children}</Suspense>
-                    </div>
+        <SidebarProvider initialExpanded={initialExpanded}>
+            <div className="flex h-screen bg-[var(--brand-page-bg)] dark:bg-[var(--brand-page-bg)] text-[var(--brand-dark)] dark:text-white transition-colors duration-200">
+                <AdminSidebar initialExpanded={initialExpanded} />
+                <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+                    <Suspense fallback={<SkeletonLoader />}>{children}</Suspense>
                 </div>
-            </SidebarProvider>
-        </ThemeProvider>
+            </div>
+        </SidebarProvider>
     )
 }

@@ -39,10 +39,12 @@ const DeliveryGridCard = React.memo(({ delivery, onDetails, onEdit, onQuickStatu
           <p className="text-xs text-brand-inactive-text">Entregador</p>
           <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
             {(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver) && (
-              <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3 h-3 object-contain shrink-0" />
+              <Tooltip text="Entregador da Rede Dudit">
+                <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3 h-3 object-contain shrink-0 cursor-help" />
+              </Tooltip>
             )}
             <p className="font-bold text-xs text-brand-dark dark:text-dark-heading truncate">
-              {delivery.deliveryPersonName || "Não atribuído"}
+              {delivery.deliveryPersonName || "Entrega própria"}
             </p>
           </div>
         </div>

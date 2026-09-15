@@ -14,8 +14,8 @@ const TRANSACTION_SELECT = `
   id, description, category, amount, status, due_date, payment_date,
   payment_type, transaction_type, created_at,
   financial_categories!category_id(name),
-  financial_accounts(name),
-  payment_methods(name)
+finance_accounts(name),
+   payment_methods(name)
 `
 
 const TRANSACTION_SELECT_ALL = `
@@ -24,9 +24,9 @@ const TRANSACTION_SELECT_ALL = `
   reference_note, contact_type, customer_id, installment_number,
   total_installments, created_at, updated_at,
   financial_categories!category_id(name),
-  financial_accounts(name),
-  payment_methods(name),
-  customers:customer_id(name),
+finance_accounts(name),
+   payment_methods(name),
+   customers:customer_id(name),
   transaction_contacts:contact_id(name)
 `
 

@@ -216,11 +216,11 @@ const formatOpeningHoursList = (hours: any) => {
     const normalizedHours = normalizeOpeningHours(hours)
     const daysMap: Record<string, string> = {
         monday: "Segunda-feira",
-        tuesday: "Terca-feira",
+        tuesday: "Terça-feira",
         wednesday: "Quarta-feira",
         thursday: "Quinta-feira",
         friday: "Sexta-feira",
-        saturday: "Sabado",
+        saturday: "Sábado",
         sunday: "Domingo",
     }
     const currentDayKey = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][new Date().getDay()]
@@ -366,7 +366,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
     )
 }
 
-const InfoTab = ({ partner, stats, isActive }: any) => {
+const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
     const hoursList = formatOpeningHoursList(partner.openingHours)
     const paymentMethodsArr = (partner.paymentMethods || []).filter(isPaymentActive)
     const pixMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "pix")
@@ -400,7 +400,7 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                                 <div className="flex flex-wrap gap-2">
                                     {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
                                     {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
-                                    {transferMethods.length > 0 && <PaymentPill label="Transferencia bancaria" />}
+                                    {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
                                 </div>
                             )}
                             {creditMethods.length > 0 && (
@@ -472,6 +472,18 @@ const InfoTab = ({ partner, stats, isActive }: any) => {
                     <MapboxMap lat={partner.lat} lng={partner.lng} name={partner.storeName} address={`${partner.street}, ${partner.number}, ${partner.city}/${partner.state}`} isActive={isActive} />
                 </div>
             </FormSection>
+
+            {onReport && (
+                <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                    <button
+                        onClick={onReport}
+                        className="flex items-center gap-2 text-[14px] text-brand-inactive-text dark:text-dark-body hover:text-brand-red hover:text-[#d32f2f] transition-colors"
+                    >
+                        <FlagIcon size={16} />
+                        <span>Comunicar algo errado sobre este vendedor</span>
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
@@ -726,11 +738,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const [selectedCoupon, setSelectedCoupon] = useState<any>(null)
     const [isMounted, setIsMounted] = useState(false)
     const [isStickyVisible, setIsStickyVisible] = useState(false)
-    const [isMobileScrolled, setIsMobileScrolled] = useState(false)
+    const [mobileTabsScrolledOut, setMobileTabsScrolledOut] = useState(false)
     const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
     const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
     const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
     const tabsScrollRef = useRef<HTMLDivElement>(null)
+    const mobileTabsRef = useRef<HTMLDivElement>(null)
     const topRef = useRef<HTMLDivElement>(null)
     const { user } = useSupabase()
     const isStoreOwner = Boolean(user?.id && ((partner?.userId && user.id === partner.userId) || (partner?.user_id && user.id === partner.user_id)))
@@ -867,7 +880,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             window.requestAnimationFrame(() => {
                 const bottom = topRef.current?.getBoundingClientRect().bottom ?? 0
                 setIsStickyVisible(bottom < 0)
-                setIsMobileScrolled(window.scrollY > 10)
+                const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0
+                setMobileTabsScrolledOut(tabsTop <= 0)
                 ticking = false
             })
             ticking = true
@@ -1142,11 +1156,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
                                 <HeartIcon size={20} />
                             </button>
-                            {!isStoreOwner && (
-                                <button onClick={() => setShowReportModal(true)} className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] hover:border-[#d32f2f] transition-colors" title="Comunicar algo errado sobre este vendedor">
-                                    <FlagIcon size={20} />
-                                </button>
-                            )}
                         </div>
                     </div>
 
@@ -1171,22 +1180,24 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             >
                                 <InfoIcon size={14} />
                             </button>
-                            {!isStoreOwner && (
-                                <button
-                                    onClick={() => setShowReportModal(true)}
-                                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-border/50 flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#d32f2f] active:bg-gray-200 dark:active:bg-dark-border transition-colors"
-                                    title="Comunicar algo errado sobre este vendedor"
-                                >
-                                    <FlagIcon size={14} />
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark border-b border-white/10 shadow-md transition-all duration-200 ${isMobileScrolled && !categoryView ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-2 pointer-events-none"}`}>
-                <div className="flex items-center gap-4 px-3 h-full">
+            {categoryView && (
+                <div className="lg:hidden">
+                    <ExplorarMobileControls
+                        activeFiltersCount={categoryActiveFiltersCount}
+                        onOpenFilters={() => setIsCategoryFiltersOpen(true)}
+                        onOpenSort={() => setIsCategorySortOpen(true)}
+                    />
+                    <div className="h-[46px]" />
+                </div>
+            )}
+
+            <div ref={mobileTabsRef} className={`lg:hidden bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md`}>
+                <div className="flex items-center gap-4 px-3 h-[46px]">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
@@ -1232,16 +1243,20 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </div>
 
-            {categoryView && (
-                <div className="lg:hidden">
-                    <ExplorarMobileControls
-                        activeFiltersCount={categoryActiveFiltersCount}
-                        onOpenFilters={() => setIsCategoryFiltersOpen(true)}
-                        onOpenSort={() => setIsCategorySortOpen(true)}
-                    />
-                    <div className="h-[46px]" />
+            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-full opacity-0 pointer-events-none"}`}>
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide h-full px-3">
+                    {allTabs.map(tab => (
+                        <button
+                            id={`vendor-tab-${tab.id}-sticky`}
+                            key={tab.id}
+                            onClick={() => selectTab(tab.id)}
+                            className={`h-full pb-0 pt-0 flex items-center justify-center shrink-0 whitespace-nowrap px-3 text-[13px] md:text-[14px] ${activeTag === tab.id ? "text-white font-semibold" : "text-white/60"}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
-            )}
+            </div>
 
             <div className="flex flex-col lg:flex-row gap-10 px-0 pb-20 items-start">
                 <aside className="hidden lg:block w-[260px] shrink-0 sticky top-[198px] z-20 bg-white dark:bg-dark-surface self-start">
@@ -1504,7 +1519,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             {infoHasBeenOpened && (
                                 <>
                                     <FormSection title={`Informações de ${partner.storeName}`}>
-                                        <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} />
+                                        <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={activeSection === "info"} onReport={() => setShowReportModal(true)} />
                                     </FormSection>
                                 </>
                             )}
@@ -1601,7 +1616,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </div>
                         <div style={{ display: mobileModalTab === "info" ? "block" : "none" }}>
                             {infoHasBeenOpened && (
-                                <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={isAboutPageOpen && mobileModalTab === "info"} />
+                                <InfoTab partner={{ ...partner, rating: displayRating }} stats={{ ...stats, reviewsCount: displayReviewsCount }} isActive={isAboutPageOpen && mobileModalTab === "info"} onReport={() => setShowReportModal(true)} />
                             )}
                         </div>
                         <div style={{ display: mobileModalTab === "gallery" ? "block" : "none" }}>

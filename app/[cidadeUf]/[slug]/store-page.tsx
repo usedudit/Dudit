@@ -53,7 +53,7 @@ export async function StorePage({ storeData }: { storeData: any }) {
         lat: address?.latitude || null,
         lng: address?.longitude || null,
         businessInfo: storeData.business_info || null,
-        paymentMethods: storeData.payment_methods?.length ? storeData.payment_methods : [],
+        paymentMethods: storeData.partners?.payment_methods?.length ? storeData.partners.payment_methods : storeData.payment_methods?.length ? storeData.payment_methods : [],
         banner_url: storeData.banner_url || null,
         gallery: storeData.gallery || [],
         planSlug: "free",

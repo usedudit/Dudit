@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Plus_Jakarta_Sans, Libre_Barcode_128_Text } from "next/font/google"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
+import { headers } from "next/headers"
 import "./globals.css"
 import { SupabaseProvider } from "@/providers/supabase-provider"
 import { QueryProvider } from "@/providers/query-provider"
@@ -219,7 +220,12 @@ export default async function RootLayout({
 }: {
     children: React.ReactNode
 }) {
-    const user = await getCurrentUser()
+    const h = await headers()
+    const isPublicPage = h.get("x-dudit-public-page") === "1"
+    // Skip the server-side auth round-trip on public pages (institucional, ajuda,
+    // auth, manutencao). The client-side SupabaseProvider will fetch the user
+    // lazily if needed, saving ~50-150ms on these routes.
+    const user = isPublicPage ? null : await getCurrentUser()
 
     return (
         <html lang="pt-BR" suppressHydrationWarning className={`${plusJakartaSans.variable} ${libreBarcode.variable}`}>

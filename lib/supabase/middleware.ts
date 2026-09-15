@@ -163,31 +163,37 @@ export async function middleware(request: NextRequest) {
             redirectUrl.searchParams.set(key, val);
           }
         });
-        console.log(`[MIDDLEWARE] request=${requestId} redirect ${request.method} ${pathname}`)
         return NextResponse.redirect(redirectUrl, { status: 301 });
       }
     }
   }
 
-  // Only log non-Server-Action requests to reduce noise
-  // Server Actions (POST with Next-Action header) are internal Next.js calls
   const isServerAction = request.headers.has("Next-Action")
-  if (!isServerAction) {
-    // Classify App Router requests without logging cookies, tokens, query values
-    // or user identifiers. This lets us distinguish a real navigation from a
-    // speculative RSC/prefetch request in Railway logs.
-    const purpose = request.headers.get("purpose")
-    const isPrefetch = request.headers.has("next-router-prefetch")
-      || request.headers.get("x-middleware-prefetch") === "1"
-      || purpose === "prefetch"
-    const isRsc = request.headers.get("RSC") === "1"
-      || request.headers.get("Accept")?.includes("text/x-component") === true
-    const kind = isPrefetch ? "prefetch" : isRsc ? "rsc" : "navigation"
 
-    console.log(
-      `[MIDDLEWARE] request=${requestId} ${request.method} ${pathname}`
-      + ` kind=${kind} prefetch=${isPrefetch} rsc=${isRsc}`
-    )
+  // Classify App Router requests without logging cookies, tokens, query values
+  // or user identifiers. This lets us distinguish a real navigation from a
+  // speculative RSC/prefetch request.
+  const purpose = request.headers.get("purpose")
+  const isPrefetch = request.headers.has("next-router-prefetch")
+    || request.headers.get("x-middleware-prefetch") === "1"
+    || purpose === "prefetch"
+  const isRsc = request.headers.get("RSC") === "1"
+    || request.headers.get("Accept")?.includes("text/x-component") === true
+
+  // Early-exit for RSC/prefetch requests: skip CSP construction, security
+  // headers, rate limiting, and auth. CSP is only enforced on HTML document
+  // responses; RSC payloads are consumed by the Next.js client-side router.
+  if (isPrefetch || isRsc) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set("x-dudit-request-id", requestId)
+    requestHeaders.set("x-dudit-request-start", String(requestStartedAt))
+    requestHeaders.delete("x-user-id")
+    requestHeaders.delete("x-user-email")
+    requestHeaders.delete("x-skip-auth-fallback")
+    // Mark public pages so the root layout can skip the getCurrentUser() call.
+    const isPublicPage = ["/institucional", "/ajuda", "/auth", "/manutencao"].some(p => pathname === p || pathname.startsWith(p + "/"))
+    if (isPublicPage) requestHeaders.set("x-dudit-public-page", "1")
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ============================================================================
@@ -463,6 +469,9 @@ export async function middleware(request: NextRequest) {
   requestHeaders.delete("x-user-id")
   requestHeaders.delete("x-user-email")
   requestHeaders.delete("x-skip-auth-fallback")
+  // Mark public pages so the root layout can skip the getCurrentUser() call.
+  const isPublicPage = ["/institucional", "/ajuda", "/auth", "/manutencao"].some(p => pathname === p || pathname.startsWith(p + "/"))
+  if (isPublicPage) requestHeaders.set("x-dudit-public-page", "1")
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue)
 
   // Otimização para páginas institucionais: pula a busca de usuário no RootLayout (server-side)

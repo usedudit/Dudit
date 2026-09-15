@@ -118,11 +118,11 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
       quantity,
       selected,
       created_at,
-      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, allow_sell_without_stock, is_active, short_id, slug),
+      products(id, name, price, promotional_price, images, stock_quantity, stock_available, availability_value, availability_unit, allow_sell_without_stock, is_active, short_id),
       product_variants(id, variant_name, variant_type, variant_value, price_adjustment, stock_quantity, stock_available, variant_options, is_active),
-      services(id, name, price, promotional_price, duration_minutes, is_active, short_id, slug),
+      services(id, name, price, promotional_price, duration_minutes, is_active, short_id),
       recurring_plans(
-        id, name, status, short_id, slug,
+        id, name, status, short_id,
         recurring_plan_items(unit_price, quantity)
       ),
       partners(
@@ -130,9 +130,7 @@ export async function getCachedCart(userId: string): Promise<MarketplaceCartPage
         user_id,
         mp_user_id,
         mp_public_key,
-        is_showcase_active,
-        short_id,
-        slug
+        is_showcase_active
       )
     `)
       .eq("user_id", userId)

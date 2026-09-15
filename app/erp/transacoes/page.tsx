@@ -24,9 +24,8 @@ export default async function FinancialTransactionsRoute() {
 
   const partnerId = context.partnerId
   const activeStoreId = context.activeStoreId || null
-  const { allowed } = await checkPermission(partnerId, "financial", "view")
-
-  const [plan] = await Promise.all([
+  const [{ allowed }, plan] = await Promise.all([
+    checkPermission(partnerId, "financial", "view"),
     getPartnerPlan(partnerId),
   ])
 

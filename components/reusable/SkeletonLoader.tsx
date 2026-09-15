@@ -18,7 +18,7 @@ export function SkeletonLoader({
     return (
         <div
             className={cn(
-                "bg-gray-200 dark:bg-dark-border animate-pulse",
+                "bg-brand-gray dark:bg-dark-border animate-pulse",
                 circle ? "rounded-full" : "rounded-md",
                 className
             )}

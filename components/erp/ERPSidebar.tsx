@@ -103,7 +103,6 @@ const navItems: NavItem[] = [
             { label: "DRE Gerencial", href: "/erp/transacoes/dre" },
             { label: "Contas a Pagar", href: "/erp/contas-a-pagar" },
             { label: "Contas a Receber", href: "/erp/contas-a-receber" },
-            { label: "Caixa (PDV)", href: "/erp/caixa" },
             { label: "Cadastros financeiros", href: "/erp/transacoes/cadastros-financeiro" },
         ],
     },

@@ -357,7 +357,7 @@ const ParaQuemVende = () => {
                         className="relative"
                     >
                         <div className="bg-[#eaf7f0] rounded-3xl p-6 md:p-10">
-                            <div className="rounded-2xl overflow-hidden shadow-lg">
+                            <div className="overflow-hidden">
                                 <img
                                     src="https://img.dudit.com.br/static/mascots/MaisUmaVitrine.png"
                                     alt="Seu negócio também pode ser encontrado na Dudit"
@@ -367,7 +367,7 @@ const ParaQuemVende = () => {
                                         target.style.display = 'none';
                                         const parent = target.parentElement;
                                         if (parent) {
-                                            parent.innerHTML = '<div class="w-full aspect-[4/5] bg-[#eaf7f0] rounded-2xl flex items-center justify-center"></div>';
+                                            parent.innerHTML = '<div class="w-full bg-[#eaf7f0] flex items-center justify-center"></div>';
                                         }
                                     }}
                                 />
