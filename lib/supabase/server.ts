@@ -1,4 +1,3 @@
-import "server-only"
 import { SupabaseClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { createClient as createServiceRoleClient } from "@supabase/supabase-js"

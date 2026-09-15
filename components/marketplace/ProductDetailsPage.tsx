@@ -879,18 +879,18 @@ export function ProductDetailsPageClient({
         const sales = partner.vendas_totais || 0
         const rating = partner.rating || 5.0
         if (sales >= 2000 && rating >= 4.7) {
-            return { name: "Diamante", badge: <img src="https://img.dudit.com.br/static/selos/Diamante.png" alt="Diamante" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
+            return { name: "Diamante", badge: <img src="https://img.dudit.com.br/static/selos/Diamante.png" alt="Diamante" className="h-7 w-7" />, color: "text-brand-inactive-text dark:text-dark-body", description: "Vendedor Diamante com excelente histórico de atendimento.", level: 5 }
         }
         if (sales >= 500 && rating >= 4.5) {
-            return { name: "Platina", badge: <img src="https://img.dudit.com.br/static/selos/Platina.png" alt="Platina" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
+            return { name: "Platina", badge: <img src="https://img.dudit.com.br/static/selos/Platina.png" alt="Platina" className="h-7 w-7" />, color: "text-brand-inactive-text dark:text-dark-body", description: "Vendedor Destaque Platina na Dudit.", level: 4 }
         }
         if (sales >= 100 && rating >= 4.3) {
-            return { name: "Ouro", badge: <img src="https://img.dudit.com.br/static/selos/Ouro.png" alt="Ouro" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
+            return { name: "Ouro", badge: <img src="https://img.dudit.com.br/static/selos/Ouro.png" alt="Ouro" className="h-7 w-7" />, color: "text-brand-inactive-text dark:text-dark-body", description: "Vendedor com reputação Ouro e ótimo serviço.", level: 3 }
         }
         if (sales >= 20 && rating >= 4.0) {
-            return { name: "Prata", badge: <img src="https://img.dudit.com.br/static/selos/Prata.png" alt="Prata" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Prata consistente na plataforma.", level: 2 }
+            return { name: "Prata", badge: <img src="https://img.dudit.com.br/static/selos/Prata.png" alt="Prata" className="h-7 w-7" />, color: "text-brand-inactive-text dark:text-dark-body", description: "Vendedor Prata consistente na plataforma.", level: 2 }
         }
-        return { name: "Bronze", badge: <img src="https://img.dudit.com.br/static/selos/Bronze.png" alt="Bronze" className="h-5 w-5" />, color: "text-brand-green bg-green-50/50 border-green-200", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
+        return { name: "Bronze", badge: <img src="https://img.dudit.com.br/static/selos/Bronze.png" alt="Bronze" className="h-7 w-7" />, color: "text-brand-inactive-text dark:text-dark-body", description: "Vendedor Bronze iniciando suas vendas na Dudit.", level: 1 }
     }, [partner])
 
     const MAX_STOCK = selectedVariant ? (selectedVariant.stock_available ?? selectedVariant.stock_quantity ?? 0) : (product.stock_available ?? product.stock_quantity ?? 0)
@@ -1743,6 +1743,8 @@ export function ProductDetailsPageClient({
                                                             {isEstimate ? `A partir de ${formatMoney(deliveryFee)}` : formatMoney(deliveryFee)}
                                                         </p>
                                                     ) : deliveryFee !== null && deliveryFee === 0 ? (
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
+                                                    ) : (deliveryError && !isTechnicalError) ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : baseFee > 0 ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">

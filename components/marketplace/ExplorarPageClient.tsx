@@ -1448,37 +1448,46 @@ export function ExplorarPageClient({
                                 {(item.category || item.subcategoryName) && (
                                     <span className="font-medium shrink-0">{item.subcategoryName || item.category}</span>
                                 )}
-                                {(item.category || item.subcategoryName) && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
-                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                                )}
-                                {locationLabel && (
+                                {locationContext?.scope === "country" && locationLabel ? (
                                     <>
+                                        {(item.category || item.subcategoryName) && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
                                         <span className="shrink-0">{locationLabel}</span>
-                                        {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                                    </>
+                                ) : (
+                                    <>
+                                        {(item.category || item.subcategoryName) && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
                                             <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
                                         )}
-                                    </>
-                                )}
-                                {deliveryTime && (
-                                    <>
-                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
-                                        {(distanceLabel || deliveryFeeLabel) && (
-                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                        {locationLabel && (
+                                            <>
+                                                <span className="shrink-0">{locationLabel}</span>
+                                                {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                                )}
+                                            </>
                                         )}
-                                    </>
-                                )}
-                                {distanceLabel && (
-                                    <>
-                                        <span className="shrink-0">{distanceLabel}</span>
+                                        {deliveryTime && (
+                                            <>
+                                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
+                                                {(distanceLabel || deliveryFeeLabel) && (
+                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                                )}
+                                            </>
+                                        )}
+                                        {distanceLabel && (
+                                            <>
+                                                <span className="shrink-0">{distanceLabel}</span>
+                                                {deliveryFeeLabel && (
+                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                                )}
+                                            </>
+                                        )}
                                         {deliveryFeeLabel && (
-                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                            <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
+                                                {deliveryFeeLabel}
+                                            </span>
                                         )}
                                     </>
-                                )}
-                                {deliveryFeeLabel && (
-                                    <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
-                                        {deliveryFeeLabel}
-                                    </span>
                                 )}
                             </div>
                         </>

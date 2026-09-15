@@ -113,9 +113,9 @@ export default function HelpContent({ article }: { article: HelpArticle }) {
                 const id = text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-")
 
                 if (level === 2) {
-                    elements.push(<h2 id={id} key={i} className="text-2xl font-bold text-brand-dark dark:text-dark-heading mt-12 mb-6 scroll-mt-24">{text}</h2>)
+                    elements.push(<h2 id={id} key={i} className="text-md lg:text-xl font-medium text-brand-dark dark:text-dark-heading mt-12 mb-6 scroll-mt-24">{text}</h2>)
                 } else {
-                    elements.push(<h3 id={id} key={i} className="text-xl font-bold text-brand-dark dark:text-dark-heading mt-8 mb-4 scroll-mt-24">{text}</h3>)
+                    elements.push(<h3 id={id} key={i} className="text-md font-medium text-brand-dark dark:text-dark-heading mt-8 mb-4 scroll-mt-24">{text}</h3>)
                 }
             }
             // Lists

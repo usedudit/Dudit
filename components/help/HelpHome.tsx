@@ -9,12 +9,9 @@ import {
     UserIcon,
     ShoppingBagIcon,
     ServiceIcon,
-    BriefcaseIcon,
     MoneyIcon,
     MegaphoneIcon,
     StoreIcon,
-    FileTextIcon,
-    HelpCircleIcon,
     KeyIcon,
     InfoIcon,
     StarIcon,
@@ -113,15 +110,14 @@ export default function HelpHome() {
                 {/* MODULES GRID - DASHBOARD STYLE */}
                 <FormSection title="Explore os Módulos" description="Explore as funcionalidades detalhadas do sistema e da vitrine">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <ListItem icon={<ShoppingBagIcon />} title="Produtos e Estoque" onClick={() => window.location.href = "/ajuda/produtos-estoque/visao-geral-produtos-estoque"} />
-                        <ListItem icon={<StoreIcon />} title="Vitrine Online" onClick={() => window.location.href = "/ajuda/vitrine-online/visao-geral-vitrine-online"} />
-                        <ListItem icon={<ShoppingBagIcon />} title="Vendas" onClick={() => window.location.href = "/ajuda/vendas/visao-geral-vendas"} />
-                        <ListItem icon={<TruckIcon />} title="Entregas" onClick={() => window.location.href = "/ajuda/entregas/visao-geral-entregas"} />
-                        <ListItem icon={<ServiceIcon />} title="Serviços" onClick={() => window.location.href = "/ajuda/servicos/visao-geral-servicos"} />
-                        <ListItem icon={<UserIcon />} title="Clientes" onClick={() => window.location.href = "/ajuda/clientes/visao-geral-clientes"} />
-                        <ListItem icon={<MoneyIcon />} title="Financeiro" onClick={() => window.location.href = "/ajuda/financeiro/visao-geral-financeiro"} />
-                        <ListItem icon={<MegaphoneIcon />} title="Marketing" onClick={() => window.location.href = "/ajuda/marketing/visao-geral-cupons"} />
-                        <ListItem icon={<HelpCircleIcon />} title="Primeiros Passos" onClick={() => window.location.href = "/ajuda/login-registro/acessando-conta"} />
+                        <ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Produtos e Estoque" onClick={() => window.location.href = "/ajuda/produtos-estoque/visao-geral-produtos-estoque"} />
+                        <ListItem className="px-4 py-3" icon={<StoreIcon />} title="Vitrine Online" onClick={() => window.location.href = "/ajuda/vitrine-online/visao-geral-vitrine-online"} />
+                        <ListItem className="px-4 py-3" icon={<ShoppingBagIcon />} title="Vendas" onClick={() => window.location.href = "/ajuda/vendas/visao-geral-vendas"} />
+                        <ListItem className="px-4 py-3" icon={<TruckIcon />} title="Entregas" onClick={() => window.location.href = "/ajuda/entregas/visao-geral-entregas"} />
+                        <ListItem className="px-4 py-3" icon={<ServiceIcon />} title="Serviços" onClick={() => window.location.href = "/ajuda/servicos/visao-geral-servicos"} />
+                        <ListItem className="px-4 py-3" icon={<UserIcon />} title="Clientes" onClick={() => window.location.href = "/ajuda/clientes/visao-geral-clientes"} />
+                        <ListItem className="px-4 py-3" icon={<MoneyIcon />} title="Financeiro" onClick={() => window.location.href = "/ajuda/financeiro/visao-geral-financeiro"} />
+                        <ListItem className="px-4 py-3" icon={<MegaphoneIcon />} title="Marketing" onClick={() => window.location.href = "/ajuda/marketing/visao-geral-cupons"} />
                     </div>
                 </FormSection>
 
@@ -158,19 +154,19 @@ export default function HelpHome() {
                             <ListItem
                                 title="Anunciar grátis"
                                 left={<StarIcon className="text-brand-green" />}
-                                className="px-4 py-3 border-x-0"
+                                className="px-4 py-3 border-x-0 border-t-0 border-b-1 rounded-none"
                                 onClick={() => window.location.href = "/auth/login?mode=partner"}
                             />
                             <ListItem
                                 title="Falar com suporte"
                                 left={<InfoIcon className="text-brand-blue" />}
-                                className="px-4 py-3 border-x-0"
+                                className="px-4 py-3 border-x-0 border-t-0 border-b-1 rounded-none"
                                 onClick={() => setIsSupportOpen(true)}
                             />
                             <ListItem
                                 title="Recuperar minha senha"
                                 left={<KeyIcon className="text-brand-orange" />}
-                                className="px-4 py-3 border-x-0"
+                                className="px-4 py-3 border-x-0 border-t-1 border-b-0 rounded-none"
                                 onClick={() => window.location.href = "/auth/login?mode=forgot-password"}
                             />
                         </div>

@@ -135,7 +135,7 @@ export function MarketplaceLandingView({
                 HERO 1 — LOCALIZAÇÃO / CIDADE VAZIA
             ═══════════════════════════════════════════════════════════ */}
             <section className="w-full bg-gradient-to-b from-brand-dark to-[#0a4a3a] text-white">
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-12 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-8 md:py-12 flex flex-col md:flex-row items-center gap-10 md:gap-16">
 
                     {/* Texto + Busca */}
                     <div className="flex-grow text-center md:text-left max-w-[640px]">
@@ -357,35 +357,36 @@ export function MarketplaceLandingView({
             {/* ═══════════════════════════════════════════════════════════
                 HERO 5 — CONVIDE QUEM VENDE
             ═══════════════════════════════════════════════════════════ */}
-            <section className="w-full bg-brand-dark dark:bg-[#0a2e24]">
-                <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] py-14 md:py-20 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+            <section className="py-16 px-4 bg-white dark:bg-dark-background relative">
+                <div className="max-w-[1200px] mx-auto relative z-10">
+                    <div className="bg-brand-dark dark:bg-[#0a2e24] rounded-3xl p-10 md:p-14 flex flex-col md:flex-row items-center gap-10 md:gap-16 overflow-hidden">
+                        {/* Texto + Botão */}
+                        <div className="flex-1 text-center md:text-left">
+                            <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">
+                                Conhece quem vende?
+                            </h2>
+                            <p className="text-white/70 text-base md:text-lg leading-relaxed mb-6">
+                                Convide lojas e profissionais da sua cidade para a Dudit.
+                                Quanto mais vendedores, mais opções pra todo mundo.
+                            </p>
+                            <Button
+                                variant="default"
+                                onClick={handleInvite}
+                                className="py-3 px-8 text-sm"
+                            >
+                                <WhatsappIcon className="w-4 h-4 mr-2" />
+                                Convidar pelo WhatsApp
+                            </Button>
+                        </div>
 
-                    {/* Texto */}
-                    <div className="flex-1 text-center md:text-left max-w-[580px]">
-                        <h2 className="text-2xl md:text-[32px] font-black text-white mb-3 leading-tight">
-                            Conhece quem vende?
-                        </h2>
-                        <p className="text-white/70 text-base md:text-lg leading-relaxed mb-6">
-                            Convide lojas e profissionais da sua cidade para a Dudit.
-                            Quanto mais vendedores, mais opções pra todo mundo.
-                        </p>
-                        <Button
-                            variant="default"
-                            onClick={handleInvite}
-                            className="py-3 px-8 text-sm"
-                        >
-                            <WhatsappIcon className="w-4 h-4 mr-2" />
-                            Convidar pelo WhatsApp
-                        </Button>
-                    </div>
-
-                    {/* Imagem */}
-                    <div className="w-[180px] md:w-[240px] shrink-0 flex items-center justify-center">
-                        <img
-                            src="https://img.dudit.com.br/static/mascots/Carousel2.png"
-                            alt="Convide quem vende"
-                            className="w-full h-auto object-contain select-none"
-                        />
+                        {/* Dino */}
+                        <div className="w-[160px] md:w-[220px] shrink-0 flex items-center justify-center">
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/Carousel2.png"
+                                alt="Convide quem vende"
+                                className="w-full h-auto object-contain select-none"
+                            />
+                        </div>
                     </div>
                 </div>
             </section>

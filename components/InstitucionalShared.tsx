@@ -219,10 +219,10 @@ export const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) =
 
 export const CTA = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     return (
-        <section className="py-24 px-4 bg-white relative">
+        <section className="py-16 px-4 bg-white relative">
             <GridLines />
-            <div className="max-w-7xl mx-auto relative z-10">
-                <div className="bg-brand-dark rounded-3xl p-16 text-center overflow-hidden relative">
+            <div className="max-w-[1200px] mx-auto relative z-10">
+                <div className="bg-brand-dark rounded-3xl p-10 md:p-14 text-center overflow-hidden relative">
                     {/* Background decorative faint rings */}
                     <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white rounded-full"></div>

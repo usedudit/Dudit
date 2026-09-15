@@ -1722,18 +1722,18 @@ export function ServiceDetailsPageClient({
                 hideHeader={true}
             >
                 <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
                     <button
                         onClick={() => setShowPaymentModal(false)}
-                        className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                        className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-black/5 hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20 flex items-center justify-center text-brand-dark dark:text-dark-heading transition-colors hidden md:flex"
                         title="Fechar"
                     >
-                        <XIcon size={16} />
+                        <XIcon size={18} />
                     </button>
                     {/* Header with Dual Squares */}
-                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden"
-                        style={{ background: 'linear-gradient(180deg, #0d5e49 0%, var(--brand-dark) 100%)' }}>
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
                         <img
-                            src="https://img.dudit.com.br/static/icons/Pagamento.png"
+                            src="https://img.dudit.com.br/static/illustrations/Pagamento.png"
                             alt="Pagamento"
                             className="w-64 h-auto object-contain transform translate-y-7"
                         />
@@ -1745,7 +1745,7 @@ export function ServiceDetailsPageClient({
                             Na Dudit, a transparência é total. Nós não processamos pagamentos diretamente e não ficamos com nenhuma comissão sobre a sua compra.
                         </p>
                         <p>
-                            Isso significa que o seu dinheiro vai direto para o profissional, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!
+                            Isso significa que o seu dinheiro vai direto para o vendedor, seja através de facilitadores seguros (como o Mercado Pago) ou por meio do acerto que você fizer direto no balcão ou no WhatsApp. É mais lucro para quem vende e mais agilidade para quem compra!
                         </p>
                     </div>
                     <Button onClick={() => setShowPaymentModal(false)} className="w-full mt-8 h-12">Entendi</Button>
@@ -1759,42 +1759,31 @@ export function ServiceDetailsPageClient({
                 hideHeader={true}
             >
                 <div className="flex flex-col relative">
+                    {/* Close X Button - Desktop Only */}
                     <Button
                         variant="filled"
                         onClick={() => setShowResponsibilityModal(false)}
-                        className="absolute top-3 right-3 z-10 w-10 h-10"
+                        className="absolute top-3 right-3 z-10 w-10 h-10 hidden md:flex"
                         title="Fechar"
                     >
                         <XIcon size={18} />
                     </Button>
                     {/* Header with Dual Squares */}
-                    <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl p-10 flex items-center justify-center gap-8 mb-8 relative group">
-                        <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:-rotate-3 overflow-hidden">
-                            <UserProfileImage
-                                fullName={partner.store_name}
-                                imageUrl={partnerProfileImageUrl.includes("Placeholder.png") ? null : partnerProfileImageUrl}
-                                className="w-full h-full rounded-lg"
-                            />
-                        </div>
-
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="w-12 h-6 bg-white dark:bg-dark-surface rounded-full flex items-center justify-center border border-brand-border/50 dark:border-dark-border/50">
-                                <ArrowLeftRightIcon size={14} className="text-brand-dark dark:text-dark-heading" />
-                            </div>
-                        </div>
-
-                        <div className="w-20 h-20 bg-white dark:bg-dark-surface rounded-2xl p-4 flex items-center justify-center transform transition-transform group-hover:rotate-3">
-                            <TruckIcon size={32} className="text-brand-green" />
-                        </div>
+                    <div className="h-[200px] rounded-2xl flex items-end justify-center mb-8 relative overflow-hidden bg-[#eaf7f0]">
+                        <img
+                            src="https://img.dudit.com.br/static/illustrations/Responsabilidade.png"
+                            alt="Responsabilidade"
+                            className="w-64 h-auto object-contain transform translate-y-7"
+                        />
                     </div>
 
                     <h4 className="text-xl font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Quem cuida do seu pedido?</h4>
                     <div className="space-y-4 text-brand-inactive-text dark:text-dark-body text-[15px] text-center leading-relaxed">
                         <p>
-                            A Dudit é a ponte que conecta você ao profissional. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução do serviço é por conta do profissional.
+                            A Dudit é a ponte que conecta você ao vendedor. Nós cuidamos da vitrine, da organização e do registro do seu pedido, mas a execução da venda é por conta do vendedor.
                         </p>
                         <p>
-                            A responsabilidade por realizar o serviço, oferecer garantia e resolver eventuais problemas é exclusivamente do profissional. Se tiver qualquer dúvida sobre o agendamento, o melhor caminho é chamar o profissional no WhatsApp para alinhar tudo, beleza?
+                            A responsabilidade por separar o produto, realizar a entrega, oferecer garantia e resolver trocas ou devoluções é exclusivamente do vendedor. Se tiver qualquer dúvida sobre o seu item, o melhor caminho é chamar o vendedor no WhatsApp para alinhar tudo, beleza?
                         </p>
                     </div>
                     <Button onClick={() => setShowResponsibilityModal(false)} className="w-full mt-8 h-12">Entendi</Button>

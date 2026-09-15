@@ -158,37 +158,46 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                         {category && (
                             <span className="font-medium shrink-0">{category}</span>
                         )}
-                        {category && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
-                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
-                        )}
-                        {locationLabel && (
+                        {locationContext?.scope === "country" && locationLabel ? (
                             <>
+                                {category && <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />}
                                 <span className="shrink-0">{locationLabel}</span>
-                                {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                            </>
+                        ) : (
+                            <>
+                                {category && (locationLabel || deliveryTime || distanceLabel || deliveryFeeLabel) && (
                                     <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
                                 )}
-                            </>
-                        )}
-                        {deliveryTime && (
-                            <>
-                                <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
-                                {(distanceLabel || deliveryFeeLabel) && (
-                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                {locationLabel && (
+                                    <>
+                                        <span className="shrink-0">{locationLabel}</span>
+                                        {(deliveryTime || distanceLabel || deliveryFeeLabel) && (
+                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                        )}
+                                    </>
                                 )}
-                            </>
-                        )}
-                        {distanceLabel && (
-                            <>
-                                <span className="shrink-0">{distanceLabel}</span>
+                                {deliveryTime && (
+                                    <>
+                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
+                                        {(distanceLabel || deliveryFeeLabel) && (
+                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                        )}
+                                    </>
+                                )}
+                                {distanceLabel && (
+                                    <>
+                                        <span className="shrink-0">{distanceLabel}</span>
+                                        {deliveryFeeLabel && (
+                                            <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                        )}
+                                    </>
+                                )}
                                 {deliveryFeeLabel && (
-                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text/50 shrink-0" />
+                                    <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
+                                        {deliveryFeeLabel}
+                                    </span>
                                 )}
                             </>
-                        )}
-                        {deliveryFeeLabel && (
-                            <span className={`shrink-0 font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400 font-bold" : "text-brand-dark dark:text-dark-heading"}`}>
-                                {deliveryFeeLabel}
-                            </span>
                         )}
                     </div>
                 </div>
@@ -616,7 +625,11 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                 <p className="text-[11px] md:text-xs text-brand-dark font-semibold truncate leading-tight dark:text-dark-heading">
                                     {sellerName}
                                 </p>
-                                {itemType === "servico" ? (
+                                {locationContext?.scope === "country" && locationLabel ? (
+                                    <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{locationLabel}</span>
+                                    </div>
+                                ) : itemType === "servico" ? (
                                     serviceDuration ? (
                                         <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
                                             <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>

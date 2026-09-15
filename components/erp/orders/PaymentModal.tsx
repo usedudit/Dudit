@@ -28,7 +28,7 @@ import { cn, formatCurrency, formatDate, formatNumber, formatTime } from '@/lib/
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { getMercadoPagoStatusAction, checkMercadoPagoPaymentStatusAction, type MpAcceptedPaymentMethods } from '@/app/actions/mercadopago';
 import { getServiceCheckoutSettingsAction } from '@/app/actions/marketplace/service-checkout-settings';
-import { buildDepositCheckoutMeta } from '@/lib/services/marketplace-checkout-amounts';
+import { buildDepositCheckoutMeta } from '@/lib/services/marketplace-deposit-meta';
 import { fetchJSONWithCSRF } from '@/lib/utils/fetch-with-csrf';
 import { formatPaymentMethodLabel } from '@/lib/utils/payment-method-label';
 import { usePaymentMethods } from '@/hooks/use-payment-methods';

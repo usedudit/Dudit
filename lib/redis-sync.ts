@@ -1,4 +1,3 @@
-import "server-only"
 import { redis } from './redis'
 import { getAdminClient } from './supabase/admin'
 import { revalidateExploreSearch } from './utils/revalidation'

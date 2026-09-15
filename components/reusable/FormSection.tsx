@@ -25,7 +25,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
         )}
         <div className={`${hasSeparator ? "mt-8 mb-8" : ""} ${className}`.trim()}>
             {(title || headerRight) && (
-                <div className={`flex items-center justify-between ${description ? "mb-2" : "mb-6"}`}>
+                <div className="flex items-center justify-between mb-6">
                     <div className="min-w-0 flex-1">
                         {title && (
                             <div className="flex items-center gap-3">

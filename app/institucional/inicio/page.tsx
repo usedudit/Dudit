@@ -356,18 +356,18 @@ const ParaQuemVende = () => {
                         transition={{ duration: 0.5 }}
                         className="relative"
                     >
-                        <div className="bg-brand-green-light rounded-3xl p-6 md:p-10">
+                        <div className="bg-[#eaf7f0] rounded-3xl p-6 md:p-10">
                             <div className="rounded-2xl overflow-hidden shadow-lg">
                                 <img
-                                    src="https://img.dudit.com.br/static/institucional/vendedor.jpg"
-                                    alt="Vendedor usando a Dudit"
+                                    src="https://img.dudit.com.br/static/mascots/MaisUmaVitrine.png"
+                                    alt="Seu negócio também pode ser encontrado na Dudit"
                                     className="w-full h-auto object-cover aspect-[4/5]"
                                     onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         target.style.display = 'none';
                                         const parent = target.parentElement;
                                         if (parent) {
-                                            parent.innerHTML = '<div class="w-full aspect-[4/5] bg-brand-green/20 rounded-2xl flex items-center justify-center"><div class="text-center"><div class="w-16 h-16 bg-brand-green/30 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg></div><p class="text-brand-dark font-medium">Sua loja na Dudit</p></div></div>';
+                                            parent.innerHTML = '<div class="w-full aspect-[4/5] bg-[#eaf7f0] rounded-2xl flex items-center justify-center"></div>';
                                         }
                                     }}
                                 />
