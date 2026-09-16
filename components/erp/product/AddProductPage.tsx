@@ -956,7 +956,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                             )}
                                             {productData.show_in_marketplace && (
                                                 <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
-                                                    Marketplace
+                                                    Vitrine online
                                                     {getTabErrorCount("marketplace") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
                                                 </TabsTrigger>
                                             )}

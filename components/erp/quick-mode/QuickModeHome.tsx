@@ -596,29 +596,19 @@ function ModeCard({
     if (isDesapego) {
         return (
             <>
-                <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/50 flex items-center justify-center shrink-0">
-                        <RocketIcon size={20} className="text-brand-green" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-brand-green bg-brand-green-light/70 dark:bg-dark-border/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                                Evoluir negócio
-                            </span>
-                            <p className="text-sm text-brand-dark dark:text-dark-heading">
-                                Ative a Vitrine Online ou o Gerenciador Completo (ERP) para desbloquear pedidos, catálogo comercial e mais.
-                            </p>
-                        </div>
-                    </div>
-                    <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-brand-green hover:bg-brand-green/90 text-white border-none rounded-full px-4 text-xs font-bold shrink-0"
-                        onClick={() => setModalOpen(true)}
-                    >
-                        Evoluir
-                    </Button>
-                </div>
+                <ListItem
+                    title=" Evoluir negócio"
+                    description="Ative a Vitrine Online ou o Gerenciador Completo (ERP) para desbloquear pedidos, catálogo comercial e mais."
+                    icon={<RocketIcon className="text-brand-green w-5 h-5 shrink-0" />}
+                    className="px-4 py-3"
+                    right={
+                        <Button
+                            onClick={() => setModalOpen(true)}
+                        >
+                            Ativar plano
+                        </Button>
+                    }
+                />
 
                 <DefaultModal
                     isOpen={modalOpen}
@@ -920,23 +910,27 @@ export function QuickModeHome({ data, partnerId }: QuickModeHomeProps) {
                 <div className="flex flex-col gap-6">
                     {/* Modo Desapego: Cards Rápidos para Anunciar */}
                     {data.isDesapego ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ListItem
-                                icon={<Package className="text-brand-green w-5 h-5" />}
-                                title="Anunciar Produto ou Desapego"
-                                description="Cadastre um item para vender no marketplace e compartilhar com seus clientes."
-                                onClick={() => router.push("/erp/produtos?create=true")}
-                                showChevron
-                                className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
-                            />
-                            <ListItem
-                                icon={<WrenchIcon className="text-brand-green w-5 h-5" />}
-                                title="Anunciar Serviço ou Atendimento"
-                                description="Divulgue seus serviços, orçamentos e agendamentos no marketplace."
-                                onClick={() => router.push("/erp/servicos?create=true")}
-                                showChevron
-                                className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
-                            />
+                        <div className={`grid grid-cols-1 ${(!data.sellsProducts && !data.sellsServices) || (data.sellsProducts && data.sellsServices) ? "md:grid-cols-2" : "md:grid-cols-1"} gap-4`}>
+                            {(data.sellsProducts || (!data.sellsProducts && !data.sellsServices)) && (
+                                <ListItem
+                                    icon={<Package className="text-brand-green w-5 h-5" />}
+                                    title="Anunciar Produto ou Desapego"
+                                    description="Venda itens novos, usados, eletrônicos, roupas ou produtos da sua loja"
+                                    onClick={() => router.push("/erp/produtos?create=true")}
+                                    showChevron
+                                    className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
+                                />
+                            )}
+                            {(data.sellsServices || (!data.sellsProducts && !data.sellsServices)) && (
+                                <ListItem
+                                    icon={<WrenchIcon className="text-brand-green w-5 h-5" />}
+                                    title="Anunciar Serviço ou Atendimento"
+                                    description="Divulgue seus serviços, agendamentos, consultoria, manutenções ou procedimentos"
+                                    onClick={() => router.push("/erp/servicos?create=true")}
+                                    showChevron
+                                    className="p-5 gap-4 cursor-pointer border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl transition-all"
+                                />
+                            )}
                         </div>
                     ) : (
                         /* Onboarding - Full Width */

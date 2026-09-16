@@ -17,6 +17,8 @@ import {
 import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
+import { sendMarketplaceReport } from "@/lib/services/discord-marketplace-webhook.service"
+import { REPORT_REASON_LABELS } from "@/lib/admin/report-reasons"
 
 const reportSchema = z.object({
   returnRequestId: z.string().uuid(),
@@ -126,6 +128,19 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
         return errorResponse(DUDIT_REPORT_LEGAL_NOTICE)
       }
       throw rpcError
+    }
+
+    // Webhook Discord: notificar denúncia criada (fail-open, não bloqueia fluxo)
+    if (result?.created === true) {
+      sendMarketplaceReport({
+        returnRequestId: parsed.returnRequestId,
+        reasonCode: parsed.reasonCode,
+        reasonLabel: REPORT_REASON_LABELS[parsed.reasonCode as keyof typeof REPORT_REASON_LABELS] || parsed.reasonCode,
+        description: parsed.description,
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+      }).catch(err => console.warn("[REPORT_RETURN] Discord webhook failed (non-blocking):", err))
     }
 
     return successResponse({

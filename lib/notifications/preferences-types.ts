@@ -36,6 +36,7 @@ export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
       "appointment_created",
       "appointment_reminder",
       "appointment_rescheduled",
+      "service_return_reminder",
     ],
   },
   seller: {
@@ -98,4 +99,5 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   admin_announcement: "Comunicados",
   low_stock: "Estoque baixo",
   replenishment_suggested: "Sugestões de reposição",
+  service_return_reminder: "Lembrete de retorno",
 }

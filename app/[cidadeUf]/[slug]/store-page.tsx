@@ -61,6 +61,8 @@ export async function StorePage({ storeData }: { storeData: any }) {
         acceptOrdersWhenClosed: storeData.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
         timezone: storeData.timezone || "America/Sao_Paulo",
         delivery_settings: (Array.isArray(storeData.delivery_settings) ? storeData.delivery_settings[0] : storeData.delivery_settings) || null,
+        mp_user_id: partner?.mp_user_id || null,
+        mp_accepted_payment_methods: partner?.mp_accepted_payment_methods || null,
     }
 
     const storeStats = {

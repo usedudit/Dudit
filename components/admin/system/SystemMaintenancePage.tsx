@@ -11,10 +11,10 @@ import {
   TelegramIcon,
   InfoIcon,
   LockIcon,
-  CalendarIcon,
   ArrowRightIcon,
   XIcon,
 } from "@/lib/icons"
+import { format } from "date-fns"
 import {
   Button,
   Badge,
@@ -28,6 +28,8 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
+  DatePicker,
+  TimePicker,
 } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import {
@@ -35,12 +37,18 @@ import {
   updateGlobalAnnouncementAdminAction,
   sendMaintenanceBroadcastAdminAction,
 } from "@/app/actions/admin/system"
+import { toDateTimeInputValue } from "@/lib/date"
 import type {
   MaintenanceConfig,
   GlobalAnnouncementConfig,
   AnnouncementType,
   SystemSettingsState,
 } from "@/lib/system/types"
+
+const combineLocalToISO = (date: string, time: string) => {
+  if (!date) return null
+  return new Date(`${date}T${time || "00:00"}`).toISOString()
+}
 
 interface SystemMaintenancePageProps {
   initialState: SystemSettingsState
@@ -288,19 +296,36 @@ export function SystemMaintenancePage({ initialState }: SystemMaintenancePagePro
                   rows={3}
                 />
 
-                <Input
-                  label="Previsão Estimada de Retorno (opcional, gera contador)"
-                  name="estimated_end"
-                  type="datetime-local"
-                  value={maintenance.estimated_end ? maintenance.estimated_end.slice(0, 16) : ""}
-                  onChange={(e) =>
-                    setMaintenance({
-                      ...maintenance,
-                      estimated_end: e.target.value ? new Date(e.target.value).toISOString() : null,
-                    })
-                  }
-                  prefix={<CalendarIcon className="w-4 h-4" />}
-                />
+                {(() => {
+                    const localISO = maintenance.estimated_end
+                      ? toDateTimeInputValue(maintenance.estimated_end)
+                      : null
+                    const datePart = localISO ? localISO.slice(0, 10) : ""
+                    const timePart = localISO ? localISO.slice(11, 16) : ""
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <DatePicker
+                          label="Data de Retorno"
+                          value={datePart}
+                          onChange={(date: Date | undefined) => {
+                            const iso = combineLocalToISO(
+                              date ? format(date, "yyyy-MM-dd") : "",
+                              timePart || "12:00"
+                            )
+                            setMaintenance({ ...maintenance, estimated_end: iso })
+                          }}
+                        />
+                        <TimePicker
+                          label="Horário de Retorno"
+                          value={timePart}
+                          onChange={(time: string) => {
+                            const iso = combineLocalToISO(datePart, time || "00:00")
+                            setMaintenance({ ...maintenance, estimated_end: iso })
+                          }}
+                        />
+                      </div>
+                    )
+                  })()}
 
                 {/* Bypass Settings */}
                 <div className="p-4 bg-brand-gray dark:bg-dark-background border border-brand-border dark:border-dark-border rounded-xl space-y-3">

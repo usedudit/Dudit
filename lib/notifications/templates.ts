@@ -22,6 +22,7 @@ interface TemplateContext {
     isBatch?: boolean
     batchCount?: number
     orderNumbers?: string[]
+    returnInterval?: string
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -42,6 +43,7 @@ interface WhatsappMessageContext {
     cancellation_note?: string
     is_batch?: boolean | string
     batch_count?: number | string
+    return_interval?: string
 }
 
 function fmtDate(dateStr?: string): string {
@@ -177,6 +179,19 @@ export function buildWhatsappMessage(
                 `*Local:* ${store}`,
                 ``,
                 `Estamos te esperando! 😊`,
+            ].filter(Boolean).join("\n")
+
+        case "service_return_reminder":
+            return [
+                `🔄 *Hora de retornar!*`,
+                ``,
+                ``,
+                `Olá, ${customer}! Já faz um tempo que você fez o serviço "${service}"${store ? ` na ${store}` : ""}.`,
+                ``,
+                ``,
+                ctx.return_interval ? `*Intervalo recomendado:* ${ctx.return_interval}` : "",
+                ``,
+                `Que tal agendar seu próximo atendimento? É só responder esta mensagem! 😊`,
             ].filter(Boolean).join("\n")
 
         // ── Pedidos ──
@@ -635,6 +650,17 @@ export function buildNotificationContent(
             return {
                 title: "📅 Agendamento remarcado!",
                 message: `Tudo pronto! Seu agendamento de "${service}" em ${store}${when ? ` para ${when}` : ""} foi remarcado. Esperamos você! 😊`,
+            }
+        case "service_return_reminder":
+            if (audience === "seller") {
+                return {
+                    title: "🔄 Lembrete de retorno agendado",
+                    message: `O cliente ${customer} deve retornar para o serviço "${service}"${ctx.returnInterval ? ` (${ctx.returnInterval})` : ""}.`,
+                }
+            }
+            return {
+                title: "🔄 Hora de retornar!",
+                message: `Olá! Já faz um tempo que você fez o serviço "${service}"${store ? ` na ${store}` : ""}. Que tal agendar seu próximo atendimento? ${ctx.returnInterval ? `Intervalo recomendado: ${ctx.returnInterval}.` : ""}`,
             }
         case "subscription_created":
             if (audience === "seller") {

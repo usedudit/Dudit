@@ -546,7 +546,7 @@ export default function MarketplaceHome({
 
     if (hasNoLocation || hasNoProductsOrVitrines) {
         content = (
-            <div className="w-full flex-grow flex flex-col">
+            <div className="w-full flex-grow flex flex-col pb-28 lg:pb-12">
                 <MarketplaceLandingView
                     user={user}
                     userProfile={userProfile}
@@ -573,7 +573,7 @@ export default function MarketplaceHome({
         const otherSections = sections.filter(s => s !== productSection && s !== serviceSection && s !== vitrineSection)
 
         content = (
-            <div className="w-full bg-white flex-grow dark:bg-dark-surface">
+            <div className="w-full bg-white flex-grow dark:bg-dark-surface pb-28 lg:pb-12">
                 <HeroBanner />
 
                 <div className="mx-auto max-w-[1400px] px-4 xl:px-0 space-y-10">

@@ -218,7 +218,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const canAccessSalesSettings = canRbac("settings.settings_negocio") && !isDesapego
   const canAccessReceipts = canRbac("settings.settings_messages") && !isDesapego
   const canAccessBusinessData = canRbac("settings.settings_negocio") && !isDesapego
-  const canAccessResources = canRbac("settings.settings_resources") && !isDesapego
+  const canAccessResources = canRbac("settings.settings_resources")
   const hasAdditionalSettings = canAccessResources || canAccessIntegrations
   const teamPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
   const paymentsPlanBlocked = !hasMinimumPlan(planSlug, "crescer")
@@ -294,6 +294,16 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                               title="Minha Vitrine"
                               description={isDesapego ? "Personalize banner, logo, status da vitrine e endereço." : "Personalize o banner, logo e o status de exibição da sua vitrine online."}
                               onClick={() => navigateToSubpage("vitrine")}
+                              showChevron
+                              className="px-4 py-3 gap-4"
+                            />
+                          )}
+                          {isDesapego && canAccessResources && (
+                            <ListItem
+                              icon={CadastrosIcon}
+                              title="Gerenciar recursos"
+                              description="Ative ou desative anúncios de produtos e serviços."
+                              onClick={() => navigateToSubpage("resources")}
                               showChevron
                               className="px-4 py-3 gap-4"
                             />

@@ -255,6 +255,9 @@ export default async function VendorPage({
     isShowcaseActive: store.is_showcase_active ?? partner?.is_showcase_active ?? true,
     acceptOrdersWhenClosed: store.accept_orders_when_closed ?? partner?.accept_orders_when_closed ?? true,
     timezone: store.timezone || "America/Sao_Paulo",
+    delivery_settings: (Array.isArray(store.delivery_settings) ? store.delivery_settings[0] : store.delivery_settings) || null,
+    mp_user_id: partner?.mp_user_id || null,
+    mp_accepted_payment_methods: partner?.mp_accepted_payment_methods || null,
   }
 
   return (

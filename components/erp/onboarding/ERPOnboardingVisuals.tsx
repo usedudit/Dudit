@@ -42,17 +42,17 @@ export interface StepVisualData {
 const VISUALS_BY_MODE: Record<string, Record<number, StepVisualData>> = {
   desapego: {
     1: {
-      title: "Desapegue sem complicação",
+      title: "Anuncie seus produtos e serviços",
       subtitle: "A Dudit organiza seus itens para você anunciar com seu link próprio e negociar no WhatsApp.",
       image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
     },
     2: {
-      title: "Seu primeiro desapego",
-      subtitle: "Cadastre com nome e valor para começar a divulgar e combinar retiradas com segurança.",
+      title: "Seu primeiro cadastro",
+      subtitle: "Cadastre com nome e valor para começar a divulgar e combinar vendas com segurança.",
       image: "https://img.dudit.com.br/static/mascots/Servicos.png",
     },
     3: {
-      title: "Pronto para desapegar!",
+      title: "Pronto para divulgar!",
       subtitle: "Seu link exclusivo já pode ser compartilhado com interessados e grupos do WhatsApp.",
       image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
     },

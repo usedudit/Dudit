@@ -34,6 +34,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
+import { sendRefundProcessed, sendHighValueRefund, sendSlaExpired, sendRefundRequested, sendExchangeCreated } from "@/lib/services/discord-general-webhook.service"
 
 // ─── Segurança: Constantes de Reembolso ────────────────────────────────────
 
@@ -630,6 +631,25 @@ export async function createReturnRequestAction(input: unknown) {
             metadata: { orderId: data.orderId, resolution: data.resolution, exchangeItems: data.exchangeItems?.length || 0 },
             source: "manual",
         })
+
+        // Webhook Discord: notificar nova solicitação de reembolso/troca (fail-open)
+        if (data.resolution === "refund" || data.resolution === "exchange") {
+            const orderNumber = (order as any)?.order_number || data.orderId.slice(0, 8).toUpperCase()
+            sendRefundRequested({
+                returnRequestId: requestId,
+                orderNumber,
+                customerId: data.customerId || user.id,
+                partnerId: data.partnerId,
+                resolution: data.resolution as "refund" | "exchange",
+                reason: data.reason,
+                refundValue: data.items.reduce((sum, item) => sum + (item.quantity * (Number(item.metadata?.price) || 0)), 0),
+                items: data.items.map(item => ({
+                    name: item.sku || item.order_item_id,
+                    quantity: item.quantity,
+                    price: Number(item.metadata?.price || 0),
+                })),
+            }).catch(err => console.warn("[RETURN] Discord webhook failed (non-blocking):", err))
+        }
 
         await revalidateReturns(data.partnerId, data.orderId, requestId)
         return successResponse({ id: requestId })
@@ -1380,6 +1400,23 @@ export async function processReturnRequestAction(input: unknown) {
             }
         }
 
+        // Webhook Discord: notificar troca criada (fail-open)
+        if (isExchange && data.nextStatus === "APPROVED") {
+            sendExchangeCreated({
+                returnRequestId: data.requestId,
+                exchangeOrderId: result?.exchange_order_id || data.requestId,
+                orderNumber: (request as any).orders?.order_number,
+                partnerId: data.partnerId,
+                customerEmail: request.customer_email_snapshot,
+                items: data.exchangeItems.map(item => ({
+                    name: (item as any).product_name || item.product_id,
+                    quantity: item.quantity,
+                })),
+                shortfallAmount: toNumber(result?.exchange_shortfall_amount),
+                surplusAmount: toNumber(result?.exchange_surplus_amount),
+            }).catch(err => console.warn("[EXCHANGE] Discord webhook failed (non-blocking):", err))
+        }
+
         return successResponse(result)
     } catch (e: any) {
         return errorResponse(e?.message || "Erro ao processar devolução")
@@ -1584,6 +1621,30 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
             revalidateEntityTimeline("order", order.id),
         ])
 
+        // Webhook Discord: notificar reembolso processado (fail-open)
+        sendRefundProcessed({
+            returnRequestId: data.requestId,
+            orderNumber: order.order_number,
+            partnerId: data.partnerId,
+            resolution: "refund",
+            refundAmount: cappedAmount,
+            refundStatus: "APPROVED",
+            processedBy: user.email || user.id,
+        }).catch(err => console.warn("[REFUND] Discord webhook failed (non-blocking):", err))
+
+        // Webhook Discord: alertar reembolso de alto valor (fail-open)
+        if (cappedAmount >= REFUND_PASSWORD_THRESHOLD) {
+            sendHighValueRefund({
+                returnRequestId: data.requestId,
+                orderNumber: order.order_number,
+                refundAmount: cappedAmount,
+                threshold: cappedAmount >= REFUND_CRITICAL_THRESHOLD ? 2000 : 300,
+                partnerId: data.partnerId,
+                customerEmail: order.customer_name || undefined,
+                requiresPassword: cappedAmount > REFUND_PASSWORD_THRESHOLD,
+            }).catch(err => console.warn("[REFUND] Discord high-value webhook failed (non-blocking):", err))
+        }
+
         return successResponse({
             refundId: data.refundId,
             mpRefundId: mpResult.mpRefundId,
@@ -1641,6 +1702,29 @@ export async function executeMercadoPagoRefundAction(input: unknown) {
 }
 
 export async function escalateReturnRequestAction(partnerId: string, requestId: string, reason?: string) {
+    // Webhook Discord: notificar SLA vencido/escalado (fail-open)
+    const supabase = createAdminClient()
+    const { data: request } = await supabase
+        .from("return_requests")
+        .select("id, partner_id, customer_id, customer_email_snapshot, sla_due_at, order_id, orders!order_id(order_number)")
+        .eq("id", requestId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+
+    if (request) {
+        const slaDueAt = request.sla_due_at ? new Date(request.sla_due_at) : null
+        const daysOverdue = slaDueAt ? Math.ceil((Date.now() - slaDueAt.getTime()) / (1000 * 60 * 60 * 24)) : 0
+
+        sendSlaExpired({
+            returnRequestId: requestId,
+            orderNumber: (request.orders as any)?.order_number,
+            partnerId,
+            customerEmail: request.customer_email_snapshot,
+            daysOverdue: Math.max(daysOverdue, 1),
+            slaDueAt: request.sla_due_at,
+        }).catch(err => console.warn("[SLA] Discord webhook failed (non-blocking):", err))
+    }
+
     return processReturnRequestAction({
         partnerId,
         requestId,

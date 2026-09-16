@@ -16,6 +16,7 @@ export const NOTIFICATION_TYPES = [
   "admin_announcement",
   "low_stock",
   "replenishment_suggested",
+  "service_return_reminder",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]

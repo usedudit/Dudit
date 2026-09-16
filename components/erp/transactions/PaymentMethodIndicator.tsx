@@ -149,6 +149,9 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify = false }: { par
     } else if (normalized.includes("pix")) {
         icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-teal-700 dark:text-teal-400"
+    } else if (normalized.includes("boleto")) {
+        icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-3.5 h-3.5 object-contain" />)
+        colorClass = "text-brand-dark dark:text-dark-heading"
     } else if (normalized.includes("dinheiro") || normalized.includes("money") || normalized.includes("espécie") || normalized.includes("espece") || normalized.includes("cash") || normalized.includes("carteira")) {
         icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-brand-dark dark:text-dark-heading"
@@ -169,15 +172,18 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify = false }: { par
         return false
     })
     if (!hasMpIcon && provider?.toLowerCase().includes("mercado pago")) {
-        icons.unshift(
-            <img
-                key="provider-mp"
-                src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                alt="Mercado Pago"
-                className="w-3.5 h-3.5 object-contain"
-            />
-        )
-        colorClass = "text-brand-dark dark:text-dark-heading"
+        const hasSpecificMethodIcon = normalized.includes("pix") || normalized.includes("boleto") || normalized.includes("cartão") || normalized.includes("cartao") || normalized.includes("credit") || normalized.includes("debit") || normalized.includes("card") || normalized.includes("dinheiro") || normalized.includes("money") || normalized.includes("cash") || normalized.includes("vale-compra") || normalized.includes("voucher")
+        if (!hasSpecificMethodIcon) {
+            icons.unshift(
+                <img
+                    key="provider-mp"
+                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                    alt="Mercado Pago"
+                    className="w-3.5 h-3.5 object-contain"
+                />
+            )
+            colorClass = "text-brand-dark dark:text-dark-heading"
+        }
     }
 
     return (

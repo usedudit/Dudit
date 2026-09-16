@@ -619,7 +619,7 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                                 Profissionais
                                             </TabsTrigger>
                                             <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
-                                                Marketplace
+                                                Vitrine online
                                             </TabsTrigger>
                                             {serviceData.show_in_marketplace && internalMode === "details" && (
                                                 <TabsTrigger value="metrics" disabled={isLoadingDetails}>

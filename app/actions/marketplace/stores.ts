@@ -27,7 +27,7 @@ export const getCachedStoreBySlug = async (slug: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
                     `)
                     .eq("slug", slug)
                     .eq("is_active", true)
@@ -50,7 +50,7 @@ export async function getStoreBySlug(slug: string) {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!inner(id, is_showcase_active, business_info, created_at, payment_methods(*))
+                        partners!inner(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
         `)
         .eq("slug", slug)
         .eq("is_active", true)
@@ -72,7 +72,7 @@ export const getCachedStoreById = async (storeId: string) => {
                         *,
                         addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                         delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                        partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
+                        partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
                     `)
 
                 if (isIdentifierUuid) {
@@ -91,7 +91,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
                             `)
                             .eq("partner_id", storeId)
                             .maybeSingle()
@@ -103,7 +103,7 @@ export const getCachedStoreById = async (storeId: string) => {
                                 *,
                                 addresses!store_id!left(id, zip_code, street, number, complement, neighborhood, city, state, is_default, latitude, longitude),
                                 delivery_settings!store_id!left(base_fee, included_km, extra_km_price, max_delivery_km, is_delivery_enabled, is_pickup_enabled, free_delivery_threshold, delivery_payer),
-                                partners!left(id, is_showcase_active, business_info, created_at, payment_methods(*))
+                                partners!left(id, is_showcase_active, business_info, created_at, mp_user_id, mp_accepted_payment_methods, payment_methods(*))
                             `)
                             .eq("slug", storeId)
                             .maybeSingle()

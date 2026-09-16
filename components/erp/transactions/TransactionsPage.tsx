@@ -138,11 +138,15 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
+const BoletoIcon = ({ className }: { className?: string }) => (
+    <img src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className={className} />
+)
+
 const getPaymentIcon = (paymentType: string) => {
     const normalized = paymentType.toLowerCase()
 
     if (normalized.includes("credit")) return CreditCardIcon
-    if (normalized.includes("boleto")) return FileIcon
+    if (normalized.includes("boleto")) return BoletoIcon
     return MoneyIcon
 }
 

@@ -158,35 +158,33 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 {/* ESQUERDA (Principal) */}
                 <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                     {/* Imagens do Serviço no Topo */}
-                    {!isDesapego && (
-                        <div className="mb-8">
-                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                                {images && images.length > 0 ? (
-                                    images.map((img, index) => (
-                                        <div
-                                            key={index}
-                                            className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
-                                        >
-                                            <img
-                                                src={getImageSrc(img)}
-                                                alt={`${serviceData.name || "Serviço"} ${index + 1}`}
-                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                            />
-                                            {index === 0 && (
-                                                <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
-                                                    Principal
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
-                                        Sem imagens
+                    <div className="mb-8">
+                        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                            {images && images.length > 0 ? (
+                                images.map((img, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                    >
+                                        <img
+                                            src={getImageSrc(img)}
+                                            alt={`${serviceData.name || "Serviço"} ${index + 1}`}
+                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                        />
+                                        {index === 0 && (
+                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                                                Principal
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                ))
+                            ) : (
+                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                    Sem imagens
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
 
                     {/* Informações Básicas */}
                     <FormSection title="Informações Básicas" className="mb-8">
@@ -390,11 +388,9 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             {/* ESQUERDA (Principal) */}
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações básicas" className="mb-8">
-                    {!isDesapego && (
-                        <div className="mb-10">
-                            <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
-                        </div>
-                    )}
+                    <div className="mb-10">
+                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={'approved'} />
+                    </div>
 
                     <div className="space-y-6">
                         <div className="grid grid-cols-12 gap-6">

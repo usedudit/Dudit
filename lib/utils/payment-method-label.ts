@@ -1,6 +1,11 @@
 /**
  * Rótulo único para meio de pagamento (evita "Dinheiro" vs "dinheiro", "PIX (pix)", etc.).
  */
+
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+}
+
 export function formatPaymentMethodLabel(
   name: string | null | undefined,
   paymentType: string | null | undefined,
@@ -68,6 +73,7 @@ export function formatPaymentMethodLabel(
       "cartão de débito", "cartao de debito", "debito", "débito", "debit card", "debit",
       "transferência", "transferencia", "transferência bancária", "transferencia bancaria", "bank transfer",
       "cartão", "cartao", "card",
+      "boleto", "boleto bancário", "boleto bancario",
       "outros", "outro", "other"
     ]
 
@@ -97,9 +103,12 @@ export function formatPaymentMethodLabel(
 
   const nameLower = finalName.toLowerCase()
   const typeLower = finalType.toLowerCase()
+  const nameNorm = stripAccents(nameLower)
+  const typeNorm = stripAccents(typeLower)
 
   const isSameConcept = 
     nameLower === typeLower ||
+    nameNorm === typeNorm ||
     (typeLower === "dinheiro" && (nameLower === "cash" || nameLower === "money" || nameLower === "dinheiro" || nameLower === "espécie" || nameLower === "espece" || nameLower === "carteira")) ||
     (typeLower === "pix" && nameLower === "pix") ||
     (typeLower === "cartão de crédito" && (nameLower === "cartão de crédito" || nameLower === "cartao de credito" || nameLower === "cartão de credito" || nameLower === "cartao de crédito" || nameLower === "credito" || nameLower === "crédito" || nameLower === "credit" || nameLower === "credit_card" || nameLower === "creditcard" || nameLower === "cartão" || nameLower === "cartao" || nameLower === "card")) ||

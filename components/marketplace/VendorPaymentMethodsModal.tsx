@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { DefaultModal, ListItem } from "@/components/reusable"
+import { DefaultModal, ListItem, FormSection } from "@/components/reusable"
 import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
 import { formatCurrency } from "@/lib/utils"
 import { previewMarketplacePaymentAction } from "@/app/actions/marketplace/payment-preview"
@@ -13,6 +13,15 @@ interface VendorPaymentMethodsModalProps {
     paymentMethods: any[]
     price: number
     mpConnected?: boolean
+    deliveryEnabled?: boolean
+    pickupEnabled?: boolean
+    mpAcceptedPaymentMethods?: {
+        credit_card: boolean
+        debit_card: boolean
+        pix: boolean
+        boleto: boolean
+        mercado_pago_wallet: boolean
+    }
 }
 
 const AVAILABLE_BRANDS = [
@@ -59,6 +68,9 @@ export function VendorPaymentMethodsModal({
     paymentMethods = [],
     price,
     mpConnected = false,
+    deliveryEnabled = true,
+    pickupEnabled = true,
+    mpAcceptedPaymentMethods,
 }: VendorPaymentMethodsModalProps) {
     const paymentMethodsArr = (paymentMethods || []).filter(isPaymentActive)
     const pixMethods = paymentMethodsArr.filter((pm: any) => toCanonicalPaymentType(pm.type || pm.payment_type) === "pix")
@@ -72,6 +84,18 @@ export function VendorPaymentMethodsModal({
 
     const hasSimplePayments = pixMethods.length > 0 || cashMethods.length > 0 || transferMethods.length > 0
     const hasPaymentSections = hasSimplePayments || creditMethods.length > 0 || debitMethods.length > 0
+
+    const hasDeliveryAndPickup = deliveryEnabled && pickupEnabled
+    const deliveryPaymentLabel = hasDeliveryAndPickup ? "Pagamento na Entrega/Retirada" : deliveryEnabled ? "Pagamento na Entrega" : pickupEnabled ? "Pagamento na Retirada" : null
+
+    const mp = mpAcceptedPaymentMethods
+    const mpMethods = mp ? [
+        mp.pix && { label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" },
+        mp.boleto && { label: "Boleto" },
+        mp.credit_card && { label: "Cartão de Crédito" },
+        mp.debit_card && { label: "Cartão de Débito" },
+        mp.mercado_pago_wallet && { label: "Saldo MP" },
+    ].filter(Boolean) as Array<{ label: string; icon?: string }> : []
 
     const ccMethod = creditMethods[0]
     const maxCcInstallments = ccMethod ? Math.max(1, Number(ccMethod.max_installments || 1)) : 1
@@ -119,129 +143,140 @@ export function VendorPaymentMethodsModal({
         >
             <div className="py-2 space-y-6">
                 {mpConnected && (
-                    <div>
-                        <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">Mercado Pago</h4>
-                        <ListItem
-                            className="!border-none !bg-transparent p-0 cursor-default"
-                            icon={
-                                <img
-                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                    alt="Mercado Pago"
-                                    className="w-6 h-6 object-contain shrink-0"
-                                />
-                            }
-                            title="Mercado Pago"
-                            description="Pague com cartão, Pix ou saldo MP."
-                        />
-                    </div>
+                    <FormSection title="Pagamento online">
+                        <div className="space-y-3">
+                            <ListItem
+                                className="!border-none !bg-transparent p-0 cursor-default"
+                                icon={
+                                    <img
+                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                        alt="Mercado Pago"
+                                        className="w-6 h-6 object-contain shrink-0"
+                                    />
+                                }
+                                title="Mercado Pago"
+                                description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
+                            />
+                        </div>
+                    </FormSection>
                 )}
 
                 {hasPaymentSections ? (
-                    <div className="space-y-6">
-                        {hasSimplePayments && (
-                            <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
-                                <div className="flex flex-wrap gap-2.5">
-                                    {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
-                                    {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
-                                    {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
+                    <FormSection title="Pagamento na loja">
+                        <div className="space-y-5">
+                            {hasSimplePayments && (
+                                <div>
+                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
+                                        {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
+                                        {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {debitMethods.length > 0 && (
-                            <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
-                                {debitBrands.length > 0 ? (
-                                    <CardBrands brands={debitBrands} />
-                                ) : (
-                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
-                                )}
-                            </div>
-                        )}
+                            {debitMethods.length > 0 && (
+                                <div>
+                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
+                                    {debitBrands.length > 0 ? (
+                                        <CardBrands brands={debitBrands} />
+                                    ) : (
+                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
+                                    )}
+                                </div>
+                            )}
 
-                        {creditMethods.length > 0 && (
-                            <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
-                                {creditBrands.length > 0 ? (
-                                    <CardBrands brands={creditBrands} />
-                                ) : (
-                                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
-                                )}
+                            {creditMethods.length > 0 && (
+                                <div>
+                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
+                                    {creditBrands.length > 0 ? (
+                                        <CardBrands brands={creditBrands} />
+                                    ) : (
+                                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>
+                                    )}
 
-                                {maxCcInstallments > 1 && price > 0 && (
-                                    <div className="mt-4">
-                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
+                                    {maxCcInstallments > 1 && price > 0 && (
+                                        <div className="mt-4">
+                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
 
-                                        {isLoadingInstallments ? (
-                                            <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text dark:text-dark-body select-none">
-                                                Carregando opções de parcelamento...
-                                            </div>
-                                        ) : installmentOptions.length > 0 ? (
-                                            <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
-                                                {installmentOptions.map((opt, idx) => {
-                                                    const isEven = idx % 2 === 0
-                                                    return (
-                                                        <div
-                                                            key={opt.installments}
-                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading transition-colors ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
-                                                                }`}
-                                                        >
-                                                            <div className="flex flex-col min-w-0">
-                                                                <span className="font-bold text-[13px] sm:text-sm">
-                                                                    {opt.installments}x de {formatCurrency(opt.installmentValue)}
+                                            {isLoadingInstallments ? (
+                                                <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text dark:text-dark-body select-none">
+                                                    Carregando opções de parcelamento...
+                                                </div>
+                                            ) : installmentOptions.length > 0 ? (
+                                                <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                                                    {installmentOptions.map((opt, idx) => {
+                                                        const isEven = idx % 2 === 0
+                                                        return (
+                                                            <div
+                                                                key={opt.installments}
+                                                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading transition-colors ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
+                                                                    }`}
+                                                            >
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="font-bold text-[13px] sm:text-sm">
+                                                                        {opt.installments}x de {formatCurrency(opt.installmentValue)}
+                                                                    </span>
+                                                                    {!opt.hasInterest && (
+                                                                        <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                                            Sem Juros
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(opt.finalAmount)}
                                                                 </span>
-                                                                {!opt.hasInterest && (
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
+                                                    {Array.from({ length: maxCcInstallments }, (_, idx) => {
+                                                        const count = idx + 1
+                                                        const val = price / count
+                                                        const isEven = idx % 2 === 0
+                                                        return (
+                                                            <div
+                                                                key={count}
+                                                                className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
+                                                                    }`}
+                                                            >
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className="font-bold text-[13px] sm:text-sm">
+                                                                        {count}x de {formatCurrency(val)}
+                                                                    </span>
                                                                     <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
                                                                         Sem Juros
                                                                     </span>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(opt.finalAmount)}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div className="mt-2 border border-brand-border rounded-xl overflow-hidden divide-y divide-brand-border select-none">
-                                                {Array.from({ length: maxCcInstallments }, (_, idx) => {
-                                                    const count = idx + 1
-                                                    const val = price / count
-                                                    const isEven = idx % 2 === 0
-                                                    return (
-                                                        <div
-                                                            key={count}
-                                                            className={`flex justify-between items-center py-2.5 px-4 text-brand-dark dark:text-dark-heading ${isEven ? "bg-brand-gray/30 dark:bg-dark-border/30" : "bg-white dark:bg-dark-surface"
-                                                                }`}
-                                                        >
-                                                            <div className="flex flex-col min-w-0">
-                                                                <span className="font-bold text-[13px] sm:text-sm">
-                                                                    {count}x de {formatCurrency(val)}
-                                                                </span>
-                                                                <span className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                                    Sem Juros
+                                                                </div>
+                                                                <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(price)}
                                                                 </span>
                                                             </div>
-                                                            <span className="text-[13px] sm:text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(price)}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ) : !mpConnected ? (
+                                                        )
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </FormSection>
+                ) : !mpConnected && !deliveryPaymentLabel ? (
                     <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
                         Nenhum meio de pagamento cadastrado por este vendedor.
                     </div>
                 ) : null}
+
+                {deliveryPaymentLabel && (
+                    <FormSection title={deliveryPaymentLabel}>
+                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">
+                            O pagamento será realizado {hasDeliveryAndPickup ? "na entrega ou na retirada" : deliveryEnabled ? "na entrega" : "na retirada"} conforme combinado com o vendedor.
+                        </p>
+                    </FormSection>
+                )}
             </div>
         </DefaultModal>
     )

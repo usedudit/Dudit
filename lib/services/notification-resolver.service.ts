@@ -42,6 +42,7 @@ const NOTIFICATION_TYPE_TO_WHATSAPP_TRIGGER: Partial<Record<NotificationType, Wh
   order_shipped: "order_shipped",
   order_delivered: "order_delivered",
   order_cancelled: "order_cancelled",
+  service_return_reminder: "service_return_reminder",
 }
 
 async function resolvePhone(partnerId?: string | null, customerId?: string | null, fallbackPhone?: string | null): Promise<string | null> {

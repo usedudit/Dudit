@@ -41,7 +41,7 @@ async function _getMarketplaceProductBase(id: string, storeId?: string | null) {
       marketplace_category_id, marketplace_category:marketplace_product_categories!marketplace_category_id(name, parent:marketplace_product_categories!parent_id(name)),
       product_logistics(weight_gross, length, width, height, preparation_days),
       partners(
-        id, user_id, created_at, mp_user_id, mp_public_key, is_showcase_active,
+        id, user_id, created_at, mp_user_id, mp_public_key, mp_accepted_payment_methods, is_showcase_active,
         addresses(city, state),
         payment_methods(*)
       ),
@@ -270,6 +270,23 @@ async function _getProductReviews(productId: string, storeId?: string | null) {
 export const getMarketplaceProduct = cache(_getMarketplaceProduct)
 export const getProductVariants = cache(_getProductVariants)
 export const getProductReviews = cache(_getProductReviews) as unknown as typeof _getProductReviews
+
+// --- SOLD COUNT ---
+async function _getProductSoldCount(productId: string): Promise<number> {
+  const supabase = getAdminClient()
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("quantity, orders!inner(situation)")
+    .eq("product_id", productId)
+
+  if (error || !data) return 0
+
+  return data
+    .filter((item: any) => item.orders?.situation === "paid")
+    .reduce((sum: number, item: any) => sum + (item.quantity || 0), 0)
+}
+
+export const getProductSoldCount = cache(_getProductSoldCount)
 
 // =============================================
 // CACHED FUNCTIONS (kept for home/explore pages)

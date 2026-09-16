@@ -1615,7 +1615,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     <img
                                                         src="https://img.dudit.com.br/static/Map.png"
                                                         alt="Endereço de entrega"
-                                                        className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                                        className="w-10 h-10 object-cover rounded-full shrink-0"
                                                     />
                                                     <div className="flex flex-col justify-center">
                                                         <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
@@ -1632,7 +1632,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     <img
                                                         src="https://img.dudit.com.br/static/Map.png"
                                                         alt="Retirada no estabelecimento"
-                                                        className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                                        className="w-10 h-10 object-cover rounded-full shrink-0"
                                                     />
                                                     <div className="flex flex-col justify-center">
                                                         <p className="text-md font-bold text-brand-dark dark:text-dark-heading">Retirada no estabelecimento</p>
@@ -1671,7 +1671,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 <img
                                                                     src="https://img.dudit.com.br/static/Map.png"
                                                                     alt={addressTitle}
-                                                                    className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                                                    className="w-10 h-10 object-cover rounded-full shrink-0"
                                                                 />
                                                                 <div className="flex flex-col justify-center min-w-0">
                                                                     <p className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading truncate">

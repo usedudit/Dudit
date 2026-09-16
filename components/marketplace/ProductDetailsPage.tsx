@@ -54,6 +54,7 @@ interface ProductDetailsPageClientProps {
     cartCount?: number
     hideHeaderAndFooter?: boolean
     sponsoredAd?: SponsoredAd | null
+    soldCount?: number
 }
 
 const PLACEHOLDER = "https://img.dudit.com.br/static/Placeholder.png"
@@ -155,6 +156,7 @@ export function ProductDetailsPageClient({
     cartCount,
     hideHeaderAndFooter = false,
     sponsoredAd = null,
+    soldCount = 0,
 }: ProductDetailsPageClientProps) {
     const router = useRouter()
     const showPrice = product.show_price_in_store !== false
@@ -239,6 +241,7 @@ export function ProductDetailsPageClient({
             banner_url: store?.banner_url || p?.banner_url || null,
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
+            mp_accepted_payment_methods: p?.mp_accepted_payment_methods || null,
             address: {
                 street: address?.street, number: address?.number,
                 neighborhood: address?.neighborhood, city: address?.city,
@@ -1231,12 +1234,10 @@ export function ProductDetailsPageClient({
         <div className="bg-white dark:bg-dark-surface relative">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
-                    {product.condition === "used" ? (
-                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Usado</span>
-                    ) : product.condition === "refurbished" ? (
-                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Recondicionado</span>
-                    ) : (
-                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">Novo</span>
+                    {soldCount > 0 && (
+                        <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
+                            {soldCount} {soldCount === 1 ? "vendido" : "vendidos"}
+                        </span>
                     )}
                     <span className="text-brand-inactive-text dark:text-dark-body text-xs">|</span>
                     <span className="text-[13px] font-semibold text-brand-inactive-text dark:text-dark-body">
@@ -1270,7 +1271,7 @@ export function ProductDetailsPageClient({
             <div className="mb-6">
                 {!showPrice ? (
                     <div className="space-y-1">
-                        <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                        <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                             Preço sob consulta
                         </p>
                     </div>
@@ -1361,7 +1362,7 @@ export function ProductDetailsPageClient({
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {formatMoney(displayPrice)}
                                     </p>
                                 </div>
@@ -1378,7 +1379,7 @@ export function ProductDetailsPageClient({
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatMoney(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {formatMoney(pixUnitPrice)}
                                     </p>
                                     <span className="text-sm text-brand-green font-medium mt-auto">{pricing.pixDiscountPercent}% no Pix</span>
@@ -1396,7 +1397,7 @@ export function ProductDetailsPageClient({
                     // Caso: Sem desconto algum
                     return (
                         <div className="space-y-1">
-                            <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                            <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                 {formatMoney(displayPrice)}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
@@ -1665,7 +1666,7 @@ export function ProductDetailsPageClient({
                                         <img
                                             src="https://img.dudit.com.br/static/Map.png"
                                             alt="Endereço de entrega"
-                                            className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                            className="w-10 h-10 object-cover rounded-full shrink-0"
                                         />
                                         <div className="flex flex-col justify-center">
                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Endereço de Entrega</p>
@@ -2078,6 +2079,9 @@ export function ProductDetailsPageClient({
                 paymentMethods={partner.paymentMethods}
                 price={pricing.current}
                 mpConnected={!!partner.mp_user_id}
+                deliveryEnabled={deliveryConfig?.settings?.isDeliveryEnabled !== false}
+                pickupEnabled={deliveryConfig?.settings?.isPickupEnabled !== false}
+                mpAcceptedPaymentMethods={partner.mp_accepted_payment_methods}
             />
 
             <StorePoliciesModal
@@ -2385,7 +2389,7 @@ export function ProductDetailsPageClient({
                     document.body
                 )}
 
-                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12 pt-4 lg:pt-[50px]">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-28 lg:pb-12 pt-4 lg:pt-[50px]">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (
@@ -2522,7 +2526,7 @@ export function ProductDetailsPageClient({
                             <div className="lg:hidden mb-6">{BuyPanel}</div>
 
                             {/* Description */}
-                            <FormSection title="Descrição">
+                            <FormSection title="Descrição" className="mb-8">
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
                                     {product.description ? (
                                         <div
@@ -2635,7 +2639,7 @@ export function ProductDetailsPageClient({
 
                                 return (
                                     <div className="mb-10">
-                                        <FormSection title="Detalhes" hasSeparator className="mb-8">
+                                        <FormSection title="Detalhes" hasSeparator>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 pt-2">
                                                 {detailsList.map((detail) => (
                                                     <ListItem

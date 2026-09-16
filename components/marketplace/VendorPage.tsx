@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, HeartIcon, WhatsappIcon, FlagIcon, Check, ImageIcon, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -379,6 +379,22 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
     const hasSimplePayments = pixMethods.length > 0 || cashMethods.length > 0 || transferMethods.length > 0
     const hasPaymentSections = hasSimplePayments || creditMethods.length > 0 || debitMethods.length > 0
 
+    const mpConnected = !!partner.mp_user_id
+    const mpAccepted = partner.mp_accepted_payment_methods
+    const mpMethods = mpAccepted ? [
+        mpAccepted.pix && { label: "Pix", icon: "https://img.dudit.com.br/static/icons/payments/Pix.png" },
+        mpAccepted.boleto && { label: "Boleto" },
+        mpAccepted.credit_card && { label: "Cartão de Crédito" },
+        mpAccepted.debit_card && { label: "Cartão de Débito" },
+        mpAccepted.mercado_pago_wallet && { label: "Saldo MP" },
+    ].filter(Boolean) as Array<{ label: string; icon?: string }> : []
+
+    const deliverySettings = partner.delivery_settings
+    const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false
+    const isPickupEnabled = deliverySettings?.is_pickup_enabled !== false
+    const hasDeliveryAndPickup = isDeliveryEnabled && isPickupEnabled
+    const deliveryPaymentLabel = hasDeliveryAndPickup ? "Pagamento na Entrega/Retirada" : isDeliveryEnabled ? "Pagamento na Entrega" : isPickupEnabled ? "Pagamento na Retirada" : null
+
     return (
         <div className="pb-10 space-y-8 animate-fade-in">
             {partner.storeDescription && (
@@ -391,33 +407,60 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
                 </>
             )}
 
+            {mpConnected && (
+                <FormSection title="Pagamento online" hasSeparator>
+                    <div className="space-y-3">
+                        <ListItem
+                            className="!border-none !bg-transparent p-0 cursor-default"
+                            icon={
+                                <img
+                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                    alt="Mercado Pago"
+                                    className="w-6 h-6 object-contain shrink-0"
+                                />
+                            }
+                            title="Mercado Pago"
+                            description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
+                        />
+                    </div>
+                </FormSection>
+            )}
+
             {hasPaymentSections && (
-                <>
-                    <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Formas de pagamento</h3>
-                        <div className="space-y-5">
-                            {hasSimplePayments && (
-                                <div className="flex flex-wrap gap-2">
+                <FormSection title="Pagamento na loja" hasSeparator>
+                    <div className="space-y-5">
+                        {hasSimplePayments && (
+                            <div>
+                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
+                                <div className="flex flex-wrap gap-2.5">
                                     {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
                                     {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
                                     {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
                                 </div>
-                            )}
-                            {creditMethods.length > 0 && (
-                                <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de crédito</h4>
-                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
-                                </div>
-                            )}
-                            {debitMethods.length > 0 && (
-                                <div>
-                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de débito</h4>
-                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
-                                </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                        {debitMethods.length > 0 && (
+                            <div>
+                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de débito</h4>
+                                {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
+                            </div>
+                        )}
+                        {creditMethods.length > 0 && (
+                            <div>
+                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de crédito</h4>
+                                {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
+                            </div>
+                        )}
                     </div>
-                </>
+                </FormSection>
+            )}
+
+            {deliveryPaymentLabel && (
+                <FormSection title={deliveryPaymentLabel} hasSeparator>
+                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">
+                        O pagamento será realizado {hasDeliveryAndPickup ? "na entrega ou na retirada" : isDeliveryEnabled ? "na entrega" : "na retirada"} conforme combinado com o vendedor.
+                    </p>
+                </FormSection>
             )}
 
             {hoursList.length > 0 && (
@@ -1082,7 +1125,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const shareMessage = useMemo(() => `Olha essa vitrine na Dudit!\n\n*${partner.storeName}*\nConfere aqui os produtos:`, [partner.storeName])
 
     return (
-        <div className="container mx-auto md:px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12">
+        <div className="container mx-auto md:px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-28 lg:pb-12">
             <MarketplaceHeader
                 productName={partner.storeName}
                 storeSearchPlaceholder={`Buscar em ${partner.storeName}`}
@@ -1121,7 +1164,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
             <div ref={topRef} className={categoryView ? "hidden lg:block" : ""}>
                 <div className="w-full max-w-[1400px] mx-auto">
-                    <div className="relative w-full max-w-[1400px] rounded-xl lg:rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[1400/300] dark:bg-dark-border/50 shadow-xs lg:mb-4">
+                    <div className="relative w-full max-w-[1400px] rounded-none md:rounded-xl lg:rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-300 bg-gray-100 aspect-[1400/300] dark:bg-dark-border/50 lg:mb-4">
                         <img src={bannerImage} alt="Banner" className="w-full h-full object-cover object-center" />
                     </div>
                 </div>
@@ -1150,12 +1193,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
 
                         <div className="w-[360px]">
                             <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <button className="w-[42px] h-[42px] rounded-full border border-brand-border flex items-center justify-center text-brand-inactive-text dark:text-dark-body hover:text-[#ef4444] hover:border-[#ef4444] transition-colors">
-                                <HeartIcon size={20} />
-                            </button>
                         </div>
                     </div>
 
@@ -1244,17 +1281,26 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             </div>
 
             <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide h-full px-3">
-                    {allTabs.map(tab => (
-                        <button
-                            id={`vendor-tab-${tab.id}-sticky`}
-                            key={tab.id}
-                            onClick={() => selectTab(tab.id)}
-                            className={`h-full pb-0 pt-0 flex items-center justify-center shrink-0 whitespace-nowrap px-3 text-[13px] md:text-[14px] ${activeTag === tab.id ? "text-white font-semibold" : "text-white/60"}`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                <div className="flex items-center gap-4 px-3 h-full">
+                    <button
+                        onClick={() => setIsContextModalOpen(true)}
+                        className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
+                        title="Selecionar tipo"
+                    >
+                        {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
+                    </button>
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full">
+                        {allTabs.map(tab => (
+                            <button
+                                id={`vendor-tab-${tab.id}-sticky`}
+                                key={tab.id}
+                                onClick={() => selectTab(tab.id)}
+                                className={`h-full pb-0 pt-0 flex items-center justify-center shrink-0 whitespace-nowrap px-3 text-[13px] md:text-[14px] ${activeTag === tab.id ? "text-white font-semibold" : "text-white/60"}`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -1602,8 +1648,8 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     <div className="sticky top-0 z-40 bg-white dark:bg-dark-surface border-b border-brand-border my-4">
                         <Tabs value={mobileModalTab} onValueChange={(v) => setMobileModalTab(v as any)}>
                             <TabsList className="justify-center gap-6 bg-transparent">
-                                <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
                                 <TabsTrigger value="info" className="text-[15px] pb-3">Informações</TabsTrigger>
+                                <TabsTrigger value="reviews" className="text-[15px] pb-3">Avaliações</TabsTrigger>
                                 <TabsTrigger value="gallery" className="text-[15px] pb-3">Galeria</TabsTrigger>
                             </TabsList>
                         </Tabs>

@@ -273,6 +273,7 @@ export function ServiceDetailsPageClient({
             addresses: store?.addresses || p?.addresses || [],
             mp_user_id: p?.mp_user_id,
             mp_public_key: p?.mp_public_key,
+            mp_accepted_payment_methods: p?.mp_accepted_payment_methods || null,
             vendas_totais: store?.vendas_totais || p?.vendas_totais || 0,
             created_at: store?.created_at || p?.created_at,
         }
@@ -1016,7 +1017,7 @@ export function ServiceDetailsPageClient({
     const BookingPanel = (
         <div className="bg-white dark:bg-dark-surface relative">
             {/* Service Info Header */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-4">
                 <span className="text-[11px] font-bold text-brand-dark dark:text-dark-heading bg-gray-100 dark:bg-dark-border/50 px-2 py-0.5 rounded uppercase tracking-wider">
                     {service.service_type === "online" ? "Remoto" : service.service_type === "hybrid" ? "Híbrido" : "Presencial"}
                 </span>
@@ -1057,7 +1058,7 @@ export function ServiceDetailsPageClient({
             <div className="mb-6">
                 {!showPrice ? (
                     <div className="space-y-1">
-                        <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                        <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                             Preço sob consulta
                         </p>
                     </div>
@@ -1132,7 +1133,7 @@ export function ServiceDetailsPageClient({
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                     </p>
                                     <span className="text-sm font-semibold text-brand-green">no Pix</span>
@@ -1158,7 +1159,7 @@ export function ServiceDetailsPageClient({
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
                                     </p>
                                 </div>
@@ -1175,7 +1176,7 @@ export function ServiceDetailsPageClient({
                             <div className="space-y-1">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body line-through font-normal">{formatCurrency(pricing.original)}</span>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                                    <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                         {pricePrefix}{formatCurrency(pixUnitPrice)}{billingSuffix}
                                     </p>
                                     <span className="text-sm text-brand-green font-medium mt-auto">{pricing.pixDiscountPercent}% no Pix</span>
@@ -1193,7 +1194,7 @@ export function ServiceDetailsPageClient({
                     // Caso: Sem desconto algum
                     return (
                         <div className="space-y-1">
-                            <p className="text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
+                            <p className="text-2xl lg:text-3xl leading-none font-bold text-brand-dark dark:text-dark-heading">
                                 {pricePrefix}{formatCurrency(displayPrice)}{billingSuffix}
                             </p>
                             <Button variant="link" onClick={() => setShowPaymentMethodsModal(true)} className="text-xs font-medium text-brand-green mt-3 px-0 py-0 block text-left">
@@ -1706,6 +1707,9 @@ export function ServiceDetailsPageClient({
                 paymentMethods={partner.paymentMethods}
                 price={pricing.current}
                 mpConnected={!!partner.mp_user_id}
+                deliveryEnabled={deliveryConfig?.settings?.isDeliveryEnabled !== false}
+                pickupEnabled={deliveryConfig?.settings?.isPickupEnabled !== false}
+                mpAcceptedPaymentMethods={partner.mp_accepted_payment_methods}
             />
 
             <StorePoliciesModal
@@ -2057,7 +2061,7 @@ export function ServiceDetailsPageClient({
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="min-h-screen bg-white dark:bg-dark-background lg:pt-[50px] font-sans flex flex-col"
             >
-                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-24 lg:pb-12 pt-4 lg:pt-[50px]">
+                <div className="container mx-auto px-4 max-w-[1400px] lg:mt-6 mb-6 flex-grow pb-28 lg:pb-12 pt-4 lg:pt-[50px]">
                     {/* Breadcrumb */}
                     <div className="hidden lg:flex items-center gap-2 text-sm text-brand-inactive-text dark:text-dark-body mb-8">
                         {partner.city && partner.state && (
@@ -2207,8 +2211,7 @@ export function ServiceDetailsPageClient({
                             <div className="lg:hidden mb-6">{BookingPanel}</div>
 
                             {/* Description */}
-                            <div id="service-description" className="mb-10">
-                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
+                            <FormSection title="Descrição" className="mb-8">
                                 <div className={`relative ${!isDescriptionExpanded ? "max-h-[150px] overflow-hidden" : ""}`}>
                                     {service.description ? (
                                         <div
@@ -2228,13 +2231,28 @@ export function ServiceDetailsPageClient({
                                         {isDescriptionExpanded ? "Ver menos" : "Ver mais"}
                                     </button>
                                 )}
-                            </div>
+                            </FormSection>
+
+                            {/* Technical specs */}
+                            {Array.isArray(service.technical_details) && service.technical_details.length > 0 && (
+                                <FormSection title="Especificações" hasSeparator>
+                                    <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden">
+                                        {service.technical_details.map((spec: any, i: number, arr: any[]) => (
+                                            <div key={i} className={`flex justify-between items-center px-4 py-3
+                        ${i % 2 === 0 ? "bg-brand-gray dark:bg-dark-border/50" : "bg-white dark:bg-dark-surface"}
+                        ${i < arr.length - 1 ? "border-b border-brand-border dark:border-dark-border" : ""}`}>
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">{spec.label || spec.name || ""}</span>
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading font-semibold text-right">{spec.value || ""}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </FormSection>
+                            )}
 
                             {/* Reviews */}
-                            <div className="border-t border-brand-border pt-2">
-                                <h3 className="text-xl font-medium text-brand-dark dark:text-dark-heading mb-6 mt-8">Avaliações do serviço</h3>
+                            <FormSection title="Avaliações do serviço" hasSeparator>
                                 <ReviewsSection reviews={reviews} />
-                            </div>
+                            </FormSection>
                         </div>
 
                         {/* ── Right Column: Booking Panel (Desktop) ── */}
@@ -2320,7 +2338,7 @@ export function ServiceDetailsPageClient({
                         userProfile={userProfile}
                     />
                 </div>
-            </motion.div>
+            </motion.div >
         </>
     )
 }

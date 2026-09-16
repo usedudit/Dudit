@@ -43,6 +43,7 @@ export const NOTIFICATION_TYPE_URGENCY_MAP: Record<NotificationType, Notificatio
   admin_announcement: "low",
   low_stock: "low",
   replenishment_suggested: "low",
+  service_return_reminder: "medium",
 }
 
 export function getNotificationUrgency(type: NotificationType): NotificationUrgency {

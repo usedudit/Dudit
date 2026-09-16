@@ -6,6 +6,7 @@ import {
   getMarketplaceProduct,
   getProductVariants,
   getProductReviews,
+  getProductSoldCount,
 } from "@/app/actions/marketplace/products"
 import { getProductUrl } from "@/lib/utils/url-generator"
 import { formatCurrency } from "@/lib/utils";
@@ -115,8 +116,8 @@ export default async function ProductDetailsPage({
   // ------------------------------------------
 
 
-  // 2. Fetch variants + reviews in parallel (Deduplicated but fresh)
-  const [variants, reviews, detailAds] = await Promise.all([
+  // 2. Fetch variants + reviews + sold count in parallel (Deduplicated but fresh)
+  const [variants, reviews, detailAds, soldCount] = await Promise.all([
     getProductVariants(product.id),
     getProductReviews(product.id, storeId),
     getSponsoredAdsForSlot("detail", {
@@ -127,6 +128,7 @@ export default async function ProductDetailsPage({
       city: userProfile?.city ?? null,
       state: userProfile?.state ?? currentCidadeUf.split("-").pop()?.toUpperCase() ?? null,
     }),
+    getProductSoldCount(product.id),
   ])
   const detailAd = detailAds[0] ?? null
 
@@ -186,6 +188,7 @@ export default async function ProductDetailsPage({
         userProfile={userProfile}
         cartCount={cartCount}
         sponsoredAd={detailAd}
+        soldCount={soldCount}
       />
 
       <MarketplaceFooter />

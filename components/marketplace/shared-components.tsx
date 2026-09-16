@@ -627,16 +627,30 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                 </p>
                                 {locationContext?.scope === "country" && locationLabel ? (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                        <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{locationLabel}</span>
+                                        {distanceLabel ? (
+                                            <span className="shrink-0">{distanceLabel}</span>
+                                        ) : (
+                                            <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{locationLabel}</span>
+                                        )}
                                     </div>
                                 ) : itemType === "servico" ? (
-                                    serviceDuration ? (
+                                    (serviceDuration || distanceLabel) ? (
                                         <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
-                                            <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>
+                                            {distanceLabel && <span className="shrink-0">{distanceLabel}</span>}
+                                            {distanceLabel && serviceDuration && (
+                                                <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                            )}
+                                            {serviceDuration && <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{serviceDuration}</span>}
                                         </div>
                                     ) : null
                                 ) : (
                                     <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-brand-inactive-text dark:text-dark-body truncate mt-0.5">
+                                        {distanceLabel && (
+                                            <>
+                                                <span className="shrink-0">{distanceLabel}</span>
+                                                <span className="w-0.5 h-0.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" />
+                                            </>
+                                        )}
                                         {deliveryTime && (
                                             <span className="font-medium text-brand-dark dark:text-dark-heading shrink-0">{deliveryTime}</span>
                                         )}
@@ -647,7 +661,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                                             <span className={`shrink-0 font-medium ${isFreeDelivery ? "text-brand-green font-bold" : ""}`}>
                                                 {deliveryFeeLabel}
                                             </span>
-                                        ) : !deliveryTime ? (
+                                        ) : !deliveryTime && !distanceLabel ? (
                                             <span>{sellerLabel || "Pronta entrega"}</span>
                                         ) : null}
                                     </div>

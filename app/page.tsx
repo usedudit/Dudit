@@ -6,7 +6,6 @@ import { getMarketplaceHomeSessionData } from "@/lib/data/user"
 import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
-import { ThreeDotsLoader } from "@/components/reusable"
 import type { Metadata } from "next"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
@@ -207,7 +206,7 @@ export default async function HomePage() {
     const cartCount = sessionData?.cartCount || 0
 
     return (
-        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[110px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
+        <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
             <Suspense fallback={<HomeFeedSkeleton />}>

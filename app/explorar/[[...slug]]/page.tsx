@@ -361,7 +361,7 @@ export default async function ExplorarPage({
                 />
                 <MarketplaceHeader userProfile={userProfile} cartCount={cartCount} />
 
-                <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 lg:py-12">
+                <main className="flex-1 max-w-7xl mx-auto w-full px-4 lg:px-8 py-8 lg:py-12 pb-24 lg:pb-12">
                     <div className="mb-8 lg:mb-10">
                         <h1 className="text-2xl lg:text-4xl font-bold text-brand-dark dark:text-dark-heading">
                             Explore por categoria

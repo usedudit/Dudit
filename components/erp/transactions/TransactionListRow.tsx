@@ -3,7 +3,7 @@
 import React from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown, Badge, Checkbox, DropdownItem } from "@/components/reusable"
-import { CreditCardIcon, FileIcon, InstallmentIcon, MoneyIcon, RepeatIcon } from "@/lib/icons"
+import { CreditCardIcon, MoneyIcon, InstallmentIcon, RepeatIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { DueDateCountdown } from "@/lib/utils/transaction-due-countdown"
 import { PaymentMethodIndicator } from "./PaymentMethodIndicator"
@@ -32,11 +32,15 @@ interface TransactionListItemProps {
     onPrefetchTouchStart?: (id: string) => void
 }
 
+const BoletoIcon = ({ className }: { className?: string }) => (
+    <img src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className={className} />
+)
+
 const getPaymentIcon = (paymentType: string) => {
     const normalized = paymentType.toLowerCase()
 
     if (normalized.includes("credit")) return CreditCardIcon
-    if (normalized.includes("boleto")) return FileIcon
+    if (normalized.includes("boleto")) return BoletoIcon
     return MoneyIcon
 }
 

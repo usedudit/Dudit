@@ -387,6 +387,16 @@ export async function confirmAccountDeletionAction(input: {
       },
     })
 
+    // Webhook Discord: notificar exclusão de conta confirmada (fail-open)
+    const { sendAccountDeleted } = await import("@/lib/services/discord-general-webhook.service")
+    sendAccountDeleted({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+      reason: finalReason || undefined,
+      requestedAt: new Date().toISOString(),
+    }).catch(err => console.warn("[ACCOUNT_DELETE] Discord webhook failed (non-blocking):", err))
+
     revalidatePath("/erp/configuracoes/assinatura")
     return { success: true }
   } catch (error: any) {

@@ -240,6 +240,32 @@ export async function runScheduledNotificationJob(job: {
     .limit(1)
     .maybeSingle()
 
+  if (job.job_type === "service_return_reminder") {
+    const returnInterval = (job.payload?.returnInterval as string) || undefined
+    const serviceNameFromPayload = (job.payload?.serviceName as string) || appointment.service_name
+
+    await notifyCustomer({
+      userId,
+      type: "service_return_reminder",
+      entityType: "appointment",
+      entityId: appointment.id,
+      partnerId: appointment.partner_id as string,
+      customerId: appointment.customer_id as string,
+      variant: job.job_type,
+      ctx: {
+        serviceName: serviceNameFromPayload,
+        storeName: hqStore?.name || undefined,
+        returnInterval,
+      },
+    })
+
+    await admin
+      .from("notification_scheduled_jobs")
+      .update({ status: "completed", updated_at: new Date().toISOString() })
+      .eq("id", job.id)
+    return
+  }
+
   const reminderLabel =
     job.job_type === "appointment_reminder_24h"
       ? "Lembrete: agendamento amanhã"
@@ -407,6 +433,13 @@ export async function onAppointmentStatusChanged(
       ctx,
       origin,
     })
+  } else if (next === "concluído" || next === "concluido" || next === "completed") {
+    await scheduleServiceReturnReminder({
+      appointment,
+      partnerId,
+      storeId,
+      origin,
+    })
   }
 }
 
@@ -510,6 +543,133 @@ export async function onAppointmentRescheduled(
     serviceName: String(appointment.service_name),
     storeName: hqStore?.name || undefined,
   })
+}
+
+function addIntervalToDate(dateStr: string, value: number, unit: string): Date | null {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return null
+  const base = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  const lower = (unit || "").toLowerCase()
+  if (lower === "dias" || lower === "dia") {
+    base.setDate(base.getDate() + value)
+  } else if (lower === "semanas" || lower === "semana") {
+    base.setDate(base.getDate() + value * 7)
+  } else if (lower === "meses" || lower === "mês") {
+    base.setMonth(base.getMonth() + value)
+  } else if (lower === "anos" || lower === "ano") {
+    base.setFullYear(base.getFullYear() + value)
+  } else {
+    base.setMonth(base.getMonth() + value)
+  }
+  return base
+}
+
+function formatIntervalLabel(value: number, unit: string): string {
+  const lower = (unit || "").toLowerCase()
+  if (lower === "dias" || lower === "dia") return `${value} dia${value > 1 ? "s" : ""}`
+  if (lower === "semanas" || lower === "semana") return `${value} semana${value > 1 ? "s" : ""}`
+  if (lower === "meses" || lower === "mês") return `${value} mês${value > 1 ? "es" : ""}`
+  if (lower === "anos" || lower === "ano") return `${value} ano${value > 1 ? "s" : ""}`
+  return `${value} ${unit}`
+}
+
+export async function scheduleServiceReturnReminder(params: {
+  appointment: Record<string, unknown>
+  partnerId: string
+  storeId?: string | null
+  origin: "manual" | "automation" | "system"
+}) {
+  const appointment = params.appointment
+  const partnerId = params.partnerId
+  const serviceId = appointment.service_id as string | null
+
+  if (!serviceId) return
+
+  const admin = getAdminClient()
+
+  const { data: service } = await admin
+    .from("services")
+    .select("id, recurrence_interval_value, recurrence_interval_unit, name")
+    .eq("id", serviceId)
+    .maybeSingle()
+
+  const intervalValue = Number(service?.recurrence_interval_value || 0)
+  const intervalUnit = String(service?.recurrence_interval_unit || "Meses")
+
+  if (!intervalValue || intervalValue <= 0) return
+
+  const reminderDate = addIntervalToDate(String(appointment.start_date), intervalValue, intervalUnit)
+  if (!reminderDate) return
+
+  const now = Date.now()
+  if (reminderDate.getTime() <= now) return
+
+  const userId = await resolveCustomerUserId({
+    customerId: appointment.customer_id as string | null,
+    marketplaceOrderId: appointment.marketplace_order_id as string | null | undefined,
+  })
+
+  const returnIntervalLabel = formatIntervalLabel(intervalValue, intervalUnit)
+
+  const { data: hqStore } = await admin
+    .from("stores")
+    .select("name")
+    .eq("partner_id", partnerId)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const storeName = hqStore?.name || ""
+
+  if (userId) {
+    await scheduleNotificationJob({
+      jobType: "service_return_reminder",
+      entityType: "appointment",
+      entityId: String(appointment.id),
+      partnerId,
+      runAt: reminderDate,
+      payload: {
+        customerId: appointment.customer_id,
+        serviceName: service?.name || String(appointment.service_name),
+        storeName,
+        returnInterval: returnIntervalLabel,
+      },
+    })
+  }
+
+  try {
+    const { scheduleWhatsappJob } = await import("./whatsapp-automation.service")
+    const phone = await (async () => {
+      const customerId = appointment.customer_id as string | null
+      if (!customerId) return null
+      const { data: customer } = await admin
+        .from("customers")
+        .select("phone")
+        .eq("id", customerId)
+        .eq("partner_id", partnerId)
+        .maybeSingle()
+      return customer?.phone || null
+    })()
+
+    if (phone) {
+      await scheduleWhatsappJob({
+        partnerId,
+        storeId: params.storeId || null,
+        jobType: "service_return_reminder",
+        entityType: "appointment",
+        entityId: String(appointment.id),
+        runAt: reminderDate,
+        payload: {
+          customerId: appointment.customer_id,
+          phone,
+          serviceName: service?.name || String(appointment.service_name),
+          returnInterval: returnIntervalLabel,
+        },
+      })
+    }
+  } catch (err) {
+    console.error("[scheduleServiceReturnReminder] Failed to schedule WhatsApp job:", err)
+  }
 }
 
 export async function notifyAppointmentCreatedFromMarketplace(params: {

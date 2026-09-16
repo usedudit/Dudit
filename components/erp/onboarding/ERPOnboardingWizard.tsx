@@ -15,6 +15,7 @@ import {
   CameraIcon,
   PinIcon,
   PackageIcon,
+  Package,
   MegaphoneIcon,
   Users,
   ChartIcon,
@@ -74,7 +75,12 @@ export function ERPOnboardingWizard({
 
   // Step 1: Objetivos principais adaptados dinamicamente ao modo
   const [selectedGoals, setSelectedGoals] = useState<string[]>(() => {
-    if (isDesapego) return ["customize_profile", "location_pickup"]
+    if (isDesapego) {
+      const initial: string[] = []
+      if (sellsProducts) initial.push("products")
+      if (sellsServices) initial.push("services")
+      return initial.length > 0 ? initial : ["products"]
+    }
     if (isERP) {
       if (sellsServices) return ["pos", "financial_control", "appointments_team"]
       return ["pos", "stock_control", "financial_control"]
@@ -85,10 +91,17 @@ export function ERPOnboardingWizard({
   })
 
   // Step 2: Primeiro item (adaptado)
-  const isHybrid = !isDesapego && sellsProducts && sellsServices
-  const [itemType, setItemType] = useState<"service" | "product">(
-    isDesapego ? "product" : (sellsServices ? "service" : "product")
-  )
+  const hasProducts = isDesapego ? selectedGoals.includes("products") : sellsProducts
+  const hasServices = isDesapego ? selectedGoals.includes("services") : sellsServices
+  const isHybrid = hasProducts && hasServices
+
+  const [itemType, setItemType] = useState<"service" | "product">(() => {
+    if (isDesapego) {
+      if (sellsServices && !sellsProducts) return "service"
+      return "product"
+    }
+    return sellsServices ? "service" : "product"
+  })
   const [itemName, setItemName] = useState("")
   const [itemPrice, setItemPrice] = useState(0)
   const [serviceDuration, setServiceDuration] = useState<number>(45)
@@ -111,9 +124,19 @@ export function ERPOnboardingWizard({
   const totalSteps = 3
 
   const toggleGoal = (id: string) => {
-    setSelectedGoals((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
-    )
+    setSelectedGoals((prev) => {
+      if (isDesapego) {
+        // Pelo menos um tem que ser obrigatório
+        if (prev.includes(id)) {
+          if (prev.length <= 1) {
+            return prev
+          }
+          return prev.filter((g) => g !== id)
+        }
+        return [...prev, id]
+      }
+      return prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    })
   }
 
   const prevStep = () => {
@@ -126,6 +149,17 @@ export function ERPOnboardingWizard({
   }
 
   const handleNextFromGoals = () => {
+    if (isDesapego) {
+      const hasProd = selectedGoals.includes("products")
+      const hasServ = selectedGoals.includes("services")
+      if (hasProd && !hasServ) {
+        setItemType("product")
+      } else if (hasServ && !hasProd) {
+        setItemType("service")
+      } else if (!itemType) {
+        setItemType("product")
+      }
+    }
     setDirection(1)
     setStep(2)
   }
@@ -203,12 +237,14 @@ export function ERPOnboardingWizard({
 
   const getStepTitle = () => {
     if (step === 1) {
-      if (isDesapego) return "O que você quer organizar hoje?"
+      if (isDesapego) return "O que você deseja anunciar?"
       if (isERP) return "O que você mais precisa gerenciar hoje?"
       return "O que você quer resolver hoje?"
     }
     if (step === 2) {
-      if (isDesapego) return "Cadastre seu primeiro desapego"
+      if (isDesapego) {
+        return itemType === "service" ? "Cadastre seu primeiro serviço" : "Cadastre seu primeiro produto ou desapego"
+      }
       if (itemType === "service") return "Cadastre seu principal serviço"
       return "Cadastre seu primeiro produto"
     }
@@ -218,12 +254,16 @@ export function ERPOnboardingWizard({
 
   const getStepSubtitle = () => {
     if (step === 1) {
-      if (isDesapego) return "Selecione o que deseja ajustar para começar a anunciar com segurança."
+      if (isDesapego) return "Escolha o que deseja divulgar no seu perfil para começar a vender."
       if (isERP) return "Selecione as ferramentas essenciais para deixarmos seu painel organizado."
       return "Selecione os objetivos principais para deixarmos seu catálogo pronto."
     }
     if (step === 2) {
-      if (isDesapego) return "Informe o nome e o valor de desapego para começar a divulgar."
+      if (isDesapego) {
+        return itemType === "service"
+          ? "Apenas o nome, valor e duração estimada para começar a divulgar."
+          : "Informe o nome e o valor de desapego para começar a divulgar."
+      }
       if (itemType === "service") return "Apenas o nome, valor e duração estimada para deixar sua agenda pronta."
       return "Informe o nome e o valor de venda para começar a divulgar."
     }
@@ -307,43 +347,29 @@ export function ERPOnboardingWizard({
                           {isDesapego && (
                             <>
                               <ListItem
-                                icon={CameraIcon}
-                                title="Personalizar perfil do desapego"
-                                description="Foto de perfil, banner e bio para transmitir confiança aos compradores."
+                                icon={Package}
+                                title="Anunciar produtos ou desapegos"
+                                description="Venda itens novos, usados, eletrônicos, roupas ou produtos da sua loja"
                                 className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("customize_profile")}
+                                onClick={() => toggleGoal("products")}
                                 right={
                                   <Checkbox
-                                    checked={selectedGoals.includes("customize_profile")}
-                                    onChange={() => toggleGoal("customize_profile")}
+                                    checked={selectedGoals.includes("products")}
+                                    onChange={() => toggleGoal("products")}
                                   />
                                 }
                               />
 
                               <ListItem
-                                icon={PinIcon}
-                                title="Definir localização para retirada"
-                                description="Informar bairro ou cidade para compradores da sua região combinarem entrega."
+                                icon={WrenchIcon}
+                                title="Anunciar serviço ou atendimento"
+                                description="Divulgue seus serviços, agendamentos, consultoria, manutenções ou procedimentos"
                                 className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("location_pickup")}
+                                onClick={() => toggleGoal("services")}
                                 right={
                                   <Checkbox
-                                    checked={selectedGoals.includes("location_pickup")}
-                                    onChange={() => toggleGoal("location_pickup")}
-                                  />
-                                }
-                              />
-
-                              <ListItem
-                                icon={WhatsappIcon}
-                                title="Divulgar meus desapegos no WhatsApp"
-                                description="Compartilhar o link com fotos e valores para negociar sem demora."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("whatsapp_share")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("whatsapp_share")}
-                                    onChange={() => toggleGoal("whatsapp_share")}
+                                    checked={selectedGoals.includes("services")}
+                                    onChange={() => toggleGoal("services")}
                                   />
                                 }
                               />
@@ -528,22 +554,8 @@ export function ERPOnboardingWizard({
                               </span>
                               <div className="grid grid-cols-2 gap-2">
                                 <ListItem
-                                  icon={WrenchIcon}
-                                  title="Serviço"
-                                  className="px-3 py-2.5 gap-3 border rounded-xl cursor-pointer"
-                                  onClick={() => setItemType("service")}
-                                  left={
-                                    <RadioButton
-                                      name="firstItemType"
-                                      value="service"
-                                      checked={itemType === "service"}
-                                      onChange={() => setItemType("service")}
-                                    />
-                                  }
-                                />
-                                <ListItem
-                                  icon={ShoppingBagIcon}
-                                  title="Produto"
+                                  icon={Package}
+                                  title={isDesapego ? "Produto / Desapego" : "Produto"}
                                   className="px-3 py-2.5 gap-3 border rounded-xl cursor-pointer"
                                   onClick={() => setItemType("product")}
                                   left={
@@ -555,6 +567,20 @@ export function ERPOnboardingWizard({
                                     />
                                   }
                                 />
+                                <ListItem
+                                  icon={WrenchIcon}
+                                  title={isDesapego ? "Serviço / Atendimento" : "Serviço"}
+                                  className="px-3 py-2.5 gap-3 border rounded-xl cursor-pointer"
+                                  onClick={() => setItemType("service")}
+                                  left={
+                                    <RadioButton
+                                      name="firstItemType"
+                                      value="service"
+                                      checked={itemType === "service"}
+                                      onChange={() => setItemType("service")}
+                                    />
+                                  }
+                                />
                               </div>
                             </div>
                           )}
@@ -563,14 +589,14 @@ export function ERPOnboardingWizard({
                             <Input
                               label={
                                 isDesapego
-                                  ? "Nome do item ou desapego"
+                                  ? (itemType === "service" ? "Nome do Serviço ou Atendimento" : "Nome do item ou desapego")
                                   : itemType === "service"
                                     ? "Nome do Serviço"
                                     : "Nome do Produto"
                               }
                               placeholder={
                                 isDesapego
-                                  ? "Ex: Tênis Nike Tam 40, Sofá 3 Lugares, iPhone 12..."
+                                  ? (itemType === "service" ? "Ex: Consultoria, Manutenção, Procedimento..." : "Ex: Tênis Nike Tam 40, Sofá 3 Lugares, iPhone 12...")
                                   : itemType === "service"
                                     ? "Ex: Corte Masculino, Manicure Completa, Consulta..."
                                     : "Ex: Bolo de Pote, Camiseta Básica, Trufa de Chocolate..."
@@ -583,7 +609,7 @@ export function ERPOnboardingWizard({
                             <MoneyInput
                               label={
                                 isDesapego
-                                  ? "Valor de desapego (R$)"
+                                  ? (itemType === "service" ? "Valor cobrado (R$)" : "Valor de desapego (R$)")
                                   : itemType === "service"
                                     ? "Valor cobrado (R$)"
                                     : "Preço de venda (R$)"

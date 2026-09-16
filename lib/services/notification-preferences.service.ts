@@ -134,6 +134,7 @@ export async function shouldDeliverWhatsapp(
     quote_shared: "order_created",
     quote_reminder: "order_created",
     payment_reminder: "order_paid",
+    service_return_reminder: "service_return_reminder",
     test_message: null,
     manual_resend: null,
   }

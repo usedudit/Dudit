@@ -53,7 +53,7 @@ const formatPaymentMethodName = (method: string) => {
         store_credit: "Vale-compra",
         transfer: "Transferência",
         link: "Link de Pagamento",
-        boleto: "Boleto Bancário",
+        boleto: "Boleto",
         wallet: "Carteira Digital",
         mercadopago: "Mercado Pago",
     }

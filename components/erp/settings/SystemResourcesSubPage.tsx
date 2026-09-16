@@ -64,12 +64,23 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
         return false
     }
 
+    const isDesapego = businessInfo?.mode === "desapego"
+
     const toggleResource = (resourceId: SystemResourceId, checked: boolean) => {
         const resource = SYSTEM_RESOURCES.find((r) => r.id === resourceId)
         if (resource?.minimumPlan && checked && !hasMinimumPlan(planSlug, resource.minimumPlan)) {
             openPlanUpgrade(resource.minimumPlan)
             return
         }
+
+        if (isDesapego && !checked) {
+            const willHaveAnyActive = selected.some((id) => id !== resourceId && (id === "products" || id === "services"))
+            if (!willHaveAnyActive) {
+                toast.warning("Pelo menos um recurso obrigatório", "No modo desapego, pelo menos um recurso (produtos ou serviços) deve permanecer ativo.")
+                return
+            }
+        }
+
         setSelected((current) => {
             if (checked) return Array.from(new Set([...current, resourceId]))
             return current.filter((id) => id !== resourceId)

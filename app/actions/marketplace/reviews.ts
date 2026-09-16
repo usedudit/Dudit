@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
+import { sendSuspiciousReview } from "@/lib/services/discord-marketplace-webhook.service"
 
 async function checkFraudulentReview(
   adminSupabase: any,
@@ -255,6 +256,17 @@ export async function createReviewAction(data: {
   const fraudCheck = await checkFraudulentReview(adminSupabase, userId, data.partnerId, data.productId, data.serviceId, data.storeId)
 
   if (fraudCheck.isSuspicious) {
+    // Webhook Discord: notificar tentativa de review suspeita (fail-open)
+    sendSuspiciousReview({
+      userId,
+      userEmail: currentUser.email,
+      productId: data.productId || undefined,
+      serviceId: data.serviceId || undefined,
+      partnerId: data.partnerId,
+      reason: fraudCheck.reason || "Padrão suspeito detectado",
+      rating: data.rating,
+    }).catch(err => console.warn("[REVIEWS] Discord webhook failed (non-blocking):", err))
+
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }
   }
 

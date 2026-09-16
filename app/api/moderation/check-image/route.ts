@@ -9,6 +9,7 @@ import {
   cacheImageModeration,
 } from '@/lib/moderation/image-cache'
 import { decideImageStatus } from '@/lib/moderation/image-decision'
+import { sendModerationImageFlagged } from '@/lib/services/discord-marketplace-webhook.service'
 import { Buffer } from 'buffer'
 
 /**
@@ -65,6 +66,21 @@ export async function POST(req: NextRequest) {
       decision.status === 'FLAGGED' ? 'FLAGGED' : 'APPROVED',
       phash,
     )
+
+    // Webhook Discord: notificar quando imagem é marcada (fail-open, não bloqueia fluxo)
+    if (decision.status === 'FLAGGED' && !analysis.isUnavailable) {
+      sendModerationImageFlagged({
+        imageUrl: `hash:${hash.slice(0, 16)}`,
+        imageHash: hash,
+        categories: analysis.categories.map(c => c.name),
+        confidence: analysis.confidence,
+        riskLevel: analysis.riskLevel as "medium" | "high",
+        entityType: body.entityType,
+        entityId: body.entityId,
+        partnerId: body.partnerId,
+        userId: body.userId,
+      }).catch(err => console.warn('[CHECK-IMAGE] Discord webhook failed (non-blocking):', err))
+    }
 
     return NextResponse.json({
       success: true,

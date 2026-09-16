@@ -8,6 +8,7 @@ import { RateLimitCategory } from "@/lib/rate-limiter"
 import { invalidatePartnerPlanCache } from "@/lib/services/subscription.service"
 import { getMpPlatformAccessToken } from "@/lib/services/mercadopago/subscriptions"
 import { syncSubscriptionToBilling } from "@/lib/billing/sync-subscription"
+import { sendPaymentFailed } from "@/lib/services/discord-general-webhook.service"
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -463,6 +464,15 @@ async function processSubscriptionWebhook(
             }
           )
         }
+
+        // Webhook Discord: notificar pagamento de assinatura falhou (fail-open)
+        sendPaymentFailed({
+          partnerId: sub.partner_id,
+          amount: sub.plan?.price || undefined,
+          errorCode: "PAST_DUE",
+          errorMessage: "Pagamento da assinatura falhou - status past_due",
+          provider: "Mercado Pago",
+        }).catch(err => console.warn("[SUB_WEBHOOK] Discord payment failed webhook failed (non-blocking):", err))
       } catch (notifyErr: any) {
         console.error("[SUB_WEBHOOK] Failed to send payment failed notification:", notifyErr.message)
       }

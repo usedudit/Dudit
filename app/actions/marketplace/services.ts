@@ -34,7 +34,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
       show_in_marketplace, tags, price_type, billing_unit, video_url, video_type,
       video_thumbnail, video_duration, video_provider_id, service_type,
       warranty, buffer_minutes, marketplace_category_id, fulfillment_modes,
-      payment_requirement, show_price_in_store, promotional_price,
+      payment_requirement, show_price_in_store, promotional_price, technical_details,
       created_at,
       partners!partner_id (
         id,
@@ -44,6 +44,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         is_showcase_active,
         mp_user_id,
         mp_public_key,
+        mp_accepted_payment_methods,
         created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
         payment_methods (*)

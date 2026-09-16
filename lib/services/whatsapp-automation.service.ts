@@ -23,6 +23,7 @@ const TEMPLATE_BY_TRIGGER: Partial<Record<WhatsappAutomationTrigger, string>> = 
   appointment_rescheduled: "appointment_rescheduled",
   appointment_reminder_24h: "appointment_reminder",
   appointment_reminder_2h: "appointment_reminder",
+  service_return_reminder: "service_return_reminder",
   order_created: "order_created",
   order_payment_approved: "order_payment_approved",
   order_preparing: "order_preparing",
@@ -314,7 +315,7 @@ export async function runScheduledWhatsappJob(job: {
     }
 
     const cancelled = String(apt.status).toLowerCase() === "cancelado"
-    if (cancelled && job.job_type.includes("reminder")) {
+    if (cancelled && job.job_type.includes("reminder") && job.job_type !== "service_return_reminder") {
       await admin.from("whatsapp_scheduled_jobs").update({
         status: "cancelled",
         result_status: "skipped_cancelled",
@@ -342,6 +343,9 @@ export async function runScheduledWhatsappJob(job: {
 
     SecureLogger.info("[whatsapp] run: dispatch_start", { jobId: job.id, partnerName: hqStore?.name })
 
+    const returnInterval = (job.payload?.returnInterval as string) || undefined
+    const serviceNameFromPayload = (job.payload?.serviceName as string) || apt.service_name
+
     const result = await dispatchWhatsappAutomation({
       partnerId: job.partner_id,
       storeId: (job.payload?.storeId as string) || null,
@@ -352,12 +356,13 @@ export async function runScheduledWhatsappJob(job: {
       customerId: apt.customer_id,
       templateVariables: {
         customer_name: apt.customer_name,
-        service_name: apt.service_name,
+        service_name: serviceNameFromPayload,
         date: apt.start_date,
         time: apt.start_time,
         store_name: hqStore?.name || "",
+        return_interval: returnInterval || "",
       },
-      includeAppointmentButtons: job.job_type.includes("reminder"),
+      includeAppointmentButtons: job.job_type.includes("reminder") && job.job_type !== "service_return_reminder",
     })
 
     const jobStatus = result.success ? "completed" : result.resultStatus.startsWith("failed") ? "failed" : "completed"

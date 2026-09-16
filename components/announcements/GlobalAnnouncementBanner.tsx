@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { AlertTriangleIcon, InfoIcon, ShieldIcon, XIcon, ArrowRightIcon } from "@/lib/icons"
 import type { GlobalAnnouncementConfig } from "@/lib/system/types"
@@ -15,14 +16,18 @@ const STORAGE_KEY_PREFIX = "dudit_dismissed_announcement_"
 
 export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnouncementBannerProps) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
   const [announcement, setAnnouncement] = useState<GlobalAnnouncementConfig | null>(
     initialAnnouncement || null
   )
-  const [isDismissed, setIsDismissed] = useState(true) // start true to prevent flash before checking localStorage
+  const [isDismissed, setIsDismissed] = useState(true)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!initialAnnouncement) {
-      // If not passed initially, fetch asynchronously
       fetch("/api/system/announcement")
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -40,13 +45,11 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
       return
     }
 
-    // Check expiration
     if (announcement.expires_at && new Date(announcement.expires_at) < new Date()) {
       setIsDismissed(true)
       return
     }
 
-    // Check localStorage
     try {
       const dismissed = localStorage.getItem(`${STORAGE_KEY_PREFIX}${announcement.id}`)
       setIsDismissed(Boolean(dismissed))
@@ -55,12 +58,11 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
     }
   }, [announcement])
 
-  // Don't show inside print or maintenance pages
-  if (pathname?.startsWith("/print") || pathname?.startsWith("/manutencao")) {
+  if (pathname?.startsWith("/print")) {
     return null
   }
 
-  if (isDismissed || !announcement || !announcement.active || !announcement.message) {
+  if (!mounted || isDismissed || !announcement || !announcement.active || !announcement.message) {
     return null
   }
 
@@ -88,18 +90,18 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
 
   const IconComponent = isUrgent ? ShieldIcon : isWarning ? AlertTriangleIcon : InfoIcon
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {!isDismissed && (
         <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="relative z-40 w-full overflow-hidden border-b backdrop-blur-md"
+          initial={{ y: -56, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -56, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-md ${bgClasses}`}
         >
-          <div className={`w-full px-4 py-2.5 sm:py-3 transition-colors ${bgClasses}`}>
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs sm:text-sm">
+          <div className="w-full max-w-7xl mx-auto px-4 py-2.5 sm:py-3">
+            <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <span className={`shrink-0 p-1.5 rounded-lg border flex items-center justify-center ${iconBg}`}>
                   <IconComponent className="w-4 h-4" />
@@ -140,6 +142,7 @@ export function GlobalAnnouncementBanner({ initialAnnouncement }: GlobalAnnounce
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

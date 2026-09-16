@@ -29,6 +29,7 @@ export type WhatsappAutomationTrigger =
   | "quote_shared"
   | "quote_reminder"
   | "payment_reminder"
+  | "service_return_reminder"
   | "test_message"
   | "manual_resend"
 

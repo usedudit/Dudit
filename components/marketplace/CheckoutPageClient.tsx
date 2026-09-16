@@ -871,7 +871,7 @@ export function CheckoutPageClient() {
         !requirements?.hasSubscriptionLines
     )
 
-const hasUnavailableServices = useMemo(() => {
+    const hasUnavailableServices = useMemo(() => {
         return Object.values(serviceAvailability).some(
             (s) => s.checked && !s.available
         )
@@ -2730,29 +2730,7 @@ const hasUnavailableServices = useMemo(() => {
                                                         />
                                                     }
                                                 />
-                                                {paymentOption === "mercadopago" && checkoutContext?.deposit.available && (
-                                                    <div className="ml-8 mt-1 mb-3 p-3 bg-brand-slate/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
-                                                        <span className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Opção de pagamento online:</span>
-                                                        <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                            <RadioButton
-                                                                name="mpPayModeDesktop"
-                                                                value="full"
-                                                                checked={!payDepositOnly}
-                                                                onChange={() => setPayDepositOnly(false)}
-                                                            />
-                                                            <span>Pagar valor integral ({formatCurrency(checkoutFullTotal)})</span>
-                                                        </label>
-                                                        <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                            <RadioButton
-                                                                name="mpPayModeDesktop"
-                                                                value="deposit"
-                                                                checked={payDepositOnly}
-                                                                onChange={() => setPayDepositOnly(true)}
-                                                            />
-                                                            <span>Pagar sinal / entrada ({formatCurrency(checkoutDepositChargeTotal)})</span>
-                                                        </label>
-                                                    </div>
-                                                )}
+
                                                 {showTraditionalPaymentOption && (
                                                     <ListItem
                                                         icon={MoneyIcon}
@@ -3194,29 +3172,7 @@ const hasUnavailableServices = useMemo(() => {
                                                     />
                                                 }
                                             />
-                                            {paymentOption === "mercadopago" && checkoutContext?.deposit.available && (
-                                                <div className="ml-8 mt-1 mb-3 p-3 bg-brand-slate/50 dark:bg-dark-border/20 rounded-xl border border-brand-border/40 dark:border-dark-border/40 space-y-2">
-                                                    <span className="block text-xs font-bold text-brand-dark dark:text-dark-heading mb-1">Opção de pagamento online:</span>
-                                                    <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                        <RadioButton
-                                                            name="mpPayModeMobile"
-                                                            value="full"
-                                                            checked={!payDepositOnly}
-                                                            onChange={() => setPayDepositOnly(false)}
-                                                        />
-                                                        <span>Valor integral ({formatCurrency(checkoutFullTotal)})</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-2 text-sm text-brand-dark dark:text-dark-heading cursor-pointer">
-                                                        <RadioButton
-                                                            name="mpPayModeMobile"
-                                                            value="deposit"
-                                                            checked={payDepositOnly}
-                                                            onChange={() => setPayDepositOnly(true)}
-                                                        />
-                                                        <span>Sinal / entrada ({formatCurrency(checkoutDepositChargeTotal)})</span>
-                                                    </label>
-                                                </div>
-                                            )}
+
                                             {showTraditionalPaymentOption && (
                                                 <ListItem
                                                     icon={MoneyIcon}
@@ -3608,7 +3564,7 @@ const hasUnavailableServices = useMemo(() => {
                                 <img
                                     src="https://img.dudit.com.br/static/Map.png"
                                     alt="Mapa"
-                                    className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                    className="w-10 h-10 object-cover rounded-full shrink-0"
                                 />
                                 <div className="flex flex-col min-w-0">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
@@ -3624,7 +3580,7 @@ const hasUnavailableServices = useMemo(() => {
                                 <img
                                     src="https://img.dudit.com.br/static/Map.png"
                                     alt="Mapa"
-                                    className="w-10 h-10 object-cover rounded-xl shrink-0"
+                                    className="w-10 h-10 object-cover rounded-full shrink-0"
                                 />
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Local de Retirada</p>
@@ -3895,18 +3851,15 @@ const hasUnavailableServices = useMemo(() => {
                         Este estabelecimento permite pagar um sinal/entrada para confirmar o seu agendamento, restando o valor restante para ser pago presencialmente.
                     </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         {/* Option Sinal */}
                         <div
                             onClick={handleSelectDeposit}
-                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-green bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all shadow-sm"
+                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border border-brand-green bg-brand-green/5 dark:bg-brand-green/10 hover:bg-brand-green/10 dark:hover:bg-brand-green/20 transition-all"
                         >
                             <div>
-                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-green bg-brand-green/10 dark:bg-brand-green/20 rounded-full mb-3">
-                                    Recomendado
-                                </span>
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
-                                    Pagar Sinal / Entrada
+                                    Sinal / Entrada
                                 </h3>
                                 <p className="text-xs text-brand-inactive-text dark:text-dark-body mb-4">
                                     Pague apenas uma porcentagem agora para garantir sua reserva.
@@ -3931,12 +3884,9 @@ const hasUnavailableServices = useMemo(() => {
                         {/* Option Integral */}
                         <div
                             onClick={handleSelectIntegral}
-                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border-2 border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10 transition-all shadow-sm"
+                            className="cursor-pointer group flex flex-col justify-between p-5 rounded-2xl border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10 transition-all"
                         >
                             <div>
-                                <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-inactive-text bg-brand-slate/80 dark:bg-dark-border/40 rounded-full mb-3">
-                                    Integral
-                                </span>
                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-1">
                                     Pagamento Integral
                                 </h3>

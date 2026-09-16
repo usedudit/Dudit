@@ -20,6 +20,7 @@ import {
 } from "@/lib/services/mercadopago/subscriptions"
 import { computeSubscriptionPeriods } from "@/lib/billing/subscription-period"
 import { SUBSCRIPTION_MESSAGES } from "@/lib/constants/messages"
+import { sendPlanChanged } from "@/lib/services/discord-general-webhook.service"
 
 // ============================================================================
 // READ ACTIONS
@@ -293,10 +294,31 @@ export async function upgradeSubscriptionAction(
       return errorResponse(SUBSCRIPTION_MESSAGES.PLAN_NOT_FOUND)
     }
 
+    // Get current plan before change
+    const currentPlan = await getPartnerPlan(partner.id)
+
     const result = await updateMpSubscription(partner.id, newPlanId, user.id)
 
     if (!result.success) {
       return errorResponse(result.error || "Erro ao alterar plano")
+    }
+
+    // Webhook Discord: notificar mudança de plano (fail-open)
+    const { getAllPlans } = await import("@/lib/services/subscription.service")
+    const allPlans = await getAllPlans()
+    const newPlan = allPlans.find(p => p.id === newPlanId)
+
+    if (newPlan && currentPlan) {
+      const changeType = result.type === "upgrade" ? "upgrade" : "downgrade"
+      sendPlanChanged({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+        partnerId: partner.id,
+        previousPlan: currentPlan.name || currentPlan.slug || "Desconhecido",
+        newPlan: newPlan.name || newPlan.slug || "Desconhecido",
+        changeType,
+      }).catch(err => console.warn("[SUBSCRIPTION] Discord webhook failed (non-blocking):", err))
     }
 
     return successResponse({
