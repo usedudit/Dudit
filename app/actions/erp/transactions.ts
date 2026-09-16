@@ -1553,7 +1553,7 @@ export async function createInstallmentGroupAction(input: {
         const firstInstallmentPaymentDate = input.firstInstallmentPaymentDate || new Date().toISOString()
         const transactionsPayload = Array.from({ length: count }).map((_, index) => {
             const installmentNumber = index + 1
-            const due = addInstallmentDate(startDate, input.frequency, interval, index)
+            const due = addInstallmentDate(startDate, input.frequency, interval, index + 1)
             const lineAmount = installmentNumber === count ? Math.round((eachAmount + amountDiff) * 100) / 100 : eachAmount
             const isFirstInstallmentPaid = initialStatus === "paid" && installmentNumber === 1
             return {

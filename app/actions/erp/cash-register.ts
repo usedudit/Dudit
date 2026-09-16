@@ -90,7 +90,7 @@ function isMovementActive(row: { reversed_at?: string | null }) {
   return row.reversed_at == null
 }
 
-/** Cash drawer balance: initial + cash sales + deposits − withdrawals − refunds (active movements only). */
+/** Cash drawer balance: initial + cash sales + deposits − withdrawals (active movements only). */
 function computeDrawerBalanceCents(params: {
   initialAmount: number
   movements: Array<{
@@ -105,7 +105,6 @@ function computeDrawerBalanceCents(params: {
   let cashSales = 0
   let deposits = 0
   let withdrawals = 0
-  let refunds = 0
 
   for (const m of params.movements || []) {
     if (!isMovementActive(m)) continue
@@ -113,7 +112,6 @@ function computeDrawerBalanceCents(params: {
     if (!(amt > 0)) continue
     if (m.type === "deposit") deposits += amt
     else if (m.type === "withdrawal") withdrawals += amt
-    else if (m.type === "refund") refunds += amt
     else if (m.type === "sale") {
       const pmType = m.payment_method_type
       const isCash = !m.payment_method_id || pmType === "cash"
@@ -121,13 +119,12 @@ function computeDrawerBalanceCents(params: {
     }
   }
 
-  const total = money(initial + cashSales + deposits - withdrawals - refunds)
+  const total = money(initial + cashSales + deposits - withdrawals)
   return {
     initial,
     cashSales,
     deposits,
     withdrawals,
-    refunds,
     total,
   }
 }
@@ -908,8 +905,7 @@ export async function closeCashSessionAction(input: {
       Number(summary.data.drawer?.initial || 0) +
       countedCashSales +
       Number(summary.data.drawer?.deposits || 0) -
-      Number(summary.data.drawer?.withdrawals || 0) -
-      Number(summary.data.drawer?.refunds || 0),
+      Number(summary.data.drawer?.withdrawals || 0),
     )
     : calculated
   const difference = money(informedTotal - calculated)
@@ -1369,7 +1365,6 @@ export async function getCashSessionDetailsAction(partnerId: string, cashSession
         totalSalesAllMethods: summaryByPaymentMethod.reduce((acc, row) => money(acc + Number(row.calculated || 0)), 0),
         totalWithdrawals: drawer.withdrawals,
         totalDeposits: drawer.deposits,
-        totalRefunds: drawer.refunds,
         calculatedDrawerTotal: calculatedTotal,
         informedDrawerTotal: informedTotal,
         difference: storedDifference ?? (informedTotal != null ? money(informedTotal - calculatedTotal) : null),

@@ -91,7 +91,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
       const [{ data: assignments }, { data: deliveryLinks }] = await Promise.all([
         adminClient
           .from("delivery_assignments")
-          .select("id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at")
+          .select("id, order_id, driver_id, status, assigned_at, accepted_at, picked_up_at, out_for_delivery_at, completed_at, failure_reason")
           .in("order_id", orderIds)
           .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
           .order("assigned_at", { ascending: false }),
@@ -187,6 +187,12 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
               totalDeliveries: totalDeliveriesMap.get(driverId) || 0,
               status: assignment.status,
               isPlatformDriver: true,
+              assigned_at: assignment.assigned_at || null,
+              accepted_at: assignment.accepted_at || null,
+              picked_up_at: assignment.picked_up_at || null,
+              out_for_delivery_at: assignment.out_for_delivery_at || null,
+              completed_at: assignment.completed_at || null,
+              failure_reason: assignment.failure_reason || null,
             },
           }
         } else if (legacyDel && legacyDel.delivery_person_id) {
@@ -203,6 +209,12 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
               totalDeliveries: 0,
               status: legacyDel.status,
               isPlatformDriver: false,
+              assigned_at: null,
+              accepted_at: null,
+              picked_up_at: null,
+              out_for_delivery_at: null,
+              completed_at: null,
+              failure_reason: null,
             },
           }
         }

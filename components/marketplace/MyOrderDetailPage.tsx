@@ -339,6 +339,88 @@ const getClientTimelineSteps = (order: any) => {
     return steps;
 };
 
+const getDeliveryTimelineSteps = (order: any) => {
+    const driver = order.delivery_driver;
+    if (!driver) return [];
+
+    const fmtStep = (iso?: string | null) => (iso ? { date: formatFullDate(iso), time: formatTime(iso), iso } : {});
+
+    const steps: { label: string; active: boolean; date?: string; time?: string; iso?: string; subLabel?: string }[] = [];
+
+    // 1. Atribuído
+    steps.push({
+        label: "Pedido atribuído a um entregador",
+        active: true,
+        ...fmtStep(driver.assigned_at),
+    });
+
+    // 2. Aceitou
+    steps.push({
+        label: "Entregador aceitou a entrega",
+        active: !!driver.accepted_at,
+        ...fmtStep(driver.accepted_at),
+    });
+
+    // 3. Coletou
+    steps.push({
+        label: "Pedido coletado pelo entregador",
+        active: !!driver.picked_up_at,
+        ...fmtStep(driver.picked_up_at),
+    });
+
+    // 4. Saiu para entrega
+    steps.push({
+        label: "Saiu para entrega",
+        active: !!driver.out_for_delivery_at,
+        ...fmtStep(driver.out_for_delivery_at),
+    });
+
+    // 5. Entregue ou Falha
+    if (driver.status === "failed") {
+        steps.push({
+            label: "Falha na entrega",
+            active: true,
+            ...fmtStep(driver.failed_at || driver.completed_at),
+            subLabel: driver.failure_reason || "Não foi possível realizar a entrega.",
+        });
+    } else {
+        steps.push({
+            label: "Pedido entregue",
+            active: !!driver.completed_at || driver.status === "delivered",
+            ...fmtStep(driver.completed_at),
+        });
+    }
+
+    return steps;
+};
+
+const getDeliveryStatusLabel = (status?: string | null) => {
+    switch (status) {
+        case "pending": return { label: "Pendente", color: "text-brand-orange" as const };
+        case "not_sent": return { label: "Não enviado", color: "text-gray-500 as const" as any };
+        case "preparing": return { label: "Preparando", color: "text-brand-orange" as const };
+        case "sent": return { label: "Enviado", color: "text-brand-blue as const" as any };
+        case "delivered": return { label: "Entregue", color: "text-brand-green" as const };
+        case "pickup_available": return { label: "Pronto para retirada", color: "text-brand-green" as const };
+        case "delivery_failed": return { label: "Falha na entrega", color: "text-brand-red" as const };
+        case "cancelled": return { label: "Cancelado", color: "text-brand-red" as const };
+        default: return { label: status || "Não informado", color: "text-gray-500 as const" as any };
+    }
+};
+
+const getAssignmentStatusLabel = (status?: string | null) => {
+    switch (status) {
+        case "assigned": return "Atribuído";
+        case "accepted": return "Aceito";
+        case "picked_up": return "Coletado";
+        case "out_for_delivery": return "A caminho";
+        case "delivered": return "Entregue";
+        case "failed": return "Falhou";
+        case "cancelled": return "Cancelado";
+        default: return status || "Desconhecido";
+    }
+};
+
 export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => {
     const router = useRouter();
     const { toast } = useToast();
@@ -415,7 +497,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         }
     };
 
-    const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "history" | "attachments" | "delivery">("details");
     const [attachments, setAttachments] = useState<any[]>([]);
     const [loadingAttachments, setLoadingAttachments] = useState(false);
     const [storePolicy, setStorePolicy] = useState<any>(null);
@@ -1356,6 +1438,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
                         <TabsList className="mb-8">
                             <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
+                            {isDelivery && (
+                                <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                            )}
                             <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
                             {attachments.length > 0 && (
                                 <TabsTrigger value="attachments">Anexos ({attachments.length})</TabsTrigger>
@@ -1986,6 +2071,156 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                 )}
                             </FormSection>
                         </TabsContent>
+
+                        {isDelivery && (
+                            <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
+                                <div className="space-y-6">
+                                    {/* Status da Entrega */}
+                                    <FormSection title="Status da Entrega">
+                                        {(() => {
+                                            const ds = getDeliveryStatusLabel(order.delivery_status);
+                                            const isPickup = order.delivery_type === "pickup";
+                                            return (
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${ds.color} bg-brand-gray dark:bg-dark-border/50`}>
+                                                        <TruckIcon size={22} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                            {isPickup ? "Retirada no estabelecimento" : ds.label}
+                                                        </p>
+                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
+                                                            {isPickup
+                                                                ? "Seu pedido está pronto para ser retirado na loja."
+                                                                : order.delivery_status === "delivered"
+                                                                    ? "Seu pedido foi entregue com sucesso."
+                                                                    : order.delivery_status === "sent" || order.delivery_status === "out_for_delivery"
+                                                                        ? "Seu pedido está a caminho."
+                                                                        : order.delivery_status === "preparing"
+                                                                            ? "O vendedor está preparando seu pedido para envio."
+                                                                            : order.delivery_status === "delivery_failed"
+                                                                                ? "Houve uma falha na entrega do seu pedido."
+                                                                                : "Aguardando preparação para entrega."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </FormSection>
+
+                                    {/* Card do Entregador */}
+                                    {order.delivery_driver && (
+                                        <FormSection title="Entregador">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
+                                                    {order.delivery_driver.avatarUrl ? (
+                                                        <img
+                                                            src={order.delivery_driver.avatarUrl}
+                                                            alt={order.delivery_driver.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <TruckIcon size={22} className="text-brand-dark dark:text-dark-heading" />
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                            {order.delivery_driver.name}
+                                                        </span>
+                                                        {order.delivery_driver.isPlatformDriver ? (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 dark:text-brand-primary">
+                                                                Dudit
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-gray dark:bg-dark-border/50 text-brand-inactive-text dark:text-dark-body">
+                                                                Loja
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                                        {order.delivery_driver.isPlatformDriver ? (
+                                                            <>
+                                                                {order.delivery_driver.totalDeliveries > 0 && (
+                                                                    <span>{order.delivery_driver.totalDeliveries} entregas realizadas</span>
+                                                                )}
+                                                                {order.delivery_driver.vehicleType && (
+                                                                    <span>{order.delivery_driver.vehicleType}</span>
+                                                                )}
+                                                                {order.delivery_driver.status && (
+                                                                    <span className="text-xs">• {getAssignmentStatusLabel(order.delivery_driver.status)}</span>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <span>Entrega própria do estabelecimento</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {order.delivery_driver.phone && ["sent", "out_for_delivery", "assigned", "accepted"].includes(order.delivery_driver.status || order.delivery_status) && (
+                                                    <a
+                                                        href={`https://wa.me/55${String(order.delivery_driver.phone).replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="shrink-0 p-2.5 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors flex items-center gap-1.5 text-xs font-semibold text-brand-dark dark:text-dark-heading"
+                                                        title="Conversar no WhatsApp"
+                                                    >
+                                                        <WhatsappIcon size={16} className="text-[#25D366]" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </FormSection>
+                                    )}
+
+                                    {/* Timeline da Entrega */}
+                                    {(() => {
+                                        const deliverySteps = getDeliveryTimelineSteps(order);
+                                        if (deliverySteps.length === 0) return null;
+
+                                        const activeSteps = deliverySteps.filter(s => s.active);
+                                        const timelineEntries = activeSteps.map((step, idx) => ({
+                                            id: `delivery-step-${idx}`,
+                                            actor_name: step.label,
+                                            change_lines: step.subLabel ? [step.subLabel] : [],
+                                            created_at: step.iso || order.created_at,
+                                            entry_type: "delivery",
+                                        }));
+
+                                        return (
+                                            <FormSection title="Acompanhamento da Entrega">
+                                                <HistoryTimeline
+                                                    entries={timelineEntries}
+                                                    emptyMessage="Nenhum evento de entrega registrado."
+                                                />
+                                            </FormSection>
+                                        );
+                                    })()}
+
+                                    {/* Resumo da Entrega */}
+                                    <FormSection title="Resumo da Entrega">
+                                        <div className="space-y-3">
+                                            <DetailRow label="Tipo de entrega" value={
+                                                order.delivery_type === "pickup" ? "Retirada" : (
+                                                    order.delivery_driver?.isPlatformDriver ? "Dudit Rede" : "Entregador da Loja"
+                                                )
+                                            } />
+                                            {order.delivery_address && order.delivery_type === "delivery" && (
+                                                <DetailRow label="Endereço" value={
+                                                    <span className="text-sm max-w-[250px] truncate inline-block">{order.delivery_address}</span>
+                                                } />
+                                            )}
+                                            {order.delivery_fee > 0 && (
+                                                <DetailRow label="Taxa de entrega" value={formatCurrency(order.delivery_fee)} />
+                                            )}
+                                            {order.delivery_type === "pickup" && store?.addresses && (
+                                                <DetailRow label="Local de retirada" value={
+                                                    <span className="text-sm max-w-[250px] truncate inline-block">{formatPartnerAddress(store.addresses)}</span>
+                                                } />
+                                            )}
+                                        </div>
+                                    </FormSection>
+                                </div>
+                            </TabsContent>
+                        )}
                     </Tabs>
                 </div>
 

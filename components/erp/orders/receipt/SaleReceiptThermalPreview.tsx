@@ -4,36 +4,20 @@ import {
     DEFAULT_RECEIPT_ACKNOWLEDGMENT,
     formatReceiptAmount,
     type SaleReceiptData,
+    type SaleReceiptInstallmentDetail,
 } from "@/lib/sales/sale-receipt"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-
-function DashedLine({ className = "my-1.5" }: { className?: string }) {
-    return (
-        <div
-            className={`w-full border-t border-dashed ${className}`}
-            style={{ borderColor: "#000000" }}
-        />
-    )
-}
+import {
+    DashedLine,
+    ReceiptRow,
+    ReceiptThermalStoreHeader,
+} from "./ReceiptComponents"
 
 type SaleReceiptThermalPreviewProps = {
     data: SaleReceiptData
     footerMessage: string
     showAcknowledgment?: boolean
     printMode?: boolean
-}
-
-function Row({ left, right, bold, className = "" }: { left: string; right: string; bold?: boolean; className?: string }) {
-    return (
-        <div
-            className={`flex justify-between items-baseline gap-2 text-[10.5px] leading-tight ${bold ? "font-bold" : "font-medium"
-                } ${className}`}
-            style={{ color: "#000000" }}
-        >
-            <span className="shrink-0">{left}</span>
-            <span className="text-right shrink-0">{right}</span>
-        </div>
-    )
 }
 
 export default function SaleReceiptThermalPreview({
@@ -85,49 +69,36 @@ export default function SaleReceiptThermalPreview({
 
             <div className="px-3 py-3" style={{ backgroundColor: "#ffffff" }}>
                 {/* Header estabelecimento */}
-                <div className="text-center mb-1.5" style={{ color: "#000000" }}>
-                    {data.partner.legalName && data.partner.legalName !== data.partner.fantasyName ? (
-                        <p className="text-[9.5px] leading-tight font-medium" style={{ color: "#000000" }}>
-                            {data.partner.legalName}
-                        </p>
-                    ) : null}
-                    <p className="font-bold text-[13.5px] uppercase tracking-tight leading-tight" style={{ color: "#000000" }}>
-                        {data.partner.fantasyName}
-                    </p>
-                    {data.partner.addressLine ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight whitespace-pre-line font-medium" style={{ color: "#000000" }}>
-                            {data.partner.addressLine}
-                        </p>
-                    ) : null}
-                    {data.partner.taxIdLine ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
-                            {data.partner.taxIdLine}
-                        </p>
-                    ) : null}
-                </div>
+                <ReceiptThermalStoreHeader partnerHeader={data.partner} partnerName={data.partner.fantasyName} />
 
                 <DashedLine className="my-1.5" />
 
                 {/* Cliente / Pedido / Entrega */}
                 <div className="space-y-0.5 text-[10.5px]" style={{ color: "#000000" }}>
-                    <p className="leading-tight font-bold">{data.customerName}</p>
+                    <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
+                        <span>Cliente:</span>
+                        <span>{data.customerName}</span>
+                    </div>
                     {data.customerPhone ? (
-                        <p className="leading-tight">{formatBrazilPhone(data.customerPhone)}</p>
+                        <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
+                            <span>Telefone:</span>
+                            <span>{formatBrazilPhone(data.customerPhone)}</span>
+                        </div>
                     ) : null}
-                    <div className="flex justify-between items-baseline font-bold pt-0.5 text-[10.5px]">
-                        <span>Nº DO PEDIDO: {data.orderNumber}</span>
+                    <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
+                        <span>Nº do Pedido: {data.orderNumber}</span>
                         <span>{data.saleDateTime}</span>
                     </div>
-                    <p className="leading-tight">
-                        <span className="font-bold">Canal / Origem:</span>{" "}
+                    <div className="flex justify-between items-baseline pt-0.5 text-[10.5px]">
+                        <span>Canal/Origem:</span>{" "}
                         {data.isOnlineOrder ? (
-                            <span className="font-bold uppercase">
+                            <span className="uppercase">
                                 {data.deliveryType === "pickup" ? "Pedido online - retirada" : "Pedido online - entrega"}
                             </span>
                         ) : (
                             data.orderSource || data.sellerName || "Não informado"
                         )}
-                    </p>
+                    </div>
 
                     {isDelivery && data.customerAddress ? (
                         <div className="pt-1">
@@ -171,21 +142,21 @@ export default function SaleReceiptThermalPreview({
 
                 {/* Totais estruturados */}
                 <div className="space-y-1" style={{ color: "#000000" }}>
-                    <Row left="Itens do pedido:" right={`R$ ${formatReceiptAmount(grossTotal)}`} />
+                    <ReceiptRow left="Itens do pedido:" right={`R$ ${formatReceiptAmount(grossTotal)}`} />
 
                     {totalDiscounts > 0.009 && (
-                        <Row left="Descontos:" right={`-R$ ${formatReceiptAmount(totalDiscounts)}`} />
+                            <ReceiptRow left="Descontos:" right={`-R$ ${formatReceiptAmount(totalDiscounts)}`} />
                     )}
 
                     {(data.shippingFee > 0.009 || data.deliveryPayer === "seller") && (
-                        <Row
+                        <ReceiptRow
                             left="Taxa de entrega:"
                             right={isDeliveryFree ? "Grátis" : `R$ ${formatReceiptAmount(data.shippingFee)}`}
                         />
                     )}
 
                     {totalOtherCosts > 0.009 && (
-                        <Row left="Outros custos:" right={`+R$ ${formatReceiptAmount(totalOtherCosts)}`} />
+                        <ReceiptRow left="Outros custos:" right={`+R$ ${formatReceiptAmount(totalOtherCosts)}`} />
                     )}
 
                     <div className="flex justify-between items-baseline pt-1 my-0.5 font-bold" style={{ color: "#000000" }}>
@@ -194,7 +165,7 @@ export default function SaleReceiptThermalPreview({
                     </div>
 
                     {data.change > 0.009 && (
-                        <Row left="Troco:" right={`R$ ${formatReceiptAmount(data.change)}`} />
+                        <ReceiptRow left="Troco:" right={`R$ ${formatReceiptAmount(data.change)}`} />
                     )}
                 </div>
 
@@ -203,14 +174,14 @@ export default function SaleReceiptThermalPreview({
                     <p className="font-bold text-[10.5px] uppercase" style={{ color: "#000000" }}>Forma de pagamento:</p>
                     {data.paymentLines && data.paymentLines.length > 0 ? (
                         data.paymentLines.map((line, i) => (
-                            <Row
+                            <ReceiptRow
                                 key={`pay-${i}`}
                                 left={line.label}
-                                right={`R$ ${formatReceiptAmount(line.amount)}`}
-                            />
-                        ))
-                    ) : (
-                        <Row left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
+                right={`R$ ${formatReceiptAmount(line.amount)}`}
+            />
+        ))
+    ) : (
+        <ReceiptRow left="Não informado" right={`R$ ${formatReceiptAmount(data.total)}`} />
                     )}
 
                     {data.isOnlinePayment && (
@@ -226,6 +197,24 @@ export default function SaleReceiptThermalPreview({
                         </div>
                     )}
                 </div>
+
+                {/* Detalhamento de parcelas */}
+                {data.installmentDetails && data.installmentDetails.length > 0 && (
+                    <>
+                        <DashedLine className="my-1.5" />
+                        <div className="space-y-1" style={{ color: "#000000" }}>
+                            <p className="font-bold text-[10.5px] uppercase" style={{ color: "#000000" }}>Detalhamento das parcelas:</p>
+                            {data.installmentDetails.map((inst, i) => (
+                                <div key={i} className="text-[10px] leading-snug font-medium" style={{ color: "#000000" }}>
+                                    <div>Nr Prestação: {String(inst.number).padStart(2, "0")}/{String(inst.total).padStart(2, "0")}</div>
+                                    <div>Data Venc.: {inst.dueDate}</div>
+                                    <div>Valor......: R$ {formatReceiptAmount(inst.amount)}</div>
+                                    {i < data.installmentDetails!.length - 1 && <div className="my-0.5" />}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
 
                 {/* Observações */}
                 {data.notes && (

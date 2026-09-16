@@ -63,9 +63,11 @@ export async function computeMarketplaceCheckoutAmounts(
     if (line.itemType === "service_booking") {
       const qty = Number(line.quantity || 1)
       const full = Number(line.fullPrice || line.unitPrice || 0)
-      const dep = Number(line.depositAmount != null ? line.depositAmount : full)
+      // depositAmount from the resolver is already the TOTAL for the line (fullPrice * qty * pct),
+      // so we must NOT multiply by qty again. When null, fall back to full * qty for parity.
+      const dep = line.depositAmount != null ? Number(line.depositAmount) : full * qty
       serviceFullTotal += full * qty
-      serviceDepositAmount += dep * qty
+      serviceDepositAmount += dep
     }
   }
 

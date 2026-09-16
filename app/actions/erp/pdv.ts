@@ -1393,21 +1393,17 @@ export async function finalizePreSaleAction(input: FinalizePreSaleInput) {
     // the remaining time shown by the PDV.
     const cashMovementsPromise = capabilities.hasFinancial && activeSessionResult.data?.id
         ? Promise.all(
-            breakdownForOrder
-                .filter((entry) => {
-                    const method = String(entry.method || "").toLowerCase().trim()
-                    return method.includes("dinheiro") || method.includes("cash")
-                })
-                .map((entry) => supabase.from("cash_movements").insert({
-                    partner_id: input.partnerId,
-                    store_id: input.storeId || null,
-                    cash_session_id: activeSessionResult.data!.id,
-                    type: "sale",
-                    description: `Venda PDV ${orderNumber}`,
-                    amount: entry.amount,
-                    user_id: user.id,
-                    order_id: orderId,
-                }))
+            breakdownForOrder.map((entry) => supabase.from("cash_movements").insert({
+                partner_id: input.partnerId,
+                store_id: input.storeId || null,
+                cash_session_id: activeSessionResult.data!.id,
+                type: "sale",
+                description: `Venda PDV ${orderNumber}`,
+                amount: entry.amount,
+                payment_method_id: entry.payment_method_id || entry.paymentMethodId || null,
+                created_by_user_id: user.id,
+                reference_id: orderId,
+            }))
         )
         : Promise.resolve()
 

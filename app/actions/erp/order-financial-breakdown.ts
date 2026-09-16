@@ -1,7 +1,7 @@
 "use server"
 
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
-import { requirePartnerRouteAccess } from "@/lib/auth/authorization"
+import { requirePartnerRouteAccess, requireMinimumPlan } from "@/lib/auth/authorization"
 
 const round2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100
 
@@ -27,6 +27,7 @@ export type FinancialBreakdownData = {
 
 export async function getOrderFinancialBreakdownAction(orderId: string, partnerId: string) {
   await requirePartnerRouteAccess(partnerId, "orders")
+  await requireMinimumPlan(partnerId, "crescer")
   const supabase = await getSupabaseServerClient()
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)

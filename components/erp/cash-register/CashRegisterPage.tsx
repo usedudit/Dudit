@@ -566,7 +566,6 @@ export default function CashRegisterPage({
         const opening = Number(closeSummary.drawer?.initial || 0)
         const deposits = Number(closeSummary.drawer?.deposits || 0)
         const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
-        const refunds = Number(closeSummary.drawer?.refunds || 0)
         const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
         const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
         const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
@@ -577,7 +576,7 @@ export default function CashRegisterPage({
             const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
             return isCash ? acc + value : acc
         }, 0)
-        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
+        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals
         return {
             opening,
             expectedCashSales,
@@ -883,12 +882,8 @@ export default function CashRegisterPage({
                                                 Sem formas de pagamento para conferência nesta sessão.
                                             </p>
                                         ) : (
-                                            <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
-                                                {groupedRows.filter((row: any) => {
-                                                    const type = String(row.paymentMethodType || "").toLowerCase()
-                                                    const label = String(row.label || "").toLowerCase()
-                                                    return type === "cash" || label.includes("dinheiro")
-                                                }).map((row: any) => {
+                                            <FormSection title="Conferência por forma de pagamento" hasSeparator>
+                                                {groupedRows.map((row: any) => {
                                                     const key = row.paymentMethodId || "__none__"
                                                     return (
                                                         <MoneyInput

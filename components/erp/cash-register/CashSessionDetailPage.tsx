@@ -18,9 +18,9 @@ type DetailPayload = {
     session: any
     movements: any[]
     operators: { open_name: string; close_name: string | null }
-    drawer: { initial: number; cashSales: number; deposits: number; withdrawals: number; refunds: number; total: number }
+    drawer: { initial: number; cashSales: number; deposits: number; withdrawals: number; total: number }
     summaryByPaymentMethod: Array<{ paymentMethodId: string | null; label: string; calculated: number; counted: number | null; difference: number | null }>
-    totals: { initial: number; totalCashSales: number; totalSalesAllMethods?: number; totalWithdrawals: number; totalDeposits: number; totalRefunds: number; calculatedDrawerTotal: number; informedDrawerTotal: number | null; difference: number | null }
+    totals: { initial: number; totalCashSales: number; totalSalesAllMethods?: number; totalWithdrawals: number; totalDeposits: number; calculatedDrawerTotal: number; informedDrawerTotal: number | null; difference: number | null }
     adjustmentMovementCount: number
 }
 
@@ -220,7 +220,6 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         const opening = Number(closeSummary.drawer?.initial || 0)
         const deposits = Number(closeSummary.drawer?.deposits || 0)
         const withdrawals = Number(closeSummary.drawer?.withdrawals || 0)
-        const refunds = Number(closeSummary.drawer?.refunds || 0)
         const expectedDrawerTotal = Number(closeSummary.expectedDrawerTotal || 0)
         const expectedCashSales = Number(closeSummary.drawer?.cashSales || 0)
         const informedCashSales = groupedRows.reduce((acc: number, row: any) => {
@@ -231,7 +230,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
             const isCash = type === "cash" || (!row.paymentMethodId && type !== "pix")
             return isCash ? acc + value : acc
         }, 0)
-        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals - refunds
+        const informedDrawerTotal = opening + informedCashSales + deposits - withdrawals
         return {
             opening,
             expectedCashSales,
@@ -479,7 +478,6 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                 <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Abertura</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatLongDateTime(session.opened_at, tz)}</span></div>
                                                 {!isOpen && <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Fechamento</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{session.closed_at ? formatLongDateTime(session.closed_at, tz) : "-"}</span></div>}
                                                 <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Saldo calculado</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.calculatedDrawerTotal)}</span></div>
-                                                <div className="flex justify-between items-start gap-4 text-[14px]"><span className="text-brand-inactive-text dark:text-dark-body font-medium">Devoluções</span><span className="text-right font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(details.totals.totalRefunds)}</span></div>
                                                 <div className="pt-3 border-t border-brand-border dark:border-dark-border space-y-3">
                                                     <button type="button" className="text-left text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline" onClick={handlePrintCoupon}>{isOpen ? "Imprimir cupom de abertura" : "Imprimir cupom de fechamento"}</button>
                                                     <Link href="/erp/transacoes" className="block text-sm font-semibold text-brand-dark dark:text-dark-heading hover:underline">Ver relatório de movimentação do caixa</Link>
@@ -712,12 +710,8 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                             Sem formas de pagamento para conferência nesta sessão.
                                         </p>
                                     ) : (
-                                        <FormSection title="Contagem de dinheiro no caixa" hasSeparator>
-                                            {groupedRows.filter((row: any) => {
-                                                const type = String(row.paymentMethodType || "").toLowerCase()
-                                                const label = String(row.label || "").toLowerCase()
-                                                return type === "cash" || label.includes("dinheiro")
-                                            }).map((row: any) => {
+                                        <FormSection title="Conferência por forma de pagamento" hasSeparator>
+                                            {groupedRows.map((row: any) => {
                                                 const key = row.paymentMethodId || "__none__"
                                                 return (
                                                     <MoneyInput

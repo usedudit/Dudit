@@ -1,10 +1,16 @@
 "use client"
 
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatDate, formatCurrency } from "@/lib/utils"
 import { stripCep } from "@/lib/utils/format-address"
-import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
+import {
+    QUOTE_PREVIEW_PRIMARY_COLOR,
+    QUOTE_PREVIEW_SECONDARY_COLOR,
+} from "@/lib/quotes/quote-preview-theme"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
+import {
+    ReceiptA4StoreData,
+    ReceiptA4Footer,
+} from "@/components/erp/orders/receipt/ReceiptComponents"
 
 const STATUS_LABELS: Record<string, string> = {
     PENDING_REVIEW: "Pendente",
@@ -65,11 +71,11 @@ export default function ReturnReceiptA4Preview({
     const title = isExchange ? "COMPROVANTE DE TROCA" : "COMPROVANTE DE DEVOLUÇÃO"
     const primary = primaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
     const secondary = secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
-    const partnerAddress = partnerHeader.addressLine || "Endereço não cadastrado"
     const customerAddress = returnRequest.customerAddress ? stripCep(String(returnRequest.customerAddress)) : undefined
+    const solicitationId = returnRequest.id ? returnRequest.id.slice(0, 8).toUpperCase() : ""
 
     return (
-        <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "quote-a4-print" : "md:border-l border-brand-border dark:border-dark-border"}`}>
+        <div className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "sale-receipt-a4-print" : "md:border-l border-brand-border dark:border-dark-border"}`}>
             <div className={printMode
                 ? "w-full flex flex-col items-center p-0"
                 : "flex-1 overflow-auto custom-scrollbar p-4 md:p-12 flex flex-col items-start lg:items-center pt-12 space-y-8 absolute top-4 right-4 bottom-4 left-4 bg-[#e5e7eb] dark:bg-dark-surface/50 rounded-2xl border border-brand-border dark:border-dark-border"
@@ -116,7 +122,7 @@ export default function ReturnReceiptA4Preview({
                             <div>
                                 <h1 className="text-2xl font-medium text-white">{title}</h1>
                                 <p className="text-white/80 text-xs tracking-widest font-light mt-1">
-                                    Solicitação #{returnRequest.id.slice(0, 8).toUpperCase()}
+                                    Solicitação #{solicitationId}
                                 </p>
                             </div>
                         </div>
@@ -148,26 +154,13 @@ export default function ReturnReceiptA4Preview({
                         </div>
                     </div>
 
-                    <div className="px-8 pb-6">
-                        <div className="grid grid-cols-2 gap-8">
-                            <div>
-                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
-                                <div className="text-xs text-gray-600 space-y-1">
-                                    <p className="font-bold text-sm text-brand-dark">{partnerHeader.fantasyName || partnerName}</p>
-                                    {partnerHeader.phone && <p>{formatBrazilPhone(partnerHeader.phone)}</p>}
-                                    <p className="whitespace-pre-wrap">{partnerAddress}</p>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
-                                <div className="text-xs text-gray-600 space-y-1">
-                                    <p className="font-bold text-sm text-brand-dark">{returnRequest.customerName}</p>
-                                    {returnRequest.customerPhone && <p>{formatBrazilPhone(returnRequest.customerPhone)}</p>}
-                                    {customerAddress && <p className="whitespace-pre-wrap">{customerAddress}</p>}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <ReceiptA4StoreData
+                        partnerHeader={partnerHeader}
+                        partnerName={partnerName}
+                        customerName={returnRequest.customerName}
+                        customerPhone={returnRequest.customerPhone}
+                        customerAddress={customerAddress}
+                    />
 
                     {/* Table items */}
                     <div className="px-8 pb-4">
@@ -301,13 +294,8 @@ export default function ReturnReceiptA4Preview({
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div
-                        className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
-                        style={{ backgroundColor: primary }}
-                    >
-                        <span>Criado via Dudit - dudit.com.br</span>
-                    </div>
+                     {/* Footer */}
+                    <ReceiptA4Footer primaryColor={primaryColor} />
                 </div>
             </div>
         </div>

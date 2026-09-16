@@ -20,6 +20,14 @@ export type SaleReceiptPaymentLine = {
     amount: number
 }
 
+export type SaleReceiptInstallmentDetail = {
+    number: number
+    total: number
+    dueDate: string
+    amount: number
+    status?: string | null
+}
+
 export type SaleReceiptPartnerHeader = {
     fantasyName: string
     legalName: string
@@ -47,6 +55,7 @@ export type SaleReceiptData = {
     total: number
     change: number
     paymentLines: SaleReceiptPaymentLine[]
+    installmentDetails?: SaleReceiptInstallmentDetail[]
     methodDiscount: number
     generalDiscount: number
     couponDiscount: number
@@ -206,6 +215,42 @@ function groupPaymentMethods(
     }))
 }
 
+function buildInstallmentDetailsFromOrder(order: any): SaleReceiptInstallmentDetail[] | undefined {
+    const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
+    const installmentEntries = breakdown.filter(
+        (e: any) => e?.method && Number(e.amount || 0) > 0.009 && Math.floor(Number(e.installmentNumber || 1)) > 1,
+    )
+    if (installmentEntries.length === 0) return undefined
+
+    const saleDate = new Date(order.created_at || order.order_date || new Date())
+    const result: SaleReceiptInstallmentDetail[] = []
+
+    for (const entry of installmentEntries) {
+        const totalInstallments = Math.floor(Number(entry.installmentNumber || 1))
+        const grossAmount = Number(entry.amount || 0)
+        const installmentValue = Math.round((grossAmount / totalInstallments) * 100) / 100
+        const diff = Math.round((grossAmount - installmentValue * totalInstallments) * 100) / 100
+
+        for (let i = 0; i < totalInstallments; i++) {
+            const due = new Date(saleDate)
+            due.setMonth(due.getMonth() + (i + 1))
+            const day = String(due.getDate()).padStart(2, "0")
+            const month = String(due.getMonth() + 1).padStart(2, "0")
+            const year = due.getFullYear()
+            result.push({
+                number: i + 1,
+                total: totalInstallments,
+                dueDate: `${day}/${month}/${year}`,
+                amount: i === totalInstallments - 1
+                    ? Math.round((installmentValue + diff) * 100) / 100
+                    : installmentValue,
+            })
+        }
+    }
+
+    return result.length > 0 ? result : undefined
+}
+
 export function buildPaymentLinesFromOrder(order: any): SaleReceiptPaymentLine[] {
     const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : []
     const filtered = breakdown.filter((e: any) => e?.method && Number(e.amount || 0) > 0.009)
@@ -314,11 +359,16 @@ export function buildSaleReceiptFromOrder(
     const customerContact = formatCustomerContact(order)
 
     const orderSource = String(order.order_source || "").toLowerCase()
+    const isPresencialOrBalcao =
+        orderSource.includes("presencial") ||
+        orderSource.includes("balcão") ||
+        orderSource.includes("balcao")
     const isOnlineOrder =
-        orderSource.includes("vitrine") ||
-        orderSource.includes("marketplace") ||
-        orderSource.includes("online") ||
-        Boolean(order.buyer_id && order.buyer_id !== order.partner_id)
+        (orderSource.includes("vitrine") ||
+            orderSource.includes("marketplace") ||
+            orderSource.includes("online") ||
+            (Boolean(order.buyer_id && order.buyer_id !== order.partner_id) &&
+                !isPresencialOrBalcao))
 
     const rawDeliveryType = String(order.delivery_type || "").toLowerCase()
     const deliveryType =
@@ -362,6 +412,7 @@ export function buildSaleReceiptFromOrder(
         total,
         change,
         paymentLines: buildPaymentLinesFromOrder(order),
+        installmentDetails: buildInstallmentDetailsFromOrder(order),
         methodDiscount,
         generalDiscount: manualDiscount,
         couponDiscount,
@@ -398,7 +449,7 @@ export type SaleReceiptCartSnapshot = {
     total: number
     totalPaid: number
     change: number
-    paymentBreakdown?: Array<{ method?: string; amount?: number }>
+    paymentBreakdown?: Array<{ method?: string; amount?: number; installmentNumber?: number }>
     paymentMethod?: string
     methodDiscount?: number
     methodFee?: number
@@ -420,6 +471,37 @@ export function buildSaleReceiptFromCartSnapshot(
     const items = mapCartItemsToReceiptItems(snapshot.cart)
     const itemsTotal = items.reduce((acc, it) => acc + it.totalPrice, 0)
 
+    const installmentEntries = (snapshot.paymentBreakdown || []).filter(
+        (e) => e?.method && Number(e.amount || 0) > 0.009 && Math.floor(Number(e.installmentNumber || 1)) > 1,
+    )
+    let installmentDetails: SaleReceiptInstallmentDetail[] | undefined
+    if (installmentEntries.length > 0) {
+        const saleDate = new Date()
+        const details: SaleReceiptInstallmentDetail[] = []
+        for (const entry of installmentEntries) {
+            const totalInstallments = Math.floor(Number(entry.installmentNumber || 1))
+            const grossAmount = Number(entry.amount || 0)
+            const installmentValue = Math.round((grossAmount / totalInstallments) * 100) / 100
+            const diff = Math.round((grossAmount - installmentValue * totalInstallments) * 100) / 100
+            for (let i = 0; i < totalInstallments; i++) {
+                const due = new Date(saleDate)
+                due.setMonth(due.getMonth() + (i + 1))
+                const day = String(due.getDate()).padStart(2, "0")
+                const month = String(due.getMonth() + 1).padStart(2, "0")
+                const year = due.getFullYear()
+                details.push({
+                    number: i + 1,
+                    total: totalInstallments,
+                    dueDate: `${day}/${month}/${year}`,
+                    amount: i === totalInstallments - 1
+                        ? Math.round((installmentValue + diff) * 100) / 100
+                        : installmentValue,
+                })
+            }
+        }
+        installmentDetails = details.length > 0 ? details : undefined
+    }
+
     return {
         customerName: snapshot.customerName || "Consumidor final",
         orderNumber: snapshot.orderNumber,
@@ -434,6 +516,7 @@ export function buildSaleReceiptFromCartSnapshot(
             snapshot.paymentMethod,
             snapshot.totalPaid,
         ),
+        installmentDetails,
         methodDiscount: Math.max(0, Number(snapshot.methodDiscount || 0)),
         generalDiscount,
         couponDiscount,

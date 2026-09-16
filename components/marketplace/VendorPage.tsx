@@ -880,7 +880,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             window.requestAnimationFrame(() => {
                 const bottom = topRef.current?.getBoundingClientRect().bottom ?? 0
                 setIsStickyVisible(bottom < 0)
-                const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 0
+                const tabsTop = mobileTabsRef.current?.getBoundingClientRect().top ?? 999
                 setMobileTabsScrolledOut(tabsTop <= 0)
                 ticking = false
             })
@@ -1196,11 +1196,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             )}
 
-            <div ref={mobileTabsRef} className={`lg:hidden bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md`}>
+            <div ref={mobileTabsRef} className={`lg:hidden`}>
                 <div className="flex items-center gap-4 px-3 h-[46px]">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
-                        className="w-8 h-8 shrink-0 flex items-center justify-center text-white"
+                        className="w-8 h-8 shrink-0 flex items-center justify-center text-brand-dark dark:text-white"
                         title="Selecionar tipo"
                     >
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
@@ -1209,7 +1209,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {canScrollTabsLeft && (
                         <button
                             onClick={() => tabsScrollRef.current?.scrollBy({ left: -160, behavior: "smooth" })}
-                            className="w-6 h-full shrink-0 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                            className="w-6 h-full shrink-0 flex items-center justify-center text-brand-inactive-text/60 hover:text-brand-dark dark:text-white/60 dark:hover:text-white transition-colors"
                         >
                             <ChevronLeftIcon size={16} />
                         </button>
@@ -1223,7 +1223,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         id={`vendor-tab-${tab.id}`}
                                         key={tab.id}
                                         value={tab.id}
-                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-white/60 data-[state=active]:text-white data-[state=active]:font-semibold bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
+                                        className="h-full pb-0 pt-0 flex items-center justify-center whitespace-nowrap text-brand-inactive-text dark:text-white/60 data-[state=active]:text-brand-dark data-[state=active]:font-semibold dark:data-[state=active]:text-white bg-transparent data-[state=active]:bg-transparent transition-colors text-[13px] md:text-[14px]"
                                     >
                                         {tab.label}
                                     </TabsTrigger>
@@ -1235,7 +1235,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     {canScrollTabsRight && (
                         <button
                             onClick={() => tabsScrollRef.current?.scrollBy({ left: 160, behavior: "smooth" })}
-                            className="w-6 h-full shrink-0 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                            className="w-6 h-full shrink-0 flex items-center justify-center text-brand-inactive-text/60 hover:text-brand-dark dark:text-white/60 dark:hover:text-white transition-colors"
                         >
                             <ChevronRightIcon size={16} />
                         </button>
@@ -1243,7 +1243,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             </div>
 
-            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-full opacity-0 pointer-events-none"}`}>
+            <div className={`lg:hidden fixed top-[52px] left-0 right-0 h-[46px] z-[45] bg-brand-dark dark:bg-dark-surface border-b border-white/10 shadow-md transition-all duration-200 ${mobileTabsScrolledOut ? "translate-y-0 opacity-100 pointer-events-auto" : "-translate-y-2 opacity-0 pointer-events-none"}`}>
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide h-full px-3">
                     {allTabs.map(tab => (
                         <button

@@ -3,16 +3,7 @@
 import { formatCurrency } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { usePartnerTimezone } from "@/lib/store-context"
-
-const DASH = "-".repeat(60)
-
-function DashedLine({ className = "my-1" }: { className?: string }) {
-    return (
-        <p className={`text-center overflow-hidden whitespace-nowrap select-none ${className}`}>
-            {DASH}
-        </p>
-    )
-}
+import { DashedLine, ReceiptRow } from "@/components/erp/orders/receipt/ReceiptComponents"
 
 type CashSessionCouponData = {
     partnerName: string
@@ -31,7 +22,6 @@ type CashSessionCouponData = {
         totalSalesAllMethods: number
         totalWithdrawals: number
         totalDeposits: number
-        totalRefunds: number
         calculatedDrawerTotal: number
         informedDrawerTotal: number | null
         difference: number | null
@@ -43,15 +33,6 @@ type CashSessionCouponPreviewProps = {
     data: CashSessionCouponData
     type: "opening" | "closing"
     printMode?: boolean
-}
-
-function Row({ left, right, bold }: { left: string; right: string; bold?: boolean }) {
-    return (
-        <div className={`flex justify-between gap-2 text-[11px] leading-tight ${bold ? "font-bold" : ""}`}>
-            <span className="shrink-0">{left}</span>
-            <span className="text-right shrink-0">{right}</span>
-        </div>
-    )
 }
 
 const formatShortDateTime = (iso: string, tz?: string) => {
@@ -90,54 +71,58 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
                 <DashedLine className="my-1" />
 
                 <div className="text-[10px] space-y-0.5 mb-2">
-                    <Row left="Sessão:" right={data.sessionId.slice(0, 8).toUpperCase()} />
-                    <Row left="Abertura:" right={formatShortDateTime(data.openedAt, tz)} />
-                    <Row left="Operador:" right={data.openOperator} />
-                    {data.closedAt && <Row left="Fechamento:" right={formatShortDateTime(data.closedAt, tz)} />}
-                    {data.closeOperator && <Row left="Fechado por:" right={data.closeOperator} />}
+                    <ReceiptRow left="Sessão:" right={data.sessionId.slice(0, 8).toUpperCase()} />
+                    <ReceiptRow left="Abertura:" right={formatShortDateTime(data.openedAt, tz)} />
+                    <ReceiptRow left="Operador:" right={data.openOperator} />
+                    {data.closedAt && <ReceiptRow left="Fechamento:" right={formatShortDateTime(data.closedAt, tz)} />}
+                    {data.closeOperator && <ReceiptRow left="Fechado por:" right={data.closeOperator} />}
                 </div>
 
                 <DashedLine className="my-1" />
 
-                <Row left="Troco inicial:" right={formatCurrency(data.initialAmount)} bold />
+                <ReceiptRow left="Troco inicial:" right={formatCurrency(data.initialAmount)} bold />
 
-                <DashedLine className="my-1" />
+                {type === "closing" && (
+                    <>
+                        <DashedLine className="my-1" />
 
-                <p className="text-[9px] font-bold uppercase mb-1">Resumo por forma de recebimento</p>
+                        <p className="text-[9px] font-bold uppercase mb-1">Resumo por forma de recebimento</p>
 
-                {data.summaryByPaymentMethod.map((row, i) => (
-                    <Row key={i} left={row.label} right={formatCurrency(row.calculated)} />
-                ))}
+                        {data.summaryByPaymentMethod.map((row, i) => (
+                            <ReceiptRow key={i} left={row.label} right={formatCurrency(row.calculated)} />
+                        ))}
 
-                {data.summaryByPaymentMethod.length === 0 && (
-                    <p className="text-[9px] text-center">Nenhuma venda registrada.</p>
+                        {data.summaryByPaymentMethod.length === 0 && (
+                            <p className="text-[9px] text-center">Nenhuma venda registrada.</p>
+                        )}
+
+                        <DashedLine className="my-1" />
+                    </>
                 )}
 
-                <DashedLine className="my-1" />
+                {type === "opening" && <DashedLine className="my-1" />}
 
                 <div className="space-y-0.5">
-                    <Row left="Total de vendas:" right={formatCurrency(data.totals.totalSalesAllMethods)} bold />
+                    {data.totals.totalSalesAllMethods > 0 && (
+                        <ReceiptRow left="Total de vendas:" right={formatCurrency(data.totals.totalSalesAllMethods)} bold />
+                    )}
 
                     {(data.totals.totalWithdrawals > 0 || data.totals.totalDeposits > 0) && (
                         <>
-                            <Row left="Sangrias:" right={formatCurrency(data.totals.totalWithdrawals)} />
-                            <Row left="Reforços:" right={formatCurrency(data.totals.totalDeposits)} />
+                            <ReceiptRow left="Sangrias:" right={formatCurrency(data.totals.totalWithdrawals)} />
+                            <ReceiptRow left="Reforços:" right={formatCurrency(data.totals.totalDeposits)} />
                         </>
-                    )}
-
-                    {data.totals.totalRefunds > 0 && (
-                        <Row left="Devoluções:" right={formatCurrency(data.totals.totalRefunds)} />
                     )}
 
                     <DashedLine className="my-1" />
 
-                    <Row left="Saldo calculado:" right={formatCurrency(data.totals.calculatedDrawerTotal)} bold />
+                    <ReceiptRow left="Saldo calculado:" right={formatCurrency(data.totals.calculatedDrawerTotal)} bold />
 
                     {type === "closing" && data.totals.informedDrawerTotal != null && (
-                        <Row left="Saldo informado:" right={formatCurrency(data.totals.informedDrawerTotal)} bold />
+                        <ReceiptRow left="Saldo informado:" right={formatCurrency(data.totals.informedDrawerTotal)} bold />
                     )}
                     {type === "closing" && data.totals.difference != null && (
-                        <Row left="Diferença:" right={formatCurrency(data.totals.difference)} bold />
+                        <ReceiptRow left="Diferença:" right={formatCurrency(data.totals.difference)} bold />
                     )}
                 </div>
 
@@ -147,6 +132,11 @@ export default function CashSessionCouponPreview({ data, type, printMode = false
                         <p className="text-[9px] text-center">Obs: {data.notes}</p>
                     </>
                 )}
+
+                <DashedLine className="my-1" />
+                <p className="text-center text-[10.5px] font-bold uppercase tracking-wide">
+                    Criado via Dudit - dudit.com.br
+                </p>
             </div>
         </div>
     )

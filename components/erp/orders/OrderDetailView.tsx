@@ -41,9 +41,11 @@ import { formatCurrency, formatDateTime, formatTime, formatDayMonth, formatQuant
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
 import BottomSheet from "@/components/BottomSheet"
+import DefaultModal from "@/components/reusable/DefaultModal"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
@@ -182,7 +184,7 @@ interface OrderDetailViewProps {
 }
 
 export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrder, onUpdateDeliveryStatus, onUpdatePaymentStatus, onCancelOrder, onOpenNotes, initialOrder }: OrderDetailViewProps) {
-    const { role, canRbac } = usePermissions()
+    const { role, canRbac, planSlug } = usePermissions()
     const { selectedStore } = useStore()
 
     const [isScrolled, setIsScrolled] = useState(false)
@@ -206,6 +208,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const [isAppointmentSheetOpen, setIsAppointmentSheetOpen] = useState(false)
     const [selectedOrderItemForAppointment, setSelectedOrderItemForAppointment] = useState<any>(null)
     const [appointmentDefaultDate] = useState(() => new Date())
+    const [showInstallmentModal, setShowInstallmentModal] = useState(false)
 
     const handleSaveAppointmentFromOrder = async (data: any) => {
         try {
@@ -389,6 +392,47 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
             deviation: "Desvio",
         }
         return map[detail?.toLowerCase()] || detail
+    }
+
+    const getCardBrandInfo = (mpPaymentMethodId: string | null) => {
+        const brands: Record<string, { label: string; icon: string }> = {
+            visa: { label: "Visa", icon: "Visa.png" },
+            mastercard: { label: "Mastercard", icon: "Mastercard.png" },
+            elo: { label: "Elo", icon: "Elo.png" },
+            amex: { label: "Amex", icon: "Amex.png" },
+            hipercard: { label: "Hipercard", icon: "Hipercard.png" },
+            discover: { label: "Discover", icon: "Discover.png" },
+            diners: { label: "Diners", icon: "Diners.png" },
+            jcb: { label: "JCB", icon: "JCB.png" },
+        }
+        return brands[(mpPaymentMethodId || "").toLowerCase()] || null
+    }
+
+    const buildInstallmentSchedule = () => {
+        const count = Number(mpLeg?.installmentNumber || installmentCount || 0)
+        if (count <= 1) return []
+        const amount = Number(mpLeg?.installmentAmount || 0)
+        const baseDate = order.mp_date_approved ? new Date(order.mp_date_approved) : new Date(order.created_at || new Date())
+        const grossAmount = Number(mpLeg?.amount || 0)
+        const perInstallment = amount > 0 ? amount : Math.round((grossAmount / count) * 100) / 100
+        const diff = Math.round((grossAmount - perInstallment * count) * 100) / 100
+        const schedule: Array<{ number: number; total: number; dueDate: string; amount: number }> = []
+        for (let i = 0; i < count; i++) {
+            const due = new Date(baseDate)
+            due.setMonth(due.getMonth() + (i + 1))
+            const day = String(due.getDate()).padStart(2, "0")
+            const month = String(due.getMonth() + 1).padStart(2, "0")
+            const year = due.getFullYear()
+            schedule.push({
+                number: i + 1,
+                total: count,
+                dueDate: `${day}/${month}/${year}`,
+                amount: i === count - 1
+                    ? Math.round((perInstallment + diff) * 100) / 100
+                    : perInstallment,
+            })
+        }
+        return schedule
     }
 
     const getPaymentTypeLabel = () => {
@@ -1094,12 +1138,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     <FormSection
                                                         title="Detalhes do Pagamento"
                                                         titleRight={
-                                                            <button
-                                                                onClick={loadFinancialBreakdown}
-                                                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                                            >
-                                                                {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
-                                                            </button>
+                                                            hasMinimumPlan(planSlug, "crescer") ? (
+                                                                <button
+                                                                    onClick={loadFinancialBreakdown}
+                                                                    className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                                                >
+                                                                    {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
+                                                                </button>
+                                                            ) : null
                                                         }
                                                         hasSeparator>
                                                         <div className="space-y-3">
@@ -1114,14 +1160,30 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             label="Status do Pagamento (MP)"
                                                                             value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
                                                                                 {translateMpStatus(mpPaymentStatus)}
-                                                                                {mpPaymentStatusDetail ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})` : ""}
+                                                                                {mpPaymentStatusDetail && translateMpStatusDetail(mpPaymentStatusDetail) !== translateMpStatus(mpPaymentStatus) ? ` (${translateMpStatusDetail(mpPaymentStatusDetail)})` : ""}
                                                                                 {order.mp_date_approved && <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">em {formatDateTime(order.mp_date_approved)}</span>}
                                                                             </span>} />
                                                                     )}
+                                                                    {mpLeg?.cardLastDigits && (() => {
+                                                                        const brand = getCardBrandInfo(mpLeg.mpPaymentMethodId || mpLeg.paymentMethodId || null)
+                                                                        return (
+                                                                            <PaymentRow
+                                                                                label="Cartão"
+                                                                                value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-1.5 justify-end">
+                                                                                    {brand && <img src={`https://img.dudit.com.br/static/icons/payments/${brand.icon}`} alt={brand.label} className="w-5 h-4 object-contain" />}
+                                                                                    <span>•••• {mpLeg.cardLastDigits}</span>
+                                                                                </span>} />
+                                                                        )
+                                                                    })()}
                                                                     {installmentCount > 1 && (
                                                                         <PaymentRow
                                                                             label="Parcelas"
-                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{installmentCount}x</span>} />
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
+                                                                                <span>{installmentCount}x de {formatCurrency(mpLeg?.installmentAmount || (Number(mpLeg?.amount || 0) / installmentCount))}</span>
+                                                                                <button onClick={() => setShowInstallmentModal(true)} className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0">
+                                                                                    Ver parcelas
+                                                                                </button>
+                                                                            </span>} />
                                                                     )}
                                                                     {showFinancialBreakdown && mpTotalFeeAmount != null && (
                                                                         <PaymentRow
@@ -1621,12 +1683,14 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 <FormSection
                                                     title="Detalhes do Pagamento"
                                                     titleRight={
-                                                        <button
-                                                            onClick={loadFinancialBreakdown}
-                                                            className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
-                                                        >
-                                                            {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
-                                                        </button>
+                                                        hasMinimumPlan(planSlug, "crescer") ? (
+                                                            <button
+                                                                onClick={loadFinancialBreakdown}
+                                                                className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0"
+                                                            >
+                                                                {financialLoading ? "Carregando..." : showFinancialBreakdown ? "Ocultar lucro líquido" : "Ver lucro líquido"}
+                                                            </button>
+                                                        ) : null
                                                     }
                                                     hasSeparator className="mt-0">
                                                     <div className="space-y-3">
@@ -1641,14 +1705,30 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         label="Status do Pagamento (MP)"
                                                                         value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">
                                                                             {translateMpStatus(order.mp_payment_status)}
-                                                                            {order.mp_payment_status_detail ? ` (${translateMpStatusDetail(order.mp_payment_status_detail)})` : ""}
+                                                                            {order.mp_payment_status_detail && translateMpStatusDetail(order.mp_payment_status_detail) !== translateMpStatus(order.mp_payment_status) ? ` (${translateMpStatusDetail(order.mp_payment_status_detail)})` : ""}
                                                                             {order.mp_date_approved && <span className="text-brand-inactive-text dark:text-dark-body font-normal ml-1">em {formatDateTime(order.mp_date_approved)}</span>}
                                                                         </span>} />
                                                                 )}
-                                                                {order.mp_installments && order.mp_installments > 1 && (
+                                                                {mpLeg?.cardLastDigits && (() => {
+                                                                    const brand = getCardBrandInfo(mpLeg.mpPaymentMethodId || mpLeg.paymentMethodId || null)
+                                                                    return (
+                                                                        <PaymentRow
+                                                                            label="Cartão"
+                                                                            value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-1.5 justify-end">
+                                                                                {brand && <img src={`https://img.dudit.com.br/static/icons/payments/${brand.icon}`} alt={brand.label} className="w-5 h-4 object-contain" />}
+                                                                                <span>•••• {mpLeg.cardLastDigits}</span>
+                                                                            </span>} />
+                                                                    )
+                                                                })()}
+                                                                {(order.mp_installments || installmentCount) > 1 && (
                                                                     <PaymentRow
                                                                         label="Parcelas"
-                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm">{order.mp_installments}x</span>} />
+                                                                        value={<span className="text-brand-dark dark:text-dark-heading font-medium text-sm flex items-center gap-2 justify-end">
+                                                                            <span>{order.mp_installments || installmentCount}x de {formatCurrency(mpLeg?.installmentAmount || (Number(mpLeg?.amount || 0) / (order.mp_installments || installmentCount)))}</span>
+                                                                            <button onClick={() => setShowInstallmentModal(true)} className="text-xs font-bold text-brand-link dark:text-blue-400 hover:underline shrink-0">
+                                                                                Ver parcelas
+                                                                            </button>
+                                                                        </span>} />
                                                                 )}
                                                                 {showFinancialBreakdown && order.mp_total_fee_amount != null && (
                                                                     <PaymentRow
@@ -1887,6 +1967,34 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                     onEnterSelectionMode={() => { }}
                 />
             )}
+
+            <DefaultModal
+                isOpen={showInstallmentModal}
+                onClose={() => setShowInstallmentModal(false)}
+                title="Parcelas — Cartão de Crédito"
+                maxWidth="md"
+            >
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-brand-border dark:border-dark-border">
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">Parcela</th>
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">Vencimento</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-brand-inactive-text dark:text-dark-body">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {buildInstallmentSchedule().map((inst) => (
+                                <tr key={inst.number} className="border-b border-brand-border/50 dark:border-dark-border/50 last:border-0">
+                                    <td className="py-2.5 px-3 text-brand-dark dark:text-dark-heading font-medium">{inst.number}/{inst.total}</td>
+                                    <td className="py-2.5 px-3 text-brand-inactive-text dark:text-dark-body">{inst.dueDate}</td>
+                                    <td className="py-2.5 px-3 text-right text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(inst.amount)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </DefaultModal>
         </>
     )
 }

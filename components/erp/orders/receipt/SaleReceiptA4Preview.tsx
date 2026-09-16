@@ -2,13 +2,16 @@
 
 import { useMemo } from "react"
 import { formatCurrency } from "@/lib/utils"
-import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import {
     DEFAULT_RECEIPT_ACKNOWLEDGMENT,
     type SaleReceiptData,
 } from "@/lib/sales/sale-receipt"
-import { QUOTE_PREVIEW_PRIMARY_COLOR, QUOTE_PREVIEW_SECONDARY_COLOR } from "@/lib/quotes/quote-preview-theme"
+import { QUOTE_PREVIEW_PRIMARY_COLOR } from "@/lib/quotes/quote-preview-theme"
+import {
+    ReceiptStoreHeaderA4,
+    ReceiptA4StoreData,
+    ReceiptA4Footer,
+} from "./ReceiptComponents"
 
 type SaleReceiptA4PreviewProps = {
     data: SaleReceiptData
@@ -24,7 +27,6 @@ const SaleReceiptA4Preview = ({
     printMode = false,
 }: SaleReceiptA4PreviewProps) => {
     const primaryColor = data.primaryColor || QUOTE_PREVIEW_PRIMARY_COLOR
-    const secondaryColor = data.secondaryColor || QUOTE_PREVIEW_SECONDARY_COLOR
     const partnerName = data.partner.fantasyName
     const partnerAvatar = data.partnerAvatar
 
@@ -108,51 +110,14 @@ const SaleReceiptA4Preview = ({
                         key={pageIndex}
                         className={`w-[210mm] min-w-[210mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans h-[297mm] flex flex-col ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"}`}
                     >
-                        <div
-                            className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
-                            style={{ backgroundColor: primaryColor }}
-                        >
-                            <div className="absolute -top-12 right-6 flex gap-3 opacity-90 rotate-180">
-                                <div className="flex flex-col gap-3">
-                                    {[0, 1, 2].map((i) => (
-                                        <div
-                                            key={i}
-                                            className="w-14 h-24 rounded-full"
-                                            style={{ backgroundColor: secondaryColor }}
-                                        />
-                                    ))}
-                                </div>
-                                <div className="flex flex-col gap-3 -mt-12">
-                                    {[0, 1, 2].map((i) => (
-                                        <div
-                                            key={`b-${i}`}
-                                            className="w-14 h-24 rounded-full"
-                                            style={{ backgroundColor: secondaryColor }}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-3 mb-6">
-                                    {partnerAvatar && !partnerAvatar.includes("Placeholder.png") ? (
-                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white shrink-0">
-                                            <img src={getR2ImageUrl(partnerAvatar)} className="w-full h-full object-cover" alt="Logo" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-[15px] font-bold text-black shrink-0">
-                                            {partnerName.charAt(0).toUpperCase()}
-                                        </div>
-                                    )}
-                                    <span className="text-white font-bold text-sm">{partnerName}</span>
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl font-medium text-white">Comprovante de venda</h1>
-                                    <p className="text-white/80 text-xs tracking-widest font-light mt-1">
-                                        Pedido #{data.orderNumber}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                    <ReceiptStoreHeaderA4
+                        partnerName={partnerName}
+                        partnerAvatar={partnerAvatar}
+                        primaryColor={data.primaryColor}
+                        secondaryColor={data.secondaryColor}
+                        title="Comprovante de venda"
+                        subtitle={`Pedido #${data.orderNumber}`}
+                    />
 
                         <div className={`flex-1 flex flex-col ${page.type !== "first" ? "pt-8" : ""}`}>
                             {page.type === "first" && (
@@ -182,30 +147,13 @@ const SaleReceiptA4Preview = ({
                                         </div>
                                     </div>
 
-                                    <div className="px-8 pb-6">
-                                        <div className="grid grid-cols-2 gap-8">
-                                            <div>
-                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados da empresa</h3>
-                                                <div className="text-xs text-gray-600 space-y-1">
-                                                    <p className="font-bold text-brand-dark">{data.partner.fantasyName}</p>
-                                                    {data.partner.phone && <p>{formatBrazilPhone(data.partner.phone)}</p>}
-                                                    {data.partner.addressLine && (
-                                                        <p className="whitespace-pre-line">{data.partner.addressLine}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-sm text-brand-dark mb-3">Dados do cliente</h3>
-                                                <div className="text-xs text-gray-600 space-y-1">
-                                                    <p className="font-bold text-brand-dark">{data.customerName}</p>
-                                                    {data.customerPhone && <p>{formatBrazilPhone(data.customerPhone)}</p>}
-                                                    {data.customerAddress && (
-                                                        <p className="whitespace-pre-line">{data.customerAddress}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <ReceiptA4StoreData
+                                        partnerHeader={data.partner}
+                                        partnerName={partnerName}
+                                        customerName={data.customerName}
+                                        customerPhone={data.customerPhone}
+                                        customerAddress={data.customerAddress}
+                                    />
                                 </>
                             )}
 
@@ -331,6 +279,24 @@ const SaleReceiptA4Preview = ({
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Detalhamento de parcelas */}
+                                            {data.installmentDetails && data.installmentDetails.length > 0 && (
+                                                <div className="pt-3 border-t border-gray-200/80 space-y-1.5">
+                                                    <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Detalhamento das parcelas</p>
+                                                    {data.installmentDetails.map((inst, i) => (
+                                                        <div key={i} className="flex items-center justify-between text-xs bg-brand-gray/30 rounded-lg px-3 py-2">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-brand-dark">
+                                                                    Parcela {String(inst.number).padStart(2, "0")}/{String(inst.total).padStart(2, "0")}
+                                                                </span>
+                                                                <span className="text-gray-500 text-[10px]">Vencimento: {inst.dueDate}</span>
+                                                            </div>
+                                                            <span className="font-bold text-brand-dark">{formatCurrency(inst.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Observações do pedido */}
@@ -378,15 +344,10 @@ const SaleReceiptA4Preview = ({
                             )}
 
                             {!page.hasTotals && <div className="mt-auto" />}
-                        </div>
+                            </div>
 
-                        <div
-                            className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
-                            style={{ backgroundColor: primaryColor }}
-                        >
-                            <span>Criado via Dudit - dudit.com.br</span>
+                            <ReceiptA4Footer primaryColor={data.primaryColor} />
                         </div>
-                    </div>
                 ))}
             </div>
         </div>

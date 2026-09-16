@@ -119,7 +119,7 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify = false }: { par
             icons.push(
                 <img
                     key="sub"
-                    src="https://img.dudit.com.br/static/icons/payments/CartaoCredito.png"
+                    src="https://img.dudit.com.br/static/icons/payments/CreditCard.png"
                     alt="Cartão"
                     className="w-3.5 h-3.5 object-contain"
                 />
@@ -153,7 +153,7 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify = false }: { par
         icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" alt="Dinheiro" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-brand-dark dark:text-dark-heading"
     } else if (normalized.includes("cartão") || normalized.includes("cartao") || normalized.includes("credit") || normalized.includes("debit") || normalized.includes("visa") || normalized.includes("master") || normalized.includes("elo") || normalized.includes("card")) {
-        icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/CartaoCredito.png" alt="Cartão" className="w-3.5 h-3.5 object-contain" />)
+        icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-3.5 h-3.5 object-contain" />)
         colorClass = "text-brand-dark dark:text-dark-heading"
     } else if (normalized.includes("mercado") || normalized.includes("mp")) {
         icons.push(<img key="icon" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-3.5 h-3.5 object-contain" />)

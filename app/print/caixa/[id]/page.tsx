@@ -94,7 +94,6 @@ export default async function PrintCaixaPage({ params, searchParams }: PageProps
             totalSalesAllMethods: details.totals.totalSalesAllMethods,
             totalWithdrawals: details.totals.totalWithdrawals,
             totalDeposits: details.totals.totalDeposits,
-            totalRefunds: details.totals.totalRefunds,
             calculatedDrawerTotal: details.totals.calculatedDrawerTotal,
             informedDrawerTotal: details.totals.informedDrawerTotal,
             difference: details.totals.difference,

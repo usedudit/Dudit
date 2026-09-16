@@ -3,28 +3,11 @@
 import { formatDate, formatCurrency } from "@/lib/utils"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
-
-function DashedLine({ className = "my-1.5" }: { className?: string }) {
-    return (
-        <div
-            className={`w-full border-t border-dashed ${className}`}
-            style={{ borderColor: "#000000" }}
-        />
-    )
-}
-
-function Row({ left, right, bold, className = "" }: { left: string; right: string; bold?: boolean; className?: string }) {
-    return (
-        <div
-            className={`flex justify-between items-baseline gap-2 text-[10.5px] leading-tight ${bold ? "font-bold" : "font-medium"
-                } ${className}`}
-            style={{ color: "#000000" }}
-        >
-            <span className="shrink-0">{left}</span>
-            <span className="text-right shrink-0">{right}</span>
-        </div>
-    )
-}
+import {
+    DashedLine,
+    ReceiptRow,
+    ReceiptThermalStoreHeader,
+} from "@/components/erp/orders/receipt/ReceiptComponents"
 
 const STATUS_LABELS: Record<string, string> = {
     PENDING_REVIEW: "Pendente",
@@ -117,26 +100,7 @@ export default function ReturnReceiptThermalPreview({
 
             <div className="px-3 py-3" style={{ backgroundColor: "#ffffff" }}>
                 {/* Header estabelecimento */}
-                <div className="text-center mb-1.5" style={{ color: "#000000" }}>
-                    {partnerHeader.legalName && partnerHeader.legalName !== partnerHeader.fantasyName ? (
-                        <p className="text-[9.5px] leading-tight font-medium" style={{ color: "#000000" }}>
-                            {partnerHeader.legalName}
-                        </p>
-                    ) : null}
-                    <p className="font-bold text-[13.5px] uppercase tracking-tight leading-tight" style={{ color: "#000000" }}>
-                        {partnerHeader.fantasyName || partnerName}
-                    </p>
-                    {partnerHeader.addressLine ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight whitespace-pre-line font-medium" style={{ color: "#000000" }}>
-                            {partnerHeader.addressLine}
-                        </p>
-                    ) : null}
-                    {partnerHeader.taxIdLine ? (
-                        <p className="text-[9.5px] mt-0.5 leading-tight font-medium" style={{ color: "#000000" }}>
-                            {partnerHeader.taxIdLine}
-                        </p>
-                    ) : null}
-                </div>
+        <ReceiptThermalStoreHeader partnerHeader={partnerHeader} partnerName={partnerName} />
 
                 <DashedLine className="my-1.5" />
 
@@ -222,16 +186,16 @@ export default function ReturnReceiptThermalPreview({
                 {/* Valores */}
                 <div className="space-y-1" style={{ color: "#000000" }}>
                     {Number(returnRequest.refundValue || 0) > 0 && (
-                        <Row left="Valor reembolsado" right={`R$ ${formatCurrency(returnRequest.refundValue)}`} />
+                        <ReceiptRow left="Valor reembolsado" right={`R$ ${formatCurrency(returnRequest.refundValue)}`} />
                     )}
                     {Number(returnRequest.storeCreditValue || 0) > 0 && (
-                        <Row left="Vale-compra gerado" right={`R$ ${formatCurrency(returnRequest.storeCreditValue)}`} />
+                        <ReceiptRow left="Vale-compra gerado" right={`R$ ${formatCurrency(returnRequest.storeCreditValue)}`} />
                     )}
                     {Number(returnRequest.exchangeShortfallAmount || 0) > 0 && (
-                        <Row left="Complemento a pagar" right={`R$ ${formatCurrency(returnRequest.exchangeShortfallAmount || 0)}`} />
+                        <ReceiptRow left="Complemento a pagar" right={`R$ ${formatCurrency(returnRequest.exchangeShortfallAmount || 0)}`} />
                     )}
                     {Number(returnRequest.exchangeSurplusAmount || 0) > 0 && (
-                        <Row left="Saldo de troca restante" right={`R$ ${formatCurrency(returnRequest.exchangeSurplusAmount || 0)}`} />
+                        <ReceiptRow left="Saldo de troca restante" right={`R$ ${formatCurrency(returnRequest.exchangeSurplusAmount || 0)}`} />
                     )}
                     <div className="flex justify-between items-baseline pt-1 my-0.5 font-bold" style={{ color: "#000000" }}>
                         <span className="text-[10.5px]">Total:</span>
@@ -256,6 +220,12 @@ export default function ReturnReceiptThermalPreview({
                 <DashedLine className="my-2" />
                 <p className="text-[9.5px] font-bold text-center uppercase tracking-wide" style={{ color: "#000000" }}>
                     Assinatura do cliente
+                </p>
+
+                {/* Footer */}
+                <DashedLine className="my-2" />
+                <p className="text-center text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#000000" }}>
+                    Criado via Dudit - dudit.com.br
                 </p>
             </div>
         </div>

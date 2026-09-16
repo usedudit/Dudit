@@ -573,7 +573,7 @@ export async function createTransactionFromOrder(
                         customer_id: orderData.customer_id || null,
                         amount: parts[n - 1],
                         original_amount: parts[n - 1],
-                        due_date: addMonthsIso(paymentDate, n - 1),
+                        due_date: addMonthsIso(paymentDate, n),
                         payment_date: null,
                         status: "pending",
                         notes: null,

@@ -1,5 +1,9 @@
-import SkeletonLoader from "@/components/erp/SkeletonLoader"
+import ThreeDotsLoader from "@/components/reusable/ThreeDotsLoader"
 
 export default function SubLoading() {
-  return <SkeletonLoader />
+  return (
+    <div className="flex h-screen w-full items-center justify-center">
+      <ThreeDotsLoader />
+    </div>
+  )
 }
