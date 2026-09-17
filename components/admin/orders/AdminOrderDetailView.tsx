@@ -37,6 +37,7 @@ import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 
 const formatDeliveryStatusLabel = (status?: string | null, deliveryType?: string | null) => {
     if (!status) return "Não enviado"
@@ -233,9 +234,7 @@ export function AdminOrderDetailView({
     const paymentMethodLabel = (() => {
         const raw = order.payment_method || order.payment_provider
         if (!raw) return "Não definido"
-        return String(raw).toLowerCase().includes("mercado pago")
-            ? "Mercado Pago"
-            : raw
+        return formatPaymentMethodLabel(raw, null)
     })()
 
     // Delivery address formatted
@@ -662,7 +661,7 @@ export function AdminOrderDetailView({
                                                             ) : (
                                                                 <div>
                                                                     <span className="text-xs font-semibold text-brand-inactive-text block mb-1">Método</span>
-                                                                    <PaymentMethodIndicator label={paymentMethodLabel} />
+                                                                    <PaymentMethodIndicator label={paymentMethodLabel} provider={order.payment_provider} />
                                                                 </div>
                                                             )}
 

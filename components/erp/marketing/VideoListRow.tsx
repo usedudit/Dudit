@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
+import { Badge, ActionsDropdown, Checkbox, Tooltip } from "@/components/reusable"
 import { PlayIcon } from "@/lib/icons"
 import { formatDate } from "@/lib/utils"
 
@@ -66,12 +66,7 @@ const VideoListItem = React.memo(
             >
                 <td className="py-3 px-2 pl-6" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center">
-                        <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => onSelect(video.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"
-                        />
+                        <Checkbox checked={selected} onChange={() => onSelect(video.id)} />
                     </div>
                 </td>
                 <td className="py-3 px-2">

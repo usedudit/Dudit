@@ -3822,6 +3822,7 @@ const PaymentModal = ({
                     qrCode={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
                     payload={depositMpPixData.qrCode}
                     amount={depositChargeAmount}
+                    subtitle={orderId ? `Sinal - ${orderId.slice(0, 13)}` : "Sinal / Entrada"}
                     onVerifyPayment={handleVerifyDepositPayment}
                     isVerifying={isCheckingDepositStatus}
                     onSendWhatsApp={customer?.phone ? handleSendDepositWhatsApp : undefined}

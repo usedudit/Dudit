@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem, FormDropdown } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
@@ -121,7 +121,7 @@ const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray
 
 /**
  * Standard Card Header:
- * Places the icon & title on the left, and legend items on the top-right in desktop,
+ * Places the icon & title on the left, and legend items / action on the top-right in desktop,
  * and neatly below the title (above chart) in mobile/tablet.
  */
 function CardHeader({
@@ -129,11 +129,13 @@ function CardHeader({
     title,
     subtitle,
     legendItems,
+    action,
 }: {
     icon?: React.ElementType
     title: string
     subtitle?: string
     legendItems?: Array<{ label: string; color: string }>
+    action?: React.ReactNode
 }) {
     return (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -150,18 +152,21 @@ function CardHeader({
                     )}
                 </div>
             </div>
-            {legendItems && legendItems.length > 0 && (
-                <div className="flex flex-wrap items-center gap-3.5 sm:self-center">
-                    {legendItems.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                            <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body">
-                                {item.label}
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3.5 sm:self-center">
+                {legendItems && legendItems.length > 0 && (
+                    <>
+                        {legendItems.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-1.5">
+                                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
+                                <span className="text-[12px] font-bold text-brand-inactive-text dark:text-dark-body">
+                                    {item.label}
+                                </span>
+                            </div>
+                        ))}
+                    </>
+                )}
+                {action && action}
+            </div>
         </div>
     )
 }
@@ -218,7 +223,7 @@ export function ReportsPage(props: ReportsPageProps) {
                     <TabsTrigger key={tab.id} value={tab.id} icon={tab.icon}>{tab.label}</TabsTrigger>
                 ))}
             </TabsList>
-            <TabsContent value="vendas"><SalesSection {...props} /></TabsContent>
+            <TabsContent value="vendas"><SalesSection {...props} productsData={props.productsData} /></TabsContent>
             {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} salesData={props.salesData} /></TabsContent>}
             {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
             {props.deliveryData && <TabsContent value="entregas"><DeliveriesSection {...props} /></TabsContent>}
@@ -235,8 +240,9 @@ export function ReportsPage(props: ReportsPageProps) {
 // ─────────────────────────────────────────────────────────────
 // 1. ABA DE VENDAS
 // ─────────────────────────────────────────────────────────────
-function SalesSection({ salesData }: { salesData: SalesReportData | null; period: Period }) {
+function SalesSection({ salesData, productsData }: { salesData: SalesReportData | null; productsData?: ProductsDashboardData | null; period: Period }) {
     const { setExportHandler } = useDashboard()
+    const [channelView, setChannelView] = useState<"pedidos" | "dinheiro">("pedidos")
 
     const insights = useMemo(() => {
         if (!salesData) return []
@@ -276,11 +282,25 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
 
     const evoData = salesData.evolution.map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
     const paymentData = salesData.byPaymentMethod.map(p => ({ label: p.label, value: p.value }))
-    const sourceData = salesData.bySource.map(s => ({ label: s.label, value: s.value }))
+
+    const channelOptions = [
+        { value: "pedidos", label: "Pedidos" },
+        { value: "dinheiro", label: "Dinheiro" },
+    ]
+
+    const channelChartData = channelView === "dinheiro"
+        ? salesData.bySource.map(s => ({ label: s.label, value: s.value, fill: CHART_COLORS_CATEGORY[salesData.bySource.indexOf(s) % CHART_COLORS_CATEGORY.length] }))
+        : salesData.ordersBySource.map(s => ({ label: s.label, value: s.value, fill: CHART_COLORS_CATEGORY[salesData.ordersBySource.indexOf(s) % CHART_COLORS_CATEGORY.length] }))
+
+    const channelTotalValue = channelView === "dinheiro"
+        ? salesData.metrics.revenueFormatted
+        : String(salesData.metrics.orderCount)
+    const channelTotalLabel = channelView === "dinheiro" ? "Receita" : "Pedidos"
+    const channelFormat: "currency" | "number" = channelView === "dinheiro" ? "currency" : "number"
 
     const combinedItems = [
         ...salesData.topProducts.map(p => ({ label: p.label, value: p.value })),
-        ...(salesData.topServices || []).map(s => ({ label: s.label, value: s.value })),
+        ...(salesData.topServices || []).map(s => ({ label: s.label, value: s.count })),
     ].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 5)
 
     return (
@@ -308,12 +328,24 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TagIcon} title="Vendas por Canal" />
+                        <CardHeader
+                            icon={TagIcon}
+                            title="Vendas por Canal"
+                            action={
+                                <FormDropdown
+                                    options={channelOptions}
+                                    value={channelView}
+                                    setValue={(v) => setChannelView(v as "pedidos" | "dinheiro")}
+                                    width="w-[140px]"
+                                />
+                            }
+                        />
                         <DashboardDonutChart
-                            data={sourceData}
-                            totalValue={String(salesData.metrics.orderCount)}
-                            totalLabel="Pedidos"
+                            data={channelChartData}
+                            totalValue={channelTotalValue}
+                            totalLabel={channelTotalLabel}
                             colors={CHART_COLORS_CATEGORY}
+                            format={channelFormat}
                         />
                     </div>
                 </div>
@@ -355,8 +387,17 @@ function SalesSection({ salesData }: { salesData: SalesReportData | null; period
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={TargetIcon} title="Curva ABC" />
-                        <DashboardBarChart data={salesData.abcCurve.map(a => ({ label: a.label, value: a.value })).slice(0, 5)} colors={["#f97316"]} height="h-[200px]" />
+                        <CardHeader icon={TagIcon} title="Principais Categorias" legendItems={[{ label: "Receita", color: "#059669" }]} />
+                        <DashboardBarChart
+                            data={(productsData?.categorySales || salesData.topProducts || []).slice(0, 6).map((p, i) => ({
+                                label: p.label || (p as any).title || "",
+                                value: Number(p.value || 0),
+                                fill: CHART_COLORS_VIVID[i % CHART_COLORS_VIVID.length],
+                            }))}
+                            colors={CHART_COLORS_VIVID}
+                            format="currency"
+                            height="h-[200px]"
+                        />
                     </div>
                 </div>
                 <div className="lg:col-span-4">
@@ -522,16 +563,26 @@ function ProductsSection({ productsData, stockValue, returnsData, salesData }: {
                 </div>
                 <div className="lg:col-span-4">
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-                        <CardHeader icon={RotateIcon} title="Giro de Estoque" />
-                        <div className="my-auto text-center py-4">
-                            <p className="text-[44px] font-extrabold text-brand-green dark:text-dark-heading leading-none">
-                                {salesData?.productTurnover || 0}
-                            </p>
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-2">unidades/produto/mês</p>
-                            <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body mt-1">
-                                Média de rotatividade no período
-                            </p>
-                        </div>
+                        <CardHeader
+                            icon={TargetIcon}
+                            title="Curva ABC"
+                            subtitle={salesData?.abcCurve?.length ? `${salesData.abcCurve.filter(a => a.category === "A").length} prod. A · ${salesData.abcCurve.filter(a => a.category === "B").length} prod. B · ${salesData.abcCurve.filter(a => a.category === "C").length} prod. C` : undefined}
+                            legendItems={[
+                                { label: "Classe A (≤50%)", color: "#059669" },
+                                { label: "Classe B (50-80%)", color: "#f59e0b" },
+                                { label: "Classe C (>80%)", color: "#ef4444" },
+                            ]}
+                        />
+                        <DashboardBarChart
+                            data={(salesData?.abcCurve || []).slice(0, 6).map(a => ({
+                                label: a.label,
+                                value: a.value,
+                                fill: a.category === "A" ? "#059669" : a.category === "B" ? "#f59e0b" : "#ef4444",
+                            }))}
+                            colors={["#059669", "#f59e0b", "#ef4444"]}
+                            format="currency"
+                            height="h-[200px]"
+                        />
                     </div>
                 </div>
             </div>
@@ -770,7 +821,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                     <ReportTableCard
                         title="Últimas Entregas"
                         columns={[
-                            { key: "orderId", header: "Pedido", render: (v: string) => (
+                            { key: "id", header: "Entrega", render: (v: string) => (
                                 <div className="flex items-center gap-2">
                                     <TruckIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
                                     <span className="font-bold">{v}</span>
@@ -782,7 +833,7 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                             { key: "duration", header: "Duração" },
                         ]}
                         data={deliveryData.recentDeliveries}
-                        onRowClick={(row) => router.push(`/erp/entregas?highlight=${row.id}`)}
+                        onRowClick={(row) => router.push(`/erp/entregas?view=${row.id}`)}
                         icon={TruckIcon}
                         pageSize={4}
                         className="h-full"
@@ -941,7 +992,7 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                             { key: "date", header: "Data" },
                         ]}
                         data={serviceOrdersData.recentOrders}
-                        onRowClick={(row) => router.push(`/erp/ordens-de-servico?highlight=${row.id}`)}
+                        onRowClick={(row) => router.push(`/erp/ordens-de-servico?view=${row.id}`)}
                         icon={FileTextIcon}
                         pageSize={4}
                         className="h-full"

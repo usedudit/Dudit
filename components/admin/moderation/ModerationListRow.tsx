@@ -5,10 +5,14 @@ import { motion } from "framer-motion"
 import { Badge, ActionsDropdown, DropdownItem } from "@/components/reusable"
 import {
     CheckCircleIcon,
-    RemoveImageIcon,
     StoreIcon,
     CancelCircleIcon,
     ChevronsUpDown,
+    EyeIcon,
+    EditIcon,
+    PackageIcon,
+    BriefcaseIcon,
+    UserIcon,
 } from "@/lib/icons"
 import { usePartnerTimezone } from "@/lib/store-context"
 import type { ModerationItem } from "@/lib/admin/types"
@@ -21,11 +25,28 @@ interface ModerationListRowProps {
     onApprove: (id: string, type: ModerationItem["type"]) => void
 }
 
+const TYPE_ICONS: Record<string, React.ComponentType<any>> = {
+    product: PackageIcon,
+    service: BriefcaseIcon,
+    partner: UserIcon,
+    community_video: PackageIcon,
+    return_dispute: PackageIcon,
+}
+
+const getTypeLabel = (type: string) => {
+    if (type === "product") return "Produto"
+    if (type === "service") return "Serviço"
+    if (type === "partner") return "Perfil"
+    if (type === "community_video") return "Vídeo"
+    if (type === "return_dispute") return "Disputa"
+    return "Item"
+}
+
 const ModerationListRow = React.memo(({
     item,
     isPending,
     onDetail,
-    onApprove
+    onApprove,
 }: ModerationListRowProps) => {
     const tz = usePartnerTimezone()
     const [showLightbox, setShowLightbox] = useState(false)
@@ -39,12 +60,10 @@ const ModerationListRow = React.memo(({
         needs_images: { variant: "blue", label: "Sem imagens" },
     }
 
-    const statusInfo = statusMap[item.moderation_status] || { variant: "gray", label: item.moderation_status }
+    const statusInfo = statusMap[item.moderation_status] || { variant: "gray" as const, label: item.moderation_status }
 
     const firstImage = item.images?.[0]
-    const imageUrl = firstImage
-        ? getR2ImageUrl(firstImage)
-        : null
+    const imageUrl = firstImage ? getR2ImageUrl(firstImage) : null
 
     const allImages = (item.images || []).map(url => getR2ImageUrl(url))
 
@@ -52,6 +71,9 @@ const ModerationListRow = React.memo(({
         setLightboxIndex(index)
         setShowLightbox(true)
     }
+
+    const TypeIcon = TYPE_ICONS[item.type] || PackageIcon
+    const typeLabel = getTypeLabel(item.type)
 
     return (
         <>
@@ -61,23 +83,22 @@ const ModerationListRow = React.memo(({
                 className="group hover:[&:not(:has(.action-btn:hover))]:bg-brand-gray dark:hover:[&:not(:has(.action-btn:hover))]:bg-dark-border/10 transition-colors cursor-pointer bg-white dark:bg-dark-background"
                 onClick={() => onDetail(item)}
             >
-                {/* Produto */}
-                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border">
+                {/* Item */}
+                <td className="p-2 pl-6 border-b border-brand-border dark:border-dark-border text-left">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border cursor-pointer relative" onClick={(e) => { e.stopPropagation(); openLightbox(0) }}>
+                        <div
+                            className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-dark-border overflow-hidden shrink-0 border border-brand-border dark:border-dark-border cursor-pointer relative"
+                            onClick={(e) => { e.stopPropagation(); openLightbox(0) }}
+                        >
                             {imageUrl ? (
                                 <img src={imageUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                    {item.type === "partner" ? (
-                                        <StoreIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    ) : (
-                                        <RemoveImageIcon className="w-5 h-5 text-brand-inactive-text" />
-                                    )}
+                                    <TypeIcon className="w-5 h-5 text-brand-inactive-text" />
                                 </div>
                             )}
                             {item.images && item.images.length > 1 && (
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                     <ChevronsUpDown className="w-5 h-5 text-white" />
                                     <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs bg-black/80 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
                                         {item.images.length} imagens - clique para ver
@@ -86,35 +107,17 @@ const ModerationListRow = React.memo(({
                             )}
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
-                                {item.title}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading leading-tight truncate">
+                                    {item.title}
+                                </span>
+                                <span className="px-1.5 py-0.5 bg-brand-gray dark:bg-dark-border rounded text-[9px] font-medium text-brand-inactive-text shrink-0">
+                                    {typeLabel}
+                                </span>
+                            </div>
                             <span className="text-[11px] font-medium text-brand-inactive-text opacity-70">
                                 {item.id}
                             </span>
-                            {/* Category and Brand */}
-                            {(item.category_name || item.brand_name) && (
-                                <div className="flex items-center gap-2 mt-1 text-[10px] text-brand-inactive-text flex-wrap">
-                                    {item.category_name && (
-                                        <span className="px-1.5 py-0.5 bg-brand-gray dark:bg-dark-border rounded text-[9px]">
-                                            {item.category_name}
-                                        </span>
-                                    )}
-                                    {item.brand_name && (
-                                        <span className="px-1.5 py-0.5 bg-brand-green/10 dark:bg-brand-green/20 text-brand-green dark:text-brand-green/80 rounded text-[9px]">
-                                            {item.brand_name}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                            {/* Video indicator */}
-                            {item.video_url && (
-                                <div className="flex items-center gap-1 mt-1 text-[10px] text-brand-blue">
-                                    <span className="px-1.5 py-0.5 bg-brand-blue/10 dark:bg-brand-blue/20 rounded text-[9px]">
-                                        Vídeo
-                                    </span>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </td>
@@ -176,13 +179,29 @@ const ModerationListRow = React.memo(({
                         <ActionsDropdown
                             onView={() => onDetail(item)}
                         >
-                            {item.moderation_status === "pending_moderation" && (
-                                <DropdownItem onClick={() => onApprove(item.id, item.type)} className="text-brand-green">
-                                    <CheckCircleIcon size={16} /> Aprovar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
+                            <DropdownItem onClick={() => onDetail(item)}>
+                                <EyeIcon size={16} /> Visualizar
+                            </DropdownItem>
+                            {item.type === "product" && (
+                                <DropdownItem
+                                    onClick={() => window.open(`/erp/produtos/${item.id}`, "_blank")}
+                                >
+                                    <EditIcon size={16} /> Editar no ERP
                                 </DropdownItem>
                             )}
-                            <DropdownItem onClick={() => onDetail(item)} className="text-brand-red">
-                                <CancelCircleIcon size={16} /> Rejeitar {item.type === "product" ? "Produto" : item.type === "partner" ? "Perfil" : item.type === "community_video" ? "Vídeo" : "Serviço"}
+                            {item.moderation_status === "pending_moderation" && (
+                                <DropdownItem
+                                    onClick={() => onApprove(item.id, item.type)}
+                                    className="text-brand-green"
+                                >
+                                    <CheckCircleIcon size={16} /> Aprovar {typeLabel}
+                                </DropdownItem>
+                            )}
+                            <DropdownItem
+                                onClick={() => onDetail(item)}
+                                className="text-brand-red"
+                            >
+                                <CancelCircleIcon size={16} /> Rejeitar {typeLabel}
                             </DropdownItem>
                         </ActionsDropdown>
                     </div>
@@ -190,13 +209,15 @@ const ModerationListRow = React.memo(({
             </motion.tr>
 
             {/* Lightbox */}
-            <ImageLightbox
-                isOpen={showLightbox}
-                onClose={() => setShowLightbox(false)}
-                images={allImages}
-                currentIndex={lightboxIndex}
-                onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
-            />
+            {showLightbox && (
+                <ImageLightbox
+                    isOpen={showLightbox}
+                    onClose={() => setShowLightbox(false)}
+                    images={allImages}
+                    currentIndex={lightboxIndex}
+                    onNavigate={(dir) => setLightboxIndex(prev => (prev + dir + allImages.length) % allImages.length)}
+                />
+            )}
         </>
     )
 }, (prev, next) =>
@@ -209,7 +230,6 @@ ModerationListRow.displayName = "ModerationListRow"
 
 export default ModerationListRow
 
-// Lightbox component
 function ImageLightbox({ isOpen, onClose, images, currentIndex, onNavigate }: {
     isOpen: boolean
     onClose: () => void

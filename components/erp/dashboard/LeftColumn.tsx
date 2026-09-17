@@ -195,7 +195,7 @@ export function Cashflow({ revenueData, totalRevenue, compareLabel }: { revenueD
       </div>
 
       <div className="h-[220px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
@@ -258,6 +258,19 @@ const iconMap: Record<string, any> = {
 export function NeedsAttention({ alerts }: { alerts: any[] }) {
   const router = useRouter();
 
+  const alertRouteMap: Record<string, string> = {
+    "due-accounts": "/erp/transacoes",
+    "pending-orders": "/erp/pedidos",
+    "low-stock": "/erp/produtos",
+    "pending-appointments": "/erp/agendamentos",
+    "late-deliveries": "/erp/entregas",
+  };
+
+  const handleResolve = (alertId: string) => {
+    const route = alertRouteMap[alertId];
+    if (route) router.push(route);
+  };
+
   if (!alerts || alerts.length === 0) {
     return (
       <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 flex flex-col justify-center min-h-[340px]">
@@ -277,23 +290,35 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
   }
 
   return (
-    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1">
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
-          <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border flex-1 min-h-[340px] h-full flex flex-col">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading shrink-0">
+            <AlertCircleIcon size={18} className="text-brand-dark dark:text-dark-heading" />
+          </div>
+          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">
+            Precisa de Atenção ({alerts.length})
+          </h3>
         </div>
-        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading">Precisa de Atenção</h3>
+        <Button
+          variant="link"
+          size="sm"
+          className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading h-auto px-0"
+          onClick={() => handleResolve(alerts[0]?.id)}
+        >
+          Resolver
+        </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left whitespace-nowrap min-w-[600px]">
+      <div className="custom-scrollbar overflow-y-auto flex-1 -mx-6 px-6">
+        <table className="w-full text-left">
           <tbody>
             {alerts.map((item) => {
               const Icon = iconMap[item.icon] || AlertCircleIcon;
 
-              let description = "Ação recomendada para manter suas operations organizadas.";
+              let description = "Ação recomendada para manter suas operações organizadas.";
               if (item.id === "due-accounts") {
-                description = "Verifique o contas a pagar e receber para evitar juros ou atrasos.";
+                description = "Verifique as contas a pagar e receber para evitar juros ou atrasos.";
               } else if (item.id === "pending-orders") {
                 description = "Aguardando confirmação de pagamento do cliente.";
               } else if (item.id === "low-stock") {
@@ -305,9 +330,13 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
               }
 
               return (
-                <tr key={item.id} className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[80px]">
-                  <td className="pl-2">
-                    <div className="flex items-center gap-4">
+                <tr
+                  key={item.id}
+                  onClick={() => handleResolve(item.id)}
+                  className="border-b border-brand-border dark:border-dark-border last:border-b-0 h-[72px] cursor-pointer transition-colors hover:bg-brand-green-light/5 dark:hover:bg-dark-border/20"
+                >
+                  <td className="pl-2 align-top pt-3">
+                    <div className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-full bg-brand-green-light dark:bg-dark-border/40 flex items-center justify-center text-brand-dark dark:text-dark-heading">
                         <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
                       </div>
@@ -316,33 +345,6 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
                         <div className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">{description}</div>
                       </div>
                     </div>
-                  </td>
-                  <td className="text-right pr-6">
-                    <span className="text-[15px] font-bold text-brand-dark dark:text-dark-heading">
-                      {item.count} pendente{item.count > 1 ? "s" : ""}
-                    </span>
-                  </td>
-                  <td className="text-right w-[100px]">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-[12px] font-bold py-1 px-4 whitespace-nowrap h-auto"
-                      onClick={() => {
-                        if (item.id === "due-accounts") {
-                          router.push("/erp/transacoes");
-                        } else if (item.id === "pending-orders") {
-                          router.push("/erp/pedidos");
-                        } else if (item.id === "low-stock") {
-                          router.push("/erp/produtos");
-                        } else if (item.id === "pending-appointments") {
-                          router.push("/erp/agendamentos");
-                        } else if (item.id === "late-deliveries") {
-                          router.push("/erp/entregas");
-                        }
-                      }}
-                    >
-                      Resolver
-                    </Button>
                   </td>
                 </tr>
               );

@@ -17,6 +17,7 @@ import {
     Accordion,
     CustomerCard,
     IconPlaceholder,
+    SidebarCard,
 } from "@/components/reusable"
 import BottomSheet from "@/components/BottomSheet"
 import Portal from "@/components/Portal"
@@ -47,18 +48,6 @@ import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } fr
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
-
-const SidebarCard = ({ title, children, className = "", hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasSeparator?: boolean }) => (
-    <>
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 ${className}`}>
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 const STEPS = [
     { key: "assigned", label: "Atribuída" },

@@ -577,7 +577,7 @@ export default function PaymentStatusModal({
                                         {depositSummary?.usesDeposit && (
                                             <InfoCard
                                                 color="blue"
-                                                message={`Sinal (${depositSummary.depositPercent}%): ${formatCurrency(depositSummary.depositAmount)} · Cobrança inicial: ${formatCurrency(depositSummary.initialChargeAmount)} · ${DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus} · Restante: ${formatCurrency(depositSummary.remainingBalance)}${depositSummary.paymentProvider ? ` · via ${depositSummary.paymentProvider}` : ""}`}
+                                                message={`Sinal${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""} (${depositSummary.depositPercent}%): ${formatCurrency(depositSummary.depositAmount)} · Cobrança inicial: ${formatCurrency(depositSummary.initialChargeAmount)} · ${DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus} · Restante: ${formatCurrency(depositSummary.remainingBalance)}${depositSummary.paymentProvider ? ` · via ${depositSummary.paymentProvider}` : ""}`}
                                             />
                                         )}
                                         {wantsChange && payWithAmount !== null && (
@@ -744,6 +744,7 @@ export default function PaymentStatusModal({
 
                                     <DepositReceiptsSection
                                         legs={breakdown}
+                                        orderNumber={targetOrder?.order_number}
                                         onSyncMp={targetOrder.mp_payment_id || targetOrder.payment_provider === "Mercado Pago" ? handleSyncMpPayment : undefined}
                                         syncing={syncing}
                                     />

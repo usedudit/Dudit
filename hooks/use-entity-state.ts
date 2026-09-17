@@ -71,9 +71,6 @@ export function useEntityState() {
     const localStateRef = useRef(localState)
     localStateRef.current = localState
 
-    // Track whether a history entry was pushed for this modal in this component session
-    const pushedHistoryRef = useRef(false)
-
     // ── SECONDARY: Sync from URL on external navigation ──────────────────
     // Track the last synced URL string to avoid reacting to transient
     // searchParams changes triggered by router.refresh() or state updates.
@@ -111,8 +108,6 @@ export function useEntityState() {
             if (window.location.pathname !== pathname) return
             const urlState = stateFromCurrentUrl()
             localStateRef.current = urlState
-            // History was popped by the browser navigation itself
-            pushedHistoryRef.current = false
             // Keep the ref in sync so the sync-effect doesn't react to this change
             lastSyncedUrlRef.current = window.location.search + window.location.pathname
             setLocalState(urlState)
@@ -162,8 +157,8 @@ export function useEntityState() {
                     // Modal was already open (e.g. view -> edit): replace state so we don't pollute history
                     window.history.replaceState(window.history.state, "", newRelative)
                 } else {
-                    // First time opening the modal: push state so browser Back returns to list
-                    pushedHistoryRef.current = true
+                    // First time opening the modal: push state so browser Back returns to list.
+                    // Closing never relies on this entry being present (see close below).
                     window.history.pushState(window.history.state, "", newRelative)
                 }
                 // Keep the ref in sync so the sync-effect doesn't react to this change
@@ -187,24 +182,21 @@ export function useEntityState() {
 
         // Safety: if pathname differs, navigation already occurred. Do not touch history!
         if (window.location.pathname !== pathname) {
-            pushedHistoryRef.current = false
             return
         }
 
-        // 2. INSTANT: Clean URL / history
-        if (pushedHistoryRef.current) {
-            pushedHistoryRef.current = false
-            window.history.back()
-        } else {
-            // Opened directly via URL (?view=123) or reloaded: use replaceState to avoid exiting the page
-            const url = new URL(window.location.href)
-            for (const a of ACTION_PARAMS) {
-                url.searchParams.delete(a)
-            }
-            url.searchParams.delete("type")
-            const newRelative = `${url.pathname}${url.search}${url.hash}`
-            window.history.replaceState(window.history.state, "", newRelative)
+        // 2. INSTANT: Clean the action params in-place.
+        // Do not call history.back() here: the current entry may have been
+        // replaced by a router navigation, a direct URL load, bfcache restore,
+        // or a concurrent RSC transition. In those cases back() exits the
+        // current route and looks like an unsolicited redirect.
+        const url = new URL(window.location.href)
+        for (const a of ACTION_PARAMS) {
+            url.searchParams.delete(a)
         }
+        url.searchParams.delete("type")
+        const newRelative = `${url.pathname}${url.search}${url.hash}`
+        window.history.replaceState(window.history.state, "", newRelative)
         // Keep the ref in sync so the sync-effect doesn't react to this change
         lastSyncedUrlRef.current = window.location.search + window.location.pathname
     }, [pathname])
@@ -212,9 +204,7 @@ export function useEntityState() {
     // ── Auto-reset on erp-sidebar-reset ──────────────────────────────────
     useEffect(() => {
         const handleReset = () => {
-            if (localStateRef.current.isOpen) {
-                close()
-            }
+            if (localStateRef.current.isOpen) close()
         }
         window.addEventListener("erp-sidebar-reset", handleReset)
         return () => window.removeEventListener("erp-sidebar-reset", handleReset)

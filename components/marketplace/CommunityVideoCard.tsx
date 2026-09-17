@@ -1,7 +1,9 @@
 "use client"
 
 import React, { useCallback } from "react"
+import Link from "next/link"
 import { recordVideoView } from "@/app/actions/marketplace/community-videos"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 
 interface CommunityVideoCardProps {
   video: {
@@ -10,7 +12,7 @@ interface CommunityVideoCardProps {
     video_thumbnail: string
     duration: number
     views_count: number
-    partner?: { name: string; store_name?: string } | null
+    partner?: { name: string; store_name?: string; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
   }
   onOpen: (videoId: string) => void
   className?: string
@@ -57,9 +59,15 @@ export function CommunityVideoCard({ video, onOpen, className = "w-[170px]" }: C
         <h3 className="text-sm font-normal text-brand-dark line-clamp-2 leading-snug dark:text-dark-heading">
           {video.title || "Vídeo da comunidade"}
         </h3>
-        <p className="text-[11px] text-brand-inactive-text mt-1 dark:text-dark-body">
-          {video.partner?.name || video.partner?.store_name || "Loja parceira"}
-        </p>
+        {video.partner?.id && (
+          <Link
+            href={getStoreUrl(video.partner)}
+            className="text-[11px] text-brand-inactive-text mt-1 dark:text-dark-body hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {video.partner?.name || video.partner?.store_name || "Loja parceira"}
+          </Link>
+        )}
       </div>
     </button>
   )

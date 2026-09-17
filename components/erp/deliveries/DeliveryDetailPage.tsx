@@ -398,21 +398,25 @@ export default function DeliveryDetailPage({
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <Tooltip text={paymentMeta.label}>
-                                        <span className="hidden lg:inline-flex">
-                                            <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                        </span>
-                                        <span className="lg:hidden">
-                                            <Badge variant={paymentMeta.variant} />
+                                        <span className="contents">
+                                            <span className="hidden lg:inline-flex">
+                                                <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                            </span>
+                                            <span className="lg:hidden">
+                                                <Badge variant={paymentMeta.variant} />
+                                            </span>
                                         </span>
                                     </Tooltip>
                                     <Tooltip text={deliveryMeta.label}>
-                                        <span className="hidden lg:inline-flex">
-                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
-                                                {deliveryMeta.label}
-                                            </Badge>
-                                        </span>
-                                        <span className="lg:hidden">
-                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)} />
+                                        <span className="contents">
+                                            <span className="hidden lg:inline-flex">
+                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)}>
+                                                    {deliveryMeta.label}
+                                                </Badge>
+                                            </span>
+                                            <span className="lg:hidden">
+                                                <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(link.status || order.delivery_status)} />
+                                            </span>
                                         </span>
                                     </Tooltip>
                                 </div>
@@ -864,24 +868,28 @@ export default function DeliveryDetailPage({
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status de Pagamento</span>
                                                 <Tooltip text={paymentMeta.label}>
-                                                    <span className="hidden lg:inline-flex">
-                                                        <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
-                                                    </span>
-                                                    <span className="lg:hidden">
-                                                        <Badge variant={paymentMeta.variant} />
+                                                    <span className="contents">
+                                                        <span className="hidden lg:inline-flex">
+                                                            <Badge variant={paymentMeta.variant}>{paymentMeta.label}</Badge>
+                                                        </span>
+                                                        <span className="lg:hidden">
+                                                            <Badge variant={paymentMeta.variant} />
+                                                        </span>
                                                     </span>
                                                 </Tooltip>
                                             </div>
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Status da Entrega</span>
                                                 <Tooltip text={deliveryMeta.label}>
-                                                    <span className="hidden lg:inline-flex">
-                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
-                                                            {deliveryMeta.label}
-                                                        </Badge>
-                                                    </span>
-                                                    <span className="lg:hidden">
-                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)} />
+                                                    <span className="contents">
+                                                        <span className="hidden lg:inline-flex">
+                                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)}>
+                                                                {deliveryMeta.label}
+                                                            </Badge>
+                                                        </span>
+                                                        <span className="lg:hidden">
+                                                            <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedLink.status || order.delivery_status)} />
+                                                        </span>
                                                     </span>
                                                 </Tooltip>
                                             </div>

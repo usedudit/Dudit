@@ -184,9 +184,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
     const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
-    const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && friendlyMethod && !friendlyMethod.toLowerCase().includes("mercado pago")
-        ? `Mercado Pago (${friendlyMethod})${pendingSuffix}`
-        : `${friendlyMethod || "Não informado"}${pendingSuffix}`
+    const paymentMethodLabel = `${friendlyMethod || "Não informado"}${pendingSuffix}`
 
     const paymentBreakdown = useMemo(() => {
         return Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
@@ -732,7 +730,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     label="Método de Pagamento"
                                     value={
                                         <div className="flex items-center gap-2">
-                                            <PaymentMethodIndicator label={paymentMethodLabel} />
+                                            <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} />
                                         </div>
                                     }
                                 />
@@ -1374,7 +1372,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 label="Método de Pagamento"
                                 value={
                                     <div className="flex items-center gap-2">
-                                        <PaymentMethodIndicator label={paymentMethodLabel} />
+                                        <PaymentMethodIndicator label={paymentMethodLabel} provider={originalPaymentProvider} />
                                     </div>
                                 }
                             />

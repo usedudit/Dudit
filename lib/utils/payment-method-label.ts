@@ -6,6 +6,59 @@ function stripAccents(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
+function titleWords(s: string): string {
+  return s
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ""))
+    .filter(Boolean)
+    .join(" ")
+}
+
+const STANDARD_TYPES = [
+  "dinheiro", "cash", "money",
+  "pix",
+  "cartão de crédito", "cartao de credito", "credito", "crédito", "credit card", "credit",
+  "cartão de débito", "cartao de debito", "debito", "débito", "debit card", "debit",
+  "transferência", "transferencia", "transferência bancária", "transferencia bancaria", "bank transfer",
+  "cartão", "cartao", "card",
+  "boleto", "boleto bancário", "boleto bancario",
+  "outros", "outro", "other"
+]
+
+function isKnownType(str: string): boolean {
+  const lower = str.toLowerCase()
+  const norm = stripAccents(lower)
+  return STANDARD_TYPES.some(t => t === lower || t === norm) ||
+    norm.includes("credito") || norm.includes("debito") || norm.includes("dinheiro") ||
+    norm.includes("pix") || norm.includes("boleto") || norm.includes("transfer") ||
+    norm.includes("cartao") || norm.includes("card") || norm.includes("money") ||
+    norm.includes("cash") || norm.includes("outro") || norm.includes("other")
+}
+
+function isSamePaymentConcept(a: string, b: string): boolean {
+  const aL = a.toLowerCase()
+  const bL = b.toLowerCase()
+  const aN = stripAccents(aL)
+  const bN = stripAccents(bL)
+  if (aL === bL || aN === bN) return true
+  // Check if both refer to the same payment concept
+  const concepts: [string[], string[]][] = [
+    [["dinheiro", "cash", "money", "espécie", "espece", "carteira"], ["dinheiro"]],
+    [["pix"], ["pix"]],
+    [["cartão de crédito", "cartao de credito", "credito", "crédito", "credit", "credit_card", "creditcard", "cartão", "cartao", "card"], ["cartão de crédito"]],
+    [["cartão de débito", "cartao de debito", "debito", "débito", "debit", "debit_card", "debitcard", "cartão", "cartao", "card"], ["cartão de débito"]],
+    [["transferência", "transferencia", "ted", "doc", "bank_transfer"], ["transferência"]],
+    [["boleto", "boleto bancário", "boleto bancario"], ["boleto"]],
+    [["outros", "outro", "other"], ["outros"]],
+  ]
+  for (const [variants, canonicals] of concepts) {
+    const aMatch = variants.some(v => aN.includes(v) || aL.includes(v))
+    const bMatch = variants.some(v => bN.includes(v) || bL.includes(v)) || canonicals.some(c => bN.includes(stripAccents(c)) || bL.includes(c))
+    if (aMatch && bMatch) return true
+  }
+  return false
+}
+
 export function formatPaymentMethodLabel(
   name: string | null | undefined,
   paymentType: string | null | undefined,
@@ -25,7 +78,6 @@ export function formatPaymentMethodLabel(
     rawType = normType === "exchange" ? "exchange" : "store_credit";
   }
 
-  // Helper to normalize and translate the payment type to a friendly Portuguese label
   const getFriendlyTypeLabel = (typeOrName: string): string => {
     const norm = typeOrName.toLowerCase().trim()
     if (norm === "exchange") return "Crédito de troca"
@@ -36,17 +88,15 @@ export function formatPaymentMethodLabel(
     if (norm.includes("dinheiro") || norm.includes("cash") || norm.includes("money")) return "Dinheiro"
     if (norm.includes("transfer") || norm.includes("ted") || norm.includes("doc")) return "Transferência"
     if (norm.includes("cartao") || norm.includes("cartão") || norm.includes("card")) return "Cartão"
+    if (norm.includes("boleto")) return "Boleto"
     if (norm.includes("other") || norm.includes("outro")) return "Outros"
     if (norm.includes("método não definido") || norm.includes("pendente")) return "Método não definido"
-
-    // Capitalize type if not recognized
     return typeOrName.charAt(0).toUpperCase() + typeOrName.slice(1)
   }
 
-  // Extract the real descriptive name, resolving any previous formatting/parentheses
   let displayName = rawName || rawType
 
-  // Separate a trailing installment suffix (" - 2x") so it doesn't break parenthesis parsing below
+  // Separate trailing installment suffix (" - 2x")
   let installmentSuffix = ""
   const suffixMatch = displayName.match(/(.*?)\s+-\s*(\d+)x\s*$/i)
   if (suffixMatch) {
@@ -54,78 +104,63 @@ export function formatPaymentMethodLabel(
     installmentSuffix = ` - ${suffixMatch[2]}x`
   }
 
-  // Get the friendly type label
-  const typeLabel = getFriendlyTypeLabel(displayName)
+  // Parse "Part1 (Part2)" pattern
+  const parenMatch = displayName.match(/^([^(]+)\(([^)]+)\)$/)
+  if (parenMatch) {
+    const part1 = parenMatch[1].trim()
+    const part2 = parenMatch[2].trim()
 
-  const match = displayName.match(/^([^(]+)\(([^)]+)\)$/)
-  if (match) {
-    const part1 = match[1].trim()
-    const part2 = match[2].trim()
-
-    const typeLabelLower = typeLabel.toLowerCase()
-    const part1Lower = part1.toLowerCase()
-    const part2Lower = part2.toLowerCase()
-
-    const standardTypesLower = [
-      "dinheiro", "cash", "money",
-      "pix",
-      "cartão de crédito", "cartao de credito", "credito", "crédito", "credit card", "credit",
-      "cartão de débito", "cartao de debito", "debito", "débito", "debit card", "debit",
-      "transferência", "transferencia", "transferência bancária", "transferencia bancaria", "bank transfer",
-      "cartão", "cartao", "card",
-      "boleto", "boleto bancário", "boleto bancario",
-      "outros", "outro", "other"
-    ]
-
-    const isType1 = standardTypesLower.includes(part1Lower) || part1Lower === typeLabelLower
-    const isType2 = standardTypesLower.includes(part2Lower) || part2Lower === typeLabelLower
-
-    if (isType1 && !isType2) {
-      displayName = part2
-    } else if (isType2 && !isType1) {
+    // If both parts are identical (e.g. "Cartao Credito (Cartao Credito)"), just use one
+    if (part1.toLowerCase() === part2.toLowerCase() || stripAccents(part1.toLowerCase()) === stripAccents(part2.toLowerCase())) {
       displayName = part1
     } else {
-      // If both or neither match, pick the longer one as it is more descriptive, e.g. "Pix 2% Desconto" vs "Pix"
-      displayName = part1.length > part2.length ? part1 : part2
+      const p1IsType = isKnownType(part1)
+      const p2IsType = isKnownType(part2)
+
+      if (p2IsType && !p1IsType) {
+        // "Mercado Pago (Boleto)" -> "Boleto (Mercado Pago)"
+        displayName = `${part2} (${part1})`
+      } else if (p1IsType && !p2IsType) {
+        // "Cartão de Crédito (Visa)" -> keep as "Cartão de Crédito (Visa)"
+        displayName = `${part1} (${part2})`
+      } else if (!p1IsType && !p2IsType) {
+        // Neither is a known type, pick the longer/more descriptive one
+        displayName = part1.length >= part2.length ? `${part1} (${part2})` : `${part2} (${part1})`
+      } else {
+        // Both are types, just keep the first
+        displayName = part1
+      }
     }
   }
 
-  // Capitalize name words nicely
-  const titleWords = (s: string) =>
-    s
-      .split(/\s+/)
-      .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ""))
-      .filter(Boolean)
-      .join(" ")
+  // Now resolve the final label
+  // If displayName already has the "Type (Detail)" format, respect it
+  const finalMatch = displayName.match(/^([^(]+)\(([^)]+)\)$/)
+  if (finalMatch) {
+    const typePart = finalMatch[1].trim()
+    const detailPart = finalMatch[2].trim()
+    const typeLabel = getFriendlyTypeLabel(typePart)
 
-  const finalName = titleWords(displayName)
-  const finalType = titleWords(typeLabel)
+    // If the type part resolves to the same concept as the detail, just use the type
+    if (isSamePaymentConcept(typePart, detailPart)) {
+      const base = titleWords(typeLabel)
+      return installmentSuffix ? `${base}${installmentSuffix}` : base
+    }
 
-  const nameLower = finalName.toLowerCase()
-  const typeLower = finalType.toLowerCase()
-  const nameNorm = stripAccents(nameLower)
-  const typeNorm = stripAccents(typeLower)
+    // If the detail is a more specific version of the type (e.g. "Cartão de Crédito" + "Visa")
+    const detailAsType = getFriendlyTypeLabel(detailPart)
+    if (isSamePaymentConcept(typePart, detailAsType)) {
+      const base = titleWords(typeLabel)
+      return installmentSuffix ? `${base}${installmentSuffix}` : base
+    }
 
-  const isSameConcept = 
-    nameLower === typeLower ||
-    nameNorm === typeNorm ||
-    (typeLower === "dinheiro" && (nameLower === "cash" || nameLower === "money" || nameLower === "dinheiro" || nameLower === "espécie" || nameLower === "espece" || nameLower === "carteira")) ||
-    (typeLower === "pix" && nameLower === "pix") ||
-    (typeLower === "cartão de crédito" && (nameLower === "cartão de crédito" || nameLower === "cartao de credito" || nameLower === "cartão de credito" || nameLower === "cartao de crédito" || nameLower === "credito" || nameLower === "crédito" || nameLower === "credit" || nameLower === "credit_card" || nameLower === "creditcard" || nameLower === "cartão" || nameLower === "cartao" || nameLower === "card")) ||
-    (typeLower === "cartão de débito" && (nameLower === "cartão de débito" || nameLower === "cartao de debito" || nameLower === "cartão de debito" || nameLower === "cartao de débito" || nameLower === "debito" || nameLower === "débito" || nameLower === "debit" || nameLower === "debit_card" || nameLower === "debitcard" || nameLower === "cartão" || nameLower === "cartao" || nameLower === "card")) ||
-    (typeLower === "cartão" && (nameLower === "cartão" || nameLower === "cartao" || nameLower === "card" || nameLower.includes("credito") || nameLower.includes("crédito") || nameLower.includes("debito") || nameLower.includes("débito"))) ||
-    (typeLower === "transferência" && (nameLower === "transferência" || nameLower === "transferencia" || nameLower === "transferência bancária" || nameLower === "transferencia bancaria" || nameLower === "bank_transfer" || nameLower === "ted" || nameLower === "doc")) ||
-    (typeLower === "outros" && (nameLower === "outros" || nameLower === "outro" || nameLower === "other")) ||
-    (typeLower === "boleto" && (nameLower === "boleto" || nameLower === "boleto bancário" || nameLower === "boleto bancario"))
-
-  // Se o tipo for apenas "Cartão" e o nome for "Cartão de Crédito", use "Cartão de Crédito"
-  let resolvedLabel = finalType
-  if (typeLower === "cartão" && (nameLower.includes("crédito") || nameLower.includes("credito"))) {
-    resolvedLabel = "Cartão de Crédito"
-  } else if (typeLower === "cartão" && (nameLower.includes("débito") || nameLower.includes("debito"))) {
-    resolvedLabel = "Cartão de Débito"
+    // Otherwise keep both: "Type (Detail)"
+    const base = `${titleWords(typeLabel)} (${titleWords(detailPart)})`
+    return installmentSuffix ? `${base}${installmentSuffix}` : base
   }
 
-  const base = isSameConcept ? resolvedLabel : `${resolvedLabel} (${finalName})`
+  // No parentheses - just resolve the type
+  const typeLabel = getFriendlyTypeLabel(displayName)
+  const base = titleWords(typeLabel)
   return installmentSuffix ? `${base}${installmentSuffix}` : base
 }

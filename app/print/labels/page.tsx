@@ -52,7 +52,7 @@ export default async function PrintLabelsPage({ searchParams }: PageProps) {
 
   const { data: partner } = await supabase.from("partners").select("id").eq("user_id", user.id).single()
   if (!partner) {
-    redirect("/dashboard")
+    redirect("/select-erp")
   }
 
   try {

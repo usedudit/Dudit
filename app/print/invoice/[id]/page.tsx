@@ -8,7 +8,7 @@ import { redirect } from "next/navigation"
 export default async function InvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
     const user = await getCurrentUser()
-    if (!user) redirect("/login")
+    if (!user) redirect("/auth/login")
 
     const invoiceData = await getInvoiceForPrintAction(id)
     if (!invoiceData) {

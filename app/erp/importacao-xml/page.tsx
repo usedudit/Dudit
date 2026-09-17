@@ -8,7 +8,7 @@ import { listImportsAction } from "@/app/actions/erp/xml-import"
 
 export default async function XmlImportPage() {
   const context = await getCurrentPartnerContext()
-  if (!context) redirect("")
+  if (!context) redirect("/select-erp")
 
   const plan = await getPartnerPlan(context.partnerId)
   const isFreePlan = plan.slug.toLowerCase() === "free"

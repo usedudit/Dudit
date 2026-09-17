@@ -195,7 +195,6 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
           date: new Date(d.created_at).toLocaleDateString("pt-BR"),
           duration: d.estimated_duration_minutes ? `${d.estimated_duration_minutes}min` : undefined,
           deliveryPerson: d.delivery_person_id ? personNameMap.get(d.delivery_person_id) || "Sem nome" : "Não atribuído",
-          orderId: d.order_id || "-",
         })),
         deliveryPersonRanking,
       }

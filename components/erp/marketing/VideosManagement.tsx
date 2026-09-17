@@ -9,12 +9,13 @@ import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useToast } from "@/hooks/use-toast"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { getPartnerCommunityVideos, createCommunityVideo, updateCommunityVideo, deleteCommunityVideo, type CommunityVideoItem } from "@/app/actions/marketplace/community-videos"
-import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal } from "@/components/reusable"
+import { getPartnerCommunityVideos, createCommunityVideo, updateCommunityVideo, deleteCommunityVideo, deleteCommunityVideosInBatch, type CommunityVideoItem } from "@/app/actions/marketplace/community-videos"
+import { Button, IconPlaceholder, ThreeDotsLoader, AlertModal, Checkbox, SelectionBanner, SavingStatusModal } from "@/components/reusable"
 import { useStore } from "@/lib/store-context"
 import Pagination from "@/components/reusable/Pagination"
+import FloatingActionBar from "@/components/reusable/FloatingActionBar"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
-import { PlusIcon } from "@/lib/icons"
+import { PlusIcon, TrashIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import VideoPageControls from "./VideoPageControls"
 import VideoListItem from "./VideoListRow"
@@ -55,6 +56,17 @@ export default function VideosManagement() {
     const [activeTab, setActiveTab] = useState<"Todos" | "Pendentes" | "Aprovados" | "Rejeitados">("Todos")
     const [videoToDelete, setVideoToDelete] = useState<CommunityVideoItem | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [selection, setSelection] = useState({ ids: new Set<string>() })
+    const [isProcessingBulk, setIsProcessingBulk] = useState(false)
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
+    const handleSelectRow = (id: string) => {
+        setSelection((p) => {
+            const s = new Set(p.ids)
+            s.has(id) ? s.delete(id) : s.add(id)
+            return { ids: s }
+        })
+    }
 
     const { data: videosData, isLoading: isVideosLoading } = useQuery({
         queryKey: ['erp', 'videos', partnerId],
@@ -110,6 +122,26 @@ export default function VideosManagement() {
     }
 
     const handleAdd = () => openEntity("create")
+
+    const handleBulkDelete = async () => {
+        const ids = Array.from(selection.ids)
+        if (ids.length === 0) return
+
+        setIsProcessingBulk(true)
+        try {
+            const result = await deleteCommunityVideosInBatch(ids)
+            if (result.success) {
+                toast({ title: "Vídeos excluídos", description: `${ids.length} vídeo(s) excluído(s) com sucesso` })
+                setShowBulkDeleteConfirm(false)
+                setSelection({ ids: new Set() })
+                await queryClient.invalidateQueries({ queryKey: ['erp', 'videos', partnerId] })
+            } else {
+                toast({ title: "Erro", description: result.error, variant: "destructive" })
+            }
+        } finally {
+            setIsProcessingBulk(false)
+        }
+    }
     const handleEdit = (video: CommunityVideoItem) => openEntity("edit", video.id)
     const handleDetails = (video: CommunityVideoItem) => openEntity("view", video.id)
     const handleCancel = () => closeEntity()
@@ -275,14 +307,22 @@ export default function VideosManagement() {
                                             key={activeTab + effectiveViewMode}
                                             className="w-full"
                                         >
+                                            <SelectionBanner
+                                                selectedCount={selection.ids.size}
+                                                totalCount={paginatedVideos.length}
+                                                onSelectAll={() => setSelection({ ids: new Set(paginatedVideos.map(v => v.id)) })}
+                                                onClearSelection={() => setSelection({ ids: new Set() })}
+                                                itemName="vídeos"
+                                                singularItemName="vídeo"
+                                            />
                                             {effectiveViewMode === "grid" ? (
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
                                                     {paginatedVideos.map((video) => (
                                                         <VideoGridCard
                                                             key={video.id}
                                                             video={video}
-                                                            selected={false}
-                                                            onSelect={() => {}}
+                                                            selected={selection.ids.has(video.id)}
+                                                            onSelect={() => handleSelectRow(video.id)}
                                                             onDetails={() => handleDetails(video)}
                                                             onEdit={() => handleEdit(video)}
                                                             onDelete={() => setVideoToDelete(video)}
@@ -296,7 +336,15 @@ export default function VideosManagement() {
                                                             <thead>
                                                                 <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                     <th className="py-3 px-2 w-12 pl-6 rounded-l-lg bg-brand-gray dark:bg-dark-border/50">
-                                                                        <div className="flex items-center">&nbsp;</div>
+                                                                        <div className="flex items-center">
+                                                                            <Checkbox
+                                                                                checked={selection.ids.size === paginatedVideos.length && paginatedVideos.length > 0}
+                                                                                onChange={(checked) => {
+                                                                                    setSelection({ ids: checked ? new Set(paginatedVideos.map(v => v.id)) : new Set() })
+                                                                                }}
+                                                                                className="bg-white dark:bg-dark-background"
+                                                                            />
+                                                                        </div>
                                                                     </th>
                                                                     {COLUMNS.map((col, idx) => (
                                                                         <th
@@ -317,11 +365,11 @@ export default function VideosManagement() {
                                                                         key={video.id}
                                                                         video={video}
                                                                         columns={COLUMNS}
-                                                                        selected={false}
-                                                                        onSelect={() => {}}
                                                                         onEdit={() => handleEdit(video)}
                                                                         onDelete={() => setVideoToDelete(video)}
                                                                         onDetails={() => handleDetails(video)}
+                                                                        selected={selection.ids.has(video.id)}
+                                                                        onSelect={() => handleSelectRow(video.id)}
                                                                     />
                                                                 ))}
                                                             </tbody>
@@ -352,11 +400,34 @@ export default function VideosManagement() {
                     if (!isDeleting) setVideoToDelete(null)
                 }}
                 title="Excluir vídeo"
-                description={`Tem certeza que deseja excluir "${videoToDelete?.title || "este vídeo"}"? Esta ação não pode ser desf eita.`}
+                description={`Tem certeza que deseja excluir "${videoToDelete?.title || "este vídeo"}"? Esta ação não pode ser desfeita.`}
                 confirmText="Excluir"
                 variant="danger"
                 onConfirm={handleDelete}
             />
+
+            <AlertModal
+                isOpen={showBulkDeleteConfirm}
+                onClose={() => setShowBulkDeleteConfirm(false)}
+                title="Excluir vídeos"
+                description={`Tem certeza que deseja excluir ${selection.ids.size} vídeo(s)? Esta ação não pode ser desfeita.`}
+                confirmText="Sim, excluir"
+                variant="danger"
+                onConfirm={handleBulkDelete}
+            />
+
+            <SavingStatusModal isOpen={isDeleting || isProcessingBulk} text={isDeleting ? "Excluindo vídeo..." : "Excluindo vídeos..."} />
+
+            <FloatingActionBar selectedCount={selection.ids.size} onClearSelection={() => setSelection({ ids: new Set() })}>
+                <Button
+                    variant="ghostred"
+                    className="h-10 px-3"
+                    leftIcon={<TrashIcon size={18} />}
+                    onClick={() => setShowBulkDeleteConfirm(true)}
+                >
+                    Excluir
+                </Button>
+            </FloatingActionBar>
         </>
     )
 }

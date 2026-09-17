@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
 import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon, ChevronDownIcon } from "@/lib/icons"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
@@ -18,21 +18,6 @@ const CONDITION_OPTIONS = [
     { value: "Recondicionado", label: "Recondicionado" },
     { value: "Para conserto / peças", label: "Para conserto / peças" },
 ]
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 interface ProductMarketplaceTabProps {
     productData: any

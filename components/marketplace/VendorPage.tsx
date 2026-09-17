@@ -138,10 +138,15 @@ const AVAILABLE_BRANDS = [
 
 const paymentKind = (pm: any) => `${pm.type || ""} ${pm.payment_type || ""} ${pm.name || ""}`.toLowerCase()
 const isPaymentActive = (pm: any) => pm.is_active !== false
-const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
-    .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(/[;,]/))
-    .map(brand => brand.trim().toLowerCase())
-    .filter(Boolean)))
+const getUniqueBrands = (methods: any[]) => {
+    const brandSet = new Set(
+        methods
+            .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(/[;,]/))
+            .map(brand => brand.trim().toLowerCase())
+            .filter(Boolean)
+    )
+    return AVAILABLE_BRANDS.filter(b => brandSet.has(b.id))
+}
 
 const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviewsCount: number; short?: boolean }) => (
     <div className="flex items-center gap-1 text-[12px] lg:text-[13px] text-brand-dark dark:text-dark-heading">
@@ -342,14 +347,12 @@ const PaymentPill = ({ icon, label }: { icon?: string; label: string }) => (
     </div>
 )
 
-const CardBrands = ({ brands }: { brands: string[] }) => {
+const CardBrands = ({ brands }: { brands: typeof AVAILABLE_BRANDS }) => {
     if (!brands.length) return null
     return (
         <div className="flex flex-wrap gap-2 mt-3">
-            {brands.map(brandId => {
-                const brand = AVAILABLE_BRANDS.find(item => item.id === brandId)
-                if (!brand) return null
-                return <PaymentPill key={brandId} icon={brand.image} label={brand.label} />
+            {brands.map(brand => {
+                return <PaymentPill key={brand.id} icon={brand.image} label={brand.label} />
             })}
         </div>
     )
@@ -389,118 +392,107 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
         mpAccepted.mercado_pago_wallet && { label: "Saldo MP" },
     ].filter(Boolean) as Array<{ label: string; icon?: string }> : []
 
-    const deliverySettings = partner.delivery_settings
-    const isDeliveryEnabled = deliverySettings?.is_delivery_enabled !== false
-    const isPickupEnabled = deliverySettings?.is_pickup_enabled !== false
-    const hasDeliveryAndPickup = isDeliveryEnabled && isPickupEnabled
-    const deliveryPaymentLabel = hasDeliveryAndPickup ? "Pagamento na Entrega/Retirada" : isDeliveryEnabled ? "Pagamento na Entrega" : isPickupEnabled ? "Pagamento na Retirada" : null
-
     return (
         <div className="pb-10 space-y-8 animate-fade-in">
             {partner.storeDescription && (
-                <>
-                    <div>
-                        <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading mb-4">Sobre {partner.storeName}</h3>
-                        <p className="text-[15px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
-                    </div>
-                    <div className="h-[1px] bg-brand-border w-full" />
-                </>
-            )}
-
-            {mpConnected && (
-                <FormSection title="Pagamento online" hasSeparator>
-                    <div className="space-y-3">
-                        <ListItem
-                            className="!border-none !bg-transparent p-0 cursor-default"
-                            icon={
-                                <img
-                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                    alt="Mercado Pago"
-                                    className="w-6 h-6 object-contain shrink-0"
-                                />
-                            }
-                            title="Mercado Pago"
-                            description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
-                        />
-                    </div>
+                <FormSection title={`Sobre ${partner.storeName}`}>
+                    <p className="text-[15px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">{partner.storeDescription}</p>
                 </FormSection>
-            )}
+            )
+            }
 
-            {hasPaymentSections && (
-                <FormSection title="Pagamento na loja" hasSeparator>
-                    <div className="space-y-5">
-                        {hasSimplePayments && (
-                            <div>
-                                <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
-                                <div className="flex flex-wrap gap-2.5">
-                                    {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
-                                    {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
-                                    {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
-                                </div>
-                            </div>
-                        )}
-                        {debitMethods.length > 0 && (
-                            <div>
-                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de débito</h4>
-                                {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
-                            </div>
-                        )}
-                        {creditMethods.length > 0 && (
-                            <div>
-                                <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de crédito</h4>
-                                {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
-                            </div>
-                        )}
-                    </div>
-                </FormSection>
-            )}
-
-            {deliveryPaymentLabel && (
-                <FormSection title={deliveryPaymentLabel} hasSeparator>
-                    <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">
-                        O pagamento será realizado {hasDeliveryAndPickup ? "na entrega ou na retirada" : isDeliveryEnabled ? "na entrega" : "na retirada"} conforme combinado com o vendedor.
-                    </p>
-                </FormSection>
-            )}
-
-            {hoursList.length > 0 && (
-                <>
-                    <FormSection title="Horário de Funcionamento" hasSeparator>
+            {
+                mpConnected && (
+                    <FormSection title="Pagamento online" hasSeparator>
                         <div className="space-y-3">
-                            {hoursList.map((item: any) => {
-                                let dayColor = "text-brand-dark dark:text-dark-heading"
-                                let timeColor = "text-brand-inactive-text dark:text-dark-body"
-                                if (item.isCurrentDay) {
-                                    if (item.status === "closing_soon") {
-                                        dayColor = "text-brand-yellow font-medium"
-                                        timeColor = "text-brand-yellow font-medium"
-                                    } else if (item.status === "closed") {
-                                        dayColor = "text-brand-red font-medium"
-                                        timeColor = "text-brand-red font-medium"
-                                    } else {
-                                        dayColor = "text-brand-green font-medium"
-                                        timeColor = "text-brand-green font-medium"
-                                    }
+                            <ListItem
+                                className="!border-none !bg-transparent p-0 cursor-default"
+                                icon={
+                                    <img
+                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                        alt="Mercado Pago"
+                                        className="w-6 h-6 object-contain shrink-0"
+                                    />
                                 }
-                                return (
-                                    <div key={item.dayName} className="flex justify-between items-center text-[14px]">
-                                        <span className="flex items-center gap-1.5">
-                                            <span className={dayColor}>{item.dayName}</span>
-                                            {item.isCurrentDay && item.status === "closing_soon" && (
-                                                <ClockIcon size={14} className="text-brand-yellow shrink-0" />
-                                            )}
-                                            {item.isCurrentDay && item.status === "closed" && (
-                                                <ClockIcon size={14} className="text-brand-red shrink-0" />
-                                            )}
-                                        </span>
-                                        <span className={timeColor}>{item.timeString}</span>
-                                    </div>
-                                )
-                            })}
+                                title="Mercado Pago"
+                                description={mpMethods.length > 0 ? mpMethods.map(m => m.label).join(", ") : "Pague com cartão, Pix ou saldo MP."}
+                            />
                         </div>
                     </FormSection>
-                </>
-            )}
+                )
+            }
+
+            {
+                hasPaymentSections && (
+                    <FormSection title="Pagamento na loja" hasSeparator>
+                        <div className="space-y-5">
+                            {hasSimplePayments && (
+                                <div>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">À Vista / Imediato</h4>
+                                    <div className="flex flex-wrap gap-2.5">
+                                        {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
+                                        {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
+                                        {transferMethods.length > 0 && <PaymentPill label="Transferência bancária" />}
+                                    </div>
+                                </div>
+                            )}
+                            {debitMethods.length > 0 && (
+                                <div>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de débito</h4>
+                                    {debitBrands.length > 0 ? <CardBrands brands={debitBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
+                                </div>
+                            )}
+                            {creditMethods.length > 0 && (
+                                <div>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">Cartão de crédito</h4>
+                                    {creditBrands.length > 0 ? <CardBrands brands={creditBrands} /> : <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">Bandeiras não informadas.</p>}
+                                </div>
+                            )}
+                        </div>
+                    </FormSection>
+                )
+            }
+
+            {
+                hoursList.length > 0 && (
+                    <>
+                        <FormSection title="Horário de Funcionamento" hasSeparator>
+                            <div className="space-y-3">
+                                {hoursList.map((item: any) => {
+                                    let dayColor = "text-brand-dark dark:text-dark-heading"
+                                    let timeColor = "text-brand-inactive-text dark:text-dark-body"
+                                    if (item.isCurrentDay) {
+                                        if (item.status === "closing_soon") {
+                                            dayColor = "text-brand-yellow font-medium"
+                                            timeColor = "text-brand-yellow font-medium"
+                                        } else if (item.status === "closed") {
+                                            dayColor = "text-brand-red font-medium"
+                                            timeColor = "text-brand-red font-medium"
+                                        } else {
+                                            dayColor = "text-brand-green font-medium"
+                                            timeColor = "text-brand-green font-medium"
+                                        }
+                                    }
+                                    return (
+                                        <div key={item.dayName} className="flex justify-between items-center text-[14px]">
+                                            <span className="flex items-center gap-1.5">
+                                                <span className={dayColor}>{item.dayName}</span>
+                                                {item.isCurrentDay && item.status === "closing_soon" && (
+                                                    <ClockIcon size={14} className="text-brand-yellow shrink-0" />
+                                                )}
+                                                {item.isCurrentDay && item.status === "closed" && (
+                                                    <ClockIcon size={14} className="text-brand-red shrink-0" />
+                                                )}
+                                            </span>
+                                            <span className={timeColor}>{item.timeString}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </FormSection>
+                    </>
+                )
+            }
 
             <FormSection title="Endereço" hasSeparator>
                 <div className="flex items-start gap-3 mb-5">
@@ -516,18 +508,20 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
                 </div>
             </FormSection>
 
-            {onReport && (
-                <div className="pt-4 border-t border-brand-border dark:border-dark-border">
-                    <button
-                        onClick={onReport}
-                        className="flex items-center gap-2 text-[14px] text-brand-inactive-text dark:text-dark-body hover:text-brand-red hover:text-[#d32f2f] transition-colors"
-                    >
-                        <FlagIcon size={16} />
-                        <span>Comunicar algo errado sobre este vendedor</span>
-                    </button>
-                </div>
-            )}
-        </div>
+            {
+                onReport && (
+                    <div className="pt-4 border-t border-brand-border dark:border-dark-border">
+                        <button
+                            onClick={onReport}
+                            className="flex items-center gap-2 text-[14px] text-brand-inactive-text dark:text-dark-body hover:text-brand-red hover:text-[#d32f2f] transition-colors"
+                        >
+                            <FlagIcon size={16} />
+                            <span>Comunicar algo errado sobre este vendedor</span>
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     )
 }
 
@@ -745,7 +739,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     })
     const categoryViewRef = useRef<string | null>(categoryView)
     categoryViewRef.current = categoryView
-    const pushedHistoryRef = useRef(false)
     const [isContextModalOpen, setIsContextModalOpen] = useState(false)
     const [mobileModalTab, setMobileModalTab] = useState<"reviews" | "info" | "gallery">("reviews")
     const [isAboutPageOpen, setIsAboutPageOpen] = useState(false)
@@ -898,7 +891,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 setActiveSection("products")
                 setTimeout(scrollToProducts, 0)
             }
-            pushedHistoryRef.current = false
         }
         window.addEventListener("popstate", handlePopState)
         return () => window.removeEventListener("popstate", handlePopState)
@@ -982,7 +974,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         if (targetUrl === currentUrl) return
 
         if (push) {
-            pushedHistoryRef.current = true
             window.history.pushState(window.history.state, "", targetUrl)
         } else {
             window.history.replaceState(window.history.state, "", targetUrl)
@@ -1025,12 +1016,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             categoryViewRef.current = null
             setCategoryView(null)
             if (typeof window !== "undefined") {
-                if (pushedHistoryRef.current) {
-                    pushedHistoryRef.current = false
-                    window.history.back()
-                } else {
-                    updateCategoryUrl(null, false)
-                }
+                updateCategoryUrl(null, false)
             }
         }
     }, [updateCategoryUrl])
@@ -1041,12 +1027,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             categoryViewRef.current = null
             setCategoryView(null)
             if (typeof window !== "undefined") {
-                if (pushedHistoryRef.current) {
-                    pushedHistoryRef.current = false
-                    window.history.back()
-                } else {
-                    updateCategoryUrl(null, false)
-                }
+                updateCategoryUrl(null, false)
             }
             setPendingScrollId(tag)
         } else {
@@ -1234,7 +1215,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
             )}
 
             <div ref={mobileTabsRef} className={`lg:hidden`}>
-                <div className="flex items-center gap-4 px-3 h-[46px]">
+                <div className="flex items-center gap-4 px-3 mb-6 border-b border-brand-border dark:border-dark-border h-[46px]">
                     <button
                         onClick={() => setIsContextModalOpen(true)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center text-brand-dark dark:text-white"

@@ -53,6 +53,7 @@ import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
 import { uploadAndSavePendingAttachments } from "@/lib/utils/attachment-uploader"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
+import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
 import { calculateOrderPricing, type PricingCoupon } from "@/lib/services/pricing-engine"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
 
@@ -1836,9 +1837,9 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                                             {(() => {
                                                 const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
-                                                const paymentMethodLabel = originalPaymentProvider === "Mercado Pago" && originalPaymentMethod && originalPaymentMethod !== "Não informado" && !originalPaymentMethod.toLowerCase().includes("mercado pago")
-                                                    ? `Mercado Pago (${originalPaymentMethod})${pendingSuffix}`
-                                                    : `${originalPaymentMethod || "Não informado"}${pendingSuffix}`;
+                                                const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
+                                                const mpSuffix = originalPaymentProvider === "Mercado Pago" && friendlyMethod && !friendlyMethod.toLowerCase().includes("mercado pago") ? " (Mercado Pago)" : "";
+                                                const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}${pendingSuffix}`;
                                                 const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
                                                     ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
                                                     : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod

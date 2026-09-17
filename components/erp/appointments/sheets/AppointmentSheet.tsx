@@ -1622,17 +1622,18 @@ export const AppointmentSheet = ({
 
     // Logic to calculate sequential time slots for the summary view
     const getServiceTimeRange = (index: number) => {
-        // Fallback for when "editTime" might be empty (new creation), use opening time
+        if (!selectedServices[index]) return '';
+
         let startTime = needsRangePicker ? startTimeRange : (editTime || selectedTimeSlot || getDayOpeningTime(selectedCalDate, openingHours));
 
-        // Calculate accumulated duration of previous services
         for (let i = 0; i < index; i++) {
-            // parseInt ensures it's a number, default to 0 if missing
-            const prevDuration = parseInt(selectedServices[i].duration || '0');
+            const prevService = selectedServices[i];
+            const prevDuration = parseInt(prevService?.duration || '0');
             startTime = addMinutes(startTime, prevDuration);
         }
 
-        const duration = parseInt(selectedServices[index].duration || '0');
+        const curService = selectedServices[index];
+        const duration = parseInt(curService?.duration || '0');
         const endTime = addMinutes(startTime, duration);
 
         return `${startTime} - ${endTime}`;

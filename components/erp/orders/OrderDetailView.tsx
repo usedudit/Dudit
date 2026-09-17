@@ -461,10 +461,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (installmentCount && installmentCount > 1) {
             label = `${label} - ${installmentCount}x`;
         }
-        if (order.payment_provider === "Mercado Pago") {
-            if (!label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
-                return `${label} (Mercado Pago)`;
-            }
+        if (order.payment_provider === "Mercado Pago" && !label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
+            label = `${label} (Mercado Pago)`;
         }
         return label;
     };

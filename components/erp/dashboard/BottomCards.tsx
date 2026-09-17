@@ -47,7 +47,7 @@ export function LatestOrdersCard({ items }: CardProps) {
               return (
                 <div 
                   key={item.id} 
-                  onClick={() => router.push(`/erp/pedidos`)}
+                  onClick={() => router.push(`/erp/pedidos/${item.id}`)}
                   className="py-3 flex items-center justify-between cursor-pointer hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 rounded-lg px-2 -mx-2 transition-colors"
                 >
                   <div className="flex flex-col min-w-0 pr-2">

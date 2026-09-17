@@ -13,8 +13,6 @@ interface VendorPaymentMethodsModalProps {
     paymentMethods: any[]
     price: number
     mpConnected?: boolean
-    deliveryEnabled?: boolean
-    pickupEnabled?: boolean
     mpAcceptedPaymentMethods?: {
         credit_card: boolean
         debit_card: boolean
@@ -36,10 +34,15 @@ const AVAILABLE_BRANDS = [
 ]
 
 const isPaymentActive = (pm: any) => pm.is_active !== false
-const getUniqueBrands = (methods: any[]) => Array.from(new Set(methods
-    .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(/[;,]/))
-    .map(brand => brand.trim().toLowerCase())
-    .filter(Boolean)))
+const getUniqueBrands = (methods: any[]) => {
+    const brandSet = new Set(
+        methods
+            .flatMap(pm => String(pm.card_brand || pm.card_brands || "").split(/[;,]/))
+            .map(brand => brand.trim().toLowerCase())
+            .filter(Boolean)
+    )
+    return AVAILABLE_BRANDS.filter(b => brandSet.has(b.id))
+}
 
 const PaymentPill = ({ icon, label }: { icon?: string; label: string }) => (
     <div className="h-9 px-3 rounded-[8px] border border-brand-border bg-white dark:bg-dark-surface flex items-center gap-2">
@@ -48,14 +51,12 @@ const PaymentPill = ({ icon, label }: { icon?: string; label: string }) => (
     </div>
 )
 
-const CardBrands = ({ brands }: { brands: string[] }) => {
+const CardBrands = ({ brands }: { brands: typeof AVAILABLE_BRANDS }) => {
     if (!brands.length) return null
     return (
         <div className="flex flex-wrap gap-2 mt-2">
-            {brands.map(brandId => {
-                const brand = AVAILABLE_BRANDS.find(item => item.id === brandId)
-                if (!brand) return null
-                return <PaymentPill key={brandId} icon={brand.image} label={brand.label} />
+            {brands.map(brand => {
+                return <PaymentPill key={brand.id} icon={brand.image} label={brand.label} />
             })}
         </div>
     )
@@ -68,8 +69,6 @@ export function VendorPaymentMethodsModal({
     paymentMethods = [],
     price,
     mpConnected = false,
-    deliveryEnabled = true,
-    pickupEnabled = true,
     mpAcceptedPaymentMethods,
 }: VendorPaymentMethodsModalProps) {
     const paymentMethodsArr = (paymentMethods || []).filter(isPaymentActive)
@@ -84,9 +83,6 @@ export function VendorPaymentMethodsModal({
 
     const hasSimplePayments = pixMethods.length > 0 || cashMethods.length > 0 || transferMethods.length > 0
     const hasPaymentSections = hasSimplePayments || creditMethods.length > 0 || debitMethods.length > 0
-
-    const hasDeliveryAndPickup = deliveryEnabled && pickupEnabled
-    const deliveryPaymentLabel = hasDeliveryAndPickup ? "Pagamento na Entrega/Retirada" : deliveryEnabled ? "Pagamento na Entrega" : pickupEnabled ? "Pagamento na Retirada" : null
 
     const mp = mpAcceptedPaymentMethods
     const mpMethods = mp ? [
@@ -166,7 +162,7 @@ export function VendorPaymentMethodsModal({
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div>
-                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-3">À Vista / Imediato</h4>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-2">À Vista / Imediato</h4>
                                     <div className="flex flex-wrap gap-2.5">
                                         {pixMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Pix.png" label="Pix" />}
                                         {cashMethods.length > 0 && <PaymentPill icon="https://img.dudit.com.br/static/icons/payments/Dinheiro.png" label="Dinheiro" />}
@@ -177,7 +173,7 @@ export function VendorPaymentMethodsModal({
 
                             {debitMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Débito</h4>
                                     {debitBrands.length > 0 ? (
                                         <CardBrands brands={debitBrands} />
                                     ) : (
@@ -188,7 +184,7 @@ export function VendorPaymentMethodsModal({
 
                             {creditMethods.length > 0 && (
                                 <div>
-                                    <h4 className="text-[14px] font-bold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
+                                    <h4 className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading mb-1">Cartão de Crédito</h4>
                                     {creditBrands.length > 0 ? (
                                         <CardBrands brands={creditBrands} />
                                     ) : (
@@ -197,7 +193,7 @@ export function VendorPaymentMethodsModal({
 
                                     {maxCcInstallments > 1 && price > 0 && (
                                         <div className="mt-4">
-                                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
+                                            <span className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading">Opções de parcelamento</span>
 
                                             {isLoadingInstallments ? (
                                                 <div className="mt-2 py-6 text-center text-xs text-brand-inactive-text dark:text-dark-body select-none">
@@ -264,19 +260,11 @@ export function VendorPaymentMethodsModal({
                             )}
                         </div>
                     </FormSection>
-                ) : !mpConnected && !deliveryPaymentLabel ? (
+                ) : !mpConnected ? (
                     <div className="text-center py-8 text-brand-inactive-text dark:text-dark-body text-sm">
                         Nenhum meio de pagamento cadastrado por este vendedor.
                     </div>
                 ) : null}
-
-                {deliveryPaymentLabel && (
-                    <FormSection title={deliveryPaymentLabel}>
-                        <p className="text-[13px] text-brand-inactive-text dark:text-dark-body">
-                            O pagamento será realizado {hasDeliveryAndPickup ? "na entrega ou na retirada" : deliveryEnabled ? "na entrega" : "na retirada"} conforme combinado com o vendedor.
-                        </p>
-                    </FormSection>
-                )}
             </div>
         </DefaultModal>
     )

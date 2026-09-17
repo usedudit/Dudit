@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ActionsDropdown } from "@/components/reusable"
-import { formatCurrency } from "@/lib/utils"
-import { getDeliveryStatusMeta } from "@/lib/orders/status"
-import { ClockIcon, TruckIcon, UserIcon } from "@/lib/icons"
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
+import { getDeliveryStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
+import { ClockIcon, MotorbikeIcon } from "@/lib/icons"
 import { Tooltip } from "@/components/reusable"
 
 interface DeliveryKanbanCardProps {
@@ -46,6 +46,7 @@ export default function DeliveryKanbanCard({
 
   const statusMeta = getDeliveryStatusMeta(delivery.status)
   const canEdit = ["pending", "not_sent", "preparing"].includes(delivery.status)
+  const isPlatformDriver = Boolean(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver)
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", delivery.id)
@@ -64,6 +65,20 @@ export default function DeliveryKanbanCard({
       onDragStart={handleDragStart as any}
     >
       <div>
+        {/* Delivery Type Indicator: shown above the created-time row */}
+        <div className="flex items-center gap-1.5 text-[11px] text-brand-inactive-text dark:text-dark-body font-medium mb-2">
+          {isPlatformDriver ? (
+            <Tooltip text="Entregador da Rede Dudit">
+              <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-4 h-4 object-contain shrink-0 cursor-help" />
+            </Tooltip>
+          ) : (
+            <MotorbikeIcon size={12} className="shrink-0 text-brand-inactive-text dark:text-dark-body" />
+          )}
+          <span>
+            {isPlatformDriver ? "Rede Dudit" : delivery.deliveryPersonName ? "Com entregador" : "Entrega própria"}
+          </span>
+        </div>
+
         {/* Top Row: Created Date / Elapsed Time & Options */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
@@ -118,25 +133,23 @@ export default function DeliveryKanbanCard({
         <div className="mt-3.5 space-y-1.5 text-[11px] font-medium text-brand-inactive-text dark:text-dark-body border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
           {delivery.deliveryPersonName ? (
             <div className="flex items-center gap-1.5 text-brand-dark dark:text-dark-heading min-w-0">
-              {(delivery.isPlatformDriver || delivery.is_platform_driver || delivery.platform_driver) ? (
-                <Tooltip text="Entregador da Rede Dudit">
-                  <img src="https://img.dudit.com.br/static/Logo.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
-                </Tooltip>
-              ) : (
-                <UserIcon size={12} className="shrink-0 text-brand-inactive-text" />
-              )}
               <span className="truncate">{delivery.deliveryPersonName}</span>
+              {isPlatformDriver && (
+                <Tooltip text="Entregador da Rede Dudit">
+                  <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                </Tooltip>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-1 text-brand-primary dark:text-brand-primary/80">
-              <TruckIcon size={12} className="shrink-0" />
+              <MotorbikeIcon size={12} className="shrink-0" />
               <span>Entrega própria</span>
             </div>
           )}
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
-              <TruckIcon size={12} className="shrink-0" />
+              <MotorbikeIcon size={12} className="shrink-0" />
               <span>Taxa: <strong className="text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</strong></span>
             </div>
 
@@ -146,6 +159,16 @@ export default function DeliveryKanbanCard({
               </span>
             ) : null}
           </div>
+
+          {delivery.completedAt ? (
+            <div className="flex items-center gap-1.5 pt-1 text-brand-inactive-text dark:text-dark-body">
+              <ClockIcon size={12} className="shrink-0" />
+              <span>
+                {getDeliveryStatusLabel(delivery.status)} em{" "}
+                {formatDate(delivery.completedAt)} {formatTime(delivery.completedAt)}
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </motion.div>

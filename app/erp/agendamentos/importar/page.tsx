@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic"
 
 export default async function ImportAppointmentsPageServer() {
   const context = await getCurrentPartnerContext()
-  if (!context) redirect("")
+  if (!context) redirect("/select-erp")
 
   return (
     <>

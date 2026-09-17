@@ -92,9 +92,6 @@ export function MyOrdersListClient({
     const activeOrderIdRef = useRef<string | null>(initialOrderId);
     activeOrderIdRef.current = activeOrderId;
 
-    // Track whether a history entry was pushed for this detail session
-    const pushedHistoryRef = useRef(false);
-
     const initialStatusTab = (initialTab && ["todos", "pending", "preparing", "sent", "delivered"].includes(initialTab)) ? initialTab : "todos";
     const [activeTab, setActiveTab] = useState<string>(initialStatusTab);
     const [currentPage, setCurrentPage] = useState(1);
@@ -120,7 +117,6 @@ export function MyOrdersListClient({
                 activeOrderIdRef.current = null;
                 setActiveOrderId(null);
             }
-            pushedHistoryRef.current = false;
         };
 
         window.addEventListener("popstate", handlePopState);
@@ -161,13 +157,12 @@ export function MyOrdersListClient({
             const currentRelative = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
             if (nextRelative !== currentRelative) {
-                pushedHistoryRef.current = true;
                 window.history.pushState(window.history.state, "", nextRelative);
             }
         }
     }, []);
 
-    // ── Close details: Safe history handling (back if pushed, replaceState if direct load) ──
+    // ── Close details: remove modal params without leaving the current route ──
     const handleCloseDetails = useCallback(() => {
         if (!activeOrderIdRef.current) return;
         activeOrderIdRef.current = null;
@@ -175,18 +170,17 @@ export function MyOrdersListClient({
 
         if (typeof window === "undefined") return;
 
-        if (pushedHistoryRef.current) {
-            pushedHistoryRef.current = false;
-            window.history.back();
-        } else {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('tab');
-            url.searchParams.delete('order_number');
-            url.searchParams.delete('order');
-            url.searchParams.delete('view');
-            const nextRelative = `${url.pathname}${url.search}${url.hash}`;
-            window.history.replaceState(window.history.state, "", nextRelative);
-        }
+        // The modal can be opened after a direct load or while the App Router
+        // is still committing an RSC transition. Calling history.back() is not
+        // guaranteed to pop the entry created by this component and can take
+        // the user out of /pedidos. Clean the URL in-place instead.
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tab');
+        url.searchParams.delete('order_number');
+        url.searchParams.delete('order');
+        url.searchParams.delete('view');
+        const nextRelative = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState(window.history.state, "", nextRelative);
     }, []);
 
     const handleCardClick = (e: React.MouseEvent, id: string, orderNumber: string) => {

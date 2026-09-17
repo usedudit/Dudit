@@ -907,7 +907,7 @@ export function PaymentWrapper({
                                     </div>
                                     <div className="mt-4 flex flex-col items-center">
                                         <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
-                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Valor do sinal / entrada</span>
+                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">{orderNumber ? `Sinal - ${orderNumber}` : "Sinal / Entrada"}</span>
                                     </div>
                                 </div>
                             )}

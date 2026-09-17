@@ -19,6 +19,7 @@ import {
     DatePicker,
     FormDropdown,
     FormSection,
+    SidebarCard,
     Input,
     Tabs,
     TabsContent,
@@ -134,21 +135,6 @@ function getOrderPreviewImage(order?: OrderPickerItem | null) {
     const firstItemImage = order?.items?.find((item) => item?.products?.images)?.products?.images
     return getR2ImageUrl(firstItemImage || null, "thumb")
 }
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = true, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden text-left mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-heading rounded-t-2xl" />}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 export default function CreateDeliveryPage({
     partnerId,
@@ -879,7 +865,7 @@ export default function CreateDeliveryPage({
                                             </div>
 
                                             <div className="col-span-12 hidden border-l border-brand-border pl-12 dark:border-dark-border lg:block lg:col-span-4">
-                                                <SidebarCard title="Informações da Entrega">
+                                                <SidebarCard hasTopStrip title="Informações da Entrega">
                                                     <div className="grid grid-cols-1 gap-4">
                                                         <FormDropdown
                                                             label="Entregador"

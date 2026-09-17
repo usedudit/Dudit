@@ -288,7 +288,7 @@ function HelpCard() {
                             description={item.description}
                             right={<ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
                             onClick={() => router.push(item.href)}
-                            className="border-0 bg-brand-gray/50 dark:bg-dark-border/40 hover:bg-brand-gray dark:hover:bg-dark-border/70 p-3 rounded-xl transition-colors"
+                            className="border-0 !px-0 !py-0"
                         />
                     ))}
                 </div>
@@ -598,14 +598,14 @@ function ModeCard({
             <>
                 <ListItem
                     title=" Evoluir negócio"
-                    description="Ative a Vitrine Online ou o Gerenciador Completo (ERP) para desbloquear pedidos, catálogo comercial e mais."
+                    description="Ative a Vitrine Online ou o Gestor para desbloquear pedidos, financeiro e muito mais."
                     icon={<RocketIcon className="text-brand-green w-5 h-5 shrink-0" />}
                     className="px-4 py-3"
                     right={
                         <Button
                             onClick={() => setModalOpen(true)}
                         >
-                            Ativar plano
+                            Evoluir negócio
                         </Button>
                     }
                 />

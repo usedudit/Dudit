@@ -21,6 +21,7 @@ import {
     Checkbox,
     InfoCard,
     FormSection,
+    SidebarCard,
 } from "@/components/reusable"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import AlertModal from "@/components/reusable/AlertModal"
@@ -185,20 +186,6 @@ const FormCombobox = ({
         />
     )
 }
-
-const SidebarCard = ({ title, children, className = "", hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface/50 ${className}`}>
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 export default function CreateTransactionPage({
     partnerId,

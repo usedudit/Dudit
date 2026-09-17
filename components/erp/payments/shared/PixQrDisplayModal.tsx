@@ -12,6 +12,7 @@ interface PixQrDisplayModalProps {
     qrCode: string
     payload: string
     amount: number
+    subtitle?: string
     onConfirmPayment?: () => void
     isConfirming?: boolean
     onVerifyPayment?: () => void
@@ -25,6 +26,7 @@ export function PixQrDisplayModal({
     qrCode,
     payload,
     amount,
+    subtitle,
     onConfirmPayment,
     isConfirming = false,
     onVerifyPayment,
@@ -84,6 +86,9 @@ export function PixQrDisplayModal({
                 {/* Amount Display */}
                 <div className="mt-4 flex flex-col items-center">
                     <span className="text-2xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(amount)}</span>
+                    {subtitle && (
+                        <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">{subtitle}</span>
+                    )}
                 </div>
 
                 {/* Separator */}

@@ -5,7 +5,7 @@ import LabelsPageClient from "@/components/erp/labels/LabelsPageClient"
 
 export default async function LabelsPage() {
   const context = await getCurrentPartnerContext()
-  if (!context) redirect("/dashboard")
+  if (!context) redirect("/select-erp")
 
   const plan = await getPartnerPlan(context.partnerId)
   const isFreePlan = plan.slug.toLowerCase() === "free"

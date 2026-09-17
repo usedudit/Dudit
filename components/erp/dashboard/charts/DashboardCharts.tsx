@@ -219,7 +219,7 @@ export function DashboardBarChart({
           />
           <Tooltip content={<CustomChartTooltip formatter={valueFormatter} />} />
           <Bar dataKey="value" name="Valor" radius={[6, 6, 0, 0]}>
-            {data.map((_, index) => <Cell key={index} fill={barColors[index % barColors.length]} />)}
+            {data.map((entry, index) => <Cell key={index} fill={(entry as any).fill || barColors[index % barColors.length]} />)}
           </Bar>
         </BarChart>
       </ChartContainer>

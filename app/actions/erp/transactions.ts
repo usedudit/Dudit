@@ -3016,12 +3016,12 @@ export async function getTransactionDetailsAction(
             row.account_id
                 ? supabase
                     .from("finance_accounts")
-                    .select("name, type")
+                    .select("name, type, integration_source")
                     .eq("id", row.account_id)
                     .eq("partner_id", partnerId)
                     .maybeSingle()
-                    .then(({ data: acc }: { data: any }) => ({ name: acc?.name || null, type: acc?.type || null }))
-                : Promise.resolve({ name: null as string | null, type: null as string | null }),
+                    .then(({ data: acc }: { data: any }) => ({ name: acc?.name || null, type: acc?.type || null, integrationSource: acc?.integration_source || null }))
+                : Promise.resolve({ name: null as string | null, type: null as string | null, integrationSource: null as string | null }),
             // 4. Subcategory name
             row.subcategory_id
                 ? supabase
@@ -3614,7 +3614,9 @@ export async function getTransactionDetailsAction(
             transactionType: row.transaction_type,
             isRecurring: !!row.recurring_id,
             paymentMethodSubtitle: finalPaymentSubtitle,
-            paymentProvider: salesOrder ? (salesOrder as any).payment_provider || null : null,
+            paymentProvider: salesOrder
+                ? (salesOrder as any).payment_provider || null
+                : (accountData as any)?.integrationSource === "mercadopago" ? "Mercado Pago" : null,
             paymentDateSubtitle,
             creatorName,
             originLabel: originLabel(row.origin),

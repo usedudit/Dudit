@@ -30,10 +30,9 @@ export const ServiceItemCard: React.FC<ServiceItemCardProps> = ({
     fulfillmentMode,
     promotions = [],
 }) => {
-    // If explicit timeRange is passed, use it. Otherwise calc based on service.startTime or fallback
     const timeDisplay = timeRange
         ? timeRange
-        : (service.startTime ? `${service.startTime} - ${getEndTime(service.startTime, parseInt(service.duration))}` : '');
+        : (service?.startTime ? `${service.startTime} - ${getEndTime(service.startTime, parseInt(service?.duration || '0'))}` : '');
 
     return (
         <div

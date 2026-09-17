@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic"
 
 export default async function MySubscriptionsPage() {
   const user = await requireUser()
-  if (!user) redirect("/login")
+  if (!user) redirect("/auth/login")
 
   const [result, sessionData] = await Promise.all([
     getMyRecurringSubscriptionsAction(),

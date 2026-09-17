@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Badge } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
 import { PlayIcon } from "@/lib/icons"
 import { formatDate } from "@/lib/utils"
 
@@ -23,10 +23,11 @@ const STATUS_LABELS: Record<string, string> = {
 interface VideoGridCardProps {
     video: any
     selected: boolean
-    onSelect: (id: string) => void
-    onDetails: (video: any) => void
-    onEdit: (video: any) => void
-    onDelete: (video: any) => void
+    onSelect: () => void
+    onDetails: () => void
+    onEdit: () => void
+    onDelete: () => void
+    onView?: () => void
     onPrefetchMouseEnter?: () => void
     onPrefetchMouseLeave?: () => void
     onPrefetchTouchStart?: () => void
@@ -40,23 +41,28 @@ const VideoGridCard = React.memo(
         onDetails,
         onEdit,
         onDelete,
+        onView,
         onPrefetchMouseEnter,
         onPrefetchMouseLeave,
         onPrefetchTouchStart,
     }: VideoGridCardProps) => {
+        const duration = video.duration
+        const minutes = Math.floor(duration / 60)
+        const seconds = (duration % 60).toString().padStart(2, "0")
+
         return (
             <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className={`group relative bg-white dark:bg-dark-surface rounded-xl border border-gray-100 dark:border-dark-border overflow-hidden hover:shadow-md transition-all cursor-pointer ${selected ? "ring-2 ring-brand-green" : ""}`}
-                onClick={() => onDetails(video)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl hover:border-brand-dark/30 dark:hover:border-brand-gray/30 transition-all duration-300 cursor-pointer group flex flex-col h-full relative overflow-hidden"
+                onClick={onDetails}
                 onMouseEnter={onPrefetchMouseEnter}
                 onMouseLeave={onPrefetchMouseLeave}
                 onTouchStart={onPrefetchTouchStart}
             >
-                <div className="relative aspect-[9/16] bg-brand-gray dark:bg-dark-border overflow-hidden">
+                <div className="relative aspect-video bg-brand-gray dark:bg-dark-border overflow-hidden">
                     {video.video_thumbnail ? (
                         <img src={video.video_thumbnail} alt="" className="w-full h-full object-cover" loading="lazy" />
                     ) : (
@@ -67,19 +73,15 @@ const VideoGridCard = React.memo(
                     <Badge variant={STATUS_VARIANTS[video.moderation_status] || "gray"} className="absolute top-2 left-2 text-xs">
                         {STATUS_LABELS[video.moderation_status] || video.moderation_status}
                     </Badge>
-                    <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
-                        <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => onSelect(video.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"
-                        />
+                    <div className="absolute bottom-2 right-2 text-xs text-white bg-black/60 px-2 py-0.5 rounded">
+                        {minutes}:{seconds}
                     </div>
-                    <div className="absolute bottom-2 left-2 text-xs text-white bg-black/60 px-2 py-0.5 rounded">
-                        {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, "0")}
+                    <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={selected} onChange={onSelect} />
                     </div>
                 </div>
-                <div className="p-3 space-y-1">
+
+                <div className="p-3 space-y-2 flex-1 flex flex-col">
                     <h3 className="font-semibold text-sm text-brand-dark dark:text-dark-heading truncate">
                         {video.title || "Sem título"}
                     </h3>
@@ -91,9 +93,22 @@ const VideoGridCard = React.memo(
                         {video.published_at ? formatDate(video.published_at) : formatDate(video.created_at)}
                     </p>
                 </div>
+
+                <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                    <Tooltip text="Ações">
+                        <div className="shrink-0">
+                            <ActionsDropdown
+                                onView={onView || onDetails}
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                            />
+                        </div>
+                    </Tooltip>
+                </div>
             </motion.div>
         )
-    }
+    },
+    (prev, next) => prev.selected === next.selected && prev.video === next.video
 )
 
 VideoGridCard.displayName = "VideoGridCard"

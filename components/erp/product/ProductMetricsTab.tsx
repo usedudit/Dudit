@@ -121,7 +121,7 @@ export function ProductMetricsTab({ productData }: ProductMetricsTabProps) {
                             Comparativo: Histórico vs Últimos 30 dias
                         </h3>
                         <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <BarChart data={comparisonData} barGap={6} barCategoryGap="25%">
                                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--color-brand-border)" />
                                     <XAxis

@@ -6,6 +6,7 @@ import type { PaymentBreakdownLeg } from "./payment-utils"
 
 type DepositReceiptsSectionProps = {
   legs: PaymentBreakdownLeg[]
+  orderNumber?: string
   onSyncMp?: () => void
   syncing?: boolean
 }
@@ -16,14 +17,14 @@ function isMpLeg(entry: PaymentBreakdownLeg) {
   return provider.includes("mercado pago") || method.includes("mercado pago")
 }
 
-export function DepositReceiptsSection({ legs, onSyncMp, syncing = false }: DepositReceiptsSectionProps) {
+export function DepositReceiptsSection({ legs, orderNumber, onSyncMp, syncing = false }: DepositReceiptsSectionProps) {
   const receivedLegs = legs.filter((entry) => Number(entry.amountReceived || 0) > 0.009)
   if (receivedLegs.length === 0) return null
 
   return (
     <div className="space-y-3">
       <h4 className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
-        Recebimentos confirmados
+        Recebimentos confirmados{orderNumber ? ` · Sinal - ${orderNumber}` : ""}
       </h4>
       {receivedLegs.map((entry, index) => {
         const received = Number(entry.amountReceived || 0)

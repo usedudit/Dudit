@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon } from "@/lib/icons"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog } from "@/components/reusable"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SidebarCard, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -539,21 +539,6 @@ export default function PromotionFormPage({
     }, [filteredSelectedCustomers, custPage])
 
     const totalCustomerPages = Math.ceil(filteredSelectedCustomers.length / 5)
-
-    const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-        <>
-            {/* Desktop: card */}
-            <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-                {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-                {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-                {children}
-            </div>
-            {/* Mobile/Tablet: FormSection */}
-            <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-                {children}
-            </FormSection>
-        </>
-    )
 
     // Render list for selected products
     const renderSelectedProductsList = () => {

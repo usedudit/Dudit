@@ -1409,7 +1409,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
         started_at: payload.startedAt,
         departure_time: payload.startedAt,
         delivered_at: status === "delivered" ? payload.startedAt : null,
-        completed_at: status === "delivered" ? payload.startedAt : null,
+        completed_at: ["delivered", "cancelled", "delivery_failed"].includes(status) ? payload.startedAt : null,
         notes: sanitizeNotes(payload.notes),
       }
 
@@ -1639,6 +1639,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             estimated_duration_minutes,
             started_at,
             delivered_at,
+            completed_at,
             created_at,
             notes,
             delivery_orders(
@@ -1819,6 +1820,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       estimated_duration_minutes,
       started_at,
       delivered_at,
+      completed_at,
       created_at,
       notes,
       delivery_orders(
@@ -2437,7 +2439,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
       patch.departure_time = currentDelivery.departure_time || currentDelivery.started_at || nowIso
       patch.started_at = currentDelivery.started_at || nowIso
       patch.delivered_at = nowIso
+    }
+    if (["delivered", "cancelled", "delivery_failed"].includes(nextStatus)) {
       patch.completed_at = nowIso
+    } else {
+      patch.completed_at = null
     }
 
     const { error } = await supabase
@@ -2734,7 +2740,11 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
 
     if (nextStatus === "delivered") {
       deliveryPatch.delivered_at = payload.startedAt || nowIso
+    }
+    if (["delivered", "cancelled", "delivery_failed"].includes(nextStatus)) {
       deliveryPatch.completed_at = payload.startedAt || nowIso
+    } else {
+      deliveryPatch.completed_at = null
     }
 
     if (distanceKm != null) deliveryPatch.distance_km = distanceKm

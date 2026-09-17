@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { Button, IconPlaceholder, Spinner, AlertModal, Pagination } from "@/components/reusable"
+import { Button, IconPlaceholder, Spinner, AlertModal, Pagination, SidebarCard } from "@/components/reusable"
 import { TagIcon, TrashIcon, ArrowUpDownIcon, Package, ClockIcon, XIcon } from "@/lib/icons"
 import {
     getProductSuppliersOverviewAction,
@@ -41,37 +41,6 @@ const COLUMNS: ColumnDef[] = [
     { id: "last_purchase", label: "Última Compra", align: "left", width: "170px", sortable: true },
     { id: "actions", label: "Ações", align: "center", width: "80px", sortable: false },
 ]
-
-const SidebarCard = ({
-    title,
-    children,
-    className = "",
-    hasTopStrip = false,
-    headerRight,
-}: {
-    title?: React.ReactNode
-    children: React.ReactNode
-    className?: string
-    hasTopStrip?: boolean
-    headerRight?: React.ReactNode
-}) => (
-    <div
-        className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}
-    >
-        {hasTopStrip && (
-            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-        )}
-        {(title || headerRight) && (
-            <div className="flex items-center justify-between mb-4 mt-1">
-                {title ? (
-                    <h3 className="text-base font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
-                ) : <div />}
-                {headerRight}
-            </div>
-        )}
-        {children}
-    </div>
-)
 
 const TimelineItem = React.memo(({
     icon: Icon,

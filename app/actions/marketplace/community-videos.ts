@@ -33,7 +33,7 @@ export interface CommunityVideoItem {
   published_at: string | null
   created_at: string
   linked_collection_short_id?: string | null
-  partner?: { name: string; store_name: string; store_image_url: string | null }
+   partner?: { name: string; store_name: string; store_image_url: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null }
 }
 
 export async function getCommunityVideos(citySlug?: string, cursor?: string, limit = 20): Promise<{
@@ -107,7 +107,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
     if (partnerIds.length > 0 || storeIds.length > 0) {
       let storeQuery = admin
         .from("stores")
-        .select("id, name, logo_url, partner_id")
+        .select("id, short_id, slug, name, logo_url, partner_id, addresses!store_id!left(city, state)")
         .eq("is_active", true)
 
       // Build filter conditions separately for each ID type
@@ -137,7 +137,7 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
         console.error("[getCommunityVideos] Store query error:", storeError)
       }
 
-      type StoreRow = { id: string; name: string | null; logo_url: string | null; partner_id: string }
+      type StoreRow = { id: string; name: string | null; logo_url: string | null; partner_id: string; short_id: string | null; slug: string | null; addresses?: { city: string | null; state: string | null }[] | null }
       const storeByPartnerMap = new Map<string, StoreRow>()
       const storeByIdMap = new Map<string, StoreRow>()
 
@@ -149,7 +149,16 @@ export async function getCommunityVideos(citySlug?: string, cursor?: string, lim
       for (const item of items) {
         const s = (item.store_id ? storeByIdMap.get(item.store_id) : null) || storeByPartnerMap.get(item.partner_id)
         const storeName = s?.name || "Loja parceira"
-        item.partner = { name: storeName, store_name: storeName, store_image_url: s?.logo_url || null }
+        item.partner = {
+            name: storeName,
+            store_name: storeName,
+            store_image_url: s?.logo_url || null,
+            short_id: s?.short_id || null,
+            id: s?.id || null,
+            slug: s?.slug || null,
+            city: s?.addresses?.[0]?.city || null,
+            state: s?.addresses?.[0]?.state || null,
+        }
       }
     }
   }
@@ -340,6 +349,34 @@ export async function deleteCommunityVideo(id: string): Promise<ActionResult> {
   } catch (err: any) {
     return { success: false, error: err.message || "Erro ao excluir vídeo" }
   }
+}
+
+export async function deleteCommunityVideosInBatch(ids: string[]): Promise<ActionResult> {
+    try {
+        const user = await requireUser()
+        const supabase = await getSupabaseServerClient()
+
+        const { data: partner } = await supabase
+            .from("partners")
+            .select("id")
+            .eq("user_id", user.id)
+            .single()
+
+        if (!partner) return { success: false, error: "Partner não encontrado" }
+
+        const { error } = await supabase
+            .from("community_videos")
+            .delete()
+            .eq("partner_id", partner.id)
+            .in("id", ids)
+
+        if (error) return { success: false, error: error.message }
+
+        await safeRevalidateTag(TAGS.communityVideos)
+        return { success: true }
+    } catch (err: any) {
+        return { success: false, error: err.message || "Erro ao excluir vídeos" }
+    }
 }
 
 export async function recordVideoView(id: string): Promise<void> {

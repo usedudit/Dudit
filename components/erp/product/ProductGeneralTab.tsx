@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState, useMemo, useEffect, useCallback } from "react"
-import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner, ListItem } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner, ListItem, SidebarCard } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
-import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon, StarIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
 import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
@@ -72,14 +72,6 @@ const FormCombobox = ({
             searchPlaceholder={searchPlaceholder}
             placeholder={placeholder}
         />
-    </div>
-)
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean }) => (
-    <div className={`bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-        {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-        {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-        {children}
     </div>
 )
 
@@ -234,22 +226,22 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 images.map((img, index) => (
                                     <div
                                         key={index}
-                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                        className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden"
                                     >
                                         <img
                                             src={getImageSrc(img)}
                                             alt={`${productData.name || "Produto"} ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            className="w-full h-full object-cover"
                                         />
                                         {index === 0 && (
-                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
-                                                Principal
+                                            <div className="absolute top-2 right-2 bg-brand-green rounded-full p-1.5 shadow-lg">
+                                                <StarIcon className="w-4 h-4 text-white fill-white" />
                                             </div>
                                         )}
                                     </div>
                                 ))
                             ) : (
-                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                <div className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden">
                                     Sem imagens
                                 </div>
                             )}
@@ -267,50 +259,46 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                             </div>
 
                             {!isDesapego ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                                    <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="flex flex-col">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                {productData.is_active ? "Ativo" : "Inativo"}
-                                            </span>
-                                        </div>
+                                        <span className={`${productData.is_active ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                            {productData.is_active ? "Ativo" : "Inativo"}
+                                        </span>
                                     </div>
 
-                                    <div>
+                                    <div className="flex flex-col">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`inline-block w-2.5 h-2.5 rounded-full ${productData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                                {productData.show_in_marketplace !== false ? "Sim" : "Não"}
-                                            </span>
-                                        </div>
+                                        <span className={`${productData.show_in_marketplace !== false ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                            {productData.show_in_marketplace !== false ? "Sim" : "Não"}
+                                        </span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="space-y-3 pt-2">
-                                    <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="flex flex-col">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">Condição do Item</span>
-                                        <div className="mt-1">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-brand-green/10 text-brand-green border border-brand-green/20">
-                                                {productData.condicao || productData.condition || "Novo"}
-                                            </span>
-                                        </div>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {productData.condicao || productData.condition || "Novo"}
+                                        </span>
                                     </div>
+
                                     {(productData.accepts_offers || productData.accepts_trades) && (
-                                        <div className="flex flex-wrap gap-2 pt-1">
-                                            {productData.accepts_offers && (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                                    🤝 Aceita Propostas
+                                        <>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">🤝 Aceita Propostas</span>
+                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {productData.accepts_offers && "Sim" || "Não"}
                                                 </span>
-                                            )}
-                                            {productData.accepts_trades && (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                                                    🔄 Aceita Trocas
+                                            </div>
+
+                                            <div className="flex flex-col">
+                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">🔄 Aceita Trocas</span>
+                                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                    {productData.accepts_trades && "Sim" || "Não"}
                                                 </span>
-                                            )}
-                                        </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -325,64 +313,63 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 message="Este produto possui variações. Os preços individuais de cada variação podem ser configurados na aba Variações."
                             />
                         ) : (
-                            <div className={`grid grid-cols-1 ${isDesapego ? "sm:grid-cols-1" : isQuickMode ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-4 sm:gap-6 mb-2`}>
-                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                        Preço de Venda
-                                    </span>
-                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                        {showPrice ? formatCurrency(productData.price || 0) : "Sob consulta"}
-                                    </div>
-                                    {showPrice && !isDesapego && Number(productData.costPrice) > 0 && (
-                                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 block">
-                                            Margem: {margin}% ({formatCurrency(profit)})
+                            <>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Preço de Venda</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            {showPrice ? formatCurrency(productData.price || 0) : "Sob consulta"}
                                         </span>
+                                    </div>
+
+                                    {showPrice && !isDesapego && Number(productData.costPrice) > 0 && (
+                                        <div className="flex flex-col">
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Margem</span>
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                Margem: {margin}% ({formatCurrency(profit)})
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {!isQuickMode && !isDesapego && (
+                                        <div className="flex flex-col">
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Preço de Custo</span>
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                {formatCurrency(productData.costPrice || 0)}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {!isDesapego && (
+                                        <div className="flex flex-col">
+                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">Preço Promocional</span>
+                                            <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                                {productData.promotional_price ? formatCurrency(productData.promotional_price) : "-"}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
-
-                                {!isQuickMode && !isDesapego && (
-                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                            Preço de Custo
-                                        </span>
-                                        <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                            {formatCurrency(productData.costPrice || 0)}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!isDesapego && (
-                                    <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                            Preço Promocional
-                                        </span>
-                                        <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
-                                            {productData.promotional_price ? formatCurrency(productData.promotional_price) : "-"}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {!showPrice && !hasVariants && (
-                            <div className="mt-4">
-                                <InfoCard
-                                    color="orange"
-                                    message="O produto está configurado para exibir 'Valor sob consulta' na sua vitrine online."
-                                />
-                            </div>
-                        )}
-
-                        {isQuickMode && productData.description && (
-                            <div className="mt-8">
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
-                                <div
-                                    className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
-                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(productData.description) }}
-                                />
-                            </div>
+                            </>
                         )}
                     </FormSection>
+
+                    {!showPrice && !hasVariants && (
+                        <div className="mt-4">
+                            <InfoCard
+                                color="orange"
+                                message="O produto está configurado para exibir 'Valor sob consulta' na sua vitrine online."
+                            />
+                        </div>
+                    )}
+
+                    {isQuickMode && productData.description && (
+                        <FormSection title="Descrição" hasSeparator>
+                            <div
+                                className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
+                                dangerouslySetInnerHTML={{ __html: sanitizeRichText(productData.description) }}
+                            />
+                        </FormSection>
+                    )}
 
                     {/* Estoque */}
                     {!isQuickMode && (
@@ -436,26 +423,26 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                     {/* Envio e Dimensões */}
                     {!isQuickMode && (
                         <FormSection hasSeparator title="Envio e Dimensões">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                                <div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Dimensões (L × A × P)</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.width || 0} × {productData.height || 0} × {productData.length || 0} cm
                                     </span>
                                 </div>
-                                <div>
+                                <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Peso Líquido / Bruto</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.weight_net || 0} kg / {productData.weight_gross || 0} kg
                                     </span>
                                 </div>
-                                <div>
+                                <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Prazo de Preparação</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.preparation_days || 0} dias
                                     </span>
                                 </div>
-                                <div>
+                                <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Embalagem</span>
                                     <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {productData.packaging_type === "package" ? "Pacote / Caixa" : productData.packaging_type === "cilinder" ? "Cilindro / Rolo" : productData.packaging_type === "envelope" ? "Envelope" : "Pacote / Caixa"}

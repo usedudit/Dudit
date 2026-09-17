@@ -8,6 +8,7 @@ import { getDateComponents, startOfDay, getTodayYmd } from "@/lib/date"
 import { getPartnerTimezone } from "@/lib/date/server"
 import type { Period } from "@/lib/period-types"
 import { scopeActiveOnly } from "@/lib/supabase/query-helpers"
+import { normalizeOrderSource } from "@/lib/orders/order-utils"
 import { cache } from "react"
 
 const addDays = (ymd: string, days: number) => {
@@ -24,6 +25,20 @@ const loadRawOrdersGeneralTab = cache(async (partnerId: string, todayYmd: string
     .from("orders")
     .select("id, total_amount, order_number, customer_name, situation, created_at, order_source")
     .eq("partner_id", partnerId)
+    .gte("created_at", fromIso)
+    .order("created_at", { ascending: false })
+  if (error) throw error
+  return data || []
+})
+
+const loadRawOrderItemsForAbc = cache(async (partnerId: string, todayYmd: string, tz: string) => {
+  const fromYmd = addDays(todayYmd, -29)
+  const supabase = createAdminClient()
+  const fromIso = startOfDay(fromYmd, tz).toISOString()
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("product_name, net_item_value, created_at, orders!inner(partner_id)")
+    .eq("orders.partner_id", partnerId)
     .gte("created_at", fromIso)
     .order("created_at", { ascending: false })
   if (error) throw error
@@ -94,6 +109,7 @@ const generalAlertsCacheMap = new Map<string, any>()
 const generalRevenueChartCacheMap = new Map<string, any>()
 const generalRevenueOriginCacheMap = new Map<string, any>()
 const generalActivityCacheMap = new Map<string, any>()
+const generalAbcCurveCacheMap = new Map<string, any>()
 const generalTopCategoriesCacheMap = new Map<string, any>()
 const productsDashboardCacheMap = new Map<string, any>()
 
@@ -130,6 +146,7 @@ export const DASHBOARD_TAGS = {
   revenueOrigin: (partnerId: string, period = "monthly") => `dashboard-revenue-origin:${partnerId}:${period}`,
   activity: (partnerId: string) => `dashboard-activity:${partnerId}`,
   categories: (partnerId: string, period = "monthly") => `dashboard-categories:${partnerId}:${period}`,
+  abcCurve: (partnerId: string, period = "monthly") => `dashboard-abc-curve:${partnerId}:${period}`,
   products: (partnerId: string) => `dashboard-products:${partnerId}`,
   services: (partnerId: string) => `dashboard-services:${partnerId}`,
   financial: (partnerId: string) => `dashboard-financial:${partnerId}`,
@@ -156,6 +173,13 @@ export type DashboardListItem = {
 }
 
 export type ChartPoint = Record<string, string | number>
+
+export type AbcCurvePoint = {
+  label: string
+  value: number
+  cumulative: number
+  category: "A" | "B" | "C"
+}
 
 export type GeneralDashboardData = {
   metrics: Metric[]
@@ -184,6 +208,9 @@ export type ActivityItem = {
   icon: string
   tone: "green" | "blue" | "orange" | "red" | "default"
   user?: string
+  entityId?: string
+  entityType?: string
+  entityLabel?: string
 }
 
 export type ProductsDashboardData = {
@@ -985,13 +1012,7 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", pe
 
         const originMap = new Map<string, number>()
         for (const order of data || []) {
-          const src = String((order as any).order_source || "Manual").toLowerCase()
-          let label = "Manual"
-          if (src.includes("presencial") || src.includes("pdv") || src.includes("pos")) label = "PDV"
-          else if (src.includes("online") || src.includes("web") || src.includes("ecommerce")) label = "Online"
-          else if (src.includes("marketplace") || src.includes("vitrine")) label = "Marketplace"
-          else if (src.includes("whatsapp") || src.includes("wpp")) label = "WhatsApp"
-          else if (src.includes("delivery") || src.includes("entrega")) label = "Delivery"
+          const label = normalizeOrderSource((order as any).order_source)
           originMap.set(label, (originMap.get(label) || 0) + money(order.total_amount))
         }
         const origins = topFromMap(originMap).filter((p) => money(p.value) > 0)
@@ -1001,6 +1022,47 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", pe
       { tags: [DASHBOARD_TAGS.revenueOrigin(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
     )
     generalRevenueOriginCacheMap.set(mapKey, cachedFn)
+  }
+  return cachedFn()
+}
+
+async function getCachedGeneralAbcCurve(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ abcCurve: AbcCurvePoint[] }> {
+  const mapKey = `${partnerId}:${period}`
+  let cachedFn = generalAbcCurveCacheMap.get(mapKey)
+  if (!cachedFn) {
+    cachedFn = unstable_cache(
+      async () => {
+        const { today, from } = getDateRangeForPeriod(period)
+        const items = await loadRawOrderItemsForAbc(partnerId, today, _requestTimezone)
+        const data = (items || []).filter((item: any) => String(item.created_at).slice(0, 10) >= from).slice(0, 600)
+
+        const prodRevenueMap = new Map<string, number>()
+        for (const item of data) {
+          const name = item.product_name || "Produto"
+          prodRevenueMap.set(name, (prodRevenueMap.get(name) || 0) + money(item.net_item_value))
+        }
+
+        const sortedProducts = Array.from(prodRevenueMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+
+        const totalValue = sortedProducts.reduce((a, [_, v]) => a + v, 0)
+        let cumulative = 0
+        const abcCurve = sortedProducts.map(([label, value]) => {
+          cumulative += value
+          const cumPct = totalValue > 0 ? Math.round((cumulative / totalValue) * 100) : 0
+          let category: "A" | "B" | "C" = "C"
+          if (cumPct <= 50) category = "A"
+          else if (cumPct <= 80) category = "B"
+          return { label, value, cumulative: cumPct, category }
+        })
+
+        return { abcCurve }
+      },
+      ["dashboard-abc-curve", partnerId, storeId, period],
+      { tags: [DASHBOARD_TAGS.abcCurve(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
+    )
+    generalAbcCurveCacheMap.set(mapKey, cachedFn)
   }
   return cachedFn()
 }
@@ -1018,6 +1080,7 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
           .select(`
             id, 
             entity_type, 
+            entity_id,
             action_type, 
             change_lines, 
             created_at, 
@@ -1115,6 +1178,9 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
             tone: entityTone[action] || "default",
             user: userName.split(" ")[0], // First name for compact view
             date: row.created_at,
+            entityId: row.entity_id ? String(row.entity_id) : undefined,
+            entityType: entity,
+            entityLabel: entityMeta[entity]?.label || entity,
           }
         })
 
@@ -1209,6 +1275,13 @@ export async function getGeneralRevenueOrigin(partnerId: string, period: Period 
   const tz = await getPartnerTimezone(partnerId)
   _requestTimezone = tz
   return getCachedGeneralRevenueOrigin(partnerId, storeId, period)
+}
+
+export async function getGeneralAbcCurve(partnerId: string, period: Period = "monthly", storeId = "") {
+  await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
+  return getCachedGeneralAbcCurve(partnerId, storeId, period)
 }
 
 export async function getGeneralActivity(partnerId: string, storeId = "") {

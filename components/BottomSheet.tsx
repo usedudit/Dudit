@@ -53,10 +53,12 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         };
     }, [isOpen]);
 
+    const maxDrag = windowHeight * 0.4;
+
     const handleDragEnd = (_: any, info: any) => {
         const currentY = y.get();
 
-        // Fecha se arrastou mais de 120px pra baixo OU velocidade alta
+        // Fecha se arrastou mais de 120px pra baixo OU velocidade alta pra baixo
         if (currentY > 120 || info.velocity.y > 500) {
             onClose();
         } else {
@@ -89,9 +91,9 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                                 ref={sheetRef}
                                 style={{ y }}
                                 drag="y"
-                                // Impede arrastar pra cima (y negativo) - o scroll interno cuida disso
-                                // Permite arrastar pra baixo livremente para fechar
-                                dragConstraints={{ top: 0, bottom: 0 }}
+                                // Permite arrastar pra baixo livremente (até 40% da tela) para fechar
+                                // Impede arrastar muito pra cima (protege contra scroll acidental pra cima)
+                                dragConstraints={{ top: -10, bottom: maxDrag }}
                                 dragElastic={{ top: 0.05, bottom: 0.8 }}
                                 onDragEnd={handleDragEnd}
                                 initial={{ y: windowHeight }}

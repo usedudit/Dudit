@@ -55,7 +55,6 @@ export function UserProfilePage({
 
     const [currentView, setCurrentView] = useState<View>(initialView)
     const currentViewRef = useRef<View>(initialView)
-    const pushedHistoryRef = useRef(false)
 
     const [isLoading, setIsLoading] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -296,17 +295,14 @@ export function UserProfilePage({
         if (view === "main") {
             currentViewRef.current = "main"
             setCurrentView("main")
-            if (pushedHistoryRef.current) {
-                pushedHistoryRef.current = false
-                window.history.back()
-            } else {
-                window.history.replaceState(window.history.state, "", "/perfil")
-            }
+            // This tab can be opened directly from a URL. Going back here can
+            // leave /perfil (or follow an unrelated previous history entry),
+            // especially after an App Router/RSC navigation on mobile.
+            window.history.replaceState(window.history.state, "", "/perfil")
         } else {
             const url = `/perfil?tab=${view}`
             if (currentViewRef.current === "main") {
                 window.history.pushState(window.history.state, "", url)
-                pushedHistoryRef.current = true
             } else {
                 window.history.replaceState(window.history.state, "", url)
             }
@@ -321,9 +317,6 @@ export function UserProfilePage({
             const tabParam = params.get("tab")
             const tab: View = isValidView(tabParam) ? tabParam : "main"
 
-            if (tab === "main") {
-                pushedHistoryRef.current = false
-            }
             currentViewRef.current = tab
             setCurrentView(tab)
             resetSubViewStates()
@@ -336,9 +329,6 @@ export function UserProfilePage({
         const tabParam = searchParams?.get("tab")
         const tab: View = isValidView(tabParam) ? tabParam : "main"
         if (tab !== currentViewRef.current) {
-            if (tab === "main") {
-                pushedHistoryRef.current = false
-            }
             currentViewRef.current = tab
             setCurrentView(tab)
             resetSubViewStates()

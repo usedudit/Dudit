@@ -15,7 +15,7 @@ import {
   getGeneralRevenueOrigin,
   getGeneralAlerts,
   getGeneralActivity,
-  getGeneralTopCategories,
+  getGeneralAbcCurve,
   getDashboardGeneralData
 } from "@/lib/data/dashboard"
 import type { Period, CompareMode } from "@/lib/period-types"
@@ -24,8 +24,8 @@ import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import { formatCurrency as brl } from "@/lib/utils"
 import {
   TrendingUpIcon,
-  TagIcon,
   CreditCardIcon,
+  TargetIcon,
 } from "@/lib/icons"
 
 interface DashboardProps {
@@ -84,10 +84,12 @@ function getCompareInfo(compare: CompareMode, period: Period, compareFrom?: stri
 function CardHeader({
   icon: Icon,
   title,
+  subtitle,
   legendItems,
 }: {
   icon?: React.ElementType
   title: string
+  subtitle?: string
   legendItems?: Array<{ label: string; color: string }>
 }) {
   return (
@@ -98,7 +100,12 @@ function CardHeader({
             <Icon size={18} className="text-brand-dark dark:text-dark-heading" />
           </div>
         )}
-        <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{title}</h3>
+        <div>
+          <h3 className="text-xl font-bold text-brand-dark dark:text-dark-heading leading-tight">{title}</h3>
+          {subtitle && (
+            <p className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">{subtitle}</p>
+          )}
+        </div>
       </div>
       {legendItems && legendItems.length > 0 && (
         <div className="flex flex-wrap items-center gap-3.5 sm:self-center">
@@ -132,7 +139,7 @@ export async function Dashboard({
     revenueOriginData,
     alertsData,
     activityData,
-    topCategoriesData,
+    abcCurveData,
     compareMetricsData,
     compareRevenueData,
     generalData
@@ -142,7 +149,7 @@ export async function Dashboard({
     getGeneralRevenueOrigin(partnerId, period),
     getGeneralAlerts(partnerId, sells),
     getGeneralActivity(partnerId),
-    getGeneralTopCategories(partnerId, sells, period),
+    getGeneralAbcCurve(partnerId, period),
     compareInfo ? getGeneralMetrics(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     compareInfo ? getGeneralRevenueChart(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     getDashboardGeneralData(partnerId),
@@ -173,8 +180,11 @@ export async function Dashboard({
   const revenueMetric = metrics.find(m => m.title.toLowerCase().includes("faturamento") || m.title.toLowerCase().includes("receita"))
   const revenueVal = revenueMetric ? parseMetricValue(revenueMetric.value) : 0
   const alertCount = alertsData.alerts.length
-  const topCategory = topCategoriesData.categories[0]
+  const topOrigin = revenueOriginData.origins.reduce((a, b) => (a.value > b.value ? a : b))
   const originCount = revenueOriginData.origins.length
+  const abcCategories = abcCurveData?.abcCurve || []
+  const abcCountA = abcCategories.filter(a => a.category === "A").length
+  const abcRevenueA = abcCategories.filter(a => a.category === "A").reduce((s, a) => s + Number(a.value), 0)
 
   const insights: { message: string; color: string }[] = []
   if (revenueVal > 0) {
@@ -182,11 +192,11 @@ export async function Dashboard({
     if (trend.includes("+")) insights.push({ message: `Faturamento de ${revenueMetric?.value} - ${trend} em relação ao período anterior.`, color: "green" })
     else insights.push({ message: `Faturamento de ${revenueMetric?.value} no período.`, color: "blue" })
   }
-  if (topCategory) {
-    insights.push({ message: `"${topCategory.label}" é a categoria mais vendida.`, color: "blue" })
+  if (abcCountA > 0 && revenueVal > 0) {
+    const pct = Math.round((abcRevenueA / revenueVal) * 100)
+    insights.push({ message: `${abcCountA} produto(s) da Classe A representam ~${pct}% da receita.`, color: "green" })
   }
   if (originCount > 0) {
-    const topOrigin = revenueOriginData.origins.reduce((a, b) => (a.value > b.value ? a : b))
     insights.push({ message: `${topOrigin.label} é a principal origem de receita (${Math.round((Number(topOrigin.value) / revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)) * 100)}%).`, color: "green" })
   }
   if (alertCount > 0) {
@@ -196,7 +206,11 @@ export async function Dashboard({
   const evoData = revenueData.map(p => ({ label: p.label, value: p.value, secondary: p.secondary }))
   const originDonutData = revenueOriginData.origins.map(o => ({ label: o.label, value: Number(o.value) }))
   const totalOrigin = revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)
-  const categoriesBarData = topCategoriesData.categories.map(c => ({ label: c.label, value: Number(c.value) }))
+  const abcBarData = abcCategories.map(a => ({
+    label: a.label,
+    value: Number(a.value),
+    fill: a.category === "A" ? "#059669" : a.category === "B" ? "#f59e0b" : "#ef4444",
+  }))
 
   return (
     <div className="flex flex-col gap-6">
@@ -237,13 +251,22 @@ export async function Dashboard({
         )}
       </div>
 
-      {/* Row 3: Principais Categorias (8) + Atividades Recentes (4) */}
-      {categoriesBarData.length > 0 && (
+      {/* Row 3: Curva ABC (8) + Atividades Recentes (4) */}
+      {abcBarData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
           <div className="lg:col-span-8">
             <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-              <CardHeader icon={TagIcon} title="Principais Categorias" />
-              <DashboardBarChart data={categoriesBarData} colors={["#059669"]} />
+              <CardHeader
+                icon={TargetIcon}
+                title="Curva ABC"
+                subtitle="Produtos classificados pela participação de receita"
+                legendItems={[
+                  { label: "Classe A (≤50%)", color: "#059669" },
+                  { label: "Classe B (50-80%)", color: "#f59e0b" },
+                  { label: "Classe C (>80%)", color: "#ef4444" },
+                ]}
+              />
+              <DashboardBarChart data={abcBarData} colors={["#059669", "#f59e0b", "#ef4444"]} format="currency" />
             </div>
           </div>
           <div className="lg:col-span-4">

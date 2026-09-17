@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ThreeDotsLoader, ActionsDropdown, DropdownItem, FormSection, SidebarCard, ListItem, IconPlaceholder, AlertModal, FormDropdown, CustomerMobileBar, DefaultModal, Input } from "@/components/reusable"
 import CustomerCard from "@/components/reusable/CustomerCard"
 import { ChevronLeftIcon, WrenchIcon, UserIcon, CalendarIcon, FileIcon, CheckCircleIcon, ClockIcon, EditIcon, PackageIcon } from "@/lib/icons"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -65,21 +65,6 @@ const PRIORITY_META: Record<string, { label: string; variant: "gray" | "green" |
     alta: { label: "Alta", variant: "orange" },
     urgente: { label: "Urgente", variant: "red" },
 }
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 interface ServiceOrderDetailProps {
     data: any

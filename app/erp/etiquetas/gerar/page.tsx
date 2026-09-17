@@ -14,7 +14,7 @@ export default async function GenerateLabelsPage() {
   const { data: partner } = await supabase.from("partners").select("*").eq("user_id", user.id).single()
 
   if (!partner) {
-    redirect("/dashboard")
+    redirect("/select-erp")
   }
 
   const { getPartnerPlan } = await import("@/lib/services/subscription.service")

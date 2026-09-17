@@ -2,13 +2,13 @@
 
 import type React from "react"
 import { useMemo, useEffect, useState } from "react"
-import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner, Button, ListItem } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner, ListItem, SidebarCard } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
 import type { FulfillmentMode } from "@/lib/commerce/capabilities"
 import FormTextarea from "@/components/reusable/FormTextarea"
 import { formatCurrency } from "@/lib/utils"
-import { PlusIcon, DiceIcon, Package, CheckCircleIcon, EditIcon, SparklesIcon, ClockIcon } from "@/lib/icons"
+import { PlusIcon, DiceIcon, SparklesIcon, ClockIcon, StarIcon } from "@/lib/icons"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 import { RichTextEditor } from "@/components/reusable"
@@ -30,21 +30,6 @@ const FormCombobox = ({
         </label>
         <Combobox options={options} value={value} onChange={onChange} disabled={disabled} width="w-full" className={width} actionItem={actionItem} />
     </div>
-)
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
 )
 
 interface ServiceGeneralTabProps {
@@ -164,22 +149,22 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 images.map((img, index) => (
                                     <div
                                         key={index}
-                                        className="relative shrink-0 w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border overflow-hidden group shadow-xs"
+                                        className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hidden"
                                     >
                                         <img
                                             src={getImageSrc(img)}
                                             alt={`${serviceData.name || "Serviço"} ${index + 1}`}
-                                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            className="w-full h-full object-cover"
                                         />
                                         {index === 0 && (
-                                            <div className="absolute top-2 left-2 bg-brand-dark/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
-                                                Principal
+                                            <div className="absolute top-2 right-2 bg-brand-green rounded-full p-1.5 shadow-lg">
+                                                <StarIcon className="w-4 h-4 text-white fill-white" />
                                             </div>
                                         )}
                                     </div>
                                 ))
                             ) : (
-                                <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border flex items-center justify-center text-xs text-brand-inactive-text">
+                                <div className="relative shrink-0 w-32 h-32 rounded-xl bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border overflow-hiddent">
                                     Sem imagens
                                 </div>
                             )}
@@ -196,41 +181,35 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 </h1>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                                <div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.is_active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {serviceData.is_active ? "Ativo" : "Inativo"}
-                                        </span>
-                                    </div>
+                                    <span className={`${serviceData.is_active ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                        {serviceData.is_active ? "Ativo" : "Inativo"}
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-col">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
+                                    <span className={`${serviceData.show_in_marketplace !== false ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                        {serviceData.show_in_marketplace !== false ? "Sim" : "Não"}
+                                    </span>
                                 </div>
 
                                 <div>
-                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`inline-block w-2.5 h-2.5 rounded-full ${serviceData.show_in_marketplace !== false ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
-                                            {serviceData.show_in_marketplace !== false ? "Sim" : "Não"}
-                                        </span>
+                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-2">Formas de Atendimento</span>
+                                    <div className="flex flex-wrap gap-2">
+                                        {modes.includes("on_site") && (
+                                            <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                No estabelecimento
+                                            </span>
+                                        )}
+                                        {modes.includes("customer_location") && (
+                                            <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
+                                                No endereço do cliente
+                                            </span>
+                                        )}
                                     </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <span className="text-xs text-brand-inactive-text dark:text-dark-body font-medium block mb-2">Formas de Atendimento</span>
-                                <div className="flex flex-wrap gap-2">
-                                    {modes.includes("on_site") && (
-                                        <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                            No estabelecimento
-                                        </span>
-                                    )}
-                                    {modes.includes("customer_location") && (
-                                        <span className="px-3 py-1.5 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/40 dark:bg-dark-border/40 text-xs font-semibold text-brand-dark dark:text-dark-heading">
-                                            No local do cliente
-                                        </span>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -238,60 +217,53 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                     {/* Preço e Cobrança */}
                     <FormSection hasSeparator title="Preço e Cobrança">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-2">
-                            <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                    {serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}
-                                </span>
-                                <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="flex flex-col">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">{serviceData.price_type === 'starting_at' ? "Preço Base" : "Preço de Venda"}</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                     {isFree ? "Gratuito" : showPrice ? formatCurrency(serviceData.price || 0) : "Sob consulta"}
-                                </div>
+                                </span>
                                 {!isFree && showPrice && Number(serviceData.cost_price) > 0 && (
-                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 block">
-                                        Margem: {margin}% ({formatCurrency(profit)})
-                                    </span>
+                                    <>
+                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">Margem</span>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                                            Margem: {margin}% ({formatCurrency(profit)})
+                                        </span>
+                                    </>
                                 )}
                             </div>
 
                             {!isFree && !isQuickMode && (
-                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                        Custo do Serviço
-                                    </span>
-                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                <div className="flex flex-col">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Custo do Serviço</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {formatCurrency(serviceData.cost_price || 0)}
-                                    </div>
+                                    </span>
                                 </div>
                             )}
 
                             {!isFree && (
-                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                        Preço Promocional
-                                    </span>
-                                    <div className="text-xl md:text-2xl font-bold text-brand-dark dark:text-dark-heading">
+                                <div className="flex flex-col">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Preço Promocional</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {serviceData.promotional_price ? formatCurrency(serviceData.promotional_price) : "-"}
-                                    </div>
+                                    </span>
                                 </div>
                             )}
 
-                            <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                    Modelo de Preço
-                                </span>
-                                <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                            <div className="flex flex-col">
+                                <span className="text-sm text-brand-inactive-text dark:text-dark-body">Modelo de Preço</span>
+                                <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                     {priceTypeLabel}
-                                </div>
+                                </span>
                             </div>
 
                             {!isQuickMode && (
-                                <div className="p-4 rounded-2xl bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border">
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-inactive-text dark:text-dark-body block mb-1">
-                                        Unidade de Cobrança
-                                    </span>
-                                    <div className="text-sm font-bold text-brand-dark dark:text-dark-heading mt-1">
+                                <div className="flex flex-col">
+                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">Unidade de Cobrança</span>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {billingUnitLabel}
-                                    </div>
+                                    </span>
                                 </div>
                             )}
                         </div>
@@ -306,41 +278,42 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         )}
 
                         {isQuickMode && serviceData.description && (
-                            <div className="mt-8">
-                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Descrição</h3>
+                            <FormSection title="Descrição" hasSeparator>
                                 <div
                                     className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
                                     dangerouslySetInnerHTML={{ __html: sanitizeRichText(serviceData.description) }}
                                 />
-                            </div>
+                            </FormSection>
                         )}
                     </FormSection>
 
                     {/* Duração e Agendamento */}
-                    {(!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
-                        <FormSection hasSeparator title="Duração e agendamento">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <ListItem
-                                    icon={ClockIcon}
-                                    title="Duração do Serviço"
-                                    description={serviceData.duration_minutes ? `${serviceData.duration_minutes} minutos` : "Não informada"}
-                                    className="p-4 cursor-default"
-                                />
-                                {!isQuickMode && (
+                    {
+                        (!serviceData.billing_unit || serviceData.billing_unit === 'per_service') && (
+                            <FormSection hasSeparator title="Duração e agendamento">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <ListItem
                                         icon={ClockIcon}
-                                        title="Tempo de Buffer (Intervalo)"
-                                        description={serviceData.buffer_minutes ? `${serviceData.buffer_minutes} minutos` : "Nenhum buffer cadastrado"}
+                                        title="Duração do Serviço"
+                                        description={serviceData.duration_minutes ? `${serviceData.duration_minutes} minutos` : "Não informada"}
                                         className="p-4 cursor-default"
                                     />
-                                )}
-                            </div>
-                        </FormSection>
-                    )}
-                </div>
+                                    {!isQuickMode && (
+                                        <ListItem
+                                            icon={ClockIcon}
+                                            title="Tempo de Buffer (Intervalo)"
+                                            description={serviceData.buffer_minutes ? `${serviceData.buffer_minutes} minutos` : "Nenhum buffer cadastrado"}
+                                            className="p-4 cursor-default"
+                                        />
+                                    )}
+                                </div>
+                            </FormSection>
+                        )
+                    }
+                </div >
 
                 {/* DIREITA (SidebarCard) */}
-                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+                < div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0" >
                     {!isDesapego && (
                         <SidebarCard hasTopStrip title="Organização">
                             <div className="space-y-4">
@@ -362,23 +335,27 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </SidebarCard>
                     )}
 
-                    {isQuickMode && officialCategoryPath && (
-                        <SidebarCard title="Categoria oficial">
-                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                {officialCategoryPath}
-                            </div>
-                        </SidebarCard>
-                    )}
+                    {
+                        isQuickMode && officialCategoryPath && (
+                            <SidebarCard title="Categoria oficial">
+                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                    {officialCategoryPath}
+                                </div>
+                            </SidebarCard>
+                        )
+                    }
 
-                    {!isQuickMode && serviceData.notes && (
-                        <SidebarCard title="Observações Internas">
-                            <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
-                                {serviceData.notes}
-                            </p>
-                        </SidebarCard>
-                    )}
-                </div>
-            </div>
+                    {
+                        !isQuickMode && serviceData.notes && (
+                            <SidebarCard title="Observações Internas">
+                                <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
+                                    {serviceData.notes}
+                                </p>
+                            </SidebarCard>
+                        )
+                    }
+                </div >
+            </div >
         )
     }
 
@@ -625,8 +602,8 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                     Number(serviceData.duration_minutes || 0) > 525600
                                         ? "Duração máxima permitida é de 1 ano (525.600 min)"
                                         : fieldErrors?.has("duration_minutes")
-                                        ? "Duração é obrigatória (máx. 525.600 min)"
-                                        : undefined
+                                            ? "Duração é obrigatória (máx. 525.600 min)"
+                                            : undefined
                                 }
                                 dataField="duration_minutes"
                             />

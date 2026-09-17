@@ -9,6 +9,7 @@ import Link from "next/link"
 import { XIcon, ChevronDownIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 
 interface VideoData {
   id: string
@@ -21,7 +22,7 @@ interface VideoData {
   linked_item_id: string | null
   partner_id: string
   views_count: number
-  partner?: { name?: string; store_name?: string; store_image_url: string | null } | null
+   partner?: { name?: string; store_name?: string; store_image_url: string | null; short_id?: string | null; id?: string | null; slug?: string | null; city?: string | null; state?: string | null } | null
 }
 
 interface VideoModalProps {
@@ -147,22 +148,49 @@ export function VideoModal({ video, isOpen, onClose }: VideoModalProps) {
               className="flex items-center gap-2.5 mb-2"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Store Logo */}
-              {storeLogo ? (
-                <img
-                  src={storeLogo}
-                  alt={storeName}
-                  className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-white/30"
-                />
+              {video?.partner?.id ? (
+                <Link
+                  href={getStoreUrl(video.partner)}
+                  className="flex items-center gap-2.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Store Logo */}
+                  {storeLogo ? (
+                    <img
+                      src={storeLogo}
+                      alt={storeName}
+                      className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-white/30"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-brand-green/80 flex items-center justify-center text-white font-bold text-sm shrink-0 border-2 border-white/30">
+                      {storeName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  {/* Store Name */}
+                  <p className="text-sm font-bold text-white drop-shadow-lg truncate">
+                    {storeName}
+                  </p>
+                </Link>
               ) : (
-                <div className="w-10 h-10 rounded-full bg-brand-green/80 flex items-center justify-center text-white font-bold text-sm shrink-0 border-2 border-white/30">
-                  {storeName.charAt(0).toUpperCase()}
-                </div>
+                <>
+                  {/* Store Logo */}
+                  {storeLogo ? (
+                    <img
+                      src={storeLogo}
+                      alt={storeName}
+                      className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-white/30"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-brand-green/80 flex items-center justify-center text-white font-bold text-sm shrink-0 border-2 border-white/30">
+                      {storeName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  {/* Store Name */}
+                  <p className="text-sm font-bold text-white drop-shadow-lg truncate">
+                    {storeName}
+                  </p>
+                </>
               )}
-              {/* Store Name */}
-              <p className="text-sm font-bold text-white drop-shadow-lg truncate">
-                {storeName}
-              </p>
             </div>
 
             {/* Description */}

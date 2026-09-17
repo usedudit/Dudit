@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
     ChevronLeftIcon,
-    ShareIcon,
     CheckCircleIcon,
     CancelCircleIcon,
     TrashIcon,
@@ -22,6 +21,8 @@ import {
     TabsContent,
     FormSection,
     Input,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -34,8 +35,10 @@ import {
     rejectFlaggedImages,
     rejectModeration,
 } from "@/app/actions/admin/moderation"
+import { removeImage } from "@/app/actions/admin/moderation-v2"
 import type { ModerationItem } from "@/lib/admin/types"
 import { useTransition } from "react"
+import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 const getStatusMeta = (status: string) => {
     switch (status) {
@@ -79,6 +82,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
     const [showFullRejectModal, setShowFullRejectModal] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
     const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
+    const [removedImages, setRemovedImages] = useState<Set<string>>(new Set())
 
     // Lightbox
     const [showLightbox, setShowLightbox] = useState(false)
@@ -109,9 +113,26 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
         return () => setHeaderOverride(null)
     }, [item.id, typeLabel, onBack, setHeaderOverride])
 
-    const allImages = (item.images || []).map(url =>
-        url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`
-    )
+    const handleRemoveImage = (url: string) => {
+        startTransition(async () => {
+            const itemType = item.type === "service" ? "service" : "product"
+            const result = await removeImage("product", item.id, url, "images", 0, undefined, item.partner_id)
+            const r = result || { success: false, error: "" }
+            if (r.success) {
+                toast.success("Imagem removida!")
+                setRemovedImages(prev => new Set(prev).add(url))
+                setSelectedImages(prev => {
+                    const next = new Set(prev)
+                    next.delete(url)
+                    return next
+                })
+            } else {
+                toast.error(r.error || "Erro ao remover imagem")
+            }
+        })
+    }
+
+    const allImages = (item.images || []).map(url => getR2ImageUrl(url))
 
     const toggleImage = (url: string) => {
         setSelectedImages(prev => {
@@ -164,10 +185,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
         })
     }
 
-    const handleShare = useCallback(() => {
-        navigator.clipboard.writeText(window.location.href)
-        toast.success("Link copiado!")
-    }, [])
+
 
     return (
         <>
@@ -206,27 +224,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 {item.title} • Criado em {formatDate(item.created_at)}
                                             </div>
                                         </div>
-
-                                        {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleShare}
-                                                leftIcon={<ShareIcon size={16} />}
-                                            >
-                                                Compartilhar
-                                            </Button>
-                                            {item.moderation_status !== "approved" && (
-                                                <Button
-                                                    onClick={() => setShowApproveModal(true)}
-                                                    isLoading={isPending}
-                                                    leftIcon={<CheckCircleIcon size={16} />}
-                                                >
-                                                    Aprovar
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
+                                </div>
 
                                     {/* Title row - mobile */}
                                     <div className="md:hidden flex items-center justify-between gap-3 py-3">
@@ -248,14 +246,6 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 </span>
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            <ShareIcon size={14} />
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -343,10 +333,10 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                         )}
                                                                         {item.video_type === "upload" && item.video_url && (
                                                                             <video
-                                                                                src={item.video_url.startsWith("http") ? item.video_url : `https://img.dudit.com.br/${item.video_url}`}
-                                                                                controls
-                                                                                className="w-full h-full"
-                                                                                poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : `https://img.dudit.com.br/${item.video_thumbnail}`) : undefined}
+                                                                            src={item.video_url.startsWith("http") ? item.video_url : getR2ImageUrl(item.video_url)}
+                                                                             controls
+                                                                             className="w-full h-full"
+                                                                             poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : getR2ImageUrl(item.video_thumbnail)) : undefined}
                                                                             />
                                                                         )}
                                                                     </div>
@@ -446,8 +436,8 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 <div className="w-16 h-16 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
                                                                     {item.store_logo_url ? (
                                                                         <img
-                                                                            src={item.store_logo_url.startsWith("http") ? item.store_logo_url : `https://img.dudit.com.br/${item.store_logo_url}`}
-                                                                            alt=""
+                                                                        src={getR2ImageUrl(item.store_logo_url)}
+                                                                        alt=""
                                                                             className="w-full h-full object-cover"
                                                                         />
                                                                     ) : (
@@ -480,7 +470,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                         <FormSection title="Banner da Vitrine" hasSeparator>
                                                             <div className="relative w-full h-40 rounded-xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
                                                                 <img
-                                                                    src={item.store_banner_url.startsWith("http") ? item.store_banner_url : `https://img.dudit.com.br/${item.store_banner_url}`}
+                                                                    src={getR2ImageUrl(item.store_banner_url)}
                                                                     alt="Banner"
                                                                     className="w-full h-full object-cover"
                                                                 />
@@ -495,7 +485,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 {item.store_gallery.map((url: string, idx: number) => (
                                                                     <div key={idx} className="relative aspect-square rounded-xl overflow-hidden bg-brand-gray dark:bg-dark-border/50 border border-brand-border dark:border-dark-border">
                                                                         <img
-                                                                            src={url.startsWith("http") ? url : `https://img.dudit.com.br/${url}`}
+                                                                            src={getR2ImageUrl(url)}
                                                                             alt={`Galeria ${idx + 1}`}
                                                                             className="w-full h-full object-cover"
                                                                         />
@@ -546,12 +536,12 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 {item.images && item.images.length > 0 ? (
                                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                                         {item.images.map((url: string, idx: number) => {
-                                                            const fullUrl = url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL || ""}/${url}`
+                                                            const fullUrl = getR2ImageUrl(url)
                                                             const isSelected = selectedImages.has(url)
                                                             return (
                                                                 <div
                                                                     key={idx}
-                                                                    className={`relative group aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
+                                                                    className={`relative group aspect-square rounded-xl overflow-hidden border-2 transition-all ${
                                                                         isSelected ? "border-red-500 ring-2 ring-red-300" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"
                                                                     }`}
                                                                     onClick={() => {
@@ -584,6 +574,21 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                             {idx + 1} / {item.images.length}
                                                                         </span>
                                                                     </div>
+                                                                    {(item.type === "product" || item.type === "service") && (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation()
+                                                                                handleRemoveImage(url)
+                                                                            }}
+                                                                            className="absolute top-1 left-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all"
+                                                                            aria-label="Remover imagem"
+                                                                        >
+                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                                                                <line x1="18" y1="6" x2="6" y2="18" />
+                                                                                <line x1="6" y1="6" x2="18" y2="18" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             )
                                                         })}
@@ -619,19 +624,22 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 Aprovar {typeLabel}
                                                             </Button>
 
-                                                            {(item.type === "product" || item.type === "service") && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className="w-full rounded-full h-11 text-[14px] font-medium"
-                                                                    onClick={() => {
-                                                                        const mappedType = item.type === "product" ? "product" : "service"
-                                                                        window.location.href = `/ddt-admin/moderation`
-                                                                    }}
-                                                                    leftIcon={<EditIcon size={18} />}
-                                                                >
-                                                                    Editar {typeLabel} no Painel
-                                                                </Button>
-                                                            )}
+                                                        {(item.type === "product" || item.type === "service") && (
+                                                            <Button
+                                                                variant="outline"
+                                                                className="w-full rounded-full h-11 text-[14px] font-medium"
+                                                                onClick={() => {
+                                                                    if (item.type === "product") {
+                                                                        window.open(`/erp/produtos/${item.id}`, "_blank")
+                                                                    } else {
+                                                                        window.open(`/erp/servicos?edit=${item.id}`, "_blank")
+                                                                    }
+                                                                }}
+                                                                leftIcon={<EditIcon size={18} />}
+                                                            >
+                                                                Editar {typeLabel} no ERP
+                                                            </Button>
+                                                        )}
 
                                                             <div className="flex gap-3">
                                                                 {selectedImages.size > 0 && (item.type === "product" || item.type === "service") && (
@@ -681,28 +689,6 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                     </Tabs>
                 </div>
             </FadeIn>
-
-            {/* Mobile bottom bar */}
-            {item.moderation_status !== "approved" && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                    <Button
-                        variant="outline"
-                        className="flex-1 text-brand-red border-red-200 hover:bg-red-50"
-                        onClick={() => setShowFullRejectModal(true)}
-                        disabled={isPending}
-                    >
-                        Rejeitar
-                    </Button>
-                    <Button
-                        variant="filled"
-                        className="flex-1"
-                        onClick={() => setShowApproveModal(true)}
-                        disabled={isPending}
-                    >
-                        Aprovar
-                    </Button>
-                </div>
-            )}
 
             {/* Approve Modal */}
             <DefaultModal

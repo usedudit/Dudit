@@ -6,6 +6,7 @@ import { getTodayYmdSaoPaulo } from "@/lib/utils/formatters"
 import { getDateRangeWithPrevious } from "@/lib/period-types"
 import { getDateComponents } from "@/lib/date/convert"
 import { money, brl } from "@/lib/data/dashboard"
+import { normalizeOrderSource } from "@/lib/orders/order-utils"
 import { REPORT_TAGS } from "./cache"
 import type { Period } from "@/lib/period-types"
 
@@ -34,6 +35,7 @@ export interface SalesReportData {
     previousTicketMedio: number
   }
   bySource: { label: string; value: number }[]
+  ordersBySource: { label: string; value: number }[]
   byPaymentMethod: { label: string; value: number }[]
   evolution: { label: string; value: number; secondary: number }[]
   topProducts: { id: string; label: string; value: number; subtitle?: string }[]
@@ -116,9 +118,11 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
         : "nova"
 
       const bySource = new Map<string, number>()
+      const ordersBySource = new Map<string, number>()
       for (const o of periodOrders) {
-        const src = String(o.order_source || "Manual")
+        const src = normalizeOrderSource(o.order_source)
         bySource.set(src, (bySource.get(src) || 0) + money(o.total_amount))
+        ordersBySource.set(src, (ordersBySource.get(src) || 0) + 1)
       }
 
       const normalizePaymentMethod = (raw: string): string => {
@@ -337,6 +341,9 @@ const getCachedSalesData = cache(async (partnerId: string, period: Period = "mon
           previousTicketMedio: prevTicket,
         },
         bySource: Array.from(bySource.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([label, value]) => ({ label, value })),
+        ordersBySource: Array.from(ordersBySource.entries())
           .sort((a, b) => b[1] - a[1])
           .map(([label, value]) => ({ label, value })),
         byPaymentMethod: Array.from(byPayment.entries())

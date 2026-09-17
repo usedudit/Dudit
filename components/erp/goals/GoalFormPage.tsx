@@ -18,6 +18,7 @@ import {
     PercentageInput,
     DatePicker,
     FormSection,
+    SidebarCard,
 } from "@/components/reusable"
 import { ChevronLeftIcon, PlusIcon, SaveIcon, TargetIcon } from "@/lib/icons"
 import { formatCurrency } from "@/lib/utils"
@@ -40,21 +41,6 @@ type GoalFormPageProps = {
     initialGoal?: any | null
     onBack: () => void
 }
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-[3px] bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 function toDateString(date: Date | undefined | null) {
     if (!date) return ""

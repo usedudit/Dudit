@@ -32,30 +32,37 @@ interface WebhookConfig {
 const rateLimitState = new Map<string, number>()
 const RATE_LIMIT_INTERVAL_MS = 210 // ~5 req/s (Discord limit is 5/s, add buffer)
 
-// Queue for batching
-const pendingBatches = new Map<string, DiscordEmbed[]>()
-const batchTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const BATCH_DELAY_MS = 300 // Wait up to 300ms to accumulate embeds
-
 const DISCORD_VALID_URL_PREFIX = "https://discord.com/api/webhooks/"
 
-const WEBHOOK_CONFIGS: Record<string, WebhookConfig> = {
-  moderation: {
-    url: process.env.DISCORD_MODERATION_WEBHOOK_URL || "",
-    username: "Dudit Moderação",
-    avatarUrl: "https://dudit.com.br/icon-192x192.png",
-  },
-  general: {
-    url: process.env.DISCORD_GENERAL_WEBHOOK_URL || "",
-    username: "Dudit Sistema",
-    avatarUrl: "https://dudit.com.br/icon-192x192.png",
-  },
+/**
+ * Lê as env vars em tempo de execução (não no top-level do módulo).
+ * No Next.js serverless, process.env pode não estar disponível no cold start.
+ */
+function getWebhookConfig(channel: string): WebhookConfig | null {
+  if (channel === "moderation") {
+    const url = process.env.DISCORD_MODERATION_WEBHOOK_URL || ""
+    return { url, username: "Dudit Moderação", avatarUrl: "https://dudit.com.br/icon-192x192.png" }
+  }
+  if (channel === "general") {
+    const url = process.env.DISCORD_GENERAL_WEBHOOK_URL || ""
+    return { url, username: "Dudit Sistema", avatarUrl: "https://dudit.com.br/icon-192x192.png" }
+  }
+  return null
+}
+
+function getWebhookUrl(channel: string): string {
+  return getWebhookConfig(channel)?.url || ""
 }
 
 function isWebhookConfigured(channel: string): boolean {
-  const config = WEBHOOK_CONFIGS[channel]
-  if (!config || !config.url) return false
-  return config.url.startsWith(DISCORD_VALID_URL_PREFIX)
+  const url = getWebhookUrl(channel)
+  if (!url) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info(`[discord-webhook] ${channel} URL is empty. Env: DISCORD_${channel.toUpperCase()}_WEBHOOK_URL = "${process.env[`DISCORD_${channel.toUpperCase()}_WEBHOOK_URL`] || "(not set)"}"`)
+    }
+    return false
+  }
+  return url.startsWith(DISCORD_VALID_URL_PREFIX)
 }
 
 async function waitForRateLimit(webhookUrl: string): Promise<void> {
@@ -80,7 +87,7 @@ async function sendEmbeds(
     return { success: true }
   }
 
-  const config = WEBHOOK_CONFIGS[channel]
+  const config = getWebhookConfig(channel)!
 
   // Discord max 10 embeds per message
   const chunks: DiscordEmbed[][] = []

@@ -1707,8 +1707,6 @@ export function ServiceDetailsPageClient({
                 paymentMethods={partner.paymentMethods}
                 price={pricing.current}
                 mpConnected={!!partner.mp_user_id}
-                deliveryEnabled={deliveryConfig?.settings?.isDeliveryEnabled !== false}
-                pickupEnabled={deliveryConfig?.settings?.isPickupEnabled !== false}
                 mpAcceptedPaymentMethods={partner.mp_accepted_payment_methods}
             />
 

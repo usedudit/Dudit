@@ -208,6 +208,7 @@ async function handler(request: NextRequest) {
     let couponItems: any[] = []
     let deliveryFee = 0
     let deliveryStoreId: string | null = body.storeId || null
+    let serviceDepositDelta = 0
 
     if (existingOrder) {
       deliveryStoreId = existingOrder.store_id || deliveryStoreId
@@ -272,6 +273,23 @@ async function handler(request: NextRequest) {
         serviceId: l.serviceId || null,
         recurringPlanId: l.recurringPlanId || null,
       }))
+
+      if (body.payDepositOnly) {
+        const { data: partnerDepositRow } = await adminClient
+          .from("partners")
+          .select("service_deposit_percentage")
+          .eq("id", partnerId)
+          .single()
+        const depositPct = Number(partnerDepositRow?.service_deposit_percentage || 50)
+
+        const svcFullTotal = resolved.lines
+          .filter((line) => line.itemType === "service_booking")
+          .reduce((sum, line) => sum + Number(line.fullPrice || line.unitPrice || 0) * Number(line.quantity || 1), 0)
+
+        serviceDepositDelta = svcFullTotal > 0
+          ? Math.round(svcFullTotal * (1 - depositPct / 100) * 100) / 100
+          : 0
+      }
     } else {
       const productIds = items.filter(i => !i.variant_id && !i.service_id).map(i => i.id).filter(Boolean)
       const serviceIds = items.map(i => i.service_id).filter(Boolean) as string[]
@@ -445,6 +463,10 @@ async function handler(request: NextRequest) {
         coupon: couponPricingData,
       })
       totalAmount = pricingResult.finalTotal
+
+      if (serviceDepositDelta > 0) {
+        totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
+      }
 
       const prefSum = preferenceItems.reduce((acc: number, i: any) => acc + Number(i.unit_price || 0) * Number(i.quantity || 1), 0)
       if (totalAmount > 0 && Math.abs(prefSum - totalAmount) > 0.01) {

@@ -3,27 +3,12 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection, Badge } from "@/components/reusable"
+import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection, Badge, SidebarCard } from "@/components/reusable"
 import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon, Package, CheckCircleIcon, EditIcon, ChevronDownIcon } from "@/lib/icons"
 import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
 import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
 import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
-
-const SidebarCard = ({ title, children, className = "", hasTopStrip = false, hasSeparator = false }: { title?: React.ReactNode; children: React.ReactNode; className?: string; hasTopStrip?: boolean; hasSeparator?: boolean }) => (
-    <>
-        {/* Desktop: card */}
-        <div className={`hidden lg:block bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors ${className}`}>
-            {hasTopStrip && <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>}
-            {title ? <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">{title}</h3> : null}
-            {children}
-        </div>
-        {/* Mobile/Tablet: FormSection */}
-        <FormSection title={title} hasSeparator={hasSeparator} className="lg:hidden">
-            {children}
-        </FormSection>
-    </>
-)
 
 interface ServiceMarketplaceTabProps {
     serviceData: any
@@ -57,6 +42,11 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
         handleInputChange({
             target: { name, value }
         })
+    }
+
+    const handleCategorySelect = (category: { id: string; name: string; path: string }) => {
+        manualChange("marketplace_category_id", category.id)
+        setCategoryPath(category.path)
     }
 
     const technicalDetails = Array.isArray(serviceData?.technical_details) ? serviceData.technical_details : []
@@ -186,16 +176,16 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    {categoryPath && (
-                        <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                        {categoryPath && (
                             <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
                                 <CheckCircleIcon className="w-3 h-3" /> Categorizado
                             </span>
-                            <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
-                                {categoryPath}
-                            </p>
-                        </SidebarCard>
-                    )}
+                        )}
+                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
+                            {categoryPath || "Nenhuma categoria oficial selecionada."}
+                        </p>
+                    </SidebarCard>
 
                     <SidebarCard title="Tags e Buscas">
                         {tags && tags.length > 0 ? (
@@ -346,58 +336,28 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
             {/* --- COLUNA DIREITA (SIDEBAR) --- */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                {/* Card de Configurações */}
-                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                    <h3 className="text-lg font-bold mb-6 mt-2 text-brand-dark dark:text-dark-heading">Configurações</h3>
-
-                    <div className="space-y-5">
-                        <FormDropdown
-                            label="Tipo de Serviço"
-                            options={[
-                                { value: "in_person", label: "Presencial" },
-                                { value: "online", label: "Online (Remoto)" },
-                                { value: "hybrid", label: "Híbrido" }
-                            ]}
-                            value={serviceData?.service_type || 'in_person'}
-                            setValue={(v) => manualChange("service_type", v)}
-                            disabled={!isEditing}
-                            width="w-full"
-                        />
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <Input
-                                label="Garantia"
-                                name="warranty_value"
-                                value={serviceData?.warranty_value || ""}
-                                onChange={handleInputChange}
-                                disabled={!isEditing}
-                                type="number"
-                                placeholder="0"
-                                className="w-full"
-                            />
+                {/* --- MOBILE / TABLET (< lg): FormSections --- */}
+                <div className="block lg:hidden space-y-8">
+                    <FormSection title="Configurações" hasSeparator>
+                        <div className="space-y-5">
                             <FormDropdown
-                                label="Período"
+                                label="Tipo de Serviço"
                                 options={[
-                                    { value: "Dias", label: "Dias" },
-                                    { value: "Meses", label: "Meses" },
-                                    { value: "Anos", label: "Anos" },
+                                    { value: "in_person", label: "Presencial" },
+                                    { value: "online", label: "Online (Remoto)" },
+                                    { value: "hybrid", label: "Híbrido" }
                                 ]}
-                                value={serviceData?.warranty_period || "Meses"}
-                                setValue={(v) => manualChange("warranty_period", v)}
+                                value={serviceData?.service_type || 'in_person'}
+                                setValue={(v) => manualChange("service_type", v)}
                                 disabled={!isEditing}
                                 width="w-full"
                             />
-                        </div>
 
-                        <div className="border-t border-brand-border dark:border-dark-border pt-5">
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Intervalo para retorno</h4>
-                            <p className="text-xs text-brand-inactive-text mb-3">Defina o tempo recomendado para o cliente repetir este serviço (ex: troca de óleo a cada 1 ano).</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <Input
-                                    label="Valor"
-                                    name="recurrence_interval_value"
-                                    value={serviceData?.recurrence_interval_value || ""}
+                                    label="Garantia"
+                                    name="warranty_value"
+                                    value={serviceData?.warranty_value || ""}
                                     onChange={handleInputChange}
                                     disabled={!isEditing}
                                     type="number"
@@ -405,36 +365,237 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                                     className="w-full"
                                 />
                                 <FormDropdown
-                                    label="Unidade"
+                                    label="Período"
                                     options={[
                                         { value: "Dias", label: "Dias" },
-                                        { value: "Semanas", label: "Semanas" },
                                         { value: "Meses", label: "Meses" },
                                         { value: "Anos", label: "Anos" },
                                     ]}
-                                    value={serviceData?.recurrence_interval_unit || "Meses"}
-                                    setValue={(v) => manualChange("recurrence_interval_unit", v)}
+                                    value={serviceData?.warranty_period || "Meses"}
+                                    setValue={(v) => manualChange("warranty_period", v)}
                                     disabled={!isEditing}
                                     width="w-full"
                                 />
                             </div>
+
+                            <div className="border-t border-brand-border dark:border-dark-border pt-5">
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Intervalo para retorno</h4>
+                                <p className="text-xs text-brand-inactive-text mb-3">Defina o tempo recomendado para o cliente repetir este serviço (ex: troca de óleo a cada 1 ano).</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Valor"
+                                        name="recurrence_interval_value"
+                                        value={serviceData?.recurrence_interval_value || ""}
+                                        onChange={handleInputChange}
+                                        disabled={!isEditing}
+                                        type="number"
+                                        placeholder="0"
+                                        className="w-full"
+                                    />
+                                    <FormDropdown
+                                        label="Unidade"
+                                        options={[
+                                            { value: "Dias", label: "Dias" },
+                                            { value: "Semanas", label: "Semanas" },
+                                            { value: "Meses", label: "Meses" },
+                                            { value: "Anos", label: "Anos" },
+                                        ]}
+                                        value={serviceData?.recurrence_interval_unit || "Meses"}
+                                        setValue={(v) => manualChange("recurrence_interval_unit", v)}
+                                        disabled={!isEditing}
+                                        width="w-full"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </FormSection>
+
+                    <FormSection
+                        title={
+                            <div className="flex items-center justify-between w-full">
+                                <span className="flex items-center gap-2">
+                                    <Package className="w-5 h-5 text-brand-green" />
+                                    Categoria Oficial
+                                </span>
+                                {categoryPath && (
+                                    <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-1 rounded-full flex items-center gap-1">
+                                        <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                                    </span>
+                                )}
+                            </div>
+                        }
+                        description="Selecione onde seu serviço será exibido na árvore de categorias."
+                        hasSeparator
+                    >
+                        <div
+                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
+                            className={`
+                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
+                                ${categoryPath
+                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
+                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
+                                }
+                                ${!isEditing && "opacity-60 pointer-events-none"}
+                            `}
+                        >
+                            <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
+                                    {categoryPath || "Selecionar categoria..."}
+                                </span>
+                                {categoryPath && <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">Clique para alterar</span>}
+                            </div>
+
+                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
+                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            </div>
+                        </div>
+                    </FormSection>
+
+                    <FormSection
+                        title="Tags e Buscas"
+                        description="Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca."
+                        hasSeparator
+                    >
+                        <TagsInput
+                            tags={tags}
+                            onChange={(t) => manualChange("tags", t)}
+                            disabled={!isEditing}
+                            placeholder="Adicionar tag..."
+                        />
+                    </FormSection>
                 </div>
 
-                {/* Card de Tags */}
-                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                    <h3 className="text-lg font-bold mb-4 text-brand-dark dark:text-dark-heading">Tags e Buscas</h3>
-                    <p className="text-sm text-brand-inactive-text mb-4">
-                        Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca.
-                    </p>
-                    <TagsInput
-                        tags={tags}
-                        onChange={(t) => manualChange("tags", t)}
-                        disabled={!isEditing}
-                        placeholder="Adicionar tag..."
-                    />
+                {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
+                <div className="hidden lg:block">
+                    {/* Card de Configurações */}
+                    <SidebarCard hasTopStrip title="Configurações">
+                        <div className="space-y-5">
+                            <FormDropdown
+                                label="Tipo de Serviço"
+                                options={[
+                                    { value: "in_person", label: "Presencial" },
+                                    { value: "online", label: "Online (Remoto)" },
+                                    { value: "hybrid", label: "Híbrido" }
+                                ]}
+                                value={serviceData?.service_type || 'in_person'}
+                                setValue={(v) => manualChange("service_type", v)}
+                                disabled={!isEditing}
+                                width="w-full"
+                            />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Garantia"
+                                    name="warranty_value"
+                                    value={serviceData?.warranty_value || ""}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full"
+                                />
+                                <FormDropdown
+                                    label="Período"
+                                    options={[
+                                        { value: "Dias", label: "Dias" },
+                                        { value: "Meses", label: "Meses" },
+                                        { value: "Anos", label: "Anos" },
+                                    ]}
+                                    value={serviceData?.warranty_period || "Meses"}
+                                    setValue={(v) => manualChange("warranty_period", v)}
+                                    disabled={!isEditing}
+                                    width="w-full"
+                                />
+                            </div>
+
+                            <div className="border-t border-brand-border dark:border-dark-border pt-5">
+                                <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">Intervalo para retorno</h4>
+                                <p className="text-xs text-brand-inactive-text mb-3">Defina o tempo recomendado para o cliente repetir este serviço (ex: troca de óleo a cada 1 ano).</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Valor"
+                                        name="recurrence_interval_value"
+                                        value={serviceData?.recurrence_interval_value || ""}
+                                        onChange={handleInputChange}
+                                        disabled={!isEditing}
+                                        type="number"
+                                        placeholder="0"
+                                        className="w-full"
+                                    />
+                                    <FormDropdown
+                                        label="Unidade"
+                                        options={[
+                                            { value: "Dias", label: "Dias" },
+                                            { value: "Semanas", label: "Semanas" },
+                                            { value: "Meses", label: "Meses" },
+                                            { value: "Anos", label: "Anos" },
+                                        ]}
+                                        value={serviceData?.recurrence_interval_unit || "Meses"}
+                                        setValue={(v) => manualChange("recurrence_interval_unit", v)}
+                                        disabled={!isEditing}
+                                        width="w-full"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    {/* Card de Categoria Oficial */}
+                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
+                        {categoryPath && (
+                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
+                            </span>
+                        )}
+
+                        <p className="text-sm text-gray-500 mt-2 mb-4">
+                            Selecione onde seu serviço será exibido na árvore de categorias.
+                        </p>
+
+                        <div
+                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
+                            className={`
+                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
+                                ${categoryPath
+                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
+                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
+                                }
+                                ${!isEditing && "opacity-60 pointer-events-none"}
+                            `}
+                        >
+                            <div className="flex flex-col">
+                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
+                                    {categoryPath || "Selecionar categoria..."}
+                                </span>
+                                {categoryPath && <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">Clique para alterar</span>}
+                            </div>
+
+                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
+                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
+                            </div>
+                        </div>
+                    </SidebarCard>
+
+                    {/* Card de Tags */}
+                    <SidebarCard title="Tags e Buscas">
+                        <p className="text-sm text-brand-inactive-text mb-4">
+                            Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca.
+                        </p>
+                        <TagsInput
+                            tags={tags}
+                            onChange={(t) => manualChange("tags", t)}
+                            disabled={!isEditing}
+                            placeholder="Adicionar tag..."
+                        />
+                    </SidebarCard>
                 </div>
+
+                <MarketplaceCategoryModal
+                    isOpen={isCategoryModalOpen}
+                    onClose={() => setIsCategoryModalOpen(false)}
+                    onSelect={handleCategorySelect}
+                    type="service"
+                />
             </div>
         </div>
     )

@@ -63,7 +63,7 @@ export function TopCategories({ categoriesData }: { categoriesData: any[] }) {
       </div>
 
       <div className="h-[250px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <XAxis
               dataKey="name"
@@ -163,11 +163,17 @@ export function RecentActivities({ activities }: { activities: any[] }) {
       return {
         title,
         items: groups[ymd].map(item => {
-          const Icon = activityIconMap[item.icon] || AlertCircleIcon;
+          const Icon = activityIconMap[item.icon] || AlertCircleIcon
+          const entityRef = item.entityId && item.entityLabel
+            ? `${item.entityLabel} #${item.entityId.slice(0, 8)}`
+            : item.entityId
+              ? `#${item.entityId.slice(0, 8)}`
+              : ""
           return {
             id: item.id,
             time: item.time + (item.user ? ` · ${item.user}` : ""),
             text: `${item.title}${item.description ? `: ${item.description}` : ""}`,
+            entityRef,
             icon: Icon
           };
         })
@@ -212,6 +218,11 @@ export function RecentActivities({ activities }: { activities: any[] }) {
                       <div className="text-[14px] font-semibold text-brand-dark dark:text-dark-heading leading-snug">
                         {item.text}
                       </div>
+                      {item.entityRef && (
+                        <div className="text-[12px] font-medium text-brand-inactive-text dark:text-dark-body mt-0.5">
+                          {item.entityRef}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

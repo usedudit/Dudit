@@ -450,9 +450,18 @@ async function handler(request: NextRequest) {
 
         if (fullPriced.success) {
           fullOrderTotal = fullPriced.data.totalAmount
-          const serviceDepositAmount = (priced.data.resolvedLines || [])
-            .filter((line) => line.payDepositOnly && line.depositAmount != null)
-            .reduce((sum, line) => sum + Number(line.depositAmount || 0) * Number(line.quantity || 1), 0)
+
+          const serviceFullTotal = (priced.data.resolvedLines || [])
+            .filter((line) => line.itemType === "service_booking")
+            .reduce((sum, line) => sum + Number(line.fullPrice || line.unitPrice || 0) * Number(line.quantity || 1), 0)
+
+          const serviceDepositDelta = serviceFullTotal > 0
+            ? Math.round(serviceFullTotal * (1 - depositPercent / 100) * 100) / 100
+            : 0
+
+          const serviceDepositAmount = Math.max(0, serviceFullTotal - serviceDepositDelta)
+
+          totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
 
           depositCheckoutMeta = buildDepositCheckoutMeta({
             payDepositOnly: true,
