@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useMemo, useEffect, useState } from "react"
+import { useMemo } from "react"
 import { Input, FormDropdown, Checkbox, MoneyInput, Combobox, InfoCard, FormSection, Spinner, ListItem, SidebarCard } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { FulfillmentModesEditor } from "@/components/erp/shared/FulfillmentModesEditor"
@@ -11,12 +11,9 @@ import { formatCurrency } from "@/lib/utils"
 import { PlusIcon, DiceIcon, SparklesIcon, ClockIcon, StarIcon } from "@/lib/icons"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
-import { RichTextEditor } from "@/components/reusable"
-import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
-import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { usePermissions } from "@/lib/permission-context"
-import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 const FormCombobox = ({
     label, value, onChange, options, disabled, width = "w-full", actionItem
@@ -73,23 +70,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
     const manualChange = (name: string, value: any) => {
         handleInputChange({ target: { name, value } })
     }
-
-    const [isOfficialCategoryModalOpen, setIsOfficialCategoryModalOpen] = useState(false)
-    const [officialCategoryPath, setOfficialCategoryPath] = useState("")
-
-    useEffect(() => {
-        let alive = true
-        const id = serviceData?.marketplace_category_id
-        if (!id) {
-            setOfficialCategoryPath("")
-            return
-        }
-        getCategoryPathClient(id, "service").then((path) => {
-            if (!alive) return
-            setOfficialCategoryPath(path || "")
-        })
-        return () => { alive = false }
-    }, [serviceData?.marketplace_category_id])
 
     const { salesPrice, profit, margin } = useMemo(() => {
         const p = Number(serviceData.price || 0), c = Number(serviceData.cost_price || 0)
@@ -184,14 +164,14 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
-                                    <span className={`${serviceData.is_active ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {serviceData.is_active ? "Ativo" : "Inativo"}
                                     </span>
                                 </div>
 
                                 <div className="flex flex-col">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
-                                    <span className={`${serviceData.show_in_marketplace !== false ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                    <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                         {serviceData.show_in_marketplace !== false ? "Sim" : "Não"}
                                     </span>
                                 </div>
@@ -276,15 +256,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                                 />
                             </div>
                         )}
-
-                        {isQuickMode && serviceData.description && (
-                            <FormSection title="Descrição" hasSeparator>
-                                <div
-                                    className="rich-text-content text-sm text-brand-dark dark:text-dark-heading"
-                                    dangerouslySetInnerHTML={{ __html: sanitizeRichText(serviceData.description) }}
-                                />
-                            </FormSection>
-                        )}
                     </FormSection>
 
                     {/* Duração e Agendamento */}
@@ -336,12 +307,13 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                     )}
 
                     {
-                        isQuickMode && officialCategoryPath && (
-                            <SidebarCard title="Categoria oficial">
-                                <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                    {officialCategoryPath}
-                                </div>
-                            </SidebarCard>
+                        isQuickMode && (
+                            <OfficialCategoryCard
+                                categoryId={serviceData?.marketplace_category_id}
+                                onChange={(id) => manualChange("marketplace_category_id", id)}
+                                type="service"
+                                isEditing={false}
+                            />
                         )
                     }
 
@@ -621,19 +593,6 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                         </div>
                     </FormSection>
                 )}
-
-                {isQuickMode && (
-                    <div className="mt-10">
-                        <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full"></div>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-5">Descrição</h3>
-                        <RichTextEditor
-                            label="Descrição Detalhada"
-                            value={serviceData?.description || ""}
-                            onChange={(val) => manualChange("description", val)}
-                            disabled={!isEditing}
-                        />
-                    </div>
-                )}
             </div>
 
             {/* DIREITA (Widgets) */}
@@ -703,43 +662,12 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 )}
 
                 {isQuickMode && (
-                    <SidebarCard title="Categoria oficial">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                            Selecione a categoria oficial do seu serviço.
-                        </p>
-                        <button
-                            type="button"
-                            disabled={!isEditing}
-                            onClick={() => setIsOfficialCategoryModalOpen(true)}
-                            className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                        {officialCategoryPath || "Selecionar categoria..."}
-                                    </div>
-                                    {officialCategoryPath ? (
-                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                            Clique para alterar
-                                        </div>
-                                    ) : null}
-                                </div>
-                                <div className="shrink-0 text-brand-inactive-text">
-                                    <PlusIcon className="w-4 h-4" />
-                                </div>
-                            </div>
-                        </button>
-
-                        <MarketplaceCategoryModal
-                            isOpen={isOfficialCategoryModalOpen}
-                            onClose={() => setIsOfficialCategoryModalOpen(false)}
-                            onSelect={(category) => {
-                                manualChange("marketplace_category_id", category.id)
-                                setOfficialCategoryPath(category.path)
-                            }}
-                            type="service"
-                        />
-                    </SidebarCard>
+                    <OfficialCategoryCard
+                        categoryId={serviceData?.marketplace_category_id}
+                        onChange={(id) => manualChange("marketplace_category_id", id)}
+                        type="service"
+                        isEditing={isEditing}
+                    />
                 )}
 
                 {!isQuickMode && (

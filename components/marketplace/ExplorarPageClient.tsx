@@ -1256,7 +1256,6 @@ export function ExplorarPageClient({
         { value: "produtos", label: "Produtos" },
         { value: "servicos", label: "Serviços" },
         { value: "vitrines", label: "Lojas" },
-        { value: "planos", label: "Assinaturas" },
     ]
 
     const sortOptions: { value: SortOption; label: string }[] = [
@@ -1568,12 +1567,18 @@ export function ExplorarPageClient({
     }
 
     const filterConfig = useMemo(() => {
-        return getFilterConfig(selectedSection, pageMode)
-    }, [selectedSection, pageMode])
+        return getFilterConfig(selectedSection, pageMode, currentType)
+    }, [selectedSection, pageMode, currentType])
 
     const contextualSortOptions = useMemo(() => {
-        return getSortOptionsForMode(pageMode, selectedSection)
-    }, [pageMode, selectedSection])
+        return getSortOptionsForMode(pageMode, selectedSection, currentType)
+    }, [pageMode, selectedSection, currentType])
+
+    useEffect(() => {
+        if (!contextualSortOptions.some(o => o.value === sortBy)) {
+            setSortBy("relevancia")
+        }
+    }, [currentType])
 
     const renderListingItem = (item: any) => {
         if (viewMode === "list") return renderListRow(item)
@@ -1856,7 +1861,7 @@ export function ExplorarPageClient({
                                         }}
                                     />
                                 </div>
-                            ) : rawItems.length === 0 && !isCategoryMode ? (
+                            ) : rawItems.length === 0 && !isCategoryMode && moreDistantItems.length === 0 && moreDistantSellers.length === 0 ? (
                                 <div className="flex justify-center">
                                     <IconPlaceholder
                                         placeholderType="image"
@@ -1895,7 +1900,7 @@ export function ExplorarPageClient({
                                     {!!query && currentType === 'tudo' && vitrinesDestaque.length > 0 && (
                                         <div className="mb-6">
                                             <HorizontalCarousel
-                                                title="Lojas encontradas"
+                                                title="Lojas e vitrines encontradas"
                                                 items={vitrinesDestaque}
                                                 renderItem={(vitrine) => (
                                                     <VitrineCard key={vitrine.id} vitrine={vitrine} userCoords={userCoords} hideCity={!!selectedCitySlug} locationContext={locationContext} className="w-full" />
@@ -1940,7 +1945,7 @@ export function ExplorarPageClient({
                                     />
 
 
-                                    {filteredResults.length === 0 && !hasNextPage ? (
+                                    {filteredResults.length === 0 && !hasNextPage && moreDistantItems.length === 0 ? (
                                         <div className="py-12 flex flex-col items-center">
                                             <IconPlaceholder
                                                 placeholderType="image"
@@ -1994,7 +1999,7 @@ export function ExplorarPageClient({
 
                                     {/* Carrossel de Itens Distantes na Busca */}
                                     {!!query && moreDistantItems.length > 0 && (
-                                        <div className="mt-12 pt-8 border-t border-gray-100 dark:border-dark-border">
+                                        <div className="mt-12 pt-8 border-t border-brand-border dark:border-dark-border">
                                             <HorizontalCarousel
                                                 title="Um pouco mais distantes do seu raio de busca"
                                                 items={moreDistantItems}
@@ -2055,7 +2060,6 @@ export function ExplorarPageClient({
                     { value: "tudo", label: "Tudo" },
                     { value: "produtos", label: "Produtos" },
                     { value: "servicos", label: "Serviços" },
-                    { value: "planos", label: "Assinaturas" },
                     { value: "vitrines", label: "Lojas" },
                 ]}
                 productCategories={productCategories}

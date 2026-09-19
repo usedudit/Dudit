@@ -1,15 +1,15 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
     ChevronLeftIcon,
     ShareIcon,
     PackageIcon,
-    StoreIcon,
-    UserIcon,
     FileIcon,
     ClockIcon,
     AlertCircleIcon,
+    UserIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -18,18 +18,19 @@ import {
     TabsList,
     TabsTrigger,
     TabsContent,
-    ThreeDotsLoader,
     FormSection,
     IconPlaceholder,
-    ListItem,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
+import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
+import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
 
 const formatReturnReasonLabel = (rawReason?: string | null): string => {
     if (!rawReason) return "Não informado"
@@ -276,45 +277,13 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleShare}
-                                                leftIcon={<ShareIcon size={16} />}
-                                            >
-                                                Compartilhar
-                                            </Button>
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                <DropdownItem onClick={handleShare}>
+                                                    <ShareIcon size={16} /> Compartilhar
+                                                </DropdownItem>
+                                            </ActionsDropdown>
                                         </div>
-                                    </div>
-
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        Solicitação #{returnId}
-                                                    </h1>
-                                                    <Badge variant={statusMeta.variant}>
-                                                        {statusMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    Pedido: #{request?.order_number_snapshot || request?.orders?.order_number || "-"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            Compartilhar
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -452,69 +421,21 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Dados do Cliente" hasSeparator>
-                                                        <ListItem
-                                                            left={
-                                                                <UserProfileImage
-                                                                    fullName={request?.customer_name_snapshot || "Cliente"}
-                                                                    className="w-12 h-12 text-lg shrink-0"
-                                                                />
-                                                            }
-                                                            title={request?.customer_name_snapshot || "Consumidor"}
-                                                            description={`ID: ${request?.customer_id || "-"}`}
-                                                            right={
-                                                                request?.customer_id ? (
-                                                                    <Link
-                                                                        href={`/ddt-admin/users?view=${request.customer_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline"
-                                                                    >
-                                                                        Ver Usuário →
-                                                                    </Link>
-                                                                ) : undefined
-                                                            }
-                                                        />
-                                                    </FormSection>
+                                                    <AdminBuyerCard
+                                                        buyer={{
+                                                            full_name: request?.customer_name_snapshot,
+                                                        }}
+                                                        buyerId={request?.customer_id}
+                                                        customerName={request?.customer_name_snapshot}
+                                                    />
                                                 </div>
 
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Dados do Vendedor / Loja
-                                                        </h3>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                                {store.logo_url ? (
-                                                                    <img src={getR2ImageUrl(store.logo_url)} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <IconPlaceholder
-                                                                        icon={StoreIcon}
-                                                                        containerSize="w-12 h-12"
-                                                                        iconSize="w-6 h-6"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            <div>
-                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                                    {store.name || "Loja Parceira"}
-                                                                </h3>
-                                                                <span className="text-xs text-brand-inactive-text">
-                                                                    Pontuação de Risco: <strong>{store.risk_score || 0} pts</strong>
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {(store.id || request?.store_id || request?.partner_id) && (
-                                                            <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border">
-                                                                <Link
-                                                                    href={`/ddt-admin/partners?view=${store.id || request?.store_id || request?.partner_id}`}
-                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                >
-                                                                    Ver ficha da loja →
-                                                                </Link>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <AdminStoreCard
+                                                        store={store}
+                                                        fallbackStoreId={request?.store_id || request?.partner_id}
+                                                    />
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -651,9 +572,17 @@ export function AdminReturnDetailView({ detail, onBack }: AdminReturnDetailViewP
 
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
-                    Compartilhar
-                </Button>
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                        </Button>
+                    }>
+                        <DropdownItem onClick={handleShare}>
+                            <ShareIcon size={16} /> Compartilhar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                </div>
             </div>
         </>
     )

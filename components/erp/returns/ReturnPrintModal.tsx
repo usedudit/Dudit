@@ -16,7 +16,7 @@ import type { SaleReceiptPartnerHeader } from "@/lib/sales/sale-receipt"
 import ReturnReceiptThermalPreview from "./ReturnReceiptThermalPreview"
 import ReturnReceiptA4Preview from "./ReturnReceiptA4Preview"
 
-type Format = "thermal" | "a4"
+type Format = "thermal" | "thermal-58" | "a4"
 
 export type ReturnPrintModalProps = {
     isOpen: boolean
@@ -170,49 +170,69 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                                 <p className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">
                                                     Formato de impressão
                                                 </p>
-                                                <div className="space-y-3">
-                                                    <ListItem
-                                                        icon={PrinterIcon}
-                                                        title="Cupom de troca (Impressora térmica)"
-                                                        description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
-                                                        onClick={() => setFormat("thermal")}
-                                                        className={`transition-all px-4 py-3 gap-4 ${format === "thermal"
-                                                            ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                            : "opacity-80 hover:opacity-100"
-                                                            }`}
-                                                        right={
-                                                            <div
-                                                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal"
-                                                                    ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                    : "border-brand-border dark:border-dark-border"
-                                                                    }`}
-                                                            >
-                                                                {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                            </div>
-                                                        }
-                                                    />
-                                                    <ListItem
-                                                        icon={FileTextIcon}
-                                                        title="Documento A4 (PDF)"
-                                                        description="Formato folha A4 com comprovante completo e termo assinado de troca."
-                                                        onClick={() => setFormat("a4")}
-                                                        className={`transition-all px-4 py-3 gap-4 ${format === "a4"
-                                                            ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
-                                                            : "opacity-80 hover:opacity-100"
-                                                            }`}
-                                                        right={
-                                                            <div
-                                                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "a4"
-                                                                    ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
-                                                                    : "border-brand-border dark:border-dark-border"
-                                                                    }`}
-                                                            >
-                                                                {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
-                                                            </div>
-                                                        }
-                                                    />
+                                                    <div className="space-y-3">
+                                                        <ListItem
+                                                            icon={PrinterIcon}
+                                                            title="Cupom de troca (Impressora térmica)"
+                                                            description="Formato em 80mm para comprovante rápido de devolução/troca no balcão."
+                                                            onClick={() => setFormat("thermal")}
+                                                            className={`transition-all px-4 py-3 gap-4 ${format === "thermal"
+                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                                : "opacity-80 hover:opacity-100"
+                                                                }`}
+                                                            right={
+                                                                <div
+                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal"
+                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                        : "border-brand-border dark:border-dark-border"
+                                                                        }`}
+                                                                >
+                                                                    {format === "thermal" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                                </div>
+                                                            }
+                                                        />
+                                                        <ListItem
+                                                            icon={PrinterIcon}
+                                                            title="Impressora térmica (58mm)"
+                                                            description="Bobina estreita de 58mm, comprovante compacto ideal para balcão e impressoras portáteis."
+                                                            onClick={() => setFormat("thermal-58")}
+                                                            className={`transition-all px-4 py-3 gap-4 ${format === "thermal-58"
+                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                                : "opacity-80 hover:opacity-100"
+                                                                }`}
+                                                            right={
+                                                                <div
+                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "thermal-58"
+                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                        : "border-brand-border dark:border-dark-border"
+                                                                        }`}
+                                                                >
+                                                                    {format === "thermal-58" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                                </div>
+                                                            }
+                                                        />
+                                                        <ListItem
+                                                            icon={FileTextIcon}
+                                                            title="Documento A4 (PDF)"
+                                                            description="Formato folha A4 com comprovante completo e termo assinado de troca."
+                                                            onClick={() => setFormat("a4")}
+                                                            className={`transition-all px-4 py-3 gap-4 ${format === "a4"
+                                                                ? "border-brand-dark dark:border-dark-heading ring-2 ring-brand-dark/10 dark:ring-white/10"
+                                                                : "opacity-80 hover:opacity-100"
+                                                                }`}
+                                                            right={
+                                                                <div
+                                                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${format === "a4"
+                                                                        ? "border-brand-dark bg-brand-dark dark:border-dark-heading dark:bg-dark-heading"
+                                                                        : "border-brand-border dark:border-dark-border"
+                                                                        }`}
+                                                                >
+                                                                    {format === "a4" && <div className="w-2 h-2 rounded-full bg-white" />}
+                                                                </div>
+                                                            }
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
 
                                             <div className="hidden lg:flex gap-3 pt-2">
                                                 <Button className="flex-1 h-12" onClick={handlePrint} leftIcon={<PrinterIcon size={18} />}>
@@ -258,11 +278,12 @@ export default function ReturnPrintModal({ isOpen, onClose, returnId, partnerId,
                                             forceMount
                                         >
                                             <div className="flex-1 overflow-auto custom-scrollbar p-4 md:p-6 flex justify-center items-start">
-                                                {format === "thermal" ? (
+                                                {format === "thermal" || format === "thermal-58" ? (
                                                     <ReturnReceiptThermalPreview
                                                         returnRequest={returnRequest}
                                                         partnerHeader={partnerHeader}
                                                         partnerName={partnerName}
+                                                        thermalWidth={format === "thermal-58" ? "58mm" : "80mm"}
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full min-h-[400px]">

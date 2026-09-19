@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, RichTextEditor, TagsInput, Button, Accordion, IconPlaceholder, FormSection, Badge, Checkbox, SidebarCard } from "@/components/reusable"
-import { TrashIcon, PlusIcon, Package, ArrowUpDownIcon, EditIcon, CheckCircleIcon, ChevronDownIcon } from "@/lib/icons"
-import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
-import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { TrashIcon, PlusIcon, ArrowUpDownIcon, ChevronDownIcon } from "@/lib/icons"
+import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import ProductVideoSection from "./ProductVideoSection"
 import { ProductAddonsSection } from "./ProductAddonsSection"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
@@ -38,36 +37,14 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
     onVideoChange,
     videoPlanBlocked = false,
 }) => {
-    // --- Estados da Categoria Oficial ---
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-    const [categoryPath, setCategoryPath] = useState("")
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
 
-    // --- Carregar Caminho da Categoria (Ex: Casa > Decoração) ---
-    useEffect(() => {
-        const fetchPath = async () => {
-            if (productData?.marketplace_category_id) {
-                const path = await getCategoryPathClient(productData.marketplace_category_id)
-                if (path) setCategoryPath(path)
-            }
-        }
-        fetchPath()
-    }, [productData?.marketplace_category_id])
-
-    // --- Helper para simular evento nativo ---
     const manualChange = (name: string, value: any) => {
         handleInputChange({
             target: { name, value }
         })
     }
 
-    // --- Handler do Modal de Categoria ---
-    const handleCategorySelect = (category: { id: string; name: string; path: string }) => {
-        manualChange("marketplace_category_id", category.id)
-        setCategoryPath(category.path)
-    }
-
-    // --- Helpers de Arrays (Segurança) ---
     const attributes = Array.isArray(productData?.attributes) ? productData.attributes : []
     const tags = Array.isArray(productData?.tags) ? productData.tags : []
 
@@ -224,16 +201,12 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
-                        {categoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
-                            {categoryPath || "Nenhuma categoria oficial selecionada."}
-                        </p>
-                    </SidebarCard>
+                    <OfficialCategoryCard
+                        categoryId={productData?.marketplace_category_id}
+                        onChange={(id) => manualChange("marketplace_category_id", id)}
+                        type="product"
+                        isEditing={false}
+                    />
 
                     <SidebarCard title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
@@ -518,47 +491,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </FormSection>
 
                     <FormSection
-                        title={
-                            <div className="flex items-center justify-between w-full">
-                                <span className="flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-brand-green" />
-                                    Categoria Oficial
-                                </span>
-                                {categoryPath && (
-                                    <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                        <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                    </span>
-                                )}
-                            </div>
-                        }
-                        description="Selecione onde seu produto será exibido na árvore de categorias."
-                        hasSeparator
-                    >
-                        <div
-                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
-                            className={`
-                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                                ${categoryPath
-                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                                }
-                                ${!isEditing && "opacity-60 pointer-events-none"}
-                            `}
-                        >
-                            <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                    {categoryPath || "Selecionar categoria..."}
-                                </span>
-                                {categoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
-                            </div>
-
-                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
-                            </div>
-                        </div>
-                    </FormSection>
-
-                    <FormSection
                         title="Palavras-chave de busca"
                         description="Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace."
                         hasSeparator
@@ -685,42 +617,6 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    {/* Card de Categoria Oficial */}
-                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
-                        {categoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-
-                        <p className="text-sm text-gray-500 mt-2 mb-4">
-                            Selecione onde seu produto será exibido na árvore de categorias.
-                        </p>
-
-                        <div
-                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
-                            className={`
-                        group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                        ${categoryPath
-                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                                }
-                        ${!isEditing && "opacity-60 pointer-events-none"}
-                    `}
-                        >
-                            <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                    {categoryPath || "Selecionar categoria..."}
-                                </span>
-                                {categoryPath && <span className="text-xs text-brand-green font-medium mt-1">Clique para alterar</span>}
-                            </div>
-
-                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
-                            </div>
-                        </div>
-                    </SidebarCard>
-
                     {/* Card de Tags */}
                     <SidebarCard title="Palavras-chave de busca">
                         <p className="text-sm text-brand-inactive-text mb-4">
@@ -735,10 +631,11 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </SidebarCard>
                 </div>
 
-                <MarketplaceCategoryModal
-                    isOpen={isCategoryModalOpen}
-                    onClose={() => setIsCategoryModalOpen(false)}
-                    onSelect={handleCategorySelect}
+                <OfficialCategoryCard
+                    categoryId={productData?.marketplace_category_id}
+                    onChange={(id) => manualChange("marketplace_category_id", id)}
+                    type="product"
+                    isEditing={isEditing}
                 />
             </div>
         </div>

@@ -176,7 +176,8 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
     try {
         const urlObj = new URL(url)
         const formatParam = urlObj.searchParams.get("format")
-        const isThermal = formatParam === "thermal" || urlObj.pathname.includes("/print/caixa")
+        const isThermal58 = formatParam === "thermal-58"
+        const isThermal = formatParam === "thermal" || isThermal58 || urlObj.pathname.includes("/print/caixa")
 
         // Forward raw Cookie header directly to ensure all requests made by Chromium include session authentication
         if (Array.isArray(nextCookies) && nextCookies.length > 0) {
@@ -204,9 +205,10 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
         }
 
         if (isThermal) {
-            // Standard thermal receipt width: 80mm (~302px width at 96 DPI, deviceScaleFactor 2 for crisp fonts & barcodes)
+            // Thermal receipt width: 80mm (~302px at 96 DPI) or 58mm (~219px at 96 DPI) for narrow bobina.
+            // deviceScaleFactor 2 for crisp fonts & barcodes
             await page.setViewport({
-                width: 302,
+                width: isThermal58 ? 219 : 302,
                 height: 800,
                 deviceScaleFactor: 2,
             })
@@ -340,9 +342,10 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
 
             const targetHeightPx = Math.max(Math.ceil(contentHeightPx + 4), 100)
 
-            // Generate exact 80mm thermal receipt PDF with continuous height (no A4 white gaps)
+            // Generate exact-width thermal receipt PDF (80mm or narrow 58mm) with continuous height
+            const pdfWidth = isThermal58 ? "58mm" : "80mm"
             const pdfBuffer = await page.pdf({
-                width: "80mm",
+                width: pdfWidth,
                 height: `${targetHeightPx}px`,
                 printBackground: true,
                 margin: {

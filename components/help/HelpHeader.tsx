@@ -124,7 +124,7 @@ export default function HelpHeader({
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
-                                className="h-7 w-auto"
+                                className="h-10 w-auto object-contain"
                             />
                         </Link>
                     </div>

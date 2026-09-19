@@ -461,7 +461,18 @@ async function handler(request: NextRequest) {
 
           const serviceDepositAmount = Math.max(0, serviceFullTotal - serviceDepositDelta)
 
-          totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
+          // Only subtract the delta if the resolver actually adjusted unitPrice.
+          // When depositAmount is null (services with payment_requirement "full_payment"),
+          // totalAmount is already the full order total — no subtraction needed.
+          const resolverAdjustedPrices = (priced.data.resolvedLines || []).some(
+            (line) => line.itemType === "service_booking" && line.depositAmount != null,
+          )
+          if (resolverAdjustedPrices) {
+            // totalAmount from first pricing run is already the deposit-adjusted total
+          } else {
+            // totalAmount is the full total — subtract delta to get the deposit charge
+            totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
+          }
 
           depositCheckoutMeta = buildDepositCheckoutMeta({
             payDepositOnly: true,

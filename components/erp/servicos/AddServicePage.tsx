@@ -606,33 +606,37 @@ export const AddServicePage: FC<AddServicePageProps> = ({
                                 </div>
 
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
-                                    {!isQuick && (
-                                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
-                                            <TabsTrigger value="general">
-                                                Dados gerais
-                                                {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
-                                            </TabsTrigger>
+                                {!isDesapego && (
+                                    <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                                        <TabsTrigger value="general">
+                                            Dados gerais
+                                            {getTabErrorCount("general") > 0 && <span className="ml-2 w-2 h-2 bg-brand-red rounded-full inline-block" />}
+                                        </TabsTrigger>
+                                        {!isQuick && (
                                             <TabsTrigger value="resources" disabled={isLoadingDetails}>
                                                 Itens e Recursos
                                             </TabsTrigger>
+                                        )}
+                                        {!isQuick && (
                                             <TabsTrigger value="staff" disabled={isLoadingDetails}>
                                                 Profissionais
                                             </TabsTrigger>
-                                            <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
-                                                Vitrine online
+                                        )}
+                                        <TabsTrigger value="marketplace" disabled={isLoadingDetails}>
+                                            Vitrine online
+                                        </TabsTrigger>
+                                        {serviceData.show_in_marketplace && internalMode === "details" && (
+                                            <TabsTrigger value="metrics" disabled={isLoadingDetails}>
+                                                <span className="inline-flex items-center gap-2">
+                                                    Métricas
+                                                    {metricsPlanBlocked ? (
+                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
+                                                    ) : null}
+                                                </span>
                                             </TabsTrigger>
-                                            {serviceData.show_in_marketplace && internalMode === "details" && (
-                                                <TabsTrigger value="metrics" disabled={isLoadingDetails}>
-                                                    <span className="inline-flex items-center gap-2">
-                                                        Métricas
-                                                        {metricsPlanBlocked ? (
-                                                            <img src={planStarIconForTarget("escalar")!} alt="" className="w-4 h-4 object-contain" />
-                                                        ) : null}
-                                                    </span>
-                                                </TabsTrigger>
-                                            )}
-                                        </TabsList>
-                                    )}
+                                        )}
+                                    </TabsList>
+                                )}
                                 </div>
                             </div>
                         </div>

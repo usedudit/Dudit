@@ -4,13 +4,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
     ChevronLeftIcon,
     CheckCircleIcon,
-    CancelCircleIcon,
     TrashIcon,
     EditIcon,
-    InfoIcon,
     StoreIcon,
     UserIcon,
     ClockIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -32,13 +31,14 @@ import { useSidebar } from "@/lib/sidebar-context"
 import { toast } from "@/hooks/use-notification"
 import {
     approveModeration,
-    rejectFlaggedImages,
     rejectModeration,
 } from "@/app/actions/admin/moderation"
 import { removeImage } from "@/app/actions/admin/moderation-v2"
 import type { ModerationItem } from "@/lib/admin/types"
 import { useTransition } from "react"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
+import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
+import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
 
 const getStatusMeta = (status: string) => {
     switch (status) {
@@ -78,10 +78,8 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
 
     // Modals
     const [showApproveModal, setShowApproveModal] = useState(false)
-    const [showRejectImagesModal, setShowRejectImagesModal] = useState(false)
     const [showFullRejectModal, setShowFullRejectModal] = useState(false)
     const [rejectReason, setRejectReason] = useState("")
-    const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set())
     const [removedImages, setRemovedImages] = useState<Set<string>>(new Set())
 
     // Lightbox
@@ -113,39 +111,26 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
         return () => setHeaderOverride(null)
     }, [item.id, typeLabel, onBack, setHeaderOverride])
 
-    const handleRemoveImage = (url: string) => {
-        startTransition(async () => {
-            const itemType = item.type === "service" ? "service" : "product"
-            const result = await removeImage("product", item.id, url, "images", 0, undefined, item.partner_id)
-            const r = result || { success: false, error: "" }
-            if (r.success) {
-                toast.success("Imagem removida!")
-                setRemovedImages(prev => new Set(prev).add(url))
-                setSelectedImages(prev => {
-                    const next = new Set(prev)
-                    next.delete(url)
-                    return next
-                })
-            } else {
-                toast.error(r.error || "Erro ao remover imagem")
-            }
-        })
-    }
-
-    const allImages = (item.images || []).map(url => getR2ImageUrl(url))
-
-    const toggleImage = (url: string) => {
-        setSelectedImages(prev => {
-            const next = new Set(prev)
-            if (next.has(url)) next.delete(url)
-            else next.add(url)
-            return next
-        })
-    }
+    // Filtered images (after removal)
+    const visibleImages = (item.images || []).filter(url => !removedImages.has(url))
+    const allImages = visibleImages.map(url => getR2ImageUrl(url))
 
     const openLightbox = (index: number = 0) => {
         setLightboxIndex(index)
         setShowLightbox(true)
+    }
+
+    const handleRemoveImageByIndex = (index: number) => {
+        const url = visibleImages[index]
+        startTransition(async () => {
+            const result = await removeImage("product", item.id, url, "images", 0, undefined, item.partner_id)
+            if (result.success) {
+                toast.success("Imagem removida!")
+                setRemovedImages(prev => new Set(prev).add(url))
+            } else {
+                toast.error(result.error || "Erro ao remover imagem")
+            }
+        })
     }
 
     const handleApprove = () => {
@@ -156,19 +141,6 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                 onBack()
             } else {
                 toast.error(result.error || `Erro ao aprovar ${typeLabel.toLowerCase()}`)
-            }
-        })
-    }
-
-    const handleRejectImages = () => {
-        startTransition(async () => {
-            const itemType = item.type === "service" ? "service" : "product"
-            const result = await rejectFlaggedImages(item.id, rejectReason, [...selectedImages], itemType as "product" | "service")
-            if (result.success) {
-                toast.success("Imagens removidas com sucesso!")
-                onBack()
-            } else {
-                toast.error(result.error || "Erro ao remover imagens")
             }
         })
     }
@@ -190,7 +162,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
     return (
         <>
             <FadeIn>
-                <div className="flex flex-col bg-white dark:bg-dark-background min-h-screen">
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full w-full">
                         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
@@ -199,13 +171,13 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                 <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                                     {/* Back button - desktop only */}
-                                    <div className={`absolute -left-12 top-7 h-full hidden xl:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
+                                    <div className={`absolute -left-12 top-7 h-full hidden lg:flex justify-center transition-all duration-500 ${isScrolled ? "scale-90" : "scale-100"}`}>
                                         <Button variant="filled" onClick={onBack} className="w-10 h-10 p-0 flex items-center justify-center">
                                             <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                         </Button>
                                     </div>
 
-                                    {/* Title row - desktop */}
+                                    {/* Title row */}
                                     <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                         <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                             <h1 className={`font-bold transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
@@ -224,28 +196,36 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 {item.title} • Criado em {formatDate(item.created_at)}
                                             </div>
                                         </div>
-                                </div>
+                                    </div>
 
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {typeLabel} #{item.id.slice(0, 8)}
-                                                    </h1>
-                                                    <Badge variant={statusMeta.variant}>
-                                                        {statusMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    {item.title}
-                                                </span>
-                                            </div>
-                                        </div>
+                                    {/* Desktop action buttons */}
+                                    <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
+                                        <ActionsDropdown
+                                            triggerVariant="outline"
+                                            triggerSize="sm"
+                                        >
+                                            {item.moderation_status !== "approved" && (
+                                                <DropdownItem onClick={() => setShowApproveModal(true)} disabled={isPending}>
+                                                    <CheckCircleIcon size={16} className="text-brand-green" /> Aprovar {typeLabel}
+                                                </DropdownItem>
+                                            )}
+                                            {(item.type === "product" || item.type === "service") && (
+                                                <DropdownItem
+                                                    onClick={() => {
+                                                        if (item.type === "product") {
+                                                            window.open(`/erp/produtos/${item.id}`, "_blank")
+                                                        } else {
+                                                            window.open(`/erp/servicos?edit=${item.id}`, "_blank")
+                                                        }
+                                                    }}
+                                                >
+                                                    <EditIcon size={16} /> Editar no ERP
+                                                </DropdownItem>
+                                            )}
+                                            <DropdownItem onClick={() => setShowFullRejectModal(true)} disabled={isPending}>
+                                                <TrashIcon size={16} className="text-brand-red" /> Rejeitar {typeLabel}
+                                            </DropdownItem>
+                                        </ActionsDropdown>
                                     </div>
 
                                     {/* Tabs */}
@@ -253,8 +233,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="general">Geral</TabsTrigger>
                                             <TabsTrigger value="store">Loja & Proprietário</TabsTrigger>
-                                            <TabsTrigger value="images">Imagens ({item.images?.length || 0})</TabsTrigger>
-                                            <TabsTrigger value="actions">Ações</TabsTrigger>
+                                            <TabsTrigger value="images">Imagens ({visibleImages.length || 0})</TabsTrigger>
                                         </TabsList>
                                     </div>
                                 </div>
@@ -333,10 +312,10 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                         )}
                                                                         {item.video_type === "upload" && item.video_url && (
                                                                             <video
-                                                                            src={item.video_url.startsWith("http") ? item.video_url : getR2ImageUrl(item.video_url)}
-                                                                             controls
-                                                                             className="w-full h-full"
-                                                                             poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : getR2ImageUrl(item.video_thumbnail)) : undefined}
+                                                                                src={item.video_url.startsWith("http") ? item.video_url : getR2ImageUrl(item.video_url)}
+                                                                                controls
+                                                                                className="w-full h-full"
+                                                                                poster={item.video_thumbnail ? (item.video_thumbnail.startsWith("http") ? item.video_thumbnail : getR2ImageUrl(item.video_thumbnail)) : undefined}
                                                                             />
                                                                         )}
                                                                     </div>
@@ -430,40 +409,22 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                         <FadeIn key="store">
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Dados da Loja" hasSeparator>
-                                                        <div className="space-y-4">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-16 h-16 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                                    {item.store_logo_url ? (
-                                                                        <img
-                                                                        src={getR2ImageUrl(item.store_logo_url)}
-                                                                        alt=""
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                    ) : (
-                                                                        <StoreIcon className="w-6 h-6 text-brand-inactive-text" />
-                                                                    )}
-                                                                </div>
-                                                                <div>
-                                                                    <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">
-                                                                        {item.store_name || item.owner_store_name}
-                                                                    </h3>
-                                                                    <span className="text-xs text-brand-inactive-text">
-                                                                        {item.store_id || item.partner_id}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
+                                                    <AdminStoreCard
+                                                        store={{
+                                                            logo_url: item.store_logo_url,
+                                                            name: item.store_name || item.owner_store_name,
+                                                            id: item.store_id || item.partner_id,
+                                                        }}
+                                                        linkToPartner={false}
+                                                    />
 
-                                                            {item.store_description && (
-                                                                <div>
-                                                                    <h4 className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body mb-2">Descrição da Loja</h4>
-                                                                    <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
-                                                                        {item.store_description}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </FormSection>
+                                                    {item.store_description && (
+                                                        <FormSection title="Descrição da Loja" hasSeparator>
+                                                            <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
+                                                                {item.store_description}
+                                                            </p>
+                                                        </FormSection>
+                                                    )}
 
                                                     {/* Banner */}
                                                     {item.store_banner_url && (
@@ -527,159 +488,18 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                             <div className="space-y-4">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                                                        Imagens do {typeLabel} ({item.images?.length || 0})
+                                                        Imagens do {typeLabel} ({visibleImages.length})
                                                     </h3>
-                                                    {selectedImages.size > 0 && (
-                                                        <span className="text-sm font-bold text-brand-red">{selectedImages.size} selecionada(s)</span>
-                                                    )}
                                                 </div>
-                                                {item.images && item.images.length > 0 ? (
-                                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                                        {item.images.map((url: string, idx: number) => {
-                                                            const fullUrl = getR2ImageUrl(url)
-                                                            const isSelected = selectedImages.has(url)
-                                                            return (
-                                                                <div
-                                                                    key={idx}
-                                                                    className={`relative group aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                                                                        isSelected ? "border-red-500 ring-2 ring-red-300" : "border-brand-border dark:border-dark-border hover:border-brand-green/50"
-                                                                    }`}
-                                                                    onClick={() => {
-                                                                        if (isSelected) {
-                                                                            toggleImage(url)
-                                                                        } else {
-                                                                            openLightbox(idx)
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <img src={fullUrl} alt={`Imagem ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                                                                    {isSelected && (
-                                                                        <div className="absolute inset-0 bg-red-500/30 flex items-center justify-center">
-                                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                    {!isSelected && (
-                                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                                <circle cx="12" cy="12" r="10" />
-                                                                                <path d="M12 8v4M12 16h.01" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="absolute bottom-2 right-2">
-                                                                        <span className="text-xs bg-black/70 text-white px-2 py-1 rounded">
-                                                                            {idx + 1} / {item.images.length}
-                                                                        </span>
-                                                                    </div>
-                                                                    {(item.type === "product" || item.type === "service") && (
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation()
-                                                                                handleRemoveImage(url)
-                                                                            }}
-                                                                            className="absolute top-1 left-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all"
-                                                                            aria-label="Remover imagem"
-                                                                        >
-                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center p-12 bg-brand-gray dark:bg-dark-border/30 rounded-2xl border border-dashed border-brand-border dark:border-dark-border text-brand-inactive-text">
-                                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3 opacity-30">
-                                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                                            <circle cx="8.5" cy="8.5" r="1.5" />
-                                                            <polyline points="21 15 16 10 5 21" />
-                                                        </svg>
-                                                        <span className="text-sm font-medium">Nenhuma imagem enviada</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </FadeIn>
-                                    </TabsContent>
-
-                                    {/* Actions Tab */}
-                                    <TabsContent value="actions" className="mt-0">
-                                        <FadeIn key="actions">
-                                            <div className="max-w-xl">
-                                                {item.moderation_status !== "approved" ? (
-                                                    <FormSection title="Ações de Moderação" hasSeparator>
-                                                        <div className="space-y-4">
-                                                            <Button
-                                                                variant="filled"
-                                                                className="w-full rounded-full h-12 text-[15px] font-bold"
-                                                                onClick={() => setShowApproveModal(true)}
-                                                                disabled={isPending}
-                                                                leftIcon={<CheckCircleIcon size={20} />}
-                                                            >
-                                                                Aprovar {typeLabel}
-                                                            </Button>
-
-                                                        {(item.type === "product" || item.type === "service") && (
-                                                            <Button
-                                                                variant="outline"
-                                                                className="w-full rounded-full h-11 text-[14px] font-medium"
-                                                                onClick={() => {
-                                                                    if (item.type === "product") {
-                                                                        window.open(`/erp/produtos/${item.id}`, "_blank")
-                                                                    } else {
-                                                                        window.open(`/erp/servicos?edit=${item.id}`, "_blank")
-                                                                    }
-                                                                }}
-                                                                leftIcon={<EditIcon size={18} />}
-                                                            >
-                                                                Editar {typeLabel} no ERP
-                                                            </Button>
-                                                        )}
-
-                                                            <div className="flex gap-3">
-                                                                {selectedImages.size > 0 && (item.type === "product" || item.type === "service") && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        className="flex-1 rounded-full h-12 text-amber-600 border-amber-200 hover:bg-amber-50"
-                                                                        onClick={() => setShowRejectImagesModal(true)}
-                                                                        disabled={isPending}
-                                                                        leftIcon={<CancelCircleIcon size={20} />}
-                                                                    >
-                                                                        Remover Imagens
-                                                                    </Button>
-                                                                )}
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className="flex-1 rounded-full h-12 text-brand-red border-red-200 hover:bg-red-50"
-                                                                    onClick={() => setShowFullRejectModal(true)}
-                                                                    disabled={isPending}
-                                                                    leftIcon={<TrashIcon size={20} />}
-                                                                >
-                                                                    Rejeitar Tudo
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </FormSection>
-                                                ) : (
-                                                    <FormSection title="Status" hasSeparator>
-                                                        <div className="flex flex-col items-center text-center gap-4 py-8">
-                                                            <div className="w-16 h-16 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green">
-                                                                <CheckCircleIcon size={32} />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-brand-dark dark:text-dark-heading font-bold text-lg">{typeLabel} aprovado</p>
-                                                                <p className="text-brand-inactive-text dark:text-dark-body text-sm mt-1">
-                                                                    Este item já foi aprovado e está visível no marketplace.
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </FormSection>
-                                                )}
+                                                <ProductImagesSection
+                                                    images={visibleImages}
+                                                    onImageUpload={() => { }}
+                                                    onRemoveImage={handleRemoveImageByIndex}
+                                                    onSetPrimaryImage={() => { }}
+                                                    isEditing={item.type === "product" || item.type === "service"}
+                                                    moderationStatus={item.moderation_status as any}
+                                                    onImageClick={openLightbox}
+                                                />
                                             </div>
                                         </FadeIn>
                                     </TabsContent>
@@ -689,6 +509,41 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                     </Tabs>
                 </div>
             </FadeIn>
+
+            {/* Mobile Bottom Action Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="flex-1">
+                    <ActionsDropdown
+                        trigger={
+                            <Button variant="outline" className="w-full h-12">
+                                <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                            </Button>
+                        }
+                    >
+                        {item.moderation_status !== "approved" && (
+                            <DropdownItem onClick={() => setShowApproveModal(true)} disabled={isPending}>
+                                <CheckCircleIcon size={16} className="text-brand-green" /> Aprovar
+                            </DropdownItem>
+                        )}
+                        {(item.type === "product" || item.type === "service") && (
+                            <DropdownItem
+                                onClick={() => {
+                                    if (item.type === "product") {
+                                        window.open(`/erp/produtos/${item.id}`, "_blank")
+                                    } else {
+                                        window.open(`/erp/servicos?edit=${item.id}`, "_blank")
+                                    }
+                                }}
+                            >
+                                <EditIcon size={16} /> Editar no ERP
+                            </DropdownItem>
+                        )}
+                        <DropdownItem onClick={() => setShowFullRejectModal(true)} disabled={isPending}>
+                            <TrashIcon size={16} className="text-brand-red" /> Rejeitar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                </div>
+            </div>
 
             {/* Approve Modal */}
             <DefaultModal
@@ -715,44 +570,6 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                 : `O serviço "${item.title}" ficará visível imediatamente.`}
                         </p>
                     </div>
-                </div>
-            </DefaultModal>
-
-            {/* Reject Images Modal */}
-            <DefaultModal
-                isOpen={showRejectImagesModal}
-                onClose={() => { setShowRejectImagesModal(false); setRejectReason("") }}
-                title="Remover Imagens"
-                maxWidth="md"
-                footer={
-                    <>
-                        <Button variant="outline" onClick={() => { setShowRejectImagesModal(false); setRejectReason("") }} disabled={isPending}>Cancelar</Button>
-                        <Button
-                            variant="destructive"
-                            disabled={!rejectReason.trim() || rejectReason.trim().length < 5 || isPending}
-                            onClick={handleRejectImages}
-                            isLoading={isPending}
-                        >
-                            Confirmar Remoção
-                        </Button>
-                    </>
-                }
-            >
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-700 dark:text-amber-400">
-                        <InfoIcon size={20} className="shrink-0 mt-0.5" />
-                        <p className="text-sm font-medium">{selectedImages.size} imagem(ns) serão removidas. O parceiro será notificado para substituí-las.</p>
-                    </div>
-                    <Input
-                        name="reject-images-reason"
-                        label="Motivo da remoção"
-                        placeholder="Explique ao parceiro por que as imagens foram removidas..."
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                        multiline
-                        rows={3}
-                        required
-                    />
                 </div>
             </DefaultModal>
 

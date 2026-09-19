@@ -3,7 +3,7 @@ import { formatPaymentMethodLabel, toCanonicalPaymentType } from "@/lib/payments
 import { formatAddressParts, stripCep } from "@/lib/utils/format-address"
 import { cleanOrderNotes } from "@/lib/orders/order-utils"
 
-export type SaleReceiptFormat = "thermal" | "a4"
+export type SaleReceiptFormat = "thermal" | "thermal-58" | "a4"
 
 export type SaleReceiptItem = {
     index: number

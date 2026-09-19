@@ -209,6 +209,7 @@ async function handler(request: NextRequest) {
     let deliveryFee = 0
     let deliveryStoreId: string | null = body.storeId || null
     let serviceDepositDelta = 0
+    let resolverAdjustedForDeposit = false
 
     if (existingOrder) {
       deliveryStoreId = existingOrder.store_id || deliveryStoreId
@@ -255,6 +256,9 @@ async function handler(request: NextRequest) {
       if (!resolved.success) {
         return NextResponse.json({ error: resolved.error }, { status: 400 })
       }
+      resolverAdjustedForDeposit = resolved.lines.some(
+        (line) => line.itemType === "service_booking" && line.depositAmount != null,
+      )
       deliveryStoreId = resolved.lines.find((line) => line.storeId)?.storeId || deliveryStoreId
 
       for (const line of resolved.lines) {
@@ -465,7 +469,9 @@ async function handler(request: NextRequest) {
       totalAmount = pricingResult.finalTotal
 
       if (serviceDepositDelta > 0) {
-        totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
+        if (!resolverAdjustedForDeposit) {
+          totalAmount = Math.max(0, Number((totalAmount - serviceDepositDelta).toFixed(2)))
+        }
       }
 
       const prefSum = preferenceItems.reduce((acc: number, i: any) => acc + Number(i.unit_price || 0) * Number(i.quantity || 1), 0)

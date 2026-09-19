@@ -225,33 +225,6 @@ export function AdminDeliveryDriverDetailView({
                                         </div>
                                     </div>
 
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {profile.full_name || "Entregador"}
-                                                    </h1>
-                                                    <Badge variant={driver.is_active ? "green" : "red"}>
-                                                        {driver.is_active ? "Ativo" : "Inativo"}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    {driver.availability_status === "available" ? "Disponível" : "Offline"} • {driver.city || "-"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <UserProfileImage
-                                            fullName={profile.full_name || "Entregador"}
-                                            imageUrl={profile.avatar_url}
-                                            className="w-10 h-10 shrink-0"
-                                        />
-                                    </div>
-
                                     {/* Tabs */}
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">

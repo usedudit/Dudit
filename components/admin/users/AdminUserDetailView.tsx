@@ -11,6 +11,9 @@ import {
     ShieldIcon,
     EditIcon,
     ClockIcon,
+    ThreeDotsIcon,
+    CancelCircleIcon,
+    CheckCircleIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -26,6 +29,8 @@ import {
     AlertModal,
     DefaultModal,
     Input,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -285,34 +290,24 @@ export function AdminUserDetailView({
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => {
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                <DropdownItem onClick={() => {
                                                     setNewRiskScore(String(profile.risk_score || 0))
                                                     setRiskModalOpen(true)
-                                                }}
-                                                leftIcon={<EditIcon size={16} />}
-                                            >
-                                                Score de Risco
-                                            </Button>
-
-                                            {isBanned ? (
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => setUnbanModalOpen(true)}
-                                                    className="text-brand-green border-brand-green/30 hover:bg-brand-green/10"
-                                                >
-                                                    Desbanir Usuário
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="destructive"
-                                                    onClick={() => setBanModalOpen(true)}
-                                                >
-                                                    Banir Usuário
-                                                </Button>
-                                            )}
+                                                }}>
+                                                    <EditIcon size={16} /> Score de Risco
+                                                </DropdownItem>
+                                                {isBanned ? (
+                                                    <DropdownItem onClick={() => setUnbanModalOpen(true)}>
+                                                        <CheckCircleIcon size={16} className="text-brand-green" /> Desbanir Usuário
+                                                    </DropdownItem>
+                                                ) : (
+                                                    <DropdownItem onClick={() => setBanModalOpen(true)} className="text-brand-red">
+                                                        <CancelCircleIcon size={16} className="text-brand-red" /> Banir Usuário
+                                                    </DropdownItem>
+                                                )}
+                                            </ActionsDropdown>
                                         </div>
                                     </div>
 
@@ -590,33 +585,29 @@ export function AdminUserDetailView({
 
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                {isBanned ? (
-                    <Button
-                        variant="outline"
-                        onClick={() => setUnbanModalOpen(true)}
-                        className="flex-1 text-brand-green border-brand-green/30"
-                    >
-                        Desbanir
-                    </Button>
-                ) : (
-                    <Button
-                        variant="destructive"
-                        onClick={() => setBanModalOpen(true)}
-                        className="flex-1"
-                    >
-                        Banir
-                    </Button>
-                )}
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        setNewRiskScore(String(profile.risk_score || 0))
-                        setRiskModalOpen(true)
-                    }}
-                    className="flex-1"
-                >
-                    Score de Risco
-                </Button>
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                        </Button>
+                    }>
+                        <DropdownItem onClick={() => {
+                            setNewRiskScore(String(profile.risk_score || 0))
+                            setRiskModalOpen(true)
+                        }}>
+                            <EditIcon size={16} /> Score de Risco
+                        </DropdownItem>
+                        {isBanned ? (
+                            <DropdownItem onClick={() => setUnbanModalOpen(true)}>
+                                <CheckCircleIcon size={16} className="text-brand-green" /> Desbanir Usuário
+                            </DropdownItem>
+                        ) : (
+                            <DropdownItem onClick={() => setBanModalOpen(true)} className="text-brand-red">
+                                <CancelCircleIcon size={16} className="text-brand-red" /> Banir Usuário
+                            </DropdownItem>
+                        )}
+                    </ActionsDropdown>
+                </div>
             </div>
 
             {/* Modal: Ajustar Score de Risco */}

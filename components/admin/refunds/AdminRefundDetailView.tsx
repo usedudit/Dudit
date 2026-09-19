@@ -4,11 +4,12 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
     ChevronLeftIcon,
     ShareIcon,
-    StoreIcon,
     FileIcon,
     ClockIcon,
     AlertCircleIcon,
     ShieldIcon,
+    ThreeDotsIcon,
+    CheckCircleIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -19,15 +20,16 @@ import {
     TabsContent,
     IconPlaceholder,
     FormSection,
-    ListItem,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { UserProfileImage } from "@/lib/utils/UserProfileImage"
-import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
+import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
+import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
 import { AdminRefundReviewModal } from "@/components/admin/AdminRefundReviewModal"
 import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
 
@@ -218,54 +220,18 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleShare}
-                                                leftIcon={<ShareIcon size={16} />}
-                                            >
-                                                Compartilhar
-                                            </Button>
-                                            {(refund.status === "pending" || refund.status === "under_review") && (
-                                                <Button
-                                                    variant="default"
-                                                    onClick={() => setShowReviewModal(true)}
-                                                    className="bg-brand-green text-white hover:bg-brand-green/90"
-                                                >
-                                                    Julgar Solicitacao
-                                                </Button>
-                                            )}
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                <DropdownItem onClick={handleShare}>
+                                                    <ShareIcon size={16} /> Compartilhar
+                                                </DropdownItem>
+                                                {(refund.status === "pending" || refund.status === "under_review") && (
+                                                    <DropdownItem onClick={() => setShowReviewModal(true)}>
+                                                        <CheckCircleIcon size={16} className="text-brand-green" /> Julgar Solicitacao
+                                                    </DropdownItem>
+                                                )}
+                                            </ActionsDropdown>
                                         </div>
-                                    </div>
-
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        Solicitacao #{refundId}
-                                                    </h1>
-                                                    <Badge variant={statusMeta.variant}>
-                                                        {statusMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    Valor: {formatCurrency(refund.amount)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            Compartilhar
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -433,66 +399,18 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
                                                 {/* Coluna principal */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
                                                     <FormSection title="Dados do Comprador" hasSeparator>
-                                                        <ListItem
-                                                            left={
-                                                                <UserProfileImage
-                                                                    fullName={partner.user_id || "Comprador"}
-                                                                    className="w-12 h-12 text-lg shrink-0"
-                                                                />
-                                                            }
-                                                            title={hqStore.name || "Loja Parceira"}
-                                                            description={`Partner ID: ${refund.partner_id || "-"}`}
-                                                            right={
-                                                                refund.partner_id ? (
-                                                                    <Link
-                                                                        href={`/ddt-admin/partners?view=${refund.partner_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline"
-                                                                    >
-                                                                        Ver Parceiro &rarr;
-                                                                    </Link>
-                                                                ) : undefined
-                                                            }
-                                                        />
+                                                        <div className="p-4 bg-brand-gray/30 dark:bg-dark-border/20 rounded-xl text-sm text-brand-inactive-text">
+                                                            Este tipo de solicitação não possui dados de comprador disponíveis. Os dados exibidos são do parceiro/lojista.
+                                                        </div>
                                                     </FormSection>
                                                 </div>
 
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Dados da Loja
-                                                        </h3>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                                {hqStore.logo_url ? (
-                                                                    <img src={getR2ImageUrl(hqStore.logo_url)} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <StoreIcon className="w-6 h-6 text-brand-inactive-text" />
-                                                                )}
-                                                            </div>
-                                                            <div>
-                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading">
-                                                                    {hqStore.name || "Loja Parceira"}
-                                                                </h3>
-                                                                {hqStore.cnpj && (
-                                                                    <span className="text-xs text-brand-inactive-text">
-                                                                        CNPJ: {hqStore.cnpj}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {refund.partner_id && (
-                                                            <div className="pt-3 mt-3 border-t border-brand-border dark:border-dark-border">
-                                                                <Link
-                                                                    href={`/ddt-admin/partners?view=${refund.partner_id}`}
-                                                                    className="text-xs font-bold text-brand-green hover:underline"
-                                                                >
-                                                                    Ver ficha do parceiro &rarr;
-                                                                </Link>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <AdminStoreCard
+                                                        store={hqStore}
+                                                        fallbackStoreId={refund.partner_id}
+                                                    />
 
                                                     {/* Assinatura */}
                                                     {subscription.id && (
@@ -662,18 +580,22 @@ export function AdminRefundDetailView({ detail, onBack }: AdminRefundDetailViewP
 
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
-                    Compartilhar
-                </Button>
-                {(refund.status === "pending" || refund.status === "under_review") && (
-                    <Button
-                        variant="default"
-                        className="flex-1 bg-brand-green text-white hover:bg-brand-green/90"
-                        onClick={() => setShowReviewModal(true)}
-                    >
-                        Julgar
-                    </Button>
-                )}
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                        </Button>
+                    }>
+                        <DropdownItem onClick={handleShare}>
+                            <ShareIcon size={16} /> Compartilhar
+                        </DropdownItem>
+                        {(refund.status === "pending" || refund.status === "under_review") && (
+                            <DropdownItem onClick={() => setShowReviewModal(true)}>
+                                <CheckCircleIcon size={16} className="text-brand-green" /> Julgar Solicitacao
+                            </DropdownItem>
+                        )}
+                    </ActionsDropdown>
+                </div>
             </div>
 
             {/* Review Modal */}

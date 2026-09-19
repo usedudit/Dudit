@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon } from "@/lib/icons"
+import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, GridIcon, ListIcon } from "@/lib/icons"
 import { getAvatarColor, getBannerUrlByColor, UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import IconPlaceholder from "@/components/reusable/IconPlaceholder"
@@ -21,7 +21,7 @@ import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
 import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
-import { getStoreUrl } from "@/lib/utils/url-generator"
+import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
 import { ExplorarFiltersBottomSheet } from "./ExplorarFiltersBottomSheet"
 import { ExplorarSortBottomSheet } from "./ExplorarSortBottomSheet"
@@ -728,6 +728,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const pathname = usePathname()
     const [activeTag, setActiveTag] = useState("todos")
     const [activeSection, setActiveSection] = useState<"products" | "reviews" | "info" | "gallery">("products")
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
     const [activeContext, setActiveContext] = useState<"Produtos" | "Servicos" | "Planos">("Produtos")
     const [categoryView, setCategoryView] = useState<string | null>(() => {
         if (initialCategory) return initialCategory
@@ -1233,7 +1234,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         </button>
                     )}
 
-                    <div ref={tabsScrollRef} className="flex-1 h-full overflow-x-auto scrollbar-hide">
+                    <div ref={tabsScrollRef} className="flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide">
                         <Tabs value={activeTag} onValueChange={selectTab} className="h-full">
                             <TabsList className="border-0 p-0 h-full gap-5 bg-transparent flex items-center">
                                 {allTabs.map(tab => (
@@ -1258,6 +1259,30 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <ChevronRightIcon size={16} />
                         </button>
                     )}
+
+                    <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[30px] shrink-0">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                                ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
+                                }`}
+                            title="Vista em lista"
+                        >
+                            <ListIcon className="w-[15px] h-[15px]" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                                ? "bg-gray-100 dark:bg-dark-border/50 text-brand-dark dark:text-dark-heading"
+                                : "text-gray-400 dark:text-dark-body/70 hover:text-gray-600"
+                                }`}
+                            title="Vista em grade"
+                        >
+                            <GridIcon className="w-[15px] h-[15px]" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1270,7 +1295,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     >
                         {activeContext === "Produtos" ? <PackageIcon size={17} /> : (activeContext === "Servicos" ? <ServiceIcon size={17} /> : <TagIcon size={17} />)}
                     </button>
-                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full">
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 h-full min-w-0">
                         {allTabs.map(tab => (
                             <button
                                 id={`vendor-tab-${tab.id}-sticky`}
@@ -1281,6 +1306,29 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                 {tab.label}
                             </button>
                         ))}
+                    </div>
+                    <div className="w-px h-5 bg-white/20 shrink-0" />
+                    <div className="flex items-center bg-white/10 border border-white/20 rounded-full p-0.5 h-[30px] shrink-0">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
+                                ? "bg-white/20 text-white"
+                                : "text-white/50 hover:text-white/70"
+                                }`}
+                            title="Vista em lista"
+                        >
+                            <ListIcon className="w-[15px] h-[15px]" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode("grid")}
+                            className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "grid"
+                                ? "bg-white/20 text-white"
+                                : "text-white/50 hover:text-white/70"
+                                }`}
+                            title="Vista em grade"
+                        >
+                            <GridIcon className="w-[15px] h-[15px]" />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1452,7 +1500,43 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4">
+                                        viewMode === "list" ? (
+                                            <div className="flex flex-col mt-4">
+                                                {categoryFilteredItems.map((item: any) => {
+                                                    const normalized = normalizeItemForCard(item, partner)
+                                                    const imageUrl = normalized.images?.[0] || null
+                                                    const itemUrl = item.duration_minutes !== undefined
+                                                        ? getServiceUrl(normalized, normalized.partners)
+                                                        : getProductUrl(normalized, normalized.partners)
+                                                    return (
+                                                        <a
+                                                            key={item.id}
+                                                            href={itemUrl}
+                                                            className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30 transition-colors"
+                                                        >
+                                                            <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
+                                                                {imageUrl && <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />}
+                                                            </div>
+                                                            <div className="min-w-0 py-1">
+                                                                <h3 className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-green transition-colors">{item.name}</h3>
+                                                                {item.category && <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{normalizeCategory(item.category)}</p>}
+                                                                <div className="flex items-center gap-2 mt-1.5">
+                                                                    {item.promotional_price ? (
+                                                                        <>
+                                                                            <span className="text-[14px] font-bold text-brand-green">{formatCurrency(Number(item.promotional_price))}</span>
+                                                                            <span className="text-[12px] text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(Number(item.price))}</span>
+                                                                        </>
+                                                                    ) : item.price ? (
+                                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(item.price))}</span>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
                                             {categoryFilteredItems.map((item: any) => (
                                                 <ItemCard
                                                     key={item.id}
@@ -1465,6 +1549,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 />
                                             ))}
                                         </div>
+                                        )
                                     ) : (
                                         <IconPlaceholder
                                             placeholderType="image"
@@ -1520,21 +1605,64 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         )
                                     })()}
 
-                                    {groupedItems.map(group => (
-                                        <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
-                                            <HorizontalCarousel
-                                                title={group.name}
-                                                items={group.items.slice(0, 20)}
-                                                renderItem={(item) => (
-                                                    <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
-                                                )}
-                                                onSeeAll={() => openCategory(group.id)}
-                                                itemWidthClass="w-[150px] md:w-[230px]"
-                                            />
+                                    {viewMode === "list" ? (
+                                        <div className="flex flex-col">
+                                            {filteredItems.length > 0 ? (
+                                                filteredItems.map((item: any) => {
+                                                    const normalized = normalizeItemForCard(item, partner)
+                                                    const imageUrl = normalized.images?.[0] || null
+                                                    const itemUrl = item.duration_minutes !== undefined
+                                                        ? getServiceUrl(normalized, normalized.partners)
+                                                        : getProductUrl(normalized, normalized.partners)
+                                                    return (
+                                                        <a
+                                                            key={item.id}
+                                                            href={itemUrl}
+                                                            className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30 transition-colors"
+                                                        >
+                                                            <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
+                                                                {imageUrl && <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />}
+                                                            </div>
+                                                            <div className="min-w-0 py-1">
+                                                                <h3 className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-green transition-colors">{item.name}</h3>
+                                                                {item.category && <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{normalizeCategory(item.category)}</p>}
+                                                                <div className="flex items-center gap-2 mt-1.5">
+                                                                    {item.promotional_price ? (
+                                                                        <>
+                                                                            <span className="text-[14px] font-bold text-brand-green">{formatCurrency(Number(item.promotional_price))}</span>
+                                                                            <span className="text-[12px] text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(Number(item.price))}</span>
+                                                                        </>
+                                                                    ) : item.price ? (
+                                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(item.price))}</span>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    )
+                                                })
+                                            ) : (
+                                                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
+                                            )}
                                         </div>
-                                    ))}
-                                    {!groupedItems.length && (
-                                        <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
+                                    ) : (
+                                        <>
+                                            {groupedItems.map(group => (
+                                                <div key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px]">
+                                                    <HorizontalCarousel
+                                                        title={group.name}
+                                                        items={group.items.slice(0, 20)}
+                                                        renderItem={(item) => (
+                                                            <ItemCard product={normalizeItemForCard(item, partner)} showSeller={false} promotions={partnerPromotions} hideSalesCount />
+                                                        )}
+                                                        onSeeAll={() => openCategory(group.id)}
+                                                        itemWidthClass="w-[150px] md:w-[230px]"
+                                                    />
+                                                </div>
+                                            ))}
+                                            {!groupedItems.length && (
+                                                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
+                                            )}
+                                        </>
                                     )}
                                 </>
                             )}

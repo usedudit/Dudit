@@ -3,7 +3,7 @@ import { getOrderDetailsAction } from "@/app/actions/erp/orders"
 import { getPartnerReceiptHeaderAction } from "@/app/actions/erp/receipt"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
-import { buildSaleReceiptFromOrder, DEFAULT_RECEIPT_FOOTER_MESSAGE } from "@/lib/sales/sale-receipt"
+import { buildSaleReceiptFromOrder, DEFAULT_RECEIPT_FOOTER_MESSAGE, type SaleReceiptFormat } from "@/lib/sales/sale-receipt"
 import SaleReceiptA4Preview from "@/components/erp/orders/receipt/SaleReceiptA4Preview"
 import SaleReceiptThermalPreview from "@/components/erp/orders/receipt/SaleReceiptThermalPreview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
@@ -125,7 +125,12 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
         secondaryColor: order.secondary_color || undefined,
     })
 
-    const format = resolvedSearchParams.format === "thermal" ? "thermal" : "a4"
+    const format: SaleReceiptFormat =
+        resolvedSearchParams.format === "thermal" || resolvedSearchParams.format === "thermal-58"
+            ? (resolvedSearchParams.format as SaleReceiptFormat)
+            : "a4"
+    const isThermal = format === "thermal" || format === "thermal-58"
+    const thermalWidth = format === "thermal-58" ? "58mm" : "80mm"
     const defaultFooterMsg = policyRes.data?.receipt_message?.trim() || DEFAULT_RECEIPT_FOOTER_MESSAGE
     const footerMessage = resolvedSearchParams.footerMessage || defaultFooterMsg
     const defaultAck = policyRes.data?.receipt_show_acknowledgment !== false
@@ -135,14 +140,15 @@ export default async function PrintReciboPage({ params, searchParams }: PageProp
             : defaultAck
 
     return (
-        <PrintLayout paperSize={format === "thermal" ? "thermal" : "a4"}>
-            {format === "thermal" ? (
-                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm] mx-auto">
+        <PrintLayout paperSize={format === "thermal-58" ? "thermal-58" : format === "thermal" ? "thermal" : "a4"}>
+            {isThermal ? (
+                <div className={`w-[${thermalWidth}] max-w-[${thermalWidth}] print:w-[${thermalWidth}] print:max-w-[${thermalWidth}] mx-auto`}>
                     <SaleReceiptThermalPreview
                         data={receiptData}
                         footerMessage={footerMessage}
                         showAcknowledgment={showAcknowledgment}
                         printMode={true}
+                        thermalWidth={thermalWidth}
                     />
                 </div>
             ) : (

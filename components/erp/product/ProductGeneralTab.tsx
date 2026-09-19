@@ -7,15 +7,13 @@ import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon, StarIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
-import MarketplaceCategoryModal from "./MarketplaceCategoryModal"
-import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
 import { RichTextEditor } from "@/components/reusable"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useRouter } from "next/navigation"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
 import { formatCurrency } from "@/lib/utils"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { ProductAddonsSection } from "./ProductAddonsSection"
+import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import { usePermissions } from "@/lib/permission-context"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
@@ -172,23 +170,6 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
         return true
     })()
 
-    const [isOfficialCategoryModalOpen, setIsOfficialCategoryModalOpen] = useState(false)
-    const [officialCategoryPath, setOfficialCategoryPath] = useState("")
-
-    useEffect(() => {
-        let alive = true
-        const id = productData?.marketplace_category_id
-        if (!id) {
-            setOfficialCategoryPath("")
-            return
-        }
-        getCategoryPathClient(id).then((path) => {
-            if (!alive) return
-            setOfficialCategoryPath(path || "")
-        })
-        return () => { alive = false }
-    }, [productData?.marketplace_category_id])
-
     const categoryName = useMemo(() => {
         return categories.find(c => c.value === productData.category_id)?.label || productData.category || "-"
     }, [categories, productData.category_id, productData.category])
@@ -262,14 +243,14 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="flex flex-col">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">Status</span>
-                                        <span className={`${productData.is_active ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                             {productData.is_active ? "Ativo" : "Inativo"}
                                         </span>
                                     </div>
 
                                     <div className="flex flex-col">
                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">Exibir na Vitrine</span>
-                                        <span className={`${productData.show_in_marketplace !== false ? 'bg-brand-green' : 'bg-brand-red'}`}>
+                                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
                                             {productData.show_in_marketplace !== false ? "Sim" : "Não"}
                                         </span>
                                     </div>
@@ -493,12 +474,13 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         </SidebarCard>
                     )}
 
-                    {isQuickMode && officialCategoryPath && (
-                        <SidebarCard title="Categoria oficial">
-                            <div className="p-4 rounded-xl border border-brand-border dark:border-dark-border bg-brand-gray/30 dark:bg-dark-border/30 text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                {officialCategoryPath}
-                            </div>
-                        </SidebarCard>
+                    {isQuickMode && (
+                        <OfficialCategoryCard
+                            categoryId={productData?.marketplace_category_id}
+                            onChange={(id) => handleFieldChange({ target: { name: "marketplace_category_id", value: id } })}
+                            type="product"
+                            isEditing={false}
+                        />
                     )}
                 </div>
 
@@ -750,29 +732,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         />
                     </div>
 
-                    {isQuickMode && (
-                        <>
-                            <FormSection title="Descrição Detalhada" hasSeparator>
-                                <RichTextEditor
-                                    label="Descrição Detalhada"
-                                    value={productData?.description || ""}
-                                    onChange={(val) => handleInputChange({ target: { name: "description", value: val } })}
-                                    disabled={!isEditing}
-                                />
-                            </FormSection>
-
-                            {!isDesapego && (
-                                <FormSection title="Complementos e Adicionais" hasSeparator>
-                                    <ProductAddonsSection
-                                        addonGroups={productData?.addon_groups || []}
-                                        onChange={(groups) => handleInputChange({ target: { name: "addon_groups", value: groups } })}
-                                        isEditing={isEditing}
-                                    />
-                                </FormSection>
-                            )}
-                        </>
-                    )}
-                </FormSection>
+                 </FormSection>
 
                 {/* ESTOQUE */}
                 {!isQuickMode && (
@@ -1035,38 +995,10 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     )}
                                 </div>
                             </FormSection>
-
-                            {isQuickMode && (
-                                <FormSection title="Categoria oficial" description="Selecione a categoria oficial do seu produto." hasSeparator>
-                                    <button
-                                        type="button"
-                                        disabled={!isEditing}
-                                        onClick={() => setIsOfficialCategoryModalOpen(true)}
-                                        className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                    {officialCategoryPath || "Selecionar categoria..."}
-                                                </div>
-                                                {officialCategoryPath ? (
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                                        Clique para alterar
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                            <div className="shrink-0 text-brand-inactive-text">
-                                                <PlusIcon className="w-4 h-4" />
-                                            </div>
-                                        </div>
-                                    </button>
-                                </FormSection>
-                            )}
-                        </div>
+                         </div>
 
                         {/* Desktop: SidebarCard */}
-                        <div className="hidden lg:block">
-                            <SidebarCard hasTopStrip title="Organização">
+                        <SidebarCard hasTopStrip title="Organização">
                                 <div className="space-y-5">
                                     {!hasVariants && (
                                         <Input
@@ -1183,79 +1115,18 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     )}
                                 </div>
                             </SidebarCard>
+                        </>
+                    )}
 
-                            {isQuickMode && (
-                                <SidebarCard title="Categoria oficial">
-                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                                        Selecione a categoria oficial do seu produto.
-                                    </p>
-                                    <button
-                                        type="button"
-                                        disabled={!isEditing}
-                                        onClick={() => setIsOfficialCategoryModalOpen(true)}
-                                        className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                                    {officialCategoryPath || "Selecionar categoria..."}
-                                                </div>
-                                                {officialCategoryPath ? (
-                                                    <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                                        Clique para alterar
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                            <div className="shrink-0 text-brand-inactive-text">
-                                                <PlusIcon className="w-4 h-4" />
-                                            </div>
-                                        </div>
-                                    </button>
-                                </SidebarCard>
-                            )}
-                        </div>
-                    </>
-                )}
-
-                {isDesapego && isQuickMode && (
-                    <SidebarCard title="Categoria oficial">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
-                            Selecione a categoria oficial do seu produto.
-                        </p>
-                        <button
-                            type="button"
-                            disabled={!isEditing}
-                            onClick={() => setIsOfficialCategoryModalOpen(true)}
-                            className="w-full text-left p-4 rounded-xl border border-brand-border dark:border-dark-border hover:bg-brand-gray/40 dark:hover:bg-dark-border/40 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">
-                                        {officialCategoryPath || "Selecionar categoria..."}
-                                    </div>
-                                    {officialCategoryPath ? (
-                                        <div className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">
-                                            Clique para alterar
-                                        </div>
-                                    ) : null}
-                                </div>
-                                <div className="shrink-0 text-brand-inactive-text">
-                                    <PlusIcon className="w-4 h-4" />
-                                </div>
-                            </div>
-                        </button>
-                    </SidebarCard>
-                )}
-
-                <MarketplaceCategoryModal
-                    isOpen={isOfficialCategoryModalOpen}
-                    onClose={() => setIsOfficialCategoryModalOpen(false)}
-                    onSelect={(category) => {
-                        handleFieldChange({ target: { name: "marketplace_category_id", value: category.id } })
-                        setOfficialCategoryPath(category.path)
-                    }}
-                />
-            </div>
+                    {isQuickMode && (
+                        <OfficialCategoryCard
+                            categoryId={productData?.marketplace_category_id}
+                            onChange={(id) => handleFieldChange({ target: { name: "marketplace_category_id", value: id } })}
+                            type="product"
+                            isEditing={isEditing}
+                        />
+                    )}
+                </div>
             <QuickStockMovementSheet
                 isOpen={isStockAdjustmentOpen}
                 product={{

@@ -6,11 +6,10 @@ import {
     ShareIcon,
     ReturnIcon,
     PackageIcon,
-    StoreIcon,
     TruckIcon,
     ClockIcon,
-    EditIcon,
     UserIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -25,6 +24,8 @@ import {
     ListItem,
     DefaultModal,
     Input,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
@@ -38,6 +39,8 @@ import Link from "next/link"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
+import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
 
 const formatDeliveryStatusLabel = (status?: string | null, deliveryType?: string | null) => {
     if (!status) return "Não enviado"
@@ -279,45 +282,13 @@ export function AdminOrderDetailView({
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleShare}
-                                                leftIcon={<ShareIcon size={16} />}
-                                            >
-                                                Compartilhar
-                                            </Button>
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                <DropdownItem onClick={handleShare}>
+                                                    <ShareIcon size={16} /> Compartilhar
+                                                </DropdownItem>
+                                            </ActionsDropdown>
                                         </div>
-                                    </div>
-
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        Pedido #{orderNumber}
-                                                    </h1>
-                                                    <Badge variant={paymentMeta.variant}>
-                                                        {paymentMeta.label}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    Criado em {formatDateTime(order.created_at)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            Compartilhar
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -338,21 +309,21 @@ export function AdminOrderDetailView({
                                         <FadeIn key="general">
                                             {returns.length > 0 && (
                                                 <div className="p-4 bg-orange-50 dark:bg-orange-900/15 border border-orange-200 dark:border-orange-900/30 rounded-2xl flex items-start gap-3 mb-8">
-                                                <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
-                                                        Solicitação de Troca ou Devolução Registrada ({returns.length})
-                                                    </h3>
-                                                    <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
-                                                        Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
-                                                    </p>
-                                                </div>
-                                                <Link
-                                                    href="/ddt-admin/returns"
-                                                    className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
-                                                >
-                                                    Ver em Devoluções →
-                                                </Link>
+                                                    <ReturnIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-bold text-orange-950 dark:text-orange-300">
+                                                            Solicitação de Troca ou Devolução Registrada ({returns.length})
+                                                        </h3>
+                                                        <p className="text-xs text-orange-900/80 dark:text-orange-400/80 mt-0.5">
+                                                            Este pedido possui uma ou mais solicitações de pós-venda em andamento ou finalizadas.
+                                                        </p>
+                                                    </div>
+                                                    <Link
+                                                        href="/ddt-admin/returns"
+                                                        className="text-xs font-bold text-orange-700 dark:text-orange-400 hover:underline shrink-0"
+                                                    >
+                                                        Ver em Devoluções →
+                                                    </Link>
                                                 </div>
                                             )}
 
@@ -724,126 +695,23 @@ export function AdminOrderDetailView({
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal: Comprador */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Dados do Comprador" hasSeparator>
-                                                        <div className="flex items-center justify-between mb-4">
-                                                            <ListItem
-                                                                left={
-                                                                    <UserProfileImage
-                                                                        fullName={order.customer_name || buyer.full_name || "Cliente"}
-                                                                        imageUrl={buyer.avatar_url}
-                                                                        className="w-12 h-12 text-lg shrink-0"
-                                                                    />
-                                                                }
-                                                                title={order.customer_name || buyer.full_name || "Consumidor"}
-                                                                description={buyer.email || "Sem e-mail cadastrado"}
-                                                                className="border-0 bg-transparent px-0 hover:bg-transparent"
-                                                            />
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge variant={(buyer.risk_score || 0) >= 50 ? "red" : (buyer.risk_score || 0) >= 25 ? "orange" : "gray"}>
-                                                                    Risco: {buyer.risk_score || 0} pts
-                                                                </Badge>
-                                                                {order.buyer_id && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            setNewRiskScore(String(buyer.risk_score || 0))
-                                                                            setRiskModalOpen(true)
-                                                                        }}
-                                                                        leftIcon={<EditIcon size={14} />}
-                                                                    >
-                                                                        Ajustar Risco
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="space-y-2 text-sm pt-2">
-                                                            {buyer.phone && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-brand-inactive-text">Telefone</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.phone}</span>
-                                                                </div>
-                                                            )}
-                                                            {buyer.cpf && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-brand-inactive-text">CPF</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{buyer.cpf}</span>
-                                                                </div>
-                                                            )}
-                                                            {order.buyer_id && (
-                                                                <div className="pt-2 flex items-center justify-between">
-                                                                    <span className="text-brand-inactive-text text-xs">ID do Usuário</span>
-                                                                    <span className="font-mono text-xs text-brand-dark dark:text-dark-heading">{order.buyer_id}</span>
-                                                                </div>
-                                                            )}
-                                                            {order.buyer_id && (
-                                                                <div className="pt-2">
-                                                                    <Link
-                                                                        href={`/ddt-admin/users?view=${order.buyer_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline"
-                                                                    >
-                                                                        Ver ficha completa do usuário no Admin →
-                                                                    </Link>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </FormSection>
+                                                    <AdminBuyerCard
+                                                        buyer={buyer}
+                                                        buyerId={order.buyer_id}
+                                                        customerName={order.customer_name}
+                                                        onAdjustRisk={() => {
+                                                            setNewRiskScore(String(buyer.risk_score || 0))
+                                                            setRiskModalOpen(true)
+                                                        }}
+                                                    />
                                                 </div>
 
                                                 {/* Sidebar: Loja */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Dados do Vendedor / Loja
-                                                        </h3>
-                                                        <div className="flex items-center gap-3 mb-4">
-                                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                                {store.logo_url ? (
-                                                                    <img src={getR2ImageUrl(store.logo_url)} alt="" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <IconPlaceholder
-                                                                        icon={StoreIcon}
-                                                                        containerSize="w-12 h-12"
-                                                                        iconSize="w-6 h-6"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                                                    {store.name || "Loja Parceira"}
-                                                                </h3>
-                                                                <span className="text-xs text-brand-inactive-text">
-                                                                    Pontuação de Risco: <strong>{store.risk_score || 0} pts</strong>
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="space-y-2 text-sm">
-                                                            {store.phone && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-brand-inactive-text">Telefone</span>
-                                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">{store.phone}</span>
-                                                                </div>
-                                                            )}
-                                                            {(store.id || order.store_id) && (
-                                                                <div className="flex justify-between text-xs">
-                                                                    <span className="text-brand-inactive-text">ID da Loja</span>
-                                                                    <span className="font-mono text-brand-dark dark:text-dark-heading">{(store.id || order.store_id).slice(0, 8)}...</span>
-                                                                </div>
-                                                            )}
-                                                            {(store.id || order.store_id) && (
-                                                                <div className="pt-2">
-                                                                    <Link
-                                                                        href={`/ddt-admin/partners?view=${store.id || order.store_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline"
-                                                                    >
-                                                                        Ver ficha completa da loja →
-                                                                    </Link>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                    <AdminStoreCard
+                                                        store={store}
+                                                        fallbackStoreId={order.store_id}
+                                                    />
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -899,11 +767,19 @@ export function AdminOrderDetailView({
             </FadeIn >
 
             {/* Mobile bottom bar */}
-            < div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3" >
-                <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
-                    Compartilhar
-                </Button>
-            </div >
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                        </Button>
+                    }>
+                        <DropdownItem onClick={handleShare}>
+                            <ShareIcon size={16} /> Compartilhar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                </div>
+            </div>
 
             {/* Modal: Ajustar Score de Risco do Comprador */}
             < DefaultModal

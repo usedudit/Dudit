@@ -5,9 +5,13 @@ import {
     ChevronLeftIcon,
     ShareIcon,
     PackageIcon,
-    StoreIcon,
     ClockIcon,
     UserIcon,
+    ThreeDotsIcon,
+    TrashIcon,
+    AlertTriangleIcon,
+    CheckCircleIcon,
+    RotateCcwIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -19,8 +23,9 @@ import {
     ThreeDotsLoader,
     FormSection,
     IconPlaceholder,
-    ListItem,
     DefaultModal,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDateTime } from "@/lib/utils"
@@ -36,6 +41,8 @@ import Link from "next/link"
 import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 import { toast } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
+import { AdminStoreCard } from "@/components/admin/AdminStoreCard"
+import { AdminBuyerCard } from "@/components/admin/AdminBuyerCard"
 
 interface AdminReportDetailViewProps {
     reportId: string
@@ -243,51 +250,6 @@ export function AdminReportDetailView({
     const targetSummary = detail?.targetSummary
     const auditEvents = detail?.auditEvents || []
 
-    const DesktopActions = () => (
-        <>
-            {report.status === "pending" && (
-                <>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setDismissModalOpen(true)}
-                        disabled={isPending}
-                    >
-                        Descartar
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                        onClick={() => setSpamModalOpen(true)}
-                        disabled={isPending}
-                    >
-                        Marcar Spam
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => setResolveModalOpen(true)}
-                        disabled={isPending}
-                    >
-                        Validar Denúncia
-                    </Button>
-                </>
-            )}
-            {report.status === "validated" && (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-orange-600 border-orange-200 hover:bg-orange-50 dark:hover:bg-orange-950/20"
-                    onClick={() => setRevertModalOpen(true)}
-                    disabled={isPending}
-                >
-                    Reverter Validação (-5 pts)
-                </Button>
-            )}
-        </>
-    )
-
     return (
         <>
             <FadeIn>
@@ -322,39 +284,31 @@ export function AdminReportDetailView({
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <DesktopActions />
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                {report.status === "pending" && (
+                                                    <>
+                                                        <DropdownItem onClick={() => setDismissModalOpen(true)} disabled={isPending}>
+                                                            <TrashIcon size={16} className="text-brand-inactive-text" /> Descartar
+                                                        </DropdownItem>
+                                                        <DropdownItem onClick={() => setSpamModalOpen(true)} disabled={isPending}>
+                                                            <AlertTriangleIcon size={16} className="text-purple-600" /> Marcar Spam
+                                                        </DropdownItem>
+                                                        <DropdownItem onClick={() => setResolveModalOpen(true)} disabled={isPending}>
+                                                            <CheckCircleIcon size={16} className="text-brand-green" /> Validar Denúncia
+                                                        </DropdownItem>
+                                                    </>
+                                                )}
+                                                {report.status === "validated" && (
+                                                    <DropdownItem onClick={() => setRevertModalOpen(true)} disabled={isPending}>
+                                                        <RotateCcwIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
+                                                    </DropdownItem>
+                                                )}
+                                                <DropdownItem onClick={handleShare}>
+                                                    <ShareIcon size={16} /> Compartilhar
+                                                </DropdownItem>
+                                            </ActionsDropdown>
                                         </div>
-                                    </div>
-
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        Denúncia #{report.id.slice(0, 8)}
-                                                    </h1>
-                                                    <Badge variant={statusInfo.variant}>
-                                                        {statusInfo.label}
-                                                    </Badge>
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    {formatDateTime(report.created_at)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            Compartilhar
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -524,80 +478,37 @@ export function AdminReportDetailView({
                                             <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                                 {/* Coluna principal */}
                                                 <div className="col-span-12 xl:col-span-8 pr-0 xl:pr-12">
-                                                    <FormSection title="Denunciante">
-                                                        <ListItem
-                                                            left={
-                                                                <UserProfileAvatar reporter={reporter} name={report.reporter_name} />
-                                                            }
-                                                            title={reporter?.profile?.full_name || report.reporter_name || "Usuário Anônimo"}
-                                                            description={reporter?.email || "Sem e-mail revelado"}
-                                                            right={
-                                                                report.reporter_user_id ? (
-                                                                    <Link
-                                                                        href={`/ddt-admin/users?view=${report.reporter_user_id}`}
-                                                                        className="text-xs font-bold text-brand-green hover:underline shrink-0"
-                                                                    >
-                                                                        Ver Usuário →
-                                                                    </Link>
-                                                                ) : undefined
-                                                            }
-                                                        />
-
-                                                        <div className="space-y-2 text-sm">
-                                                            <div className="flex justify-between">
-                                                                <span className="text-brand-inactive-text text-xs">ID do Denunciante</span>
-                                                                <span className="font-mono text-xs text-brand-dark dark:text-dark-heading">{report.reporter_user_id}</span>
-                                                            </div>
-                                                            {reporter?.profile?.phone && (
-                                                                <div className="flex justify-between">
-                                                                    <span className="text-brand-inactive-text text-xs">Telefone</span>
-                                                                    <span className="font-bold text-xs text-brand-dark dark:text-dark-heading">{reporter.profile.phone}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </FormSection>
+                                                    <AdminBuyerCard
+                                                        buyer={{
+                                                            full_name: reporter?.profile?.full_name || report.reporter_name,
+                                                            email: reporter?.email,
+                                                            phone: reporter?.profile?.phone,
+                                                        }}
+                                                        buyerId={report.reporter_user_id}
+                                                        customerName={reporter?.profile?.full_name || report.reporter_name}
+                                                    />
                                                 </div>
 
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Loja Vinculada ao Alvo
-                                                        </h3>
-                                                        {target?.store?.name ? (
-                                                            <div className="space-y-3">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center overflow-hidden shrink-0">
-                                                                        <StoreIcon className="w-6 h-6 text-brand-inactive-text" />
-                                                                    </div>
-                                                                    <div className="min-w-0">
-                                                                        <h3 className="font-bold text-base text-brand-dark dark:text-dark-heading truncate">
-                                                                            {target.store.name}
-                                                                        </h3>
-                                                                        {typeof target.risk_score === "number" && (
-                                                                            <span className="text-xs text-brand-inactive-text">
-                                                                                Pontuação de Risco: <strong>{target.risk_score} pts</strong>
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                                {target.store.id && (
-                                                                    <Link
-                                                                        href={getStoreUrl(target.store)}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="inline-block text-xs font-bold text-brand-green hover:underline"
-                                                                    >
-                                                                        Ver loja no marketplace →
-                                                                    </Link>
-                                                                )}
-                                                            </div>
-                                                        ) : (
+                                                    {target?.store?.name ? (
+                                                        <AdminStoreCard
+                                                            store={{
+                                                                name: target.store.name,
+                                                                risk_score: target.risk_score,
+                                                                id: target.store.id,
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
+                                                            <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
+                                                                Loja Vinculada ao Alvo
+                                                            </h3>
                                                             <p className="text-xs text-brand-inactive-text">
                                                                 Este tipo de alvo não possui uma loja vinculada ou os dados não estão disponíveis.
                                                             </p>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -647,25 +558,36 @@ export function AdminReportDetailView({
             </FadeIn>
 
             {/* Mobile bottom bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-2">
-                {report.status === "pending" ? (
-                    <>
-                        <Button variant="outline" className="flex-1" onClick={() => setDismissModalOpen(true)} disabled={isPending}>
-                            Descartar
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
                         </Button>
-                        <Button variant="destructive" className="flex-1" onClick={() => setResolveModalOpen(true)} disabled={isPending}>
-                            Validar
-                        </Button>
-                    </>
-                ) : report.status === "validated" ? (
-                    <Button variant="outline" className="flex-1" onClick={() => setRevertModalOpen(true)} disabled={isPending}>
-                        Reverter Validação (-5 pts)
-                    </Button>
-                ) : (
-                    <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
-                        Compartilhar
-                    </Button>
-                )}
+                    }>
+                        {report.status === "pending" && (
+                            <>
+                                <DropdownItem onClick={() => setDismissModalOpen(true)} disabled={isPending}>
+                                    <TrashIcon size={16} className="text-brand-inactive-text" /> Descartar
+                                </DropdownItem>
+                                <DropdownItem onClick={() => setSpamModalOpen(true)} disabled={isPending}>
+                                    <AlertTriangleIcon size={16} className="text-purple-600" /> Marcar Spam
+                                </DropdownItem>
+                                <DropdownItem onClick={() => setResolveModalOpen(true)} disabled={isPending}>
+                                    <CheckCircleIcon size={16} className="text-brand-green" /> Validar Denúncia
+                                </DropdownItem>
+                            </>
+                        )}
+                        {report.status === "validated" && (
+                            <DropdownItem onClick={() => setRevertModalOpen(true)} disabled={isPending}>
+                                <RotateCcwIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
+                            </DropdownItem>
+                        )}
+                        <DropdownItem onClick={handleShare}>
+                            <ShareIcon size={16} /> Compartilhar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                </div>
             </div>
 
             {/* Modal: Validar Denúncia */}
@@ -772,22 +694,6 @@ export function AdminReportDetailView({
                 </div>
             </DefaultModal>
         </>
-    )
-}
-
-const UserProfileAvatar = ({ reporter, name }: { reporter: any; name?: string }) => {
-    const initials = (reporter?.profile?.full_name || name || "U")
-        .split(" ")
-        .map((n: string) => n.charAt(0))
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-
-    return (
-        <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/40 border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-            <UserIcon className="w-5 h-5 text-brand-inactive-text" />
-            <span className="sr-only">{initials}</span>
-        </div>
     )
 }
 

@@ -665,21 +665,19 @@ function ModeCard({
     }
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
-            <ListItem
-                title="Gestão completa"
-                description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
-                icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
-                className="px-4 py-3"
-                right={
-                    <Button
-                        onClick={() => handleUpgrade("erp")}
-                    >
-                        {loading ? "Ativando..." : "Ativar"}
-                    </Button>
-                }
-            />
-        </div>
+        <ListItem
+            title="Gestão completa"
+            description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
+            icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
+            className="px-4 py-3"
+            right={
+                <Button
+                    onClick={() => handleUpgrade("erp")}
+                >
+                    {loading ? "Ativando..." : "Ativar"}
+                </Button>
+            }
+        />
     );
 }
 

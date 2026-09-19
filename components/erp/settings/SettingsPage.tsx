@@ -179,7 +179,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
         "subscription": "Minha Assinatura",
         "sales-settings": "Configurações de Vendas",
         "receipts": "Recibos e Impressão",
-        "payment-methods": "Formas de Pagamentos",
+        "payment-methods": "Formas de Pagamento",
         "comissao": "Comissão",
         "trocas": "Trocas e Devoluções",
         "vitrine": "Minha Vitrine",
@@ -356,10 +356,10 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
                                 icon={MoneyIcon}
                                 title={paymentsPlanBlocked ? (
                                   <span className="inline-flex items-center gap-2">
-                                    Formas de Pagamentos
+                                    Formas de Pagamento
                                     <img src={planStarIconForTarget("crescer")!} alt="" className="w-4 h-4 object-contain" />
                                   </span>
-                                ) : "Formas de Pagamentos"}
+                                ) : "Formas de Pagamento"}
                                 description="Configure os métodos de pagamento aceitos e as taxas de operadoras."
                                 onClick={() => navigateToSubpage("payment-methods")}
                                 showChevron
@@ -484,6 +484,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               onBack={() => navigateToSubpage("home")}
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
               storeId={selectedStore?.id}
+              orderFlow={(selectedStore as any)?.order_flow || (isQuick ? "whatsapp" : "dudit")}
             />
           )}
 

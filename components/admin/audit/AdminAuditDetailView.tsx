@@ -7,6 +7,7 @@ import {
     UserIcon,
     ArrowRightIcon,
     DatabaseIcon,
+    ThreeDotsIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -16,6 +17,8 @@ import {
     TabsTrigger,
     TabsContent,
     FormSection,
+    ActionsDropdown,
+    DropdownItem,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDateTime } from "@/lib/utils"
@@ -119,43 +122,13 @@ export function AdminAuditDetailView({
                                         </div>
 
                                         {/* Desktop action buttons */}
-                                        <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={handleShare}
-                                                leftIcon={<ShareIcon size={16} />}
-                                            >
-                                                Compartilhar
-                                            </Button>
+                                        <div className="hidden md:flex items-center gap-2.5 shrink-0 ml-3">
+                                            <ActionsDropdown>
+                                                <DropdownItem onClick={handleShare}>
+                                                    <ShareIcon size={16} /> Compartilhar
+                                                </DropdownItem>
+                                            </ActionsDropdown>
                                         </div>
-                                    </div>
-
-                                    {/* Title row - mobile */}
-                                    <div className="md:hidden flex items-center justify-between gap-3 py-3">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Button variant="filled" onClick={onBack} className="w-9 h-9 p-0 flex items-center justify-center shrink-0">
-                                                <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
-                                            </Button>
-                                            <div className="flex flex-col gap-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h1 className="text-lg font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        Log #{log.id.slice(0, 8)}
-                                                    </h1>
-                                                    {getActionBadge(log.action_type)}
-                                                </div>
-                                                <span className="text-xs text-brand-inactive-text truncate">
-                                                    {formatDateTime(log.created_at)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleShare}
-                                            className="shrink-0"
-                                        >
-                                            Compartilhar
-                                        </Button>
                                     </div>
 
                                     {/* Tabs */}
@@ -363,9 +336,17 @@ export function AdminAuditDetailView({
 
             {/* Mobile bottom bar */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={handleShare} leftIcon={<ShareIcon size={16} />}>
-                    Compartilhar
-                </Button>
+                <div className="flex-1">
+                    <ActionsDropdown trigger={
+                        <Button variant="outline" className="w-full h-12">
+                            <ThreeDotsIcon size={18} className="text-brand-inactive-text" />
+                        </Button>
+                    }>
+                        <DropdownItem onClick={handleShare}>
+                            <ShareIcon size={16} /> Compartilhar
+                        </DropdownItem>
+                    </ActionsDropdown>
+                </div>
             </div>
         </>
     )

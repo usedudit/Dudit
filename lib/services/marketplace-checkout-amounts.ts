@@ -79,10 +79,13 @@ export async function computeMarketplaceCheckoutAmounts(
   // Full order total based on pricing calculation
   const calculatedTotal = Number(priced.data.totalAmount || 0)
 
-  // If the line items in cart currently had pay_deposit_only active in DB,
-  // calculatedTotal is the deposit amount. Otherwise, it is the full order total.
+  // If the line items in cart currently had pay_deposit_only active in DB
+  // AND the resolver actually computed a depositAmount (adjusting unitPrice),
+  // calculatedTotal is the deposit amount. When depositAmount is null
+  // (services with payment_requirement "full_payment" or null), the resolver
+  // did NOT adjust unitPrice, so calculatedTotal is the full order total.
   const hasActiveDepositInLines = resolvedLines.some(
-    (l) => l.itemType === "service_booking" && l.payDepositOnly,
+    (l) => l.itemType === "service_booking" && l.payDepositOnly && l.depositAmount != null,
   )
 
   let fullOrderTotal = calculatedTotal

@@ -1,13 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input, FormDropdown, Checkbox, Button, Accordion, IconPlaceholder, RichTextEditor, TagsInput, FormSection, Badge, SidebarCard } from "@/components/reusable"
-import { PlusIcon, XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon, Package, CheckCircleIcon, EditIcon, ChevronDownIcon } from "@/lib/icons"
+import { XIcon, StoreIcon, ArrowUpDownIcon, TrashIcon, ChevronDownIcon } from "@/lib/icons"
 import ProductVideoSection from "@/components/erp/product/ProductVideoSection"
-import MarketplaceCategoryModal from "@/components/erp/product/MarketplaceCategoryModal"
-import { getCategoryPathClient } from "@/lib/data/marketplace-categories-client"
+import { OfficialCategoryCard } from "@/components/erp/OfficialCategoryCard"
 import { sanitizeRichText } from "@/lib/security/rich-text-sanitizer"
 
 interface ServiceMarketplaceTabProps {
@@ -24,29 +23,11 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
     serviceData, handleInputChange, isEditing, itemId, video, onVideoChange, videoPlanBlocked = false
 }) => {
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
-    const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-    const [categoryPath, setCategoryPath] = useState("")
 
-    useEffect(() => {
-        const fetchPath = async () => {
-            if (serviceData?.marketplace_category_id) {
-                const path = await getCategoryPathClient(serviceData.marketplace_category_id, "service")
-                if (path) setCategoryPath(path)
-            }
-        }
-        fetchPath()
-    }, [serviceData?.marketplace_category_id])
-
-    // --- Helper para simular evento nativo ---
     const manualChange = (name: string, value: any) => {
         handleInputChange({
             target: { name, value }
         })
-    }
-
-    const handleCategorySelect = (category: { id: string; name: string; path: string }) => {
-        manualChange("marketplace_category_id", category.id)
-        setCategoryPath(category.path)
     }
 
     const technicalDetails = Array.isArray(serviceData?.technical_details) ? serviceData.technical_details : []
@@ -176,16 +157,12 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
-                        {categoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-                        <p className="text-sm text-brand-dark dark:text-dark-heading font-medium mt-2">
-                            {categoryPath || "Nenhuma categoria oficial selecionada."}
-                        </p>
-                    </SidebarCard>
+                    <OfficialCategoryCard
+                        categoryId={serviceData?.marketplace_category_id}
+                        onChange={(id) => manualChange("marketplace_category_id", id)}
+                        type="service"
+                        isEditing={false}
+                    />
 
                     <SidebarCard title="Tags e Buscas">
                         {tags && tags.length > 0 ? (
@@ -410,46 +387,12 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         </div>
                     </FormSection>
 
-                    <FormSection
-                        title={
-                            <div className="flex items-center justify-between w-full">
-                                <span className="flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-brand-green" />
-                                    Categoria Oficial
-                                </span>
-                                {categoryPath && (
-                                    <span className="text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-300 px-2 py-1 rounded-full flex items-center gap-1">
-                                        <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                                    </span>
-                                )}
-                            </div>
-                        }
-                        description="Selecione onde seu serviço será exibido na árvore de categorias."
-                        hasSeparator
-                    >
-                        <div
-                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
-                            className={`
-                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                                ${categoryPath
-                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                                }
-                                ${!isEditing && "opacity-60 pointer-events-none"}
-                            `}
-                        >
-                            <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                    {categoryPath || "Selecionar categoria..."}
-                                </span>
-                                {categoryPath && <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">Clique para alterar</span>}
-                            </div>
-
-                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
-                            </div>
-                        </div>
-                    </FormSection>
+                    <OfficialCategoryCard
+                        categoryId={serviceData?.marketplace_category_id}
+                        onChange={(id) => manualChange("marketplace_category_id", id)}
+                        type="service"
+                        isEditing={isEditing}
+                    />
 
                     <FormSection
                         title="Tags e Buscas"
@@ -540,41 +483,12 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         </div>
                     </SidebarCard>
 
-                    {/* Card de Categoria Oficial */}
-                    <SidebarCard title={<><Package className="w-5 h-5 text-brand-green" /> Categoria Oficial</>}>
-                        {categoryPath && (
-                            <span className="text-xs font-medium bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                <CheckCircleIcon className="w-3 h-3" /> Categorizado
-                            </span>
-                        )}
-
-                        <p className="text-sm text-gray-500 mt-2 mb-4">
-                            Selecione onde seu serviço será exibido na árvore de categorias.
-                        </p>
-
-                        <div
-                            onClick={() => isEditing && setIsCategoryModalOpen(true)}
-                            className={`
-                                group relative w-full p-4 rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer flex items-center justify-between
-                                ${categoryPath
-                                    ? "border-brand-green/30 bg-brand-green/5 hover:bg-brand-green/10"
-                                    : "border-gray-300 hover:border-brand-green hover:bg-brand-gray dark:border-gray-600 dark:hover:bg-dark-border"
-                                }
-                                ${!isEditing && "opacity-60 pointer-events-none"}
-                            `}
-                        >
-                            <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${categoryPath ? "text-brand-dark dark:text-dark-heading" : "text-gray-400 group-hover:text-gray-600"}`}>
-                                    {categoryPath || "Selecionar categoria..."}
-                                </span>
-                                {categoryPath && <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-1 truncate">Clique para alterar</span>}
-                            </div>
-
-                            <div className={`p-2 rounded-full ${categoryPath ? "bg-white text-brand-green" : "bg-gray-100 text-gray-400 group-hover:bg-white group-hover:text-brand-green group-hover:shadow-sm"} transition-all`}>
-                                {categoryPath ? <EditIcon className="w-4 h-4" /> : <PlusIcon className="w-5 h-5" />}
-                            </div>
-                        </div>
-                    </SidebarCard>
+                    <OfficialCategoryCard
+                        categoryId={serviceData?.marketplace_category_id}
+                        onChange={(id) => manualChange("marketplace_category_id", id)}
+                        type="service"
+                        isEditing={isEditing}
+                    />
 
                     {/* Card de Tags */}
                     <SidebarCard title="Tags e Buscas">
@@ -590,12 +504,6 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     </SidebarCard>
                 </div>
 
-                <MarketplaceCategoryModal
-                    isOpen={isCategoryModalOpen}
-                    onClose={() => setIsCategoryModalOpen(false)}
-                    onSelect={handleCategorySelect}
-                    type="service"
-                />
             </div>
         </div>
     )

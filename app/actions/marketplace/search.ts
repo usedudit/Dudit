@@ -1193,7 +1193,7 @@ async function searchMarketplaceByCity(
             }
             return true
         })
-        partnerIds = partnersInRadius.map((p: any) => p.id)
+        partnerIds = [...new Set(partnersInRadius.flatMap((p: any) => [p.partner_id, p.id]).filter(Boolean))] as string[]
         filteredPartners = partnersInRadius
     } else {
         filteredPartners = allPartners

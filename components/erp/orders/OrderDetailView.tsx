@@ -657,7 +657,8 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const itemsBaseSubtotal = (sortedOrderItems || []).reduce(
         (sum: number, item: any) => sum + Number(item.subtotal || item.product_price * item.quantity || 0), 0
     )
-    const hasItemDiscount = isMarketplaceOrder && itemsBaseSubtotal > 0 && subtotalValue > 0 && Math.abs(itemsBaseSubtotal - subtotalValue) > 0.005
+    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly)
+    const hasItemDiscount = isMarketplaceOrder && !isDepositOrder && itemsBaseSubtotal > 0 && subtotalValue > 0 && Math.abs(itemsBaseSubtotal - subtotalValue) > 0.005
     const itemDiscountRatio = hasItemDiscount ? subtotalValue / itemsBaseSubtotal : 1
 
     const getItemDiscountedPrice = (item: any) => {

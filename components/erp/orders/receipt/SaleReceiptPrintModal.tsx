@@ -227,6 +227,21 @@ export default function SaleReceiptPrintModal({ isOpen, onClose, orderId }: Sale
                                                         }
                                                     />
                                                     <ListItem
+                                                        icon={PrinterIcon}
+                                                        title="Impressora térmica (58mm)"
+                                                        description="Bobina estreita de 58mm, comprovante compacto ideal para balcão e impressoras portáteis."
+                                                        onClick={() => setFormat("thermal-58")}
+                                                        className="px-4 py-3 gap-4"
+                                                        right={
+                                                            <RadioButton
+                                                                name={"format"}
+                                                                value={"thermal-58"}
+                                                                checked={format === "thermal-58"}
+                                                                onChange={() => setFormat("thermal-58")}
+                                                            />
+                                                        }
+                                                    />
+                                                    <ListItem
                                                         icon={FileTextIcon}
                                                         title="Documento A4 (PDF)"
                                                         description="Formato folha inteira A4, ideal para impressão comum, arquivamento e envio em PDF."
@@ -318,12 +333,14 @@ function PreviewPane({
     footerMessage: string
     showAcknowledgment: boolean
 }) {
-    if (format === "thermal") {
+    if (format === "thermal" || format === "thermal-58") {
+        const thermalWidth: "80mm" | "58mm" = format === "thermal-58" ? "58mm" : "80mm"
         return (
             <SaleReceiptThermalPreview
                 data={data}
                 footerMessage={footerMessage}
                 showAcknowledgment={showAcknowledgment}
+                thermalWidth={thermalWidth}
             />
         )
     }

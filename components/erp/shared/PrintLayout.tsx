@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/reusable"
 import { useEffect, useState } from "react"
-export type PrintPaperSize = "a4" | "letter" | "thermal"
+export type PrintPaperSize = "a4" | "letter" | "thermal" | "thermal-58"
 
 interface PrintLayoutProps {
     children: React.ReactNode
@@ -49,12 +49,14 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
     }, [])
 
     const isThermal = paperSize === "thermal"
-    const paperWidth = isThermal ? "80mm" : paperSize === "letter" ? "215.9mm" : "210mm"
-    const paperHeight = isThermal ? "auto" : paperSize === "letter" ? "279.4mm" : "297mm"
-    const pageSize = isThermal ? "auto" : paperSize === "letter" ? "Letter" : "A4"
+    const isThermal58 = paperSize === "thermal-58"
+    const paperWidth = isThermal58 ? "58mm" : isThermal ? "80mm" : paperSize === "letter" ? "215.9mm" : "210mm"
+    const paperHeight = isThermal || isThermal58 ? "auto" : paperSize === "letter" ? "279.4mm" : "297mm"
+    const pageSize = isThermal || isThermal58 ? "auto" : paperSize === "letter" ? "Letter" : "A4"
+    const thermalLabel = isThermal58 ? "Recibo Térmico (58mm)" : "Recibo Térmico (80mm)"
 
     return (
-        <div className={`bg-white text-black print:bg-white print:text-black ${isThermal ? "w-full max-w-[80mm] mx-auto min-h-0 h-auto" : "min-h-screen"}`}>
+        <div className={`bg-white text-black print:bg-white print:text-black ${isThermal ? "w-full max-w-[80mm] mx-auto min-h-0 h-auto" : isThermal58 ? "w-full max-w-[58mm] mx-auto min-h-0 h-auto" : "min-h-screen"}`}>
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -82,8 +84,11 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                                 color: #000000 !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
-                                width: ${paperWidth} !important;
-                                ${isThermal ? "min-height: auto !important; height: auto !important; max-width: 80mm !important;" : `height: ${paperHeight} !important;`}
+                                ${isThermal58
+                                    ? "width: 58mm !important; min-height: auto !important; height: auto !important; max-width: 58mm !important;"
+                                    : isThermal
+                                    ? "min-height: auto !important; height: auto !important; max-width: 80mm !important;"
+                                    : `height: ${paperHeight} !important;`}
                             }
                             
                             /* Hide browser-added headers and footers with valid page size */
@@ -106,14 +111,18 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                         /* Container styling for PDF preview & print */
                         .pdf-print-container {
                             width: 100%;
-                            ${isThermal ? "display: block;" : "display: flex; flex-direction: column; align-items: center;"}
+                            ${isThermal || isThermal58 ? "display: block;" : "display: flex; flex-direction: column; align-items: center;"}
                             background-color: #ffffff;
                             margin: 0 auto;
                         }
 
                         @media print {
                             .pdf-print-container {
-                                ${isThermal ? "display: block !important; width: 80mm !important; max-width: 80mm !important; margin: 0 auto !important;" : ""}
+                                ${isThermal
+                                    ? "display: block !important; width: 80mm !important; max-width: 80mm !important; margin: 0 auto !important;"
+                                    : isThermal58
+                                    ? "display: block !important; width: 58mm !important; max-width: 58mm !important; margin: 0 auto !important;"
+                                    : ""}
                             }
                             .sale-receipt-thermal-print {
                                 width: 80mm !important;
@@ -147,7 +156,7 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
             {/* Top Toolbar for manual print & close (hidden in print and headless mode) */}
             {!isHeadless && (
                 <div className="no-print sticky top-0 z-50 bg-dark-surface text-white px-4 py-2.5 flex items-center justify-between mb-3 text-xs font-sans">
-                    <span className="font-semibold">{isThermal ? "Recibo Térmico (80mm)" : "Documento para Impressão"}</span>
+                    <span className="font-semibold">{isThermal || isThermal58 ? thermalLabel : "Documento para Impressão"}</span>
                     <div className="flex items-center gap-2">
                         <Button
                             onClick={() => window.print()}

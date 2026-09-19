@@ -20,6 +20,7 @@ interface ProductImagesSectionProps {
     blockedImages?: Set<number>
     isSaving?: boolean
     moderationStatus?: 'approved' | 'pending_moderation' | 'rejected'
+    onImageClick?: (index: number) => void
 }
 
 function ProductImagesSection({
@@ -137,7 +138,11 @@ function ProductImagesSection({
                                         : "opacity-50 cursor-not-allowed"
                                     }
               `}
-                                onMouseEnter={() => setHoveredIndex(index)}
+                                 onClick={(e) => {
+                                        e.stopPropagation()
+                                        onImageClick?.(index)
+                                    }}
+                                    onMouseEnter={() => setHoveredIndex(index)}
                                 onMouseLeave={() => setHoveredIndex(null)}
                             >
                                 {uploadingImages.has(index) ? (

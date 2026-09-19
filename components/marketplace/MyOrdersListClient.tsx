@@ -47,7 +47,8 @@ function calculateDiscountedPrice(item: any, order: any) {
     const subtotalVal = Number(order.subtotal_value || 0) > 0
         ? Number(order.subtotal_value || 0)
         : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscount + pmDiscount - pmExtra
-    const hasItemDiscount = itemsBaseSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsBaseSubtotal - subtotalVal) > 0.005
+    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly)
+    const hasItemDiscount = !isDepositOrder && itemsBaseSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsBaseSubtotal - subtotalVal) > 0.005
     const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsBaseSubtotal : 1
     const basePrice = Number(item.product_price || 0)
     if (item.is_gift || item.is_promotional) return { discountedPrice: basePrice, hasItemDiscount: false, basePrice }

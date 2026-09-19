@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon } from '@/lib/icons';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon, MotorbikeIcon } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -1438,7 +1438,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
                         <TabsList className="mb-8">
                             <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
-                            {isDelivery && (
+                            {isDelivery && order.delivery_driver && (
                                 <TabsTrigger value="delivery">Entrega</TabsTrigger>
                             )}
                             <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
@@ -2072,7 +2072,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </FormSection>
                         </TabsContent>
 
-                        {isDelivery && (
+                        {isDelivery && order.delivery_driver && (
                             <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
                                 <div className="space-y-6">
                                     {/* Status da Entrega */}
@@ -2081,29 +2081,25 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             const ds = getDeliveryStatusLabel(order.delivery_status);
                                             const isPickup = order.delivery_type === "pickup";
                                             return (
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${ds.color} bg-brand-gray dark:bg-dark-border/50`}>
-                                                        <TruckIcon size={22} />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                            {isPickup ? "Retirada no estabelecimento" : ds.label}
-                                                        </p>
-                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                                            {isPickup
-                                                                ? "Seu pedido está pronto para ser retirado na loja."
-                                                                : order.delivery_status === "delivered"
-                                                                    ? "Seu pedido foi entregue com sucesso."
-                                                                    : order.delivery_status === "sent" || order.delivery_status === "out_for_delivery"
-                                                                        ? "Seu pedido está a caminho."
-                                                                        : order.delivery_status === "preparing"
-                                                                            ? "O vendedor está preparando seu pedido para envio."
-                                                                            : order.delivery_status === "delivery_failed"
-                                                                                ? "Houve uma falha na entrega do seu pedido."
-                                                                                : "Aguardando preparação para entrega."}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                                <ListItem
+                                                    icon={<MotorbikeIcon />}
+                                                    title={isPickup ? "Retirada no estabelecimento" : ds.label}
+                                                    description={
+                                                        isPickup
+                                                            ? "Seu pedido está pronto para ser retirado na loja."
+                                                            : order.delivery_status === "delivered"
+                                                                ? "Seu pedido foi entregue com sucesso."
+                                                                : order.delivery_status === "sent" ||
+                                                                    order.delivery_status === "out_for_delivery"
+                                                                    ? "Seu pedido está a caminho."
+                                                                    : order.delivery_status === "preparing"
+                                                                        ? "O vendedor está preparando seu pedido para envio."
+                                                                        : order.delivery_status === "delivery_failed"
+                                                                            ? "Houve uma falha na entrega do seu pedido."
+                                                                            : "Aguardando preparação para entrega."
+                                                    }
+                                                />
+
                                             );
                                         })()}
                                     </FormSection>
@@ -2497,6 +2493,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     />
                 )}
             </div>
-        </motion.div>
+        </motion.div >
     );
 };

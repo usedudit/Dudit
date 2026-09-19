@@ -136,13 +136,45 @@ export const SECTION_FILTERS: Record<string, SectionFilterMapping> = {
     },
 }
 
-export function getFilterConfig(sectionId: string | null, pageMode: PageMode): FilterConfig {
-    if (pageMode === "category") return SECTION_FILTERS.category.config
-    if (sectionId && SECTION_FILTERS[sectionId]) return SECTION_FILTERS[sectionId].config
-    return SECTION_FILTERS.default.config
+export function getFilterConfig(sectionId: string | null, pageMode: PageMode, currentType?: string): FilterConfig {
+    let base: FilterConfig
+
+    if (pageMode === "category") {
+        base = SECTION_FILTERS.category.config
+    } else if (sectionId && SECTION_FILTERS[sectionId]) {
+        base = SECTION_FILTERS[sectionId].config
+    } else {
+        base = SECTION_FILTERS.default.config
+    }
+
+    if (currentType === "vitrines") {
+        return { ...base, showPrice: false, showPromo: false }
+    }
+
+    if (currentType === "servicos") {
+        return { ...base, showPromo: false }
+    }
+
+    return base
 }
 
-export function getSortOptionsForMode(pageMode: PageMode, sectionId?: string | null): { value: SortOption; label: string }[] {
+export function getSortOptionsForMode(pageMode: PageMode, sectionId?: string | null, currentType?: string): { value: SortOption; label: string }[] {
+    if (currentType === "vitrines") {
+        return [
+            { value: "relevancia" as SortOption, label: "Relevância" },
+            { value: "recentes" as SortOption, label: "Mais Recentes" },
+        ]
+    }
+
+    if (currentType === "servicos") {
+        return [
+            { value: "relevancia" as SortOption, label: "Relevância" },
+            { value: "preco_menor" as SortOption, label: "Menor Preço" },
+            { value: "preco_maior" as SortOption, label: "Maior Preço" },
+            { value: "recentes" as SortOption, label: "Mais Recentes" },
+        ]
+    }
+
     const base = [
         { value: "relevancia" as SortOption, label: "Relevância" },
         { value: "preco_menor" as SortOption, label: "Menor Preço" },

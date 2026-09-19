@@ -18,6 +18,7 @@ type SaleReceiptThermalPreviewProps = {
     footerMessage: string
     showAcknowledgment?: boolean
     printMode?: boolean
+    thermalWidth?: "80mm" | "58mm"
 }
 
 export default function SaleReceiptThermalPreview({
@@ -25,6 +26,7 @@ export default function SaleReceiptThermalPreview({
     footerMessage,
     showAcknowledgment = true,
     printMode = false,
+    thermalWidth = "80mm",
 }: SaleReceiptThermalPreviewProps) {
     const grossTotal = data.itemsTotal || data.items.reduce((acc, item) => acc + item.totalPrice, 0)
     const isDeliveryFree = data.deliveryPayer === 'seller'
@@ -39,7 +41,7 @@ export default function SaleReceiptThermalPreview({
             className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : ""
                 }`}
             style={{
-                width: printMode ? "80mm" : "320px",
+                width: printMode ? thermalWidth : (thermalWidth === "58mm" ? "220px" : "320px"),
                 maxWidth: "100%",
                 boxSizing: "border-box",
                 color: "#000000",

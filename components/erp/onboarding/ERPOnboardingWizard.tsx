@@ -293,7 +293,7 @@ export function ERPOnboardingWizard({
                     alt="Dudit"
                     width={90}
                     height={28}
-                    className="h-7 w-auto hover:opacity-80 transition-opacity"
+                    className="h-7 w-auto"
                   />
                 </Link>
                 <button

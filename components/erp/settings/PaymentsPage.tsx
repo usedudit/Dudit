@@ -27,13 +27,16 @@ export function PaymentsPage({
     onBack,
     planGate,
     storeId,
+    orderFlow,
 }: {
     partner: any
     paymentMethods: any[]
     onBack: () => void
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
     storeId?: string | null
+    orderFlow?: "whatsapp" | "dudit"
 }) {
+    const isWhatsAppFlow = orderFlow === "whatsapp"
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const [activeTab, setActiveTab] = useState("formas")
@@ -288,6 +291,20 @@ export function PaymentsPage({
                                 <TabsContent value="configuracoes" className="mt-0 focus-visible:outline-none">
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                         <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12 space-y-12">
+                                            {isWhatsAppFlow && (
+                                                <InfoCard
+                                                    color="orange"
+                                                    message="Seu fluxo de pedidos está como WhatsApp. Estas configurações só terão efeito ao mudar o fluxo para Dudit."
+                                                />
+                                            )}
+
+                                            {!isWhatsAppFlow && depositEnabled && (
+                                                <InfoCard
+                                                    color="orange"
+                                                    message="Com sinal obrigatório ativo, o pagamento na retirada/entrega fica indisponível. O checkout aceita apenas Mercado Pago."
+                                                />
+                                            )}
+
                                             {/* Pagamento na retirada */}
                                             <FormSection title="Pagamento na retirada / entrega">
                                                 <div className="flex items-center justify-between py-3">
@@ -298,21 +315,14 @@ export function PaymentsPage({
                                                     <Switch
                                                         checked={depositEnabled ? false : pickupPaymentPolicy === "allow_pickup_payment"}
                                                         onCheckedChange={(checked) => {
-                                                            if (!depositEnabled) {
+                                                            if (!depositEnabled && !isWhatsAppFlow) {
                                                                 setPickupPaymentPolicy(checked ? "allow_pickup_payment" : "require_online_payment")
                                                             }
                                                         }}
-                                                        disabled={depositEnabled}
+                                                        disabled={depositEnabled || isWhatsAppFlow}
                                                     />
                                                 </div>
                                             </FormSection>
-
-                                            {depositEnabled && (
-                                                <InfoCard
-                                                    color="orange"
-                                                    message="Com sinal obrigatório ativo, o pagamento na retirada/entrega fica indisponível. O checkout aceita apenas Mercado Pago."
-                                                />
-                                            )}
 
                                             {/* Entrada (sinal) */}
                                             <FormSection title="Sinal (pagamento antecipado)" hasSeparator>
@@ -337,11 +347,11 @@ export function PaymentsPage({
                                                                     }
                                                                 }
                                                             }}
-                                                            disabled={!depositFeatureAllowed}
+                                                            disabled={!depositFeatureAllowed || isWhatsAppFlow}
                                                         />
                                                     </div>
 
-                                                    {!mpConnected && (
+                                                    {!mpConnected && !isWhatsAppFlow && (
                                                         <InfoCard
                                                             title="Mercado Pago não conectado"
                                                             message="Para cobrar sinal, é necessário ter o Mercado Pago conectado."
@@ -372,7 +382,9 @@ export function PaymentsPage({
                                                 <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
                                                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
                                                 <p className="text-xs text-brand-inactive-text mb-6">
-                                                    O recebimento do sinal é feito exclusivamente online via Mercado Pago no checkout.
+                                                    {isWhatsAppFlow
+                                                        ? "Configure seus métodos de pagamento para exibir na vitrine. O recebimento do sinal requer fluxo de pedidos via Dudit."
+                                                        : "O recebimento do sinal é feito exclusivamente online via Mercado Pago no checkout."}
                                                 </p>
 
                                                 <div className="space-y-6">

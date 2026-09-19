@@ -50,6 +50,7 @@ type ReturnReceiptThermalPreviewProps = {
     partnerHeader: SaleReceiptPartnerHeader
     partnerName: string
     printMode?: boolean
+    thermalWidth?: "80mm" | "58mm"
 }
 
 export default function ReturnReceiptThermalPreview({
@@ -57,6 +58,7 @@ export default function ReturnReceiptThermalPreview({
     partnerHeader,
     partnerName,
     printMode = false,
+    thermalWidth = "80mm",
 }: ReturnReceiptThermalPreviewProps) {
     const isExchange = returnRequest.desiredResolution === "exchange" || returnRequest.approvedResolution === "exchange"
     const title = isExchange ? "COMPROVANTE DE TROCA" : "COMPROVANTE DE DEVOLUÇÃO"
@@ -70,7 +72,7 @@ export default function ReturnReceiptThermalPreview({
             className={`thermal-receipt-root mx-auto break-inside-avoid ${printMode ? "sale-receipt-thermal-print" : ""
                 }`}
             style={{
-                width: printMode ? "80mm" : "320px",
+                width: printMode ? thermalWidth : (thermalWidth === "58mm" ? "220px" : "320px"),
                 maxWidth: "100%",
                 boxSizing: "border-box",
                 color: "#000000",

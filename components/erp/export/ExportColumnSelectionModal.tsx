@@ -25,20 +25,12 @@ export default function ExportColumnSelectionModal({
       maxWidth="md"
     >
       <div className="flex flex-col gap-4 pb-2">
-        <div className="flex items-start gap-3 p-3 bg-brand-muted dark:bg-dark-muted rounded-lg">
-          <AlertCircleIcon size={20} className="text-brand-warning shrink-0 mt-0.5" />
-          <p className="text-brand-body dark:text-dark-body text-sm">
-            Escolha quais colunas deseja incluir na exportação:
-          </p>
-        </div>
-
         <div className="flex flex-col gap-3 pt-2">
           <ListItem
             icon={ColumnsIcon}
             title="Colunas padrão"
             description="Colunas essenciais para análise rápida."
             className="px-4 py-3"
-            right={<Badge variant="gray">Essenciais</Badge>}
             onClick={() => onConfirm(false)}
           />
 
@@ -58,12 +50,12 @@ export default function ExportColumnSelectionModal({
               )
             }
             onClick={canExportAllColumns ? () => onConfirm(true) : undefined}
-            className={"px-4 py-3" + canExportAllColumns ? "" : "opacity-60 cursor-default"}
+            className={`px-4 py-3 ${canExportAllColumns ? "" : "opacity-60 cursor-default"}`}
           />
         </div>
 
         {!canExportAllColumns && (
-          <p className="text-sm text-brand-inactive-text dark:text-dark-muted text-center pt-2">
+          <p className="text-sm text-brand-inactive-text dark:text-dark-body text-center pt-2">
             A exportação com todas as colunas está disponível a partir do plano <strong>Crescer</strong>.
           </p>
         )}

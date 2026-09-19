@@ -235,12 +235,12 @@ function AuthContent() {
                     alt="Dudit"
                     width={90}
                     height={28}
-                    className="h-7 w-auto hover:opacity-80 transition-opacity"
+                    className="h-7 w-auto"
                   />
                 </Link>
                 <button
                   onClick={() => { setPageMode("auth"); updateUrlMode("login") }}
-                  className="text-xs font-semibold text-gray-900 hover:text-brand-green transition-colors"
+                  className="text-xs font-semibold text-brand-dark hover:text-brand-green transition-colors"
                 >
                   Já tem conta? Entrar
                 </button>

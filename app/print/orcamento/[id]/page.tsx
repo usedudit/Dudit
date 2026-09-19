@@ -4,17 +4,23 @@ import { getPartnerAddressAction } from "@/app/actions/erp/quotes"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import { requirePartnerAccessWithPermission } from "@/lib/auth/authorization"
 import QuotePreview from "@/components/erp/quotes/QuotePreview"
+import QuoteThermalPreview from "@/components/erp/quotes/QuoteThermalPreview"
 import PrintLayout from "@/components/erp/shared/PrintLayout"
 import { notFound, redirect } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 
 interface PageProps {
     params: Promise<{ id: string }>
+    searchParams: Promise<{
+        format?: string
+    }>
 }
 
-export default async function PrintOrcamentoPage({ params }: PageProps) {
+export default async function PrintOrcamentoPage({ params, searchParams }: PageProps) {
     const { id } = await params
-    
+    const resolvedSearchParams = await searchParams
+    const isThermal = resolvedSearchParams.format === "thermal" || resolvedSearchParams.format === "thermal-58"
+    const thermalWidth: "80mm" | "58mm" = resolvedSearchParams.format === "thermal-58" ? "58mm" : "80mm"
     const user = await getCurrentUser()
     if (!user) {
         redirect("/auth/login")
@@ -81,31 +87,61 @@ export default async function PrintOrcamentoPage({ params }: PageProps) {
     }
 
     return (
-        <PrintLayout>
-            <QuotePreview
-                invoiceNumber={quoteDetails.quote_number || ""}
-                quoteDate={quoteDetails.issue_date || ""}
-                expiryDate={quoteDetails.expiration_date || ""}
-                selectedCustomer={quoteDetails.customers}
-                quoteItems={formattedItems}
-                subtotal={Number(quoteDetails.subtotal || 0)}
-                shippingNum={Number(quoteDetails.shipping_cost || 0)}
-                otherCosts={Number(quoteDetails.additional_costs || 0)}
-                discountValue={Number(quoteDetails.discount_value || 0)}
-                total={Number(quoteDetails.total || 0)}
-                note={quoteDetails.notes || undefined}
-                partnerName={partnerName}
-                partnerAddress={partnerAddress}
-                partnerPhone={partnerPhone}
-                partnerAvatar={partnerAvatar}
-                printMode={true}
-                primaryColor={previewMeta.primaryColor}
-                secondaryColor={previewMeta.secondaryColor}
-                quoteTitle={previewMeta.quoteTitle}
-                quoteSubtitle={previewMeta.quoteSubtitle}
-                showDecoration={previewMeta.showDecoration}
-                salespersonName={quoteDetails.user_profiles?.full_name || undefined}
-            />
+        <PrintLayout paperSize={isThermal ? (resolvedSearchParams.format === "thermal-58" ? "thermal-58" : "thermal") : "a4"}>
+            {isThermal ? (
+                <div className={`w-[${thermalWidth}] max-w-[${thermalWidth}] print:w-[${thermalWidth}] print:max-w-[${thermalWidth}] mx-auto`}>
+                    <QuoteThermalPreview
+                        invoiceNumber={quoteDetails.quote_number || ""}
+                        quoteDate={quoteDetails.issue_date || ""}
+                        expiryDate={quoteDetails.expiration_date || ""}
+                        selectedCustomer={quoteDetails.customers}
+                        quoteItems={formattedItems}
+                        subtotal={Number(quoteDetails.subtotal || 0)}
+                        shippingNum={Number(quoteDetails.shipping_cost || 0)}
+                        otherCosts={Number(quoteDetails.additional_costs || 0)}
+                        discountValue={Number(quoteDetails.discount_value || 0)}
+                        total={Number(quoteDetails.total || 0)}
+                        note={quoteDetails.notes || undefined}
+                        partnerName={partnerName}
+                        partnerAddress={partnerAddress}
+                        partnerPhone={partnerPhone}
+                        partnerAvatar={partnerAvatar}
+                        printMode={true}
+                        thermalWidth={thermalWidth}
+                        primaryColor={previewMeta.primaryColor}
+                        secondaryColor={previewMeta.secondaryColor}
+                        quoteTitle={previewMeta.quoteTitle}
+                        quoteSubtitle={previewMeta.quoteSubtitle}
+                        showDecoration={previewMeta.showDecoration}
+                        salespersonName={quoteDetails.user_profiles?.full_name || undefined}
+                    />
+                </div>
+            ) : (
+                <QuotePreview
+                    invoiceNumber={quoteDetails.quote_number || ""}
+                    quoteDate={quoteDetails.issue_date || ""}
+                    expiryDate={quoteDetails.expiration_date || ""}
+                    selectedCustomer={quoteDetails.customers}
+                    quoteItems={formattedItems}
+                    subtotal={Number(quoteDetails.subtotal || 0)}
+                    shippingNum={Number(quoteDetails.shipping_cost || 0)}
+                    otherCosts={Number(quoteDetails.additional_costs || 0)}
+                    discountValue={Number(quoteDetails.discount_value || 0)}
+                    total={Number(quoteDetails.total || 0)}
+                    note={quoteDetails.notes || undefined}
+                    partnerName={partnerName}
+                    partnerAddress={partnerAddress}
+                    partnerPhone={partnerPhone}
+                    partnerAvatar={partnerAvatar}
+                    printMode={true}
+                    primaryColor={previewMeta.primaryColor}
+                    secondaryColor={previewMeta.secondaryColor}
+                    quoteTitle={previewMeta.quoteTitle}
+                    quoteSubtitle={previewMeta.quoteSubtitle}
+                    showDecoration={previewMeta.showDecoration}
+                    salespersonName={quoteDetails.user_profiles?.full_name || undefined}
+                />
+            )}
         </PrintLayout>
     )
 }

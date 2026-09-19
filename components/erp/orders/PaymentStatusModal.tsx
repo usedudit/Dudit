@@ -97,6 +97,8 @@ const TransactionReceiptContent = ({
     totalOrder,
     totalPaid,
     totalRemaining,
+    depositSummary,
+    orderNumber,
 }: any) => (
     <div className="bg-brand-gray dark:bg-dark-border/50 rounded-t-2xl p-6 pb-12 flex flex-col relative h-full border border-brand-border dark:border-dark-border border-b-0">
         <div className="mb-6 flex justify-between items-center">
@@ -123,6 +125,19 @@ const TransactionReceiptContent = ({
 
         <div className="mt-auto pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
             <div className="space-y-2 mb-6">
+                {depositSummary?.usesDeposit && depositSummary.initialChargeAmount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-brand-inactive-text dark:text-dark-body font-medium">
+                            Sinal{orderNumber ? ` - ${orderNumber}` : ""} ({depositSummary.depositPercent}%)
+                        </span>
+                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(depositSummary.initialChargeAmount)}
+                            <span className="text-xs font-normal text-brand-inactive-text ml-1">
+                                ({DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus})
+                            </span>
+                        </span>
+                    </div>
+                )}
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Total</span>
                     <span className="font-bold text-brand-dark dark:text-dark-heading">
@@ -224,7 +239,8 @@ export default function PaymentStatusModal({
     const totalOrder = targetOrder ? getOrderTotalAmount(targetOrder) : 0;
     const totalPaid = targetOrder ? getOrderPaidAmount(targetOrder) : 0;
     const totalRemaining = targetOrder ? getOrderRemainingBalance(targetOrder) : 0;
-    const frozen = targetOrder ? isOrderFinanciallyFrozen(targetOrder) : false;
+    const baseFrozen = targetOrder ? isOrderFinanciallyFrozen(targetOrder) : false;
+    const frozen = baseFrozen && !(depositSummary?.usesDeposit && totalRemaining > 0.009);
 
     const isMpOrder = Boolean(
         targetOrder?.payment_provider === "Mercado Pago" ||
@@ -294,6 +310,9 @@ export default function PaymentStatusModal({
     const cashChangeAmount = wantsChange && payWithAmount ? payWithAmount - Number(targetOrder?.total_amount || 0) : 0;
 
     const lockedMethod = useMemo(() => {
+        if (depositSummary?.usesDeposit && totalRemaining > 0.009) {
+            return null;
+        }
         const paidLeg = breakdown.find((leg) => {
             const m = leg.method;
             if (!m) return false;
@@ -310,9 +329,12 @@ export default function PaymentStatusModal({
             }
         }
         return null;
-    }, [targetOrder, breakdown]);
+    }, [targetOrder, breakdown, depositSummary, totalRemaining]);
 
     const lockedInstallments = useMemo(() => {
+        if (depositSummary?.usesDeposit && totalRemaining > 0.009) {
+            return 1;
+        }
         const matchingLeg = breakdown.find((leg) => {
             const legMethod = leg.method;
             if (!legMethod) return false;
@@ -320,7 +342,7 @@ export default function PaymentStatusModal({
             return !norm.includes('não definido') && !norm.includes('metodo nao definido') && !norm.includes('pendente') && !norm.includes('não informado') && !norm.includes('nao informado');
         });
         return matchingLeg?.installmentNumber || 1;
-    }, [breakdown]);
+    }, [breakdown, depositSummary, totalRemaining]);
 
     const pendingNewAmount = useMemo(
         () => pendingLegs.reduce((sum, leg) => sum + Number(leg.amountReceived ?? leg.amount ?? 0), 0),
@@ -527,6 +549,8 @@ export default function PaymentStatusModal({
                             totalOrder={totalOrder}
                             totalPaid={totalPaid}
                             totalRemaining={totalRemaining}
+                            depositSummary={depositSummary}
+                            orderNumber={targetOrder?.order_number}
                             itemCount={receiptCart.length}
                             customerName={targetOrder.customer_name}
                         />
@@ -573,12 +597,6 @@ export default function PaymentStatusModal({
                                     <div className="flex flex-col gap-4">
                                         {frozen && (
                                             <InfoCard color="orange" message={FINANCIAL_FREEZE_INFO_MESSAGE} />
-                                        )}
-                                        {depositSummary?.usesDeposit && (
-                                            <InfoCard
-                                                color="blue"
-                                                message={`Sinal${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""} (${depositSummary.depositPercent}%): ${formatCurrency(depositSummary.depositAmount)} · Cobrança inicial: ${formatCurrency(depositSummary.initialChargeAmount)} · ${DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus} · Restante: ${formatCurrency(depositSummary.remainingBalance)}${depositSummary.paymentProvider ? ` · via ${depositSummary.paymentProvider}` : ""}`}
-                                            />
                                         )}
                                         {wantsChange && payWithAmount !== null && (
                                             <InfoCard

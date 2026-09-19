@@ -28,6 +28,7 @@ import {
 } from "@/app/actions/erp/pdv"
 import { validateCouponAction } from "@/app/actions/shared/coupons"
 import { computeItemDisplayPrice, calculateOrderPricing } from "@/lib/services/pricing-engine"
+import { getServiceCheckoutSettingsAction } from "@/app/actions/marketplace/service-checkout-settings"
 import { createProductComprehensiveAction } from "@/app/actions/erp/products"
 import { openCashSessionAction } from "@/app/actions/erp/cash-register"
 import SelectCustomerSheet from "@/components/erp/clientes/SelectCustomerSheet"
@@ -281,6 +282,35 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
     const [appliedCouponDiscount, setAppliedCouponDiscount] = useState(0)
     const [appliedCouponCustomerScope, setAppliedCouponCustomerScope] = useState<string>("all")
     const [preSaleSearch, setPreSaleSearch] = useState("")
+
+    const [depositSettings, setDepositSettings] = useState<{ depositEnabled: boolean; depositPercentage: number }>({
+        depositEnabled: false,
+        depositPercentage: 50,
+    })
+
+    useEffect(() => {
+        if (!partnerId) return
+        let active = true
+        getServiceCheckoutSettingsAction(partnerId).then((res) => {
+            if (active && res?.success && res?.settings) {
+                setDepositSettings({
+                    depositEnabled: Boolean(res.settings.depositEnabled),
+                    depositPercentage: Number(res.settings.depositPercentage || 50),
+                })
+            }
+        })
+        return () => { active = false }
+    }, [partnerId])
+
+    const serviceSubtotal = useMemo(
+        () => cart.filter((item) => item.serviceId).reduce((sum, item) => sum + item.price * item.qty, 0),
+        [cart],
+    )
+    const depositChargeAmount = useMemo(() => {
+        if (!depositSettings.depositEnabled) return 0
+        const pct = (depositSettings.depositPercentage || 50) / 100
+        return Math.round(serviceSubtotal * pct * 100) / 100
+    }, [serviceSubtotal, depositSettings])
 
     const filteredPreSales = useMemo(() => {
         const query = preSaleSearch.trim().toLowerCase()
@@ -2163,6 +2193,9 @@ export default function POSPage({ partnerId, activeStoreId, initialData, initial
                                 headerSubtitle={PAYMENT_MODAL_HEADER_SUBTITLE}
                                 onConfirm={handleConfirmPayment}
                                 deliveryBreakdown={deliveryBreakdown}
+                                allowDepositCharge={depositSettings.depositEnabled && serviceSubtotal > 0.009}
+                                depositChargeAmount={depositChargeAmount}
+                                depositPercentage={depositSettings.depositPercentage}
                             />
                         )}
                     </AnimatePresence>

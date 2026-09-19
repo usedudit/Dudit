@@ -85,17 +85,21 @@ export default async function PrintTrocaPage({ params, searchParams }: PageProps
     const rawAvatar = storeRes.data?.logo_url || partnerRes.data?.store_image_url || undefined
     const partnerAvatar = rawAvatar ? getR2ImageUrl(rawAvatar) : undefined
 
-    const format = resolvedSearchParams.format === "thermal" ? "thermal" : "a4"
+    const rawFormat = resolvedSearchParams.format
+    const isThermal = rawFormat === "thermal" || rawFormat === "thermal-58"
+    const format = isThermal ? (rawFormat as "thermal" | "thermal-58") : "a4"
+    const thermalWidth: "80mm" | "58mm" = format === "thermal-58" ? "58mm" : "80mm"
 
     return (
-        <PrintLayout paperSize={format === "thermal" ? "thermal" : "a4"}>
-            {format === "thermal" ? (
-                <div className="w-[80mm] max-w-[80mm] print:w-[80mm] print:max-w-[80mm] mx-auto">
+        <PrintLayout paperSize={format === "thermal-58" ? "thermal-58" : format === "thermal" ? "thermal" : "a4"}>
+            {isThermal ? (
+                <div className={`w-[${thermalWidth}] max-w-[${thermalWidth}] print:w-[${thermalWidth}] print:max-w-[${thermalWidth}] mx-auto`}>
                     <ReturnReceiptThermalPreview
                         returnRequest={returnRequest}
                         partnerHeader={partnerHeader}
                         partnerName={partnerName}
                         printMode={true}
+                        thermalWidth={thermalWidth}
                     />
                 </div>
             ) : (
