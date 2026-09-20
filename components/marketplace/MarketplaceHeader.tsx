@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect, useMemo, memo, useCallback, useTransition } from "react"
 import Link from "next/link"
+import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { ShoppingBagIcon, MapPinIcon, ChevronDownIcon, SearchIcon, ChevronRightIcon, ChevronLeftIcon, Package, HeartIcon, ShareIcon, XIcon, MoonIcon, PlusIcon } from "@/lib/icons"
@@ -820,14 +821,14 @@ const Header: React.FC<HeaderProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <Link href="/sacola" prefetch={false} className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
+                                    <IntentPrefetchLink href="/sacola" className="shrink-0 relative text-white px-1 flex items-center justify-center cursor-pointer">
                                         <ShoppingBagIcon size={18} strokeWidth={2} />
                                         {cartCount > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 bg-brand-orange text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border border-brand-dark">
                                                 {cartCount}
                                             </span>
                                         )}
-                                    </Link>
+                                    </IntentPrefetchLink>
                                 </>
                             )}
                         </div>
@@ -837,9 +838,8 @@ const Header: React.FC<HeaderProps> = ({
                     {(!isScrolled && showDeliveryInfo && !isProductDetail) && (
                         <div className="flex items-center justify-between mt-2.5 px-1">
                             {user && userLocation ? (
-                                <Link
+                                <IntentPrefetchLink
                                     href="/perfil?tab=enderecos"
-                                    prefetch={false}
                                     className="flex items-center gap-1.5 text-brand-inactive-text cursor-pointer overflow-hidden hover:opacity-80 transition-opacity min-w-0 flex-1"
                                 >
                                     <MapPinIcon size={14} className="shrink-0 text-white" />
@@ -847,7 +847,7 @@ const Header: React.FC<HeaderProps> = ({
                                         Você está em {userLocation}
                                     </span>
                                     <ChevronRightIcon size={14} className="opacity-60 shrink-0 mt-0.5 text-white" />
-                                </Link>
+                                </IntentPrefetchLink>
                             ) : (
                                 <button
                                     type="button"
@@ -1047,15 +1047,14 @@ const Header: React.FC<HeaderProps> = ({
                 <BottomSheet isOpen={isMobileCategoryMenuOpen} onClose={() => setIsMobileCategoryMenuOpen(false)}>
                     <div className="flex flex-col py-2">
                         {navigationLinks.map((link) => (
-                            <Link
+                            <IntentPrefetchLink
                                 key={link.label}
                                 href={link.href}
-                                prefetch={false}
                                 onClick={() => setIsMobileCategoryMenuOpen(false)}
                                 className="px-6 py-3 text-[15px] font-normal text-brand-inactive-text hover:bg-brand-gray hover:text-brand-dark transition-colors"
                             >
                                 {link.label}
-                            </Link>
+                            </IntentPrefetchLink>
                         ))}
                         <div className="border-t border-gray-100 mt-2 pt-2">
                             <button
@@ -1073,7 +1072,7 @@ const Header: React.FC<HeaderProps> = ({
 
             <header className="hidden lg:flex flex-col w-full bg-brand-dark dark:bg-dark-surface border-b border-white/10 fixed top-0 left-0 right-0 z-[100] shadow-md">
                 <div className="w-full h-[68px] flex items-center justify-between max-w-[1400px] px-2 mx-auto gap-4">
-                    <Link href="/" prefetch={false} className="cursor-pointer shrink-0 z-[110] pt-1">
+                    <IntentPrefetchLink href="/" className="cursor-pointer shrink-0 z-[110] pt-1">
                         <img
                             src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
                             alt="Dudit"
@@ -1081,12 +1080,11 @@ const Header: React.FC<HeaderProps> = ({
                             height={40}
                             className="h-10 w-auto object-contain"
                         />
-                    </Link>
+                    </IntentPrefetchLink>
 
                     {user && userLocation ? (
-                        <Link
+                        <IntentPrefetchLink
                             href="/perfil?tab=enderecos"
-                            prefetch={false}
                             className="flex flex-col justify-center items-start text-white hover:bg-white/10 rounded-md px-2 py-1.5 cursor-pointer min-w-[140px] transition-colors -ml-1"
                         >
                             <span className="text-[11px] text-gray-300 leading-none ml-4 block mb-0.5">
@@ -1098,7 +1096,7 @@ const Header: React.FC<HeaderProps> = ({
                                     {userLocation}
                                 </span>
                             </div>
-                        </Link>
+                        </IntentPrefetchLink>
                     ) : (
                         <button
                             type="button"
@@ -1254,12 +1252,12 @@ const Header: React.FC<HeaderProps> = ({
 
                         {user && <NotificationBell variant="marketplace" />}
 
-                        <Link href="/pedidos" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                        <IntentPrefetchLink href="/pedidos" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <Package size={18} />
                             <span className="text-[13px] font-medium hidden xl:block">Pedidos</span>
-                        </Link>
+                        </IntentPrefetchLink>
 
-                        <Link href="/sacola" prefetch={false} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
+                        <IntentPrefetchLink href="/sacola" className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity text-white">
                             <div className="relative">
                                 <ShoppingBagIcon size={18} />
                                 {cartCount > 0 && (
@@ -1269,21 +1267,20 @@ const Header: React.FC<HeaderProps> = ({
                                 )}
                             </div>
                             <span className="text-[13px] font-medium hidden xl:block">Sacola</span>
-                        </Link>
+                        </IntentPrefetchLink>
                     </div>
                 </div>
 
                 <div className="w-full h-[40px] bg-brand-dark dark:bg-dark-surface flex items-center max-w-[1400px] mx-auto text-white text-[13px] border-t border-white/10">
                     <div className="flex items-center gap-1 h-full overflow-x-auto no-scrollbar">
                         {desktopNavigationLinks.map((link) => (
-                            <Link
+                            <IntentPrefetchLink
                                 key={link.label}
                                 href={link.href}
-                                prefetch={false}
                                 className="px-3 py-1.5 whitespace-nowrap rounded-full hover:bg-white/10 transition-all font-normal"
                             >
                                 {link.label}
-                            </Link>
+                            </IntentPrefetchLink>
                         ))}
                     </div>
 

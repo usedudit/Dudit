@@ -33,6 +33,7 @@ function ProductImagesSection({
     blockedImages = new Set(),
     isSaving = false,
     moderationStatus,
+    onImageClick,
 }: ProductImagesSectionProps) {
     const { toast } = useToast()
     const fileInputRef = useRef<HTMLInputElement>(null)

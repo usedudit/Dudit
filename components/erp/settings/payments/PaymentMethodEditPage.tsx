@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
@@ -527,7 +527,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                         {/* Right Column */}
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                            <SidebarCard hasTopStrip title="Taxas e Custos">
+                            <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
                                 <div className="grid grid-cols-1 gap-6">
                                     <FormDropdown
                                         label="Quem paga a taxa?"
@@ -559,7 +559,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                 </div>
                             </SidebarCard>
 
-                            <SidebarCard title="Preferências">
+                            <SidebarCard hasSeparator title="Preferências">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -976,7 +976,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                                 {/* Right Column */}
                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                    <SidebarCard hasTopStrip title="Taxas e Custos">
+                                    <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
                                         <div className="grid grid-cols-1 gap-6">
                                             <FormDropdown
                                                 label="Quem paga a taxa?"
@@ -1008,7 +1008,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         </div>
                                     </SidebarCard>
 
-                                    <SidebarCard title="Preferências">
+                                    <SidebarCard hasSeparator title="Preferências">
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <div>
@@ -1118,3 +1118,4 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
         </FadeIn>
     )
 }
+

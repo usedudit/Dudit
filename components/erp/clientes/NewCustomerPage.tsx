@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
@@ -1019,7 +1019,7 @@ onAddressFetched={(data) => {
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                                         {activeTab === 'general' ? (
                                             <div className="hidden lg:block space-y-8">
-                                                <SidebarCard hasTopStrip title="Imagem do Cliente">
+                                                <SidebarCard hasSeparator hasTopStrip title="Imagem do Cliente">
                                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                                         <div onClick={() => imageInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                                             {imagePreview ? (
@@ -1065,9 +1065,7 @@ onAddressFetched={(data) => {
                                                 </SidebarCard>
 
                                                 {personType === "Pessoa Física" && (
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mt-8 relative overflow-hidden">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Informações adicionais</h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Informações adicionais">
                                                         <div className="space-y-5">
                                                             <DatePicker
                                                                 label="Data de aniversário"
@@ -1099,7 +1097,7 @@ onAddressFetched={(data) => {
                                                                 maxLength={150}
                                                             />
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
                                                 )}
                                             </div>
                                         ) : activeTab === 'address' ? (
@@ -1192,3 +1190,4 @@ onAddressFetched={(data) => {
 }
 
 export default NewCustomerPage
+

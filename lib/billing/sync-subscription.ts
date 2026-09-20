@@ -1,10 +1,21 @@
+/**
+ * PRODUCTION - This is the canonical implementation for subscription billing sync.
+ *
+ * All webhooks, cron jobs, and manual actions MUST call this function to sync
+ * subscription state into billing_purchases, billing_payments, and billing_invoices.
+ *
+ * BACKUP/LEGACY alternatives (do NOT use in production):
+ * - scripts/sync-subscription-to-billing.sql (manual/dev/testing only)
+ * - SQL RPC sync_subscription_to_billing() in migrations (legacy, superseded by this)
+ */
+
 import { getAdminClient } from "@/lib/supabase/admin"
 import type { BillingPurchase } from "./types"
 import { logBillingAudit } from "./audit"
 import { generateInvoiceForPurchase } from "./invoice-generation"
 import { computeSubscriptionPeriods, periodKey } from "./subscription-period"
 
-type SyncContext = "webhook" | "manual" | "migration" | "dev_test"
+type SyncContext = "webhook" | "manual" | "migration" | "dev_test" | "reconciliation"
 
 const SUBSCRIPTION_PURCHASE_MAP: Record<string, string> = {
     active: "completed",

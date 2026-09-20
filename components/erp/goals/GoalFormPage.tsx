@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -498,7 +498,7 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
                             </div>
 
                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
-                                <SidebarCard title="Abrangência" hasTopStrip>
+                                <SidebarCard hasSeparator title="Abrangência" hasTopStrip>
                                     {abrangenciaContent}
                                 </SidebarCard>
                             </div>
@@ -582,3 +582,4 @@ export default function GoalFormPage({ partnerId, mode, sellers, accounts, initi
         </FadeIn>
     )
 }
+

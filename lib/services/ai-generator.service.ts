@@ -3,15 +3,22 @@ import { redis } from "@/lib/redis"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { SecureLogger } from "@/lib/secure-logger"
-import { getAiProvider } from "@/lib/ai/product-generation/providers"
+import { getAiProvider, getGroqProvider } from "@/lib/ai/product-generation/providers"
 import { extractLocalDataSimple } from "@/lib/ai/product-generation/local-extractor"
 import crypto from "crypto"
 
-// Configuração de limites diários por plano
+// Configuração de limites diários por plano (geração por texto)
 export const AI_GENERATION_LIMITS = {
   free: 0,
   crescer: 10,
   escalar: 50,
+} as const
+
+// Configuração de limites diários por plano (geração por imagem)
+export const AI_IMAGE_GENERATION_LIMITS = {
+  free: 0,
+  crescer: 10,
+  escalar: 25,
 } as const
 
 export interface GenerateInput {
@@ -21,6 +28,7 @@ export interface GenerateInput {
 }
 
 export interface GeneratedDetails {
+  name?: string
   brand: string
   description: string
   tags: string[]
@@ -361,6 +369,261 @@ export class AiGeneratorService {
         success: true,
         data: fallbackData,
         message: "IA temporariamente indisponível. Alguns campos foram preenchidos de forma básica com base no título."
+      }
+    }
+  }
+
+  /**
+   * Gera detalhes do produto analisando uma imagem via Groq + Llama 4 Scout.
+   * Retorna nome sugerido, preço, descrição, marca, tags, specs e categoria.
+   */
+  static async generateProductDetailsFromImage(
+    partnerId: string,
+    userId: string,
+    input: GenerateInput & { imageBase64: string; imageMimeType: string }
+  ): Promise<GenerationResult> {
+    const startTime = Date.now()
+    const { title, itemType = "product", imageBase64, imageMimeType } = input
+
+    if (!title || !title.trim()) {
+      return { success: false, error: "invalid_input", message: "O título não pode ser vazio." }
+    }
+
+    if (!imageBase64) {
+      return { success: false, error: "invalid_input", message: "A imagem é obrigatória para geração por IA." }
+    }
+
+    const hashed = crypto.createHash("sha256").update(`${title.trim().toLowerCase()}:${itemType}:img`).digest("hex")
+    const cacheKey = `ai:cache:prod_details_img:${partnerId}:${hashed}`
+    const todayStr = await getPartnerDateStr(partnerId)
+    const rateLimitKey = `ai:rate_limit_img:${partnerId}:${todayStr}`
+
+    try {
+      const plan = await getPartnerPlan(partnerId)
+      const planSlug = (plan?.slug || "free").toLowerCase() as keyof typeof AI_IMAGE_GENERATION_LIMITS
+      const limit = AI_IMAGE_GENERATION_LIMITS[planSlug] ?? 0
+
+      if (limit === 0) {
+        return {
+          success: false,
+          error: "plan_blocked",
+          message: "A geração por imagem não está inclusa no seu plano atual. Faça upgrade para o plano Crescer ou superior."
+        }
+      }
+
+      const currentUsage = (await redis.get<number>(rateLimitKey)) || 0
+      if (currentUsage >= limit) {
+        return {
+          success: false,
+          error: "limit_exceeded",
+          message: `Você atingiu o limite diário de ${limit} gerações por imagem do seu plano.`
+        }
+      }
+
+      // Verificar cache (24 horas)
+      const cachedData = await redis.get<GeneratedDetails>(cacheKey)
+      if (cachedData) {
+        SecureLogger.info("AI_IMAGE_GENERATION_CACHE_HIT", { partner_id: partnerId, user_id: userId, title })
+        return { success: true, data: cachedData, cached: true }
+      }
+
+      // Buscar categorias oficiais
+      const admin = getAdminClient()
+      const isProduct = itemType === "product"
+      const { data: dbCategories, error: catError } = await admin
+        .from(isProduct ? "marketplace_product_categories" : "marketplace_service_categories")
+        .select("id, name, parent_id")
+
+      if (catError) {
+        SecureLogger.warn("[AI IMAGE GENERATOR] Falha ao carregar categorias oficiais:", { error: catError.message })
+      }
+
+      const categoryList: Array<{ id: string; path: string }> = []
+      const categoryIdSet = new Set<string>()
+
+      if (dbCategories && dbCategories.length > 0) {
+        const catMap = new Map(dbCategories.map((c: any) => [c.id, c]))
+        for (const c of dbCategories) {
+          categoryIdSet.add(c.id)
+          let path = c.name
+          let current = c
+          while (current.parent_id && catMap.has(current.parent_id)) {
+            current = catMap.get(current.parent_id)
+            path = `${current.name} > ${path}`
+          }
+          categoryList.push({ id: c.id, path })
+        }
+      }
+
+      const categoriesContext = categoryList
+        .map((c) => `[ID: "${c.id}"] ${c.path}`)
+        .join("\n")
+
+      // Prompt multimodal para análise de imagem
+      const prompt = `
+        Você é um assistente especialista em e-commerce e marketplace local para cadastro de ${isProduct ? "produtos" : "serviços"}.
+        Sua tarefa é analisar a imagem fornecida JUNTO COM o título e gerar dados comerciais completos em formato JSON.
+
+        Título informado pelo usuário: "${title}"
+
+        IMPORTANTE: Use a imagem como fonte principal de informação. O título é apenas uma referência complementar.
+
+        Lista Oficial de Categorias Disponíveis (Selecione o ID mais adequado):
+        ${categoriesContext || "Nenhuma categoria disponível."}
+
+        Diretrizes de Geração:
+        1. NOME DO PRODUTO:
+           - Retorne o nome comercial correto do produto/serviço conforme identificado na imagem.
+           - Se a imagem mostrar um produto específico com nome visível, use ele.
+           - Caso contrário, melhore o título informado pelo usuário.
+
+        2. DESCRIÇÃO COMERCIAL:
+           - Escreva em português do Brasil, tom profissional e persuasivo.
+           - ${isProduct ? "Maximo 600 caracteres. Destaque utilidade, qualidade e diferenciais." : "Maximo 600 caracteres. Foque em confiança e atendimento."}
+
+        3. MARCA:
+           - Identifique a marca/fabricante visível na imagem ou mencionada no título.
+           - Se for genérico ou artesanal, retorne "".
+
+        4. TAGS ESTRATÉGICAS (SEO):
+           - Gere 6 a 10 tags em minúsculas e sem acentos.
+           - PROIBIDO tags genéricas como 'produto', 'servico', 'loja'.
+
+        5. ESPECIFICAÇÕES:
+           - Extraia atributos técnicos visíveis na imagem (Cor, Capacidade, Material, Tamanho, etc.).
+           - Máximo 8 atributos.
+
+        6. CATEGORIA:
+           - Selecione o ID mais compatível da lista oficial com confiança entre 0.0 e 1.0.
+           - Se não houver correspondência, retorne id "" e confidence 0.0.
+
+        Formato de Resposta (EXCLUSIVAMENTE JSON):
+        {
+          "name": string,
+          "description": string,
+          "brand": string,
+          "tags": string[],
+          "specs": { [key: string]: string },
+          "category": {
+            "id": string,
+            "confidence": number
+          }
+        }
+      `
+
+      // Usar Groq para análise de imagem
+      const groqProvider = getGroqProvider()
+      let apiResponseText = ""
+
+      try {
+        SecureLogger.info("[AI IMAGE GENERATOR] Analisando imagem com Groq + Llama 4 Scout")
+        const apiResult = await groqProvider.generateWithImage(
+          prompt,
+          imageBase64,
+          imageMimeType,
+          undefined,
+          { timeout: getAiTimeoutMs() }
+        )
+        apiResponseText = apiResult.text
+
+        const durationMs = Date.now() - startTime
+        SecureLogger.info("AI_IMAGE_GENERATION_SUCCESS", {
+          partner_id: partnerId,
+          user_id: userId,
+          model_used: apiResult.modelUsed,
+          duration_ms: durationMs,
+          tokens_prompt: apiResult.tokensPrompt,
+          tokens_completion: apiResult.tokensCompletion,
+        })
+      } catch (err: any) {
+        SecureLogger.warn(`[AI IMAGE GENERATOR] Falha no Groq: ${err.message}. Usando fallback por texto.`)
+        // Fallback: usar geração por texto se a imagem falhar
+        return this.generateProductDetails(partnerId, userId, { title, itemType })
+      }
+
+      if (!apiResponseText) {
+        throw new Error("Resposta vazia do Groq na análise de imagem.")
+      }
+
+      // Parsear resposta
+      const cleanedJson = cleanJsonResponse(apiResponseText)
+      const aiResponseObj = JSON.parse(cleanedJson)
+
+      const name = (aiResponseObj.name || "").trim().slice(0, 200)
+      const description = (aiResponseObj.description || "").trim().slice(0, 800)
+      const brand = (aiResponseObj.brand || "").trim()
+
+      let rawTags = Array.isArray(aiResponseObj.tags) ? aiResponseObj.tags : []
+      const bannedTags = new Set(["produto", "produtos", "servico", "servicos", "loja", "lojas", "qualidade", "novo", "venda", "comprar"])
+      const sanitizedTags = Array.from(
+        new Set(
+          rawTags
+            .map((t: any) => removeAccents(String(t).toLowerCase().trim()))
+            .filter((t: any) => t.length > 1 && !bannedTags.has(t))
+        )
+      ).slice(0, 10) as string[]
+
+      const rawSpecs = typeof aiResponseObj.specs === "object" && aiResponseObj.specs !== null ? aiResponseObj.specs : {}
+      const sanitizedSpecs: Record<string, string> = {}
+      let specCount = 0
+      for (const [key, val] of Object.entries(rawSpecs)) {
+        if (specCount >= 10) break
+        const cleanKey = String(key).trim()
+        const cleanVal = String(val).trim()
+        if (cleanKey && cleanVal) {
+          sanitizedSpecs[cleanKey] = cleanVal
+          specCount++
+        }
+      }
+
+      let finalCategoryId: string | null = null
+      const aiCategory = aiResponseObj.category || {}
+      const aiCategoryId = (aiCategory.id || "").trim()
+      const aiConfidence = Number(aiCategory.confidence || 0)
+
+      if (aiCategoryId && categoryIdSet.has(aiCategoryId) && aiConfidence >= 0.85) {
+        finalCategoryId = aiCategoryId
+      }
+
+      const finalDetails: GeneratedDetails = {
+        name: name || undefined,
+        brand,
+        description,
+        tags: sanitizedTags,
+        specs: sanitizedSpecs,
+        category: {
+          id: finalCategoryId,
+          confidence: aiConfidence,
+        }
+      }
+
+      // Salvar no cache
+      await redis.set(cacheKey, finalDetails, { ex: 24 * 3600 })
+
+      // Incrementar Rate Limit diário
+      await redis.incr(rateLimitKey)
+      await redis.expire(rateLimitKey, 48 * 3600)
+
+      return { success: true, data: finalDetails }
+
+    } catch (error: any) {
+      const durationMs = Date.now() - startTime
+      const errorMsg = error.message || "Erro na geração por imagem."
+
+      SecureLogger.error("AI_IMAGE_GENERATION_FAILED", {
+        partner_id: partnerId,
+        user_id: userId,
+        duration_ms: durationMs,
+        success: false,
+        error_message: errorMsg
+      })
+
+      // Fallback local
+      const fallbackData = extractLocalDataSimple(title)
+      return {
+        success: true,
+        data: fallbackData,
+        message: "Análise de imagem indisponível. Campos preenchidos de forma básica com base no título."
       }
     }
   }

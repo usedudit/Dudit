@@ -10,4 +10,5 @@ export const REPORT_TAGS = {
   marketing:    (pid: string, p = "monthly") => `report-marketing:${pid}:${p}`,
   produtividade:(pid: string, p = "monthly") => `report-produtividade:${pid}:${p}`,
   trocas:       (pid: string, p = "monthly") => `report-trocas:${pid}:${p}`,
+  agendamentos: (pid: string, p = "monthly") => `report-agendamentos:${pid}:${p}`,
 }

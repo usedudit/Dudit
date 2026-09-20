@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon } from "@/lib/icons"
@@ -1247,7 +1247,7 @@ export default function PromotionFormPage({
 
                                             {/* Right Column */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                <SidebarCard hasTopStrip title="Duração da Campanha">
+                                                <SidebarCard hasSeparator hasTopStrip title="Duração da Campanha">
                                                     <div className="space-y-5">
                                                         <DatePicker
                                                             label="Início da Vigência"
@@ -1542,7 +1542,7 @@ export default function PromotionFormPage({
 
                                                     {/* Right Column: Rule limits and status */}
                                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                                        <SidebarCard hasTopStrip title="Limitações">
+                                                        <SidebarCard hasSeparator hasTopStrip title="Limitações">
                                                             <div className="space-y-4">
                                                                 <Input
                                                                     label="Prioridade de Execução"
@@ -1728,3 +1728,4 @@ export default function PromotionFormPage({
         </FadeIn>
     )
 }
+

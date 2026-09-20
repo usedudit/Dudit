@@ -1,5 +1,6 @@
 import { OpenRouterProvider } from "./openrouter.provider"
 import { GeminiProvider } from "./gemini.provider"
+import { GroqProvider } from "./groq.provider"
 
 export interface AiProvider {
   /**
@@ -37,8 +38,17 @@ export function getAiProvider(providerName?: string): AiProvider {
   switch (name) {
     case "gemini":
       return new GeminiProvider()
+    case "groq":
+      return new GroqProvider()
     case "openrouter":
     default:
       return new OpenRouterProvider()
   }
+}
+
+/**
+ * Retorna o provedor Groq dedicado para análise de imagens.
+ */
+export function getGroqProvider(): GroqProvider {
+  return new GroqProvider()
 }

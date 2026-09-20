@@ -17,8 +17,12 @@ import {
     TabsTrigger,
     TabsContent,
     FormSection,
+    IconPlaceholder,
+    DefaultModal,
+    Input,
     ActionsDropdown,
     DropdownItem,
+    SidebarCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDateTime } from "@/lib/utils"
@@ -203,11 +207,7 @@ export function AdminAuditDetailView({
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                                     {/* Card do Alvo */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Alvo da Ação
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Alvo da Ação">
                                                         <div className="space-y-3">
                                                             <div className="flex flex-col min-w-0">
                                                                 <span className="text-xs text-brand-inactive-text uppercase tracking-wider font-semibold">
@@ -234,7 +234,7 @@ export function AdminAuditDetailView({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Card de Contexto Técnico */}
                                                     {(log.ip_address || log.user_agent) && (
@@ -299,11 +299,7 @@ export function AdminAuditDetailView({
                                                 </div>
 
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Resumo do Evento
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Resumo do Evento">
                                                         <div className="space-y-2.5 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text items-center gap-3">
                                                                 <span>Ação</span>
@@ -322,7 +318,7 @@ export function AdminAuditDetailView({
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>

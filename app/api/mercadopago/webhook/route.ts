@@ -263,14 +263,52 @@ async function processWebhookWithRetry(
           if (preapprovalId) {
             const { data: sub } = await supabase
               .from("subscriptions")
-              .select("id, status")
+              .select("id, status, partner_id, plan_id")
               .eq("mercado_pago_subscription_id", preapprovalId.toString())
               .maybeSingle()
 
             if (sub) {
+              const previousStatus = sub.status
               const targetStatus = authPayData.status === "approved" ? "active" : "past_due"
               await syncSubscriptionToBilling(sub.id, "webhook", targetStatus)
               console.log(`[WEBHOOK] ✅ Subscription ${sub.id} synced via authorized payment (${authPayData.status})`)
+
+              // Notify on renewal (approved payment)
+              if (authPayData.status === "approved" && previousStatus === "active") {
+                try {
+                  const { data: partner } = await supabase
+                    .from("partners")
+                    .select("user_id")
+                    .eq("id", sub.partner_id)
+                    .single()
+
+                  const { data: plan } = await supabase
+                    .from("plans")
+                    .select("name, price")
+                    .eq("id", sub.plan_id)
+                    .maybeSingle()
+
+                  if (partner?.user_id && plan && Number(plan.price || 0) > 0) {
+                    const { sendBillingNotification } = await import("@/lib/billing/notifications")
+                    await sendBillingNotification(
+                      "billing.subscription_renewed",
+                      partner.user_id,
+                      sub.partner_id,
+                      {
+                        message: `Sua assinatura do plano ${plan.name} foi renovada automaticamente.`,
+                        subscription_id: sub.id,
+                        mp_subscription_id: preapprovalId.toString(),
+                        plan_name: plan.name,
+                        plan_price: Number(plan.price || 0),
+                        is_paid: true,
+                      }
+                    )
+                  }
+                } catch (notifyErr: any) {
+                  console.error("[WEBHOOK] Failed to send renewal notification:", notifyErr.message)
+                }
+              }
+
               return
             }
           }
@@ -513,6 +551,9 @@ async function processWebhookWithRetry(
 
             // Log billing event
             try {
+              const minuteBucket = Math.floor(Date.now() / 60000)
+              const idempotencyKey = `subscription_reactivated:${saasSubscription.partner_id}:${saasSubscription.mercado_pago_subscription_id}:${minuteBucket}`
+
               await supabase.from("billing_events").insert({
                 partner_id: saasSubscription.partner_id,
                 event_type: "subscription_reactivated",
@@ -524,6 +565,7 @@ async function processWebhookWithRetry(
                   previous_status: "past_due",
                   payment_method: "pix",
                 },
+                idempotency_key: idempotencyKey,
               })
             } catch (billErr: any) {
               console.error("[WEBHOOK] Failed to log billing event:", billErr.message)

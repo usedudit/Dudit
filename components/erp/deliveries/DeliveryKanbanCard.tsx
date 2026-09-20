@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { ActionsDropdown } from "@/components/reusable"
+import { ActionsDropdown, Badge } from "@/components/reusable"
 import { formatCurrency, formatDate, formatTime } from "@/lib/utils"
 import { getDeliveryStatusMeta, getDeliveryStatusLabel } from "@/lib/orders/status"
-import { ClockIcon, MotorbikeIcon } from "@/lib/icons"
+import { ClockIcon, MoneyIcon, MotorbikeIcon } from "@/lib/icons"
 import { Tooltip } from "@/components/reusable"
 
 interface DeliveryKanbanCardProps {
@@ -65,29 +65,13 @@ export default function DeliveryKanbanCard({
       onDragStart={handleDragStart as any}
     >
       <div>
-        {/* Delivery Type Indicator: shown above the created-time row */}
-        <div className="flex items-center gap-1.5 text-[11px] text-brand-inactive-text dark:text-dark-body font-medium mb-2">
-          {isPlatformDriver ? (
-            <Tooltip text="Entregador da Rede Dudit">
-              <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-4 h-4 object-contain shrink-0 cursor-help" />
-            </Tooltip>
-          ) : (
-            <MotorbikeIcon size={12} className="shrink-0 text-brand-inactive-text dark:text-dark-body" />
-          )}
-          <span>
-            {isPlatformDriver ? "Rede Dudit" : delivery.deliveryPersonName ? "Com entregador" : "Entrega própria"}
-          </span>
-        </div>
-
         {/* Top Row: Created Date / Elapsed Time & Options */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-1 text-[11px] text-brand-inactive-text dark:text-dark-body font-medium">
             <ClockIcon size={12} className="shrink-0" />
             <span>Criada {elapsed}</span>
             {delivery.deliveryTimingLabel && (
-              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${delivery.deliveryTimingState === "late" ? "bg-red-50 text-brand-red dark:bg-red-950/20" : "bg-green-50 text-brand-green dark:bg-green-950/20"}`}>
-                {delivery.deliveryTimingLabel}
-              </span>
+              <Badge variant={delivery.deliveryTimingState === "late" ? "red" : "green"}>{delivery.deliveryTimingLabel}</Badge>
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -102,13 +86,17 @@ export default function DeliveryKanbanCard({
 
         {/* Title Row: ID & Order Count & Status Badge */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
-            {delivery.orderDisplayId}
-          </span>
-          {delivery.orderCount > 1 && (
-            <span className="bg-brand-slate dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0">
-              +{delivery.orderCount - 1} ped.
+          {delivery.orderCount === 1 ? (
+            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+              {delivery.orderDisplayId}
             </span>
+          ) : (
+            <>
+              <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                Múltiplos pedidos
+              </span>
+              <Badge variant="gray">{delivery.orderCount}</Badge>
+            </>
           )}
         </div>
 
@@ -136,13 +124,13 @@ export default function DeliveryKanbanCard({
               <span className="truncate">{delivery.deliveryPersonName}</span>
               {isPlatformDriver && (
                 <Tooltip text="Entregador da Rede Dudit">
-                  <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
+                  <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
                 </Tooltip>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1 text-brand-primary dark:text-brand-primary/80">
-              <MotorbikeIcon size={12} className="shrink-0" />
+            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
+              <MoneyIcon size={12} className="shrink-0" />
               <span>Entrega própria</span>
             </div>
           )}
@@ -150,13 +138,11 @@ export default function DeliveryKanbanCard({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <MotorbikeIcon size={12} className="shrink-0" />
-              <span>Taxa: <strong className="text-brand-primary">{formatCurrency(delivery.deliveryFee || 0)}</strong></span>
+              <span>Taxa: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(delivery.deliveryFee || 0)}</strong></span>
             </div>
 
             {delivery.estimatedDurationMinutes ? (
-              <span className="bg-brand-slate dark:bg-dark-border px-1.5 py-0.5 rounded text-[10px]">
-                {delivery.estimatedDurationMinutes} min
-              </span>
+              <Badge variant="gray" icon={<ClockIcon />}>{delivery.estimatedDurationMinutes} min</Badge>
             ) : null}
           </div>
 

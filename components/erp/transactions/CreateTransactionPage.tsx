@@ -1,5 +1,4 @@
 "use client"
-
 import React, { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -71,7 +70,6 @@ import {
     cancelRecurringTransactionAction,
     type RecurringFrequency,
 } from "@/app/actions/erp/recurring-transactions"
-
 export type CategoryItem = { id: string; name: string; parent_id: string | null; category_type?: "income" | "expense" | null }
 export type AccountItem = {
     id: string
@@ -81,9 +79,7 @@ export type AccountItem = {
     is_default?: boolean
     current_balance?: number | string | null
 }
-
 export type TxKind = "income" | "expense" | "transfer" | "adjustment" | "refund"
-
 interface CreateTransactionPageProps {
     partnerId: string
     storeId?: string | null
@@ -98,19 +94,15 @@ interface CreateTransactionPageProps {
     editRecurringTemplate?: any
     forcedTab?: TransactionTab
 }
-
 type ContactType = "customer" | "supplier" | "service" | "employee" | "partner" | "other"
 type TransactionMode = "single" | "installment" | "recurring"
-
 type QuickModal = null | "category" | "subcategory" | "account" | "contact"
-
 function toYmd(d: Date | string | undefined): string {
     if (!d) return ""
     const date = d instanceof Date ? d : new Date(d)
     if (isNaN(date.getTime())) return ""
     return format(date, "yyyy-MM-dd")
 }
-
 function formatLocalYmdToIso(ymd: string): string {
     if (!ymd) return new Date().toISOString()
     const todayYmd = format(new Date(), "yyyy-MM-dd")
@@ -120,16 +112,13 @@ function formatLocalYmdToIso(ymd: string): string {
     const localDate = new Date(`${ymd}T12:00:00`)
     return isNaN(localDate.getTime()) ? new Date().toISOString() : localDate.toISOString()
 }
-
 function normalizeName(value: string) {
     return value.trim().replace(/\s+/g, " ").toLowerCase()
 }
-
 function parseYmdToLocalNoon(ymd: string): Date {
     const [y, m, d] = ymd.split("-").map(Number)
     return new Date(y || 1970, (m || 1) - 1, d || 1, 12, 0, 0, 0)
 }
-
 function ymdAfterAddingPeriod(anchorYmd: string, frequency: RecurringFrequency, interval: number): string {
     const d = parseYmdToLocalNoon(anchorYmd)
     const iv = Math.max(Math.floor(Number(interval) || 1), 1)
@@ -139,18 +128,15 @@ function ymdAfterAddingPeriod(anchorYmd: string, frequency: RecurringFrequency, 
     else if (frequency === "yearly") d.setFullYear(d.getFullYear() + iv)
     return format(d, "yyyy-MM-dd")
 }
-
 function toMiddayIsoFromYmd(ymd: string): string {
     return parseYmdToLocalNoon(ymd).toISOString()
 }
-
 function installmentFrequencyLabel(frequency: RecurringFrequency, interval: number): string {
     const iv = Math.max(Math.floor(Number(interval) || 1), 1)
     const unit =
         frequency === "daily" ? "dia" : frequency === "weekly" ? "semana" : frequency === "monthly" ? "mês" : "ano"
     return iv === 1 ? `${unit}` : `${iv} ${unit}s`
 }
-
 const FormCombobox = ({
     label,
     value,
@@ -186,7 +172,6 @@ const FormCombobox = ({
         />
     )
 }
-
 export default function CreateTransactionPage({
     partnerId,
     storeId: storeIdProp,
@@ -211,7 +196,6 @@ export default function CreateTransactionPage({
     const [isScrolled, setIsScrolled] = useState(false)
     const [activeTab, setActiveTab] = useState("general")
     const [isSaving, setIsSaving] = useState(false)
-
     /* ── Edit mode computed flags ── */
     const isEditMode = !!editTransaction || !!editRecurringTemplate
     const isRecurringTemplateEdit = !!editRecurringTemplate
@@ -227,13 +211,10 @@ export default function CreateTransactionPage({
     const isInstallmentTransaction = !!editTransaction?.installmentGroupId
     const isRecurringTransaction = !!editTransaction && !!editTransaction.recurringId
     const isSalesOrigin = !!editTransaction && String(editTransaction.category || "").toLowerCase() === "vendas"
-
     const [draftTransactionId] = useState(() => crypto.randomUUID())
     const transactionId = editTransaction?.id || draftTransactionId
-
     const [stagedDocFiles, setStagedDocFiles] = useState<File[]>([])
     const [stagedImageFiles, setStagedImageFiles] = useState<(string | File)[]>([])
-
     const uploadStagedAttachments = async (targetTxId: string) => {
         if (stagedDocFiles.length === 0 && stagedImageFiles.length === 0) return
         const res = await uploadAndSavePendingAttachments({
@@ -247,7 +228,6 @@ export default function CreateTransactionPage({
             console.error("Aviso no upload de anexos:", res.errors)
         }
     }
-
     const [txKind, setTxKind] = useState<TxKind>(() => {
         if (editRecurringTemplate) return editRecurringTemplate.type || "income"
         if (editTransaction) return editTransaction.transactionType || "income"
@@ -276,7 +256,6 @@ export default function CreateTransactionPage({
     const [paymentMethodId, setPaymentMethodId] = useState<string | undefined>(() => editRecurringTemplate?.payment_method_id ?? editTransaction?.paymentMethodId ?? undefined)
     const [contactType, setContactType] = useState<ContactType>(() => editRecurringTemplate?.contact_type || "customer")
     const [notes, setNotes] = useState(() => editTransaction?.notes || "")
-
     const [contactRows, setContactRows] = useState<TransactionContactRow[]>([])
     const [contactsLoading, setContactsLoading] = useState(false)
     const [selectedContactId, setSelectedContactId] = useState<string | undefined>(undefined)
@@ -285,11 +264,9 @@ export default function CreateTransactionPage({
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(() => new Set())
     const [showDiscardModal, setShowDiscardModal] = useState(false)
     const [cancelRecurringOpen, setCancelRecurringOpen] = useState(false)
-
     const [adjustmentTargetBalance, setAdjustmentTargetBalance] = useState(0)
     const [refundKind, setRefundKind] = useState<"expense_refund" | "revenue_refund">(() => editTransaction?.refundKind || "expense_refund")
     const [referenceNote, setReferenceNote] = useState(() => editTransaction?.referenceNote || "")
-
     const [enableRecurrence, setEnableRecurrence] = useState(() => !!editRecurringTemplate)
     const [transactionMode, setTransactionMode] = useState<TransactionMode>(() => (editRecurringTemplate ? "recurring" : "single"))
     const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurringFrequency>(() => editRecurringTemplate?.frequency || "monthly")
@@ -302,7 +279,6 @@ export default function CreateTransactionPage({
     const [installmentsCount, setInstallmentsCount] = useState(2)
     const [installmentFrequency, setInstallmentFrequency] = useState<RecurringFrequency>("monthly")
     const [installmentInterval, setInstallmentInterval] = useState(1)
-
     const [quickModal, setQuickModal] = useState<QuickModal>(null)
     const [quickSaving, setQuickSaving] = useState(false)
     const [quickName, setQuickName] = useState("")
@@ -314,7 +290,6 @@ export default function CreateTransactionPage({
     const pendingCloseRef = useRef<(() => void) | null>(null)
     const skipTransferBalanceCheckRef = useRef(false)
     const skipBalanceWarningRef = useRef(false)
-
     const [transferInsufficientOpen, setTransferInsufficientOpen] = useState(false)
     const [transferInsufficientMeta, setTransferInsufficientMeta] = useState({ fromBal: 0, amount: 0 })
     const [balanceWarningOpen, setBalanceWarningOpen] = useState(false)
@@ -329,19 +304,16 @@ export default function CreateTransactionPage({
     const [adjustFromTransferSaving, setAdjustFromTransferSaving] = useState(false)
     const isQuickModalCloseLocked = quickSaving
     const isAdjustModalCloseLocked = adjustFromTransferSaving
-
     const defaultDayYmd = useMemo(() => format(new Date(), "yyyy-MM-dd"), [])
     const defaultRecurrenceNext = useMemo(
         () => ymdAfterAddingPeriod(format(new Date(), "yyyy-MM-dd"), "monthly", 1),
         [],
     )
-
     const activeAccounts = useMemo(() => accounts.filter((a) => a.is_active), [accounts])
     const accountOptions = useMemo(
         () => activeAccounts.map((a) => ({ value: a.id, label: a.name })),
         [activeAccounts],
     )
-
     const paymentMethodOptions = useMemo(() => {
         const options = [...STANDARD_PAYMENT_METHODS]
         const current = paymentMethodId || paymentType || ""
@@ -352,7 +324,6 @@ export default function CreateTransactionPage({
         }
         return options
     }, [paymentMethodId, paymentType, paymentMethods])
-
     const getAccountBalance = useCallback(
         (id?: string) => {
             if (!id) return 0
@@ -365,7 +336,6 @@ export default function CreateTransactionPage({
         },
         [activeAccounts],
     )
-
     const isDirty = useMemo(() => {
         if (isEditMode) {
             const iTxKind = editRecurringTemplate ? (editRecurringTemplate.type || "income") : editTransaction?.transactionType || "income"
@@ -380,7 +350,6 @@ export default function CreateTransactionPage({
             const iDueDate = editRecurringTemplate?.start_date?.slice(0, 10) || (editTransaction?.dueDateRaw ? editTransaction.dueDateRaw.slice(0, 10) : defaultDayYmd)
             const iPaymentDate = editTransaction?.paymentDateRaw ? editTransaction.paymentDateRaw.slice(0, 10) : defaultDayYmd
             const iContactType = editRecurringTemplate?.contact_type || "customer"
-
             if (txKind !== iTxKind) return true
             if (amount !== iAmount) return true
             if (description !== iDescription) return true
@@ -393,10 +362,8 @@ export default function CreateTransactionPage({
             if (dueDate !== iDueDate) return true
             if (paymentDate !== iPaymentDate) return true
             if (contactType !== iContactType) return true
-
             return false
         }
-
         // Original logic for create mode
         if (description.trim()) return true
         if (txKind === "adjustment") {
@@ -465,9 +432,7 @@ export default function CreateTransactionPage({
         recurrenceNextRunYmd,
         defaultRecurrenceNext,
     ])
-
     const { showConfirmDialog: unsavedChangesDialogOpen, confirmNavigation: handleUnsavedChangesConfirm, cancelNavigation: handleUnsavedChangesDialogClose } = useUnsavedChanges(isDirty)
-
     const handleBack = useCallback(() => {
         if (isDirty) {
             setShowDiscardModal(true)
@@ -475,10 +440,8 @@ export default function CreateTransactionPage({
             onBack()
         }
     }, [isDirty, onBack])
-
     const { setHeaderOverride } = useSidebar()
     const pageTitle = isRecurringTemplateEdit ? "Editar recorrência" : isEditMode ? "Editar transação" : "Nova transação"
-
     useEffect(() => {
         setHeaderOverride({
             title: pageTitle,
@@ -487,21 +450,17 @@ export default function CreateTransactionPage({
         })
         return () => setHeaderOverride(null)
     }, [pageTitle, handleBack, setHeaderOverride])
-
     const confirmDiscard = useCallback(() => {
         setShowDiscardModal(false)
         onBack()
     }, [onBack])
-
     const isIncomeExpense = txKind === "income" || txKind === "expense"
     const needsContactPanel = isIncomeExpense || txKind === "refund"
     const recurringModeEnabled = transactionMode === "recurring"
     const installmentModeEnabled = transactionMode === "installment"
-
     useEffect(() => {
         if (contactType !== "customer") setSelectedCustomer(null)
     }, [contactType])
-
     useEffect(() => {
         if (!editRecurringTemplate) return
         if (editRecurringTemplate.customer_id) {
@@ -518,21 +477,17 @@ export default function CreateTransactionPage({
             pendingSelectContactIdRef.current = editRecurringTemplate.contact_id
         }
     }, [editRecurringTemplate])
-
     useEffect(() => {
         if (txKind === "adjustment" || txKind === "transfer") setStatus("paid")
     }, [txKind])
-
     useEffect(() => {
         if (txKind !== "adjustment" || !accountId) return
         setAdjustmentTargetBalance(getAccountBalance(accountId))
     }, [txKind, accountId, getAccountBalance])
-
     const transferFromAccountName = useMemo(
         () => activeAccounts.find((a) => a.id === fromAccountId)?.name || "Conta de origem",
         [activeAccounts, fromAccountId],
     )
-
     const parentCategories = useMemo(() => categories.filter((c) => !c.parent_id), [categories])
     const visibleParentCategories = useMemo(() => {
         if (txKind === "income") return parentCategories.filter((c) => c.category_type === "income")
@@ -547,12 +502,10 @@ export default function CreateTransactionPage({
         () => String(parentCategories.find((c) => c.id === categoryId)?.name || "").trim(),
         [parentCategories, categoryId],
     )
-
     const contactComboboxOptions = useMemo(
         () => contactRows.map((c) => ({ value: c.id, label: c.name })),
         [contactRows],
     )
-
     useEffect(() => {
         if (!needsContactPanel) {
             setContactRows([])
@@ -587,11 +540,9 @@ export default function CreateTransactionPage({
             cancelled = true
         }
     }, [partnerId, contactType, needsContactPanel])
-
     useEffect(() => {
         if (!isIncomeExpense) setEnableRecurrence(false)
     }, [isIncomeExpense])
-
     useEffect(() => {
         if (!isIncomeExpense) {
             setTransactionMode("single")
@@ -601,26 +552,20 @@ export default function CreateTransactionPage({
         if (transactionMode === "recurring") setEnableRecurrence(true)
         else setEnableRecurrence(false)
     }, [isIncomeExpense, transactionMode])
-
     useEffect(() => {
         if (!enableRecurrence || !isIncomeExpense || isRecurringTemplateEdit) return
         setRecurrenceNextRunYmd(dueDate)
     }, [enableRecurrence, dueDate, isIncomeExpense, isRecurringTemplateEdit])
-
     const dueDateYmdParts = useMemo(() => {
         const [y, m, d] = dueDate.split("-").map(Number)
         return { month: m || 1, day: d || 1 }
     }, [dueDate])
-
     const handleScroll = useCallback(() => {
         if (scrollContainerRef.current) setIsScrolled(scrollContainerRef.current.scrollTop > 5)
     }, [])
-
     const paidLabel =
         txKind === "expense" || (txKind === "refund" && refundKind === "revenue_refund") ? "Pago" : "Recebido"
-
     const refreshLists = () => debouncedRefresh()
-
     const openQuickCategory = () => {
         setQuickName("")
         setQuickModal("category")
@@ -643,7 +588,6 @@ export default function CreateTransactionPage({
         setNewContactDesc("")
         setQuickModal("contact")
     }
-
     const handleQuickSave = async () => {
         if (quickModal === "category") {
             if (!quickName.trim()) return error("Nome obrigatório")
@@ -738,7 +682,6 @@ export default function CreateTransactionPage({
             }
         }
     }
-
     const collectValidationErrors = useCallback((): Set<string> => {
         const e = new Set<string>()
         if (isCancelledTx) return e
@@ -794,7 +737,6 @@ export default function CreateTransactionPage({
         adjustmentTargetBalance,
         getAccountBalance,
     ])
-
     const contactPayload = useCallback(() => {
         if (contactType === "customer" && selectedCustomer) {
             return {
@@ -823,7 +765,6 @@ export default function CreateTransactionPage({
             contactTypeResolved: contactType,
         }
     }, [contactType, selectedCustomer, selectedContactId])
-
     const handleSave = async () => {
         const errs = collectValidationErrors()
         if (errs.size > 0) {
@@ -833,7 +774,6 @@ export default function CreateTransactionPage({
             return
         }
         setFieldErrors(new Set())
-
         /* ── Insufficient balance check for transactions with positive amount and selected account ── */
         if (txKind !== "transfer" && txKind !== "adjustment") {
             if (!skipBalanceWarningRef.current && amount > 0 && accountId) {
@@ -852,7 +792,6 @@ export default function CreateTransactionPage({
             }
             skipBalanceWarningRef.current = false
         }
-
         /* ── EDIT MODE: update existing recurring template ── */
         if (isRecurringTemplateEdit && editRecurringTemplateId) {
             setIsSaving(true)
@@ -896,14 +835,12 @@ export default function CreateTransactionPage({
             }
             return
         }
-
         /* ── EDIT MODE: update existing transaction ── */
         if (isEditMode && editTransaction) {
             setIsSaving(true)
             try {
                 const cp = contactPayload()
                 const patch: Record<string, unknown> = {}
-
                 if (isCancelledTx) {
                     patch.notes = notes || null
                 } else if (isInstallmentTransaction) {
@@ -911,18 +848,15 @@ export default function CreateTransactionPage({
                     patch.accountId = accountId || null
                     patch.paymentMethodId = paymentMethodId || null
                 } else {
-
                     // Always allow these
                     patch.description = description.trim()
                     patch.notes = notes || null
-
                     if (!isPaidTransaction) {
                         patch.categoryId = categoryId || null
                         patch.subcategoryId = subcategoryId || null
                         patch.status = status
                         patch.paymentDate = status === "paid" ? formatLocalYmdToIso(paymentDate) : null
                     }
-
                     // Only allow financial fields if NOT locked
                     if (!lockFinancialFields) {
                         patch.amount = amount
@@ -935,16 +869,13 @@ export default function CreateTransactionPage({
                         patch.transactionDate = isSalesOrigin ? (paymentDate ? formatLocalYmdToIso(paymentDate) : null) : (dueDate ? toMiddayIsoFromYmd(dueDate) : null)
                     }
                 }
-
                 const res = await updateManualTransactionAction(
                     editTransaction.id,
                     partnerId,
                     patch as any,
                 )
                 if (!res.success) return error(res.error || "Erro ao atualizar transação")
-                
                 await uploadStagedAttachments(editTransaction.id)
-                
                 success("Transação atualizada com sucesso!")
                 onSuccess?.()
                 debouncedRefresh()
@@ -954,9 +885,7 @@ export default function CreateTransactionPage({
             }
             return
         }
-
         /* ── CREATE MODE (original logic below) ── */
-
         if (txKind === "transfer") {
             const fromBal = getAccountBalance(fromAccountId)
             if (
@@ -970,7 +899,6 @@ export default function CreateTransactionPage({
                 return
             }
             skipTransferBalanceCheckRef.current = false
-
             setIsSaving(true)
             try {
                 const res = await createTransferPairAction({
@@ -996,7 +924,6 @@ export default function CreateTransactionPage({
             }
             return
         }
-
         if (txKind === "adjustment") {
             const cur = getAccountBalance(accountId)
             const signed = Math.round((adjustmentTargetBalance - cur) * 100) / 100
@@ -1040,7 +967,6 @@ export default function CreateTransactionPage({
             }
             return
         }
-
         if (txKind === "refund") {
             const cp = contactPayload()
             setIsSaving(true)
@@ -1080,7 +1006,6 @@ export default function CreateTransactionPage({
             }
             return
         }
-
         const cp = contactPayload()
         setIsSaving(true)
         try {
@@ -1088,7 +1013,6 @@ export default function CreateTransactionPage({
                 const iv = Math.max(Math.floor(Number(recurrenceInterval) || 1), 1)
                 const startIso = toMiddayIsoFromYmd(dueDate)
                 const endIso = recurrenceEndYmd.trim() ? toMiddayIsoFromYmd(recurrenceEndYmd.trim()) : null
-
                 const recRes = await createRecurringTransactionAction({
                     partnerId,
                     storeId,
@@ -1139,12 +1063,10 @@ export default function CreateTransactionPage({
                 onBack()
                 return
             }
-
             if (installmentModeEnabled) {
                 const iv = Math.max(Math.floor(Number(installmentInterval) || 1), 1)
                 const count = Math.max(1, Math.floor(Number(installmentsCount) || 1))
                 if (count > 48) return error("Máximo de 48 parcelas.")
-
                 const installmentRes = await createInstallmentGroupAction({
                     partnerId,
                     storeId,
@@ -1177,7 +1099,6 @@ export default function CreateTransactionPage({
                 onBack()
                 return
             }
-
             const res = await createManualTransactionAction({
                 id: transactionId,
                 partnerId,
@@ -1201,7 +1122,6 @@ export default function CreateTransactionPage({
                 notes: notes || null,
                 origin: "manual",
             })
-
             if (!res.success) return error(res.error || "Erro ao salvar transação")
             const createdTxId = (res.data as { id?: string } | undefined)?.id || transactionId
             await uploadStagedAttachments(createdTxId)
@@ -1213,7 +1133,6 @@ export default function CreateTransactionPage({
             setIsSaving(false)
         }
     }
-
     const handleConfirmCancelRecurring = useCallback(() => {
         if (!editRecurringTemplateId) return
         void (async () => {
@@ -1235,7 +1154,6 @@ export default function CreateTransactionPage({
             }
         })()
     }, [editRecurringTemplateId, partnerId, error, success, onSuccess, debouncedRefresh, onBack])
-
     const typeButtons: {
         id: TxKind
         label: string
@@ -1289,13 +1207,11 @@ export default function CreateTransactionPage({
                 icon: <ReturnIcon size={22} />,
             },
         ]
-
     const accountAction = {
         label: "Criar nova conta",
         icon: <PlusIcon className="w-4 h-4" />,
         onClick: openQuickAccount,
     }
-
     const renderTypeSpecificLeft = () => (
         <>
             {txKind === "transfer" && (
@@ -1345,12 +1261,10 @@ export default function CreateTransactionPage({
                     />
                 </section>
             )}
-
             {txKind === "adjustment" && (
                 <section className="space-y-4">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Ajuste de saldo</h3>
                     <InfoCard message="Informe o novo saldo da conta; o sistema calcula a diferença e registra o ajuste." color="gray" />
-
                     <Input
                         label="Saldo atual"
                         readOnly
@@ -1379,7 +1293,6 @@ export default function CreateTransactionPage({
                     <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
             )}
-
             {txKind === "refund" && (
                 <section className="space-y-4">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">Reembolso</h3>
@@ -1419,7 +1332,6 @@ export default function CreateTransactionPage({
                     <DatePicker label="Data" value={dueDate} onChange={(d) => setDueDate(toYmd(d))} />
                 </section>
             )}
-
             {isIncomeExpense && (
                 <FormSection title="Detalhes do lançamento">
                     <MoneyInput
@@ -1485,7 +1397,6 @@ export default function CreateTransactionPage({
                             />
                         </div>
                     )}
-
                     {isIncomeExpense && (!isEditMode || isRecurringTemplateEdit) && (
                         <FormSection title={enableRecurrence && "Detalhes da recorrência" || installmentModeEnabled && "Detalhes das parcelas"} hasSeparator>
                             {!enableRecurrence && !isRecurringTemplateEdit && recurringModeEnabled && (
@@ -1622,7 +1533,6 @@ export default function CreateTransactionPage({
                             )}
                         </FormSection>
                     )}
-
                     {isEditMode && isRecurringTransaction && (
                         <div>
                             <InfoCard message="Esta transação faz parte de uma recorrência. Campos financeiros estão bloqueados. Para alterar valores futuros, edite a recorrência diretamente." color="blue" />
@@ -1632,10 +1542,9 @@ export default function CreateTransactionPage({
             )}
         </>
     )
-
     const renderRightColumn = () => (
         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-            <SidebarCard title={txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}>
+            <SidebarCard hasSeparator title={txKind === "transfer" ? "Status" : txKind === "adjustment" ? "Status e conta" : "Status e conta"}>
                 <div className="space-y-4">
                     {isIncomeExpense && !isRecurringTemplateEdit && !isEditMode && (
                         <FormDropdown
@@ -1643,7 +1552,7 @@ export default function CreateTransactionPage({
                             options={[
                                 { value: "single", label: "Única" },
                                 { value: "installment", label: "Parcelada" },
-                                { value: "recurring", label: isFreePlan ? "Recorrente ⭐" : "Recorrente" },
+                                { value: "recurring", label: isFreePlan ? "Recorrente " : "Recorrente" },
                             ]}
                             value={transactionMode}
                             setValue={(v) => {
@@ -1655,7 +1564,6 @@ export default function CreateTransactionPage({
                             }}
                         />
                     )}
-
                     {(isIncomeExpense || txKind === "refund" || txKind === "adjustment") && (
                         <FormCombobox
                             label="Conta bancária / caixa"
@@ -1668,7 +1576,6 @@ export default function CreateTransactionPage({
                             errorMessage={fieldErrors.has("accountId") ? "Selecione a conta" : undefined}
                         />
                     )}
-
                     {isIncomeExpense && (
                         <>
                             <FormCombobox
@@ -1695,7 +1602,6 @@ export default function CreateTransactionPage({
                             )}
                         </>
                     )}
-
                     {txKind === "refund" && (
                         <DatePicker
                             label="Data do pagamento"
@@ -1704,7 +1610,6 @@ export default function CreateTransactionPage({
                             disabled={status !== "paid"}
                         />
                     )}
-
                     {txKind === "adjustment" || txKind === "transfer" ? (
                         <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed">
                             O {txKind === "transfer" ? "lançamento" : "ajuste"} é efetivado ao salvar e atualiza o saldo da conta.
@@ -1734,9 +1639,8 @@ export default function CreateTransactionPage({
                     )}
                 </div>
             </SidebarCard>
-
             {needsContactPanel && (
-                <SidebarCard title="Contato">
+                <SidebarCard hasSeparator title="Contato">
                     <FormDropdown
                         label="Tipo de contato"
                         options={[
@@ -1820,7 +1724,6 @@ export default function CreateTransactionPage({
             )}
         </div>
     )
-
     return (
         <FadeIn>
             <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden relative transition-colors duration-300">
@@ -1839,7 +1742,6 @@ export default function CreateTransactionPage({
                                         <ChevronLeftIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
                                     </Button>
                                 </div>
-
                                 <div className="hidden md:flex items-start justify-between">
                                     <div className="flex flex-col gap-1 overflow-hidden min-w-0">
                                         <h1
@@ -1857,7 +1759,6 @@ export default function CreateTransactionPage({
                                                 : "Registre e organize os lançamentos do seu financeiro."}
                                         </div>
                                     </div>
-
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <Button variant="outline" onClick={handleBack} disabled={isSaving}>
@@ -1869,7 +1770,6 @@ export default function CreateTransactionPage({
                                         </Button>
                                     </div>
                                 </div>
-
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger
@@ -1891,7 +1791,6 @@ export default function CreateTransactionPage({
                                 </div>
                             </div>
                         </div>
-
                         <div className="px-3 md:px-6 py-6 max-w-[1300px] mx-auto min-h-[400px]">
                             <TabsContent value="general" className="mt-0">
                                 <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
@@ -1972,15 +1871,12 @@ export default function CreateTransactionPage({
                                                     </FormSection>
                                                 </>
                                             )}
-
                                             {renderTypeSpecificLeft()}
                                         </motion.div>
                                     </div>
-
                                     {renderRightColumn()}
                                 </div>
                             </TabsContent>
-
                             <TabsContent value="notes" className="mt-0">
                                 <div className="grid grid-cols-12 gap-y-8 md:gap-y-0">
                                     <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
@@ -1998,7 +1894,6 @@ export default function CreateTransactionPage({
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border min-h-[120px]" />
                                 </div>
                             </TabsContent>
-
                             <TabsContent value="attachments" className="mt-0">
                                 <div className="py-2">
                                     <GenericAttachmentsTab
@@ -2019,7 +1914,6 @@ export default function CreateTransactionPage({
                             </TabsContent>
                         </div>
                     </div>
-
                     <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
                         <Button variant="outline" onClick={handleBack} disabled={isSaving} className="flex-1 h-12">
                             Cancelar
@@ -2029,7 +1923,6 @@ export default function CreateTransactionPage({
                         </Button>
                     </div>
                 </Tabs>
-
                 <DefaultModal
                     isOpen={quickModal === "category"}
                     onClose={() => {
@@ -2051,7 +1944,6 @@ export default function CreateTransactionPage({
                 >
                     <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Marketing" maxLength={150} />
                 </DefaultModal>
-
                 <DefaultModal
                     isOpen={quickModal === "subcategory"}
                     onClose={() => {
@@ -2076,7 +1968,6 @@ export default function CreateTransactionPage({
                     </p>
                     <Input label="Nome" value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="Ex: Energia" maxLength={150} />
                 </DefaultModal>
-
                 <DefaultModal
                     isOpen={quickModal === "account"}
                     onClose={() => {
@@ -2111,7 +2002,6 @@ export default function CreateTransactionPage({
                         <MoneyInput label="Saldo inicial" value={newAccountInitial} onChange={setNewAccountInitial} />
                     </div>
                 </DefaultModal>
-
                 <DefaultModal
                     isOpen={quickModal === "contact"}
                     onClose={() => {
@@ -2154,7 +2044,6 @@ export default function CreateTransactionPage({
                         />
                     </div>
                 </DefaultModal>
-
                 <DefaultModal
                     isOpen={transferInsufficientOpen}
                     onClose={() => setTransferInsufficientOpen(false)}
@@ -2186,16 +2075,13 @@ export default function CreateTransactionPage({
                 >
                     <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
                         <p>A conta de origem selecionada não possui saldo suficiente para essa transferência.</p>
-
                         <div className="rounded-xl border border-brand-border dark:border-dark-border p-3 space-y-2 text-brand-dark dark:text-dark-heading font-medium">
                             <p>Saldo atual: {formatCurrency(transferInsufficientMeta.fromBal)}</p>
                             <p>Valor da transferência: {formatCurrency(transferInsufficientMeta.amount)}</p>
                         </div>
-
                         <InfoCard color="red" title="Atenção!" message="Se continuar, o saldo ficará negativo." />
                     </div>
                 </DefaultModal>
-
                 <DefaultModal
                     isOpen={adjustFromTransferOpen}
                     onClose={() => {
@@ -2253,7 +2139,6 @@ export default function CreateTransactionPage({
                         />
                     </div>
                 </DefaultModal>
-
                 <SelectCustomerSheet
                     isOpen={customerSheetOpen}
                     onClose={() => setCustomerSheetOpen(false)}
@@ -2262,9 +2147,7 @@ export default function CreateTransactionPage({
                     }
                     partnerId={partnerId}
                 />
-
                 <SavingStatusModal isOpen={isSaving} text="Salvando transação..." />
-
                 {unsavedChangesDialogOpen && (
                     <AlertModal
                         isOpen={unsavedChangesDialogOpen}
@@ -2277,7 +2160,6 @@ export default function CreateTransactionPage({
                         variant="warning"
                     />
                 )}
-
                 <AlertModal
                     isOpen={showDiscardModal}
                     onClose={() => setShowDiscardModal(false)}
@@ -2288,7 +2170,6 @@ export default function CreateTransactionPage({
                     cancelText="Continuar editando"
                     variant="warning"
                 />
-
                 <AlertModal
                     isOpen={cancelRecurringOpen}
                     onClose={() => setCancelRecurringOpen(false)}
@@ -2298,7 +2179,6 @@ export default function CreateTransactionPage({
                     confirmText="Cancelar recorrência"
                     variant="warning"
                 />
-
                 <AlertModal
                     isOpen={balanceWarningOpen}
                     onClose={() => {

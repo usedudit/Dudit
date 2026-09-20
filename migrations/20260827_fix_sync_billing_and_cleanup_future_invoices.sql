@@ -1,4 +1,6 @@
 -- ============================================================================
+-- LEGACY - Retained for reference. Production sync is in lib/billing/sync-subscription.ts
+-- ============================================================================
 -- Migration: Corrigir sync_subscription_to_billing e remover faturas futuras pré-geradas
 -- ============================================================================
 -- 1. Garante que sync_subscription_to_billing gere APENAS o ciclo atual (purchase + fatura).

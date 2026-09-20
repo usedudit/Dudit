@@ -126,31 +126,31 @@ export function SummaryCards({ metrics, variant = "grid" }: { metrics: any[], va
 
 function makeTooltip(secondaryLabel: string) {
   return function CustomTooltip({ active, payload, label }: any) {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
-        <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{label}</p>
-        <div className="flex flex-col gap-1.5">
-          {payload.map((entry: any, index: number) => {
-            const color = entry.stroke || entry.fill || entry.color || "var(--color-brand-green)";
-            const name = entry.name === "income" ? "Este Período" : entry.name === "expense" ? (secondaryLabel || "Período Anterior") : entry.name;
-            return (
-              <div key={index} className="flex items-center justify-between gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded bg-current shrink-0" style={{ color }} />
-                  <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
-                    {name}
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-dark-surface rounded-xl border border-brand-border dark:border-dark-border p-3.5 shadow-lg flex flex-col gap-2 font-sans min-w-[150px]">
+          <p className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{label}</p>
+          <div className="flex flex-col gap-1.5">
+            {payload.map((entry: any, index: number) => {
+              const color = entry.stroke || entry.fill || entry.color || "var(--color-brand-green)";
+              const name = entry.name === "income" ? "Este Período" : entry.name === "expense" ? (secondaryLabel || "Período Anterior") : entry.name;
+              return (
+                <div key={index} className="flex items-center justify-between gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-current shrink-0" style={{ color }} />
+                    <span className="text-[12px] font-semibold text-brand-inactive-text dark:text-dark-body">
+                      {name}
+                    </span>
+                  </div>
+                  <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
+                    {typeof entry.value === "number" ? brl(entry.value) : entry.value}
                   </span>
                 </div>
-                <span className="text-[12px] font-bold text-brand-dark dark:text-dark-heading">
-                  {typeof entry.value === "number" ? brl(entry.value) : entry.value}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
+      );
     }
     return null;
   }
@@ -300,14 +300,6 @@ export function NeedsAttention({ alerts }: { alerts: any[] }) {
             Precisa de Atenção ({alerts.length})
           </h3>
         </div>
-        <Button
-          variant="link"
-          size="sm"
-          className="text-[13px] font-bold text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:hover:text-dark-heading h-auto px-0"
-          onClick={() => handleResolve(alerts[0]?.id)}
-        >
-          Resolver
-        </Button>
       </div>
 
       <div className="custom-scrollbar overflow-y-auto flex-1 -mx-6 px-6">

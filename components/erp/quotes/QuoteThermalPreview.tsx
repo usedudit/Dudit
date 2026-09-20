@@ -54,6 +54,7 @@ export default function QuoteThermalPreview({
     partnerAvatar,
     printMode = false,
     thermalWidth = "80mm",
+    salespersonName,
 }: QuoteThermalPreviewProps) {
     const partnerAddressFormatted = (() => {
         if (!partnerAddress) return ""

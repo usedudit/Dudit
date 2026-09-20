@@ -9,4 +9,5 @@ export {
   generateReturnsInsights,
   generateDeliveryInsights,
   generateProductivityInsights,
+  generateAppointmentsInsights,
 } from "./engine"

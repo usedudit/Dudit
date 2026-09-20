@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -137,7 +137,7 @@ export default function CouponDetailPage({
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                            <SidebarCard hasTopStrip title="Status do cupom">
+                                            <SidebarCard hasSeparator hasTopStrip title="Status do cupom">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
@@ -154,7 +154,7 @@ export default function CouponDetailPage({
                                                 </div>
                                             </SidebarCard>
 
-                                            <SidebarCard hasTopStrip title="Aplicação">
+                                            <SidebarCard hasSeparator hasTopStrip title="Aplicação">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Produtos</span>
@@ -215,7 +215,7 @@ export default function CouponDetailPage({
                                         </div>
 
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                            <SidebarCard hasTopStrip title="Resumo do escopo">
+                                            <SidebarCard hasSeparator hasTopStrip title="Resumo do escopo">
                                                 <div className="space-y-3 text-sm">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <span className="text-brand-inactive-text dark:text-dark-body">Aplicação</span>
@@ -256,3 +256,4 @@ export default function CouponDetailPage({
         </FadeIn>
     )
 }
+

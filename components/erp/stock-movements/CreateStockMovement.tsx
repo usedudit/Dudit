@@ -27,7 +27,8 @@ import {
     ThreeDotsLoader,
     FormTextarea,
     FormSection,
-    Badge
+    Badge,
+    SidebarCard,
 } from '@/components/reusable';
 import { searchProductByBarcodeAction } from '@/app/actions/erp/products';
 import { playBeepSound, vibrateMobile } from '@/lib/utils/barcode';
@@ -992,10 +993,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                                 {/* Sidebar Column - Projeção de Estoque */}
                                 {activeTab === 'Geral' && (
                                     <div className="col-span-12 lg:col-span-4 lg:border-l border-brand-border dark:border-dark-border lg:pl-12 space-y-8 mt-12 lg:mt-0">
-                                        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-all duration-300">
-                                            <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Projeção de Estoque</h3>
-
+                                        <SidebarCard hasTopStrip hasSeparator title="Projeção de Estoque">
                                             <AnimatePresence mode="wait">
                                                 {items.length > 0 ? (
                                                     <motion.div
@@ -1067,7 +1065,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                                                     </motion.div>
                                                 )}
                                             </AnimatePresence>
-                                        </div>
+                                        </SidebarCard>
                                     </div>
                                 )}
                             </div>

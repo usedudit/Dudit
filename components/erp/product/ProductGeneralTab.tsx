@@ -1,13 +1,12 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { Input, FormDropdown, Checkbox, Accordion, MoneyInput, InfoCard, FormSection, Button, Spinner, ListItem, SidebarCard } from "@/components/reusable"
 import { SalePriceCalculator } from "@/components/reusable/SalePriceCalculator"
 import { PlusIcon, DiceIcon, SparklesIcon, Package, AlertTriangleIcon, MapPinIcon, CheckCircleIcon, StarIcon } from "@/lib/icons"
 import ProductImagesSection from "./ProductImagesSection"
 import { Combobox } from "@/components/reusable"
-import { RichTextEditor } from "@/components/reusable"
 import { planStarIconForTarget, usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { useRouter } from "next/navigation"
 import QuickStockMovementSheet from "./QuickStockMovementSheet"
@@ -437,7 +436,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                 {/* DIREITA (SidebarCard) */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                     {!isDesapego && (
-                        <SidebarCard hasTopStrip title="Organização">
+                        <SidebarCard hasSeparator hasTopStrip title="Organização">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center pb-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
@@ -732,7 +731,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                         />
                     </div>
 
-                 </FormSection>
+                </FormSection>
 
                 {/* ESTOQUE */}
                 {!isQuickMode && (
@@ -995,138 +994,138 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
                                     )}
                                 </div>
                             </FormSection>
-                         </div>
+                        </div>
 
                         {/* Desktop: SidebarCard */}
-                        <SidebarCard hasTopStrip title="Organização">
-                                <div className="space-y-5">
-                                    {!hasVariants && (
-                                        <Input
-                                            label="Código do Produto"
-                                            name="sku"
-                                            value={productData.sku}
-                                            placeholder="Gerar automaticamente"
-                                            onChange={handleFieldChange}
-                                            disabled={!isEditing}
-                                            dataField="sku"
-                                            suffix={
-                                                <div
-                                                    onClick={generateRandomCode}
-                                                    className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                >
-                                                    <DiceIcon size={20} />
-                                                </div>
-                                            }
-                                        />
-                                    )}
-
-                                    {!isQuickMode && (
-                                        <>
-                                            <div className="space-y-1.5 w-full">
-                                                <Input
-                                                    label="Código de Barras (EAN/GTIN)"
-                                                    name="gtin"
-                                                    value={productData.gtin || ""}
-                                                    onChange={handleFieldChange}
-                                                    disabled={!isEditing}
-                                                    dataField="gtin"
-                                                    suffix={
-                                                        <div
-                                                            onClick={onGenerateBarcode}
-                                                            className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
-                                                        >
-                                                            <DiceIcon size={20} />
-                                                        </div>
-                                                    }
-                                                />
+                        <SidebarCard hasSeparator hasTopStrip title="Organização">
+                            <div className="space-y-5">
+                                {!hasVariants && (
+                                    <Input
+                                        label="Código do Produto"
+                                        name="sku"
+                                        value={productData.sku}
+                                        placeholder="Gerar automaticamente"
+                                        onChange={handleFieldChange}
+                                        disabled={!isEditing}
+                                        dataField="sku"
+                                        suffix={
+                                            <div
+                                                onClick={generateRandomCode}
+                                                className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                            >
+                                                <DiceIcon size={20} />
                                             </div>
+                                        }
+                                    />
+                                )}
 
-                                            <FormCombobox
-                                                label="Categoria"
-                                                options={categories}
-                                                value={productData.category_id}
-                                                onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                {!isQuickMode && (
+                                    <>
+                                        <div className="space-y-1.5 w-full">
+                                            <Input
+                                                label="Código de Barras (EAN/GTIN)"
+                                                name="gtin"
+                                                value={productData.gtin || ""}
+                                                onChange={handleFieldChange}
                                                 disabled={!isEditing}
-                                                width="w-full"
-                                                dataField="category_id"
-                                                actionItem={{
-                                                    label: metadataPlanBlocked ? (
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            Nova categoria
-                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                        </span>
-                                                    ) : "Criar nova categoria",
-                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
-                                                }}
+                                                dataField="gtin"
+                                                suffix={
+                                                    <div
+                                                        onClick={onGenerateBarcode}
+                                                        className="cursor-pointer p-1 text-brand-inactive-text hover:text-brand-dark dark:hover:text-dark-heading transition-colors"
+                                                    >
+                                                        <DiceIcon size={20} />
+                                                    </div>
+                                                }
                                             />
+                                        </div>
 
-                                            <FormCombobox
-                                                label="Subcategoria"
-                                                options={subCategories}
-                                                value={productData.subcategory_id}
-                                                onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
-                                                disabled={!isEditing}
-                                                width="w-full"
-                                                actionItem={{
-                                                    label: metadataPlanBlocked ? (
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            Nova subcategoria
-                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                        </span>
-                                                    ) : "Criar nova subcategoria",
-                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
-                                                }}
-                                            />
+                                        <FormCombobox
+                                            label="Categoria"
+                                            options={categories}
+                                            value={productData.category_id}
+                                            onChange={(v) => handleFieldChange({ target: { name: "category_id", value: v } })}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                            dataField="category_id"
+                                            actionItem={{
+                                                label: metadataPlanBlocked ? (
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        Nova categoria
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                    </span>
+                                                ) : "Criar nova categoria",
+                                                icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("category")
+                                            }}
+                                        />
 
-                                            <FormCombobox
-                                                label="Marca"
-                                                options={brands}
-                                                value={productData.brand_id || productData.brand || ""}
-                                                onChange={handleBrandChange}
-                                                disabled={!isEditing}
-                                                width="w-full"
-                                                creatable={true}
-                                                searchPlaceholder="Buscar ou digitar nova marca..."
-                                                placeholder="Selecione ou digite..."
-                                                createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
-                                                actionItem={{
-                                                    label: metadataPlanBlocked ? (
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            Nova marca
-                                                            <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
-                                                        </span>
-                                                    ) : "Criar nova marca",
-                                                    icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
-                                                    onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
-                                                }}
-                                            />
+                                        <FormCombobox
+                                            label="Subcategoria"
+                                            options={subCategories}
+                                            value={productData.subcategory_id}
+                                            onChange={(v) => handleFieldChange({ target: { name: "subcategory_id", value: v } })}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                            actionItem={{
+                                                label: metadataPlanBlocked ? (
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        Nova subcategoria
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                    </span>
+                                                ) : "Criar nova subcategoria",
+                                                icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("subcategory")
+                                            }}
+                                        />
 
-                                            <FormCombobox
-                                                label="Unidade"
-                                                options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
-                                                value={productData.unidade}
-                                                onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
-                                                disabled={!isEditing}
-                                                width="w-full"
-                                            />
-                                        </>
-                                    )}
-                                </div>
-                            </SidebarCard>
-                        </>
-                    )}
+                                        <FormCombobox
+                                            label="Marca"
+                                            options={brands}
+                                            value={productData.brand_id || productData.brand || ""}
+                                            onChange={handleBrandChange}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                            creatable={true}
+                                            searchPlaceholder="Buscar ou digitar nova marca..."
+                                            placeholder="Selecione ou digite..."
+                                            createLabel={(s) => <span>Usar marca &ldquo;<strong>{s}</strong>&rdquo;</span>}
+                                            actionItem={{
+                                                label: metadataPlanBlocked ? (
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        Nova marca
+                                                        <img src={planStarIconForTarget("crescer")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                    </span>
+                                                ) : "Criar nova marca",
+                                                icon: metadataPlanBlocked ? undefined : <PlusIcon className="w-4 h-4" />,
+                                                onClick: () => metadataPlanBlocked ? openPlanUpgrade("crescer") : openAddItemModal("brand")
+                                            }}
+                                        />
 
-                    {isQuickMode && (
-                        <OfficialCategoryCard
-                            categoryId={productData?.marketplace_category_id}
-                            onChange={(id) => handleFieldChange({ target: { name: "marketplace_category_id", value: id } })}
-                            type="product"
-                            isEditing={isEditing}
-                        />
-                    )}
-                </div>
+                                        <FormCombobox
+                                            label="Unidade"
+                                            options={unidadesMedida.map(c => ({ value: c.codigo, label: c.codigo }))}
+                                            value={productData.unidade}
+                                            onChange={(v) => handleFieldChange({ target: { name: "unidade", value: v } })}
+                                            disabled={!isEditing}
+                                            width="w-full"
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        </SidebarCard>
+                    </>
+                )}
+
+                {isQuickMode && (
+                    <OfficialCategoryCard
+                        categoryId={productData?.marketplace_category_id}
+                        onChange={(id) => handleFieldChange({ target: { name: "marketplace_category_id", value: id } })}
+                        type="product"
+                        isEditing={isEditing}
+                    />
+                )}
+            </div>
             <QuickStockMovementSheet
                 isOpen={isStockAdjustmentOpen}
                 product={{
@@ -1145,3 +1144,4 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
         </div>
     )
 }
+

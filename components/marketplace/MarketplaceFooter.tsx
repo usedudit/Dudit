@@ -35,7 +35,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                     <div className="md:w-1/3">
                         <Link href="/" prefetch={false} className="inline-block mb-6">
                             <img
-                                src="https://img.dudit.com.br/cdn-cgi/image/width=140,format=auto,quality=80/static/Logo.png"
+                                src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
                                 width={140}
                                 height={40}
@@ -43,41 +43,48 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                             />
                         </Link>
                         <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
-                            Descubra oportunidades, anuncie o que quiser e gerencie seu negócio sem complicação.
+                            Descubra oportunidades, anuncie o que quiser e gerencie seu negócio sem comissão e sem complicação.
                         </p>
                     </div>
 
                     {/* Colunas de Links */}
                     <div className="flex-1 flex flex-wrap justify-between gap-8">
 
-                        {/* Coluna 1: Institucional */}
+                        {/* Coluna 1: Institucional & Segmentos */}
                         <div>
                             <h4 className="text-sm font-medium text-white mb-6">Institucional</h4>
                             <ul className="space-y-4">
                                 <li><Link href="/institucional/inicio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Conheça mais</Link></li>
                                 <li><Link href="/institucional/sobre" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Sobre a Dudit</Link></li>
-                                <li><Link href="/institucional/segmentos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Segmentos</Link></li>
                                 <li><Link href="/institucional/planos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Nossos Planos</Link></li>
+                                <li><Link href="/segmentos/oficinas-e-tecnicos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Oficinas e Técnicos</Link></li>
+                                <li><Link href="/segmentos/saloes-e-barbearias" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Salões e Barbearias</Link></li>
+                                <li><Link href="/segmentos/confeitarias-e-alimentacao" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Para Confeitarias</Link></li>
                             </ul>
                         </div>
 
-                        {/* Coluna 2: Para Lojistas (O "ouro" do seu ERP) */}
+                        {/* Coluna 2: Ferramentas Gratuitas (Tool SEO) */}
                         <div>
-                            <h4 className="text-sm font-medium text-white mb-6">Plataforma</h4>
+                            <h4 className="text-sm font-medium text-white mb-6">Ferramentas Grátis</h4>
                             <ul className="space-y-4">
-                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar</Link></li>
-                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Anunciar na Dudit</Link></li>
+                                <li><Link href="/ferramentas" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Todas as Calculadoras</Link></li>
+                                <li><Link href="/ferramentas/calculadora-taxas-marketplace" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Calculadora de Taxas</Link></li>
+                                <li><Link href="/ferramentas/calculadora-margem-lucro-preco-venda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Preço de Venda & Markup</Link></li>
+                                <li><Link href="/ferramentas/calculadora-ponto-equilibrio" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Ponto de Equilíbrio</Link></li>
+                                <li><Link href="/ferramentas/gerador-link-whatsapp" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Link de WhatsApp para Bio</Link></li>
                             </ul>
                         </div>
 
-                        {/* Coluna 3: Suporte */}
+                        {/* Coluna 3: Plataforma & Suporte */}
                         <div>
-                            <h4 className="text-sm font-medium text-white mb-6">Suporte</h4>
+                            <h4 className="text-sm font-medium text-white mb-6">Plataforma & Ajuda</h4>
                             <ul className="space-y-4">
+                                <li><Link href="/explorar" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Explorar Cidades</Link></li>
+                                <li><Link href="/auth/login?mode=partner" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Começar Grátis (Loja)</Link></li>
                                 <li><Link href="/ajuda" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Central de Ajuda</Link></li>
                                 <li><Link href="/institucional/contato" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Fale Conosco</Link></li>
                                 <li><Link href="/institucional/termos" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Termos de uso</Link></li>
-                                <li><Link href="/institucional/privacidade" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Política de Privacidade</Link></li>
+                                <li><Link href="/institucional/privacidade" prefetch={false} className="text-sm text-gray-400 hover:text-brand-green transition-colors">Privacidade</Link></li>
                             </ul>
                         </div>
                     </div>
@@ -91,7 +98,7 @@ const Footer: React.FC<FooterProps> = ({ setView }) => {
                         </p>
                     </div>
 
-                    {/* Redes Sociais com Links Reais e Target Blank */}
+                    {/* Redes Sociais */}
                     <div className="flex gap-4 order-1 md:order-2">
                         <a
                             href="https://instagram.com/usedudit"

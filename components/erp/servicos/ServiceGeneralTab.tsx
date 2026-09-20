@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
 import { useMemo } from "react"
@@ -286,7 +286,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 {/* DIREITA (SidebarCard) */}
                 < div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0" >
                     {!isDesapego && (
-                        <SidebarCard hasTopStrip title="Organização">
+                        <SidebarCard hasSeparator hasTopStrip title="Organização">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                     <span className="text-sm text-brand-inactive-text dark:text-dark-body">Código (SKU)</span>
@@ -319,7 +319,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
 
                     {
                         !isQuickMode && serviceData.notes && (
-                            <SidebarCard title="Observações Internas">
+                            <SidebarCard hasSeparator title="Observações Internas">
                                 <p className="text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap leading-relaxed">
                                     {serviceData.notes}
                                 </p>
@@ -598,7 +598,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
             {/* DIREITA (Widgets) */}
             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
                 {!isDesapego && (
-                    <SidebarCard hasTopStrip title="Organização">
+                    <SidebarCard hasSeparator hasTopStrip title="Organização">
                         <div className="space-y-5">
                             <Input
                                 label="Código do Serviço (SKU)"
@@ -671,7 +671,7 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
                 )}
 
                 {!isQuickMode && (
-                    <SidebarCard title="Observações Internas">
+                    <SidebarCard hasSeparator title="Observações Internas">
                         <FormTextarea
                             label="Anotações"
                             name="notes"
@@ -689,3 +689,4 @@ export const ServiceGeneralTab: React.FC<ServiceGeneralTabProps> = ({
         </div>
     )
 }
+

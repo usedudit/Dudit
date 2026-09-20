@@ -26,6 +26,7 @@ import {
     Input,
     ActionsDropdown,
     DropdownItem,
+    SidebarCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
@@ -527,11 +528,7 @@ export function AdminOrderDetailView({
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                                     {/* Resumo Financeiro */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Resumo Financeiro
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Resumo Financeiro">
                                                         <div className="space-y-2.5 text-sm">
                                                             <div className="flex justify-between text-brand-inactive-text">
                                                                 <span>Subtotal dos itens</span>
@@ -601,7 +598,7 @@ export function AdminOrderDetailView({
                                                                 <span className="font-bold text-brand-green text-lg">{formatCurrency(total)}</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Formas de Pagamento */}
                                                     <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">

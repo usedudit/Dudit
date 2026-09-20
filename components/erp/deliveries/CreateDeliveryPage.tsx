@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useRef, useState, useCallback, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -865,7 +865,7 @@ export default function CreateDeliveryPage({
                                             </div>
 
                                             <div className="col-span-12 hidden border-l border-brand-border pl-12 dark:border-dark-border lg:block lg:col-span-4">
-                                                <SidebarCard hasTopStrip title="Informações da Entrega">
+                                                <SidebarCard hasSeparator hasTopStrip title="Informações da Entrega">
                                                     <div className="grid grid-cols-1 gap-4">
                                                         <FormDropdown
                                                             label="Entregador"
@@ -1273,3 +1273,4 @@ export default function CreateDeliveryPage({
         </FadeIn >
     )
 }
+

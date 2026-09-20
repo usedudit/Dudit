@@ -17,7 +17,7 @@ async function handleGenerateProductDetails(req: NextRequest) {
       return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 })
     }
 
-    const { title, partnerId, itemType = "product" } = body
+    const { title, partnerId, itemType = "product", imageBase64, imageMimeType } = body
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: "Título é obrigatório." }, { status: 400 })
@@ -38,10 +38,23 @@ async function handleGenerateProductDetails(req: NextRequest) {
       return NextResponse.json({ error: "Acesso negado para este parceiro." }, { status: 403 })
     }
 
-    const result = await AiGeneratorService.generateProductDetails(partnerId, user.id, {
-      title,
-      itemType,
-    })
+    let result
+
+    // Se imagem foi enviada, usar geração por imagem (Groq + Llama 4 Scout)
+    if (imageBase64 && imageMimeType) {
+      result = await AiGeneratorService.generateProductDetailsFromImage(partnerId, user.id, {
+        title,
+        itemType,
+        imageBase64,
+        imageMimeType,
+      })
+    } else {
+      // Geração por texto (fluxo existente)
+      result = await AiGeneratorService.generateProductDetails(partnerId, user.id, {
+        title,
+        itemType,
+      })
+    }
 
     if (!result.success) {
       if (result.error === "plan_blocked" || result.error === "limit_exceeded") {

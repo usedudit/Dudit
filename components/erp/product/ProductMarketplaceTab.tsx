@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -152,7 +152,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
 
                 {/* --- COLUNA DIREITA (Sidebar) --- */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip title="Configurações">
+                    <SidebarCard hasSeparator hasTopStrip title="Configurações">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Produto</span>
@@ -208,7 +208,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                         isEditing={false}
                     />
 
-                    <SidebarCard title="Palavras-chave de busca">
+                    <SidebarCard hasSeparator title="Palavras-chave de busca">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (
@@ -507,7 +507,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                 {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
                 <div className="hidden lg:block">
                     {/* Card de Configurações */}
-                    <SidebarCard hasTopStrip title="Configurações">
+                    <SidebarCard hasSeparator hasTopStrip title="Configurações">
 
                         <div className="space-y-5">
                             <FormDropdown
@@ -618,7 +618,7 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
                     </SidebarCard>
 
                     {/* Card de Tags */}
-                    <SidebarCard title="Palavras-chave de busca">
+                    <SidebarCard hasSeparator title="Palavras-chave de busca">
                         <p className="text-sm text-brand-inactive-text mb-4">
                             Adicione termos relacionados para ajudar clientes a encontrarem este produto no marketplace.
                         </p>
@@ -641,3 +641,4 @@ export const ProductMarketplaceTab: React.FC<ProductMarketplaceTabProps> = ({
         </div>
     )
 }
+

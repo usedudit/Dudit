@@ -451,7 +451,14 @@ async function processSubscriptionWebhook(
           .eq("id", sub.partner_id)
           .single()
 
+        const { data: plan } = await supabase
+          .from("plans")
+          .select("name, price")
+          .eq("id", sub.plan_id)
+          .maybeSingle()
+
         if (partner?.user_id) {
+          const isPaid = plan ? Number(plan.price || 0) > 0 : false
           const { sendBillingNotification } = await import("@/lib/billing/notifications")
           await sendBillingNotification(
             "billing.payment_failed",
@@ -461,6 +468,9 @@ async function processSubscriptionWebhook(
               message: `O pagamento da assinatura falhou. A assinatura entrou em status "Atrasado". Você tem 3 dias para regularizar antes da suspensão dos recursos.`,
               subscription_id: sub.id,
               mp_subscription_id: resourceId,
+              plan_name: plan?.name || null,
+              plan_price: plan ? Number(plan.price || 0) : 0,
+              is_paid: isPaid,
             }
           )
         }
@@ -489,6 +499,52 @@ async function processSubscriptionWebhook(
     } catch (syncErr: any) {
       // Non-critical: billing sync failure must not break the webhook
       SecureLogger.error("[SUB_WEBHOOK] Billing sync error", { error: syncErr.message, subscriptionId: sub.id })
+    }
+
+    // ── Notify partner on renewal (active → active or past_due → active) ──
+    if (newStatus === "active" && (sub.status === "active" || sub.status === "past_due")) {
+      try {
+        const { data: partner } = await supabase
+          .from("partners")
+          .select("user_id")
+          .eq("id", sub.partner_id)
+          .single()
+
+        const { data: plan } = await supabase
+          .from("plans")
+          .select("name, price")
+          .eq("id", sub.plan_id)
+          .maybeSingle()
+
+        if (partner?.user_id && plan) {
+          const isPaid = Number(plan.price || 0) > 0
+          const notificationType = sub.status === "past_due"
+            ? "billing.payment_received"
+            : "billing.subscription_renewed"
+
+          const message = sub.status === "past_due"
+            ? `Pagamento da assinatura aprovado! Seu plano ${plan.name} foi reativado com sucesso.`
+            : `Sua assinatura do plano ${plan.name} foi renovada automaticamente.`
+
+          const { sendBillingNotification } = await import("@/lib/billing/notifications")
+          await sendBillingNotification(
+            notificationType,
+            partner.user_id,
+            sub.partner_id,
+            {
+              message,
+              subscription_id: sub.id,
+              mp_subscription_id: resourceId,
+              plan_name: plan.name,
+              plan_price: Number(plan.price || 0),
+              is_paid: isPaid,
+              next_billing_date: updatePayload.current_period_end || null,
+            }
+          )
+        }
+      } catch (notifyErr: any) {
+        console.error("[SUB_WEBHOOK] Failed to send renewal notification:", notifyErr.message)
+      }
     }
 
     console.log("[SUB_WEBHOOK] ==========================================================\n")
@@ -535,14 +591,22 @@ async function logBillingEvent(
   metadata: Record<string, unknown>,
 ): Promise<void> {
   try {
+    // Idempotency key: prevents duplicate events within the same minute
+    const minuteBucket = Math.floor(Date.now() / 60000)
+    const resourceId = metadata.mp_subscription_id || metadata.subscription_id || ""
+    const idempotencyKey = `${eventType}:${partnerId}:${resourceId}:${minuteBucket}`
+
     await admin.from("billing_events").insert({
       partner_id: partnerId,
       event_type: eventType,
       amount,
       provider: "mercado_pago",
       metadata,
+      idempotency_key: idempotencyKey,
     })
   } catch (err) {
+    // Unique constraint violation = duplicate event, safe to ignore
+    if ((err as any)?.code === "23505") return
     console.error("[BILLING_EVENT] Failed to log:", {
       eventType,
       error: err instanceof Error ? err.message : String(err),

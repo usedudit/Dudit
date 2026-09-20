@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
@@ -432,7 +432,7 @@ export default function AvailableDeliveryDetail({
 
                                             {/* RIGHT SIDEBAR COLUMN with divider */}
                                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
-                                                <SidebarCard title="Remuneração & Valores">
+                                                <SidebarCard hasSeparator title="Remuneração & Valores">
                                                     <InfoCard
                                                         title="Sua Taxa de Entrega (Total)"
                                                         message={formatCurrency(totalRouteDeliveryFee)}
@@ -858,3 +858,4 @@ export default function AvailableDeliveryDetail({
         </FadeIn>
     )
 }
+

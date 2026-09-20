@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Button, IconPlaceholder, Spinner, AlertModal, Pagination, SidebarCard } from "@/components/reusable"
@@ -707,8 +707,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                 {showSidePanel && selectedSupplier && (
                     <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-8 border-0 xl:border-l border-brand-border dark:border-dark-border">
                         {/* Última Compra */}
-                        <SidebarCard
-                            title="Última Compra"
+                        <SidebarCard hasSeparator title="Última Compra"
                             headerRight={
                                 <button
                                     onClick={() => setSelectedSupplierId(null)}
@@ -758,7 +757,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                         </SidebarCard>
 
                         {/* Histórico de Custos */}
-                        <SidebarCard title="Histórico de Custos">
+                        <SidebarCard hasSeparator title="Histórico de Custos">
                             {costHistoryLoading ? (
                                 <div className="flex justify-center py-4">
                                     <Spinner size={20} />
@@ -790,7 +789,7 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
                         </SidebarCard>
 
                         {/* Compras Recentes */}
-                        <SidebarCard title="Compras Recentes">
+                        <SidebarCard hasSeparator title="Compras Recentes">
                             {purchasesLoading ? (
                                 <div className="flex justify-center py-4">
                                     <Spinner size={20} />
@@ -865,3 +864,6 @@ export const ProductSuppliersTab: React.FC<ProductSuppliersTabProps> = ({
         </div>
     )
 }
+
+
+

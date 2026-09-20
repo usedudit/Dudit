@@ -20,7 +20,8 @@ import {
     SavingStatusModal,
     NumberInputWithCheckbox,
     FormSection,
-    FormDropdown
+    FormDropdown,
+    SidebarCard,
 } from "@/components/reusable"
 import { BusinessHoursSelector } from "@/components/BusinessHoursSelector"
 import { updatePartnerAction } from "@/app/actions/marketplace/partners"
@@ -678,10 +679,7 @@ export const BusinessDataSubPage = ({
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border flex flex-col relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">Categoria do Negócio</h3>
-
+                                            <SidebarCard hasTopStrip hasSeparator title="Categoria do Negócio">
                                                 <div className="flex flex-col gap-4">
                                                     <button
                                                         type="button"
@@ -711,7 +709,7 @@ export const BusinessDataSubPage = ({
                                                         </button>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </SidebarCard>
                                         </div>
                                     </motion.div>
                                 </TabsContent>
@@ -825,12 +823,8 @@ export const BusinessDataSubPage = ({
                                         </div>
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <div className="bg-white dark:bg-dark-surface p-0 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden flex flex-col">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                <div className="p-4 flex items-center justify-between border-b border-brand-border dark:border-dark-border mt-1 border-opacity-60">
-                                                    <h4 className="font-bold text-brand-dark dark:text-dark-heading">Localização</h4>
-                                                </div>
-                                                <div className="p-4 flex flex-col">
+                                            <SidebarCard hasTopStrip hasSeparator title="Localização">
+                                                <div className="flex flex-col">
                                                     <div className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group" onClick={() => window.open(mapsUrl, '_blank')}>
                                                         <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
                                                         <div className="absolute inset-0 flex items-center justify-center">
@@ -850,7 +844,7 @@ export const BusinessDataSubPage = ({
                                                         </p>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </SidebarCard>
                                         </div>
                                     </motion.div>
                                 </TabsContent>

@@ -21,6 +21,7 @@ import {
     getServiceOrderReportData,
     getGoalReportData,
     getSubscriptionReportData,
+    getAppointmentsReportData,
 } from "@/lib/data/reports"
 import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
 import { requireMinimumPlan } from "@/lib/auth/authorization"
@@ -56,7 +57,7 @@ export default async function ERPEstatisticasPage(props: {
     const searchParams = await props.searchParams
     const period = (searchParams?.period as Period) || "monthly"
 
-    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue] = await Promise.all([
+    const [productsData, servicesData, financialData, salesData, customerData, returnsData, deliveryData, marketingData, productivityData, serviceOrdersData, goalData, subscriptionData, stockValue, appointmentsData] = await Promise.all([
         checkPermission(partnerId, "products", "view").then(res => res.allowed ? getDashboardProductsData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getDashboardServicesData(partnerId).catch(() => null) : null),
         checkPermission(partnerId, "financial", "view").then(res => res.allowed ? getDashboardFinancialData(partnerId).catch(() => null) : null),
@@ -78,6 +79,7 @@ export default async function ERPEstatisticasPage(props: {
             return r.data.reduce((sum: number, p: any) => sum + (Number(p.stock_quantity || 0) * Number(p.cost_price || 0)), 0)
           } catch { return 0 }
         }),
+        checkPermission(partnerId, "appointments", "view").then(res => res.allowed ? getAppointmentsReportData(partnerId, period).catch(() => null) : null),
     ])
 
     return (
@@ -118,6 +120,7 @@ export default async function ERPEstatisticasPage(props: {
                                 goalData={goalData}
                                 subscriptionData={subscriptionData}
                                 stockValue={stockValue}
+                                appointmentsData={appointmentsData}
                             />
                         </Suspense>
                     </div>

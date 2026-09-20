@@ -577,9 +577,20 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
                     updated_at: nowIso,
                 })
                 .eq("id", purchase.id)
+
+            // c) Fatura: atualiza status para refunded
+            if (purchase.invoice_id) {
+                await supabase
+                    .from("billing_invoices")
+                    .update({
+                        status: "refunded",
+                        updated_at: nowIso,
+                    })
+                    .eq("id", purchase.invoice_id)
+            }
         }
 
-        // c) Assinatura: cancela e ajusta término para a carência de 24h
+        // e) Assinatura: cancela e ajusta término para a carência de 24h
         if (subscription?.id) {
             await supabase
                 .from("subscriptions")
@@ -593,7 +604,7 @@ export async function adminProcessRefundAction(input: z.input<typeof adminProces
                 .eq("id", subscription.id)
         }
 
-        // d) Solicitação de reembolso
+        // f) Solicitação de reembolso
         await supabase
             .from("billing_refund_requests")
             .update({

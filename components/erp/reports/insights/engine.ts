@@ -570,3 +570,93 @@ export function generateProductivityInsights(input: ProductivityInsightInput): I
 
   return insights
 }
+
+interface AppointmentsInsightInput {
+  totalAppointments: number
+  completedCount: number
+  cancelledCount: number
+  noShowCount: number
+  repeatCustomerRate: number
+  avgDuration: number
+  topServiceName?: string
+  topServiceCount?: number
+  totalRevenue: number
+}
+
+export function generateAppointmentsInsights(input: AppointmentsInsightInput): Insight[] {
+  const insights: Insight[] = []
+
+  if (input.totalAppointments > 0 && input.cancelledCount > 0) {
+    const cancelPct = Math.round((input.cancelledCount / input.totalAppointments) * 100)
+    if (cancelPct > 20) {
+      insights.push({
+        id: "appt-cancel-high",
+        message: `${cancelPct}% dos agendamentos foram cancelados. Considere revisar a política de cancelamento.`,
+        tone: "negative",
+        category: "Agendamentos",
+        priority: 1,
+      })
+    } else if (cancelPct > 10) {
+      insights.push({
+        id: "appt-cancel-moderate",
+        message: `${cancelPct}% de cancelamentos no período.`,
+        tone: "warning",
+        category: "Agendamentos",
+        priority: 2,
+      })
+    }
+  }
+
+  if (input.noShowCount > 0 && input.totalAppointments > 0) {
+    const noShowPct = Math.round((input.noShowCount / input.totalAppointments) * 100)
+    if (noShowPct > 10) {
+      insights.push({
+        id: "appt-noshow-high",
+        message: `${noShowPct}% de ausências — considere confirmação automática por WhatsApp.`,
+        tone: "warning",
+        category: "Agendamentos",
+        priority: 1,
+      })
+    }
+  }
+
+  if (input.repeatCustomerRate > 50) {
+    insights.push({
+      id: "appt-repeat-high",
+      message: `${Math.round(input.repeatCustomerRate)}% dos clientes são recorrentes — excelente fidelização.`,
+      tone: "positive",
+      category: "Agendamentos",
+      priority: 2,
+    })
+  } else if (input.repeatCustomerRate < 20 && input.totalAppointments > 10) {
+    insights.push({
+      id: "appt-repeat-low",
+      message: `Apenas ${Math.round(input.repeatCustomerRate)}% dos clientes retornam. Considere programas de fidelidade.`,
+      tone: "warning",
+      category: "Agendamentos",
+      priority: 2,
+    })
+  }
+
+  if (input.topServiceName && input.topServiceCount) {
+    insights.push({
+      id: "appt-top-service",
+      message: `${input.topServiceName} é o serviço mais agendado com ${input.topServiceCount} agendamentos.`,
+      tone: "info",
+      category: "Agendamentos",
+      priority: 3,
+    })
+  }
+
+  if (input.totalRevenue > 0) {
+    insights.push({
+      id: "appt-revenue",
+      message: `Receita de agendamentos: ${brl(input.totalRevenue)}.`,
+      tone: "positive",
+      category: "Agendamentos",
+      priority: 3,
+    })
+  }
+
+  return insights
+}

@@ -407,9 +407,34 @@ const AddProductPage: FC<AddProductPageProps> = ({
         if (!productName) return notifyWarning("Atenção", "Digite o nome do produto primeiro")
         setIsGeneratingDetails(true)
         try {
+            // Verificar se há imagem para enviar (primeira imagem File)
+            let imageBase64: string | undefined
+            let imageMimeType: string | undefined
+            const firstImage = productData.images?.[0]
+            if (firstImage instanceof File) {
+                const reader = new FileReader()
+                const base64Promise = new Promise<string>((resolve) => {
+                    reader.onloadend = () => {
+                        const result = reader.result as string
+                        // Extrair apenas o base64 (remover prefixo data:image/...;base64,)
+                        const base64 = result.split(",")[1] || ""
+                        resolve(base64)
+                    }
+                    reader.readAsDataURL(firstImage)
+                })
+                imageBase64 = await base64Promise
+                imageMimeType = firstImage.type || "image/jpeg"
+            }
+
+            const body: any = { title: productName, partnerId, itemType: "product" }
+            if (imageBase64) {
+                body.imageBase64 = imageBase64
+                body.imageMimeType = imageMimeType
+            }
+
             const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
                 method: "POST",
-                body: { title: productName, partnerId, itemType: "product" },
+                body,
             })
             if (data.error) {
                 notifyError("Erro", data.error)
@@ -443,6 +468,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
                 return {
                     ...prev,
+                    name: aiData.name || prev.name,
                     description: aiData.description || prev.description,
                     brand: brandName,
                     brand_id: brandId,
@@ -464,7 +490,7 @@ const AddProductPage: FC<AddProductPageProps> = ({
         } finally {
             setIsGeneratingDetails(false)
         }
-    }, [productData.name, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning, openPlanUpgrade])
+    }, [productData.name, productData.images, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning, openPlanUpgrade])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)

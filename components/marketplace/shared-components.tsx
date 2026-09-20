@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import { HeartIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ShieldIcon, InfoIcon, EditIcon, TagIcon, ClockIcon, EnergyIcon } from "@/lib/icons"
 import Link from "next/link"
+import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { useRouter } from "next/navigation"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
@@ -121,9 +122,8 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
     const isFreeDelivery = deliveryFeeLabel ? (deliveryFeeLabel.toLowerCase().includes("grátis") || deliveryFeeLabel.toLowerCase().includes("gratis")) : false
 
     return (
-        <Link
+        <IntentPrefetchLink
             href={getStoreUrl({ ...partner, ...vitrine })}
-            prefetch={false}
             className={`flex flex-col group cursor-pointer transition-all duration-300 ${className}`}
         >
             <div className="relative w-full aspect-[1400/300] rounded-[16px] overflow-hidden bg-gray-100 mb-3 shrink-0 dark:bg-dark-border/50">
@@ -202,7 +202,7 @@ export const VitrineCard: React.FC<VitrineCardProps> = memo(({ vitrine, hideCity
                     </div>
                 </div>
             </div>
-        </Link>
+        </IntentPrefetchLink>
     )
 })
 
@@ -503,9 +503,8 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
 
     return (
         <div className={`relative group/card h-full shrink-0 ${className}`}>
-            <Link
+            <IntentPrefetchLink
                 href={itemUrl}
-                prefetch={false}
                 className="block h-full flex-col hover:no-underline"
             >
                 <div className="relative mb-3 overflow-hidden rounded-[16px] border border-gray-100 bg-brand-gray aspect-square dark:border-dark-border dark:bg-dark-border/30">
@@ -670,7 +669,7 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
                         </div>
                     )}
                 </div>
-            </Link>
+            </IntentPrefetchLink>
         </div>
     );
 });
@@ -718,10 +717,9 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                         const imgUrl = storeImage ? getR2ImageUrl(storeImage, "thumb") : "https://img.dudit.com.br/static/Placeholder.png"
 
                         return (
-                            <Link
+                            <IntentPrefetchLink
                                 key={store.id}
                                 href={storeUrl}
-                                prefetch={false}
                                 className="w-[180px] md:w-[220px] shrink-0 snap-start block hover:no-underline"
                             >
                                 <div className="flex flex-col items-center gap-3 p-4 rounded-[16px] border border-gray-100 bg-white hover:shadow-md transition-all h-full dark:border-dark-border dark:bg-dark-surface">
@@ -745,7 +743,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
                                         )}
                                     </div>
                                 </div>
-                            </Link>
+                            </IntentPrefetchLink>
                         )
                     })}
                 </div>

@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
+import { helpCategories } from "@/lib/help-data"
 
 export const revalidate = 86400
 
@@ -20,18 +21,55 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const now = new Date()
 
-    // --- Static pages ---
+    // --- Static institutional & hub pages ---
     const staticUrls: MetadataRoute.Sitemap = [
         { url: "https://dudit.com.br", lastModified: now, changeFrequency: "daily", priority: 1 },
         { url: "https://dudit.com.br/explorar", lastModified: now, changeFrequency: "daily", priority: 0.9 },
+        { url: "https://dudit.com.br/ferramentas", lastModified: now, changeFrequency: "daily", priority: 0.9 },
+        { url: "https://dudit.com.br/ajuda", lastModified: now, changeFrequency: "daily", priority: 0.9 },
         { url: "https://dudit.com.br/institucional/inicio", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/sobre", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/planos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/segmentos", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/institucional/termos", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
         { url: "https://dudit.com.br/institucional/privacidade", lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+        { url: "https://dudit.com.br/institucional/estatisticas", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
         { url: "https://dudit.com.br/mapa", lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     ]
+
+    // --- Public Tool Pages (Tool SEO) ---
+    const toolUrls: MetadataRoute.Sitemap = [
+        { url: "https://dudit.com.br/ferramentas/calculadora-taxas-marketplace", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/ferramentas/calculadora-margem-lucro-preco-venda", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/ferramentas/calculadora-ponto-equilibrio", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/ferramentas/gerador-link-whatsapp", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+    ]
+
+    // --- Segment Pages (Niche Verticals) ---
+    const segmentUrls: MetadataRoute.Sitemap = [
+        { url: "https://dudit.com.br/segmentos/oficinas-e-tecnicos", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/segmentos/saloes-e-barbearias", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+        { url: "https://dudit.com.br/segmentos/confeitarias-e-alimentacao", lastModified: now, changeFrequency: "weekly", priority: 0.85 },
+    ]
+
+    // --- Help Center Categories & Articles (AEO / GEO) ---
+    const helpUrls: MetadataRoute.Sitemap = []
+    for (const cat of helpCategories) {
+        helpUrls.push({
+            url: `https://dudit.com.br/ajuda/${cat.id}`,
+            lastModified: now,
+            changeFrequency: "weekly",
+            priority: 0.8,
+        })
+        for (const art of cat.articles) {
+            helpUrls.push({
+                url: `https://dudit.com.br/ajuda/${cat.id}/${art.slug}`,
+                lastModified: now,
+                changeFrequency: "weekly",
+                priority: 0.8,
+            })
+        }
+    }
 
     // --- State pages: /explorar/estado-{uf} ---
     const stateUrls: MetadataRoute.Sitemap = ESTADOS.map((uf) => ({
@@ -50,7 +88,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }))
 
     // Base sitemap before dynamic content
-    const baseUrls = [...staticUrls, ...stateUrls, ...categoryUrls]
+    const baseUrls = [
+        ...staticUrls,
+        ...toolUrls,
+        ...segmentUrls,
+        ...helpUrls,
+        ...stateUrls,
+        ...categoryUrls
+    ]
 
     if (!supabase) return baseUrls
 
@@ -64,7 +109,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 .order("created_at", { ascending: false })
                 .limit(1000),
 
-            // Top 500 most recent public products in marketplace.
+            // Top 500 most recent public products in marketplace
             supabase
                 .rpc("get_marketplace_products_public", { p_product_ids: null, p_store_id: null })
                 .order("created_at", { ascending: false })

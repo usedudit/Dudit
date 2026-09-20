@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EditIcon, ChevronLeftIcon, ThreeDotsIcon, StarIcon, ShoppingCartIcon, MoneyIcon, TruckIcon, StoreIcon, Users, CreditCardIcon } from '@/lib/icons';
-import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal, CustomerCard } from '@/components/reusable';
+import { Button, Badge, Tabs, TabsList, TabsTrigger, TabsContent, ActionsDropdown, ThreeDotsLoader, AlertModal } from '@/components/reusable';
 import { formatBrazilPhone } from "@/lib/utils/phone-utils";
 import Pagination from '@/components/reusable/Pagination';
 import { useNotification } from '@/hooks/use-notification';
@@ -22,7 +22,6 @@ import { hasMinimumPlan } from '@/lib/subscription/plan-tier';
 import { usePermissions } from '@/lib/permission-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import SavingStatusModal from '@/components/reusable/SavingStatusModal';
-import { KPICard } from '@/components/erp/dashboard/cards/KPICard'
 import { HorizontalKPICard } from '@/components/erp/dashboard/cards/HorizontalKPICard';
 
 const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; width: string }[] = [
@@ -571,11 +570,15 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                     {renderBirthdayCard()}
 
                                                     {/* KPI Stats Row for Tablet/Mobile */}
-                                                    <div className="grid grid-cols-2 gap-4 mb-6">
-                                                        <KPICard title="Pedidos" value={stats.totalOrders} />
-                                                        <KPICard title="Total Gasto" value={stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00"} />
-                                                        <KPICard title="Valor médio" value={stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00"} />
-                                                        <KPICard title="Última Compra" value={stats.lastOrderDate} />
+                                                    <div className="mb-6">
+                                                        <HorizontalKPICard
+                                                            items={[
+                                                                { title: "Pedidos", value: stats.totalOrders, icon: ShoppingCartIcon },
+                                                                { title: "Total Gasto", value: stats.totalSpent ? formatCurrency(stats.totalSpent) : "R$ 0,00", icon: MoneyIcon },
+                                                                { title: "Valor médio", value: stats.avgOrder ? formatCurrency(stats.avgOrder) : "R$ 0,00", icon: Users },
+                                                                { title: "Última Compra", value: stats.lastOrderDate, icon: CreditCardIcon },
+                                                            ]}
+                                                        />
                                                     </div>
 
                                                     <div className="flex items-center gap-3 mb-6">
@@ -594,26 +597,25 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             <div className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                                                                 {formatOrderId(customer.id)} • {customer.email || 'Sem e-mail'}
                                                             </div>
-                                                            <div className="flex items-center gap-2 mt-1 text-sm text-brand-inactive-text dark:text-dark-body">
-                                                                <span>Cliente desde {customer.createdAt ? formatDate(customer.createdAt) : '-'}</span>
-                                                                <span className="text-brand-inactive-text dark:text-dark-body">•</span>
-                                                                <span>{customer.personType === 'pj' || customer.cnpj ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
-                                                            </div>
                                                         </div>
                                                     </div>
 
-                                                    <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border p-5 space-y-3">
+                                                    <div className="space-y-4">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Cliente desde</span>
+                                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{customer.createdAt ? formatDate(customer.createdAt) : '-'}</span>
+                                                        </div>
                                                         {customer.birth_date && (
-                                                            <div className="flex justify-between items-center py-2 border-b border-brand-border dark:border-dark-border/50">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Nascimento</span>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Nascimento</span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                     {formatDateToBR(customer.birth_date)}
                                                                 </span>
                                                             </div>
                                                         )}
                                                         {(customer.cpf || customer.cnpj) && (
-                                                            <div className="flex justify-between items-center py-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">
                                                                     {customer.cnpj ? 'CNPJ' : 'CPF'}
                                                                 </span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
@@ -622,20 +624,20 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
                                                             </div>
                                                         )}
                                                         {customer.phone && (
-                                                            <div className="flex justify-between items-center py-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Telefone</span>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Telefone</span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatBrazilPhone(customer.phone)}</span>
                                                             </div>
                                                         )}
                                                         {customer.mobile && (
-                                                            <div className="flex justify-between items-center py-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Celular</span>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Celular</span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatBrazilPhone(customer.mobile)}</span>
                                                             </div>
                                                         )}
                                                         {customer.email && (
-                                                            <div className="flex justify-between items-center py-2">
-                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">E-mail</span>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">E-mail</span>
                                                                 <span className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate max-w-[60%]">{customer.email}</span>
                                                             </div>
                                                         )}
@@ -829,12 +831,80 @@ export const CustomerDetailPage = ({ customer, onBack, onEdit }: Props) => {
 
                                                 <div className="border-t border-brand-border dark:border-dark-border w-full"></div>
 
-                                                {/* Address + Contact (padronizado) */}
+                                                {/* Address */}
                                                 <div className="p-6 text-left">
-                                                    <CustomerCard
-                                                        customer={{ ...customer, addresses: customerAddresses }}
-                                                        showMap={true}
-                                                    />
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Endereço</h3>
+                                                    </div>
+
+                                                    {customerAddresses.length > 0 ? (
+                                                        <div className="space-y-6">
+                                                            <div>
+                                                                <div
+                                                                    className="w-full h-[120px] bg-brand-gray dark:bg-dark-border rounded-lg relative overflow-hidden mb-4 flex items-center justify-center cursor-pointer group"
+                                                                    onClick={() => {
+                                                                        const addr = customerAddresses[0];
+                                                                        const full = [addr.street, addr.number, addr.complement, addr.neighborhood, addr.city, addr.state, addr.zipCode].filter(Boolean).join(", ");
+                                                                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}`, '_blank');
+                                                                    }}
+                                                                >
+                                                                    <img src="https://img.dudit.com.br/static/MapLarge.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Mapa" />
+                                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                                        <div className="w-6 h-6 bg-brand-green rounded-full border-2 border-white flex items-center justify-center text-white z-10 transition-transform group-hover:scale-110">
+                                                                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="mb-0">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate pr-2">Endereço Principal</h4>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const addr = customerAddresses[0];
+                                                                                const full = [addr.street, addr.number, addr.complement, addr.neighborhood, addr.city, addr.state, addr.zipCode].filter(Boolean).join(", ");
+                                                                                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}`, '_blank');
+                                                                            }}
+                                                                            className="text-xs font-bold text-brand-dark dark:text-dark-heading underline decoration-brand-dark dark:decoration-dark-heading shrink-0"
+                                                                        >
+                                                                            Ver Mapa
+                                                                        </button>
+                                                                    </div>
+                                                                    <p className="text-[14px] text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-line">
+                                                                        {[customerAddresses[0].street, customerAddresses[0].number, customerAddresses[0].complement, customerAddresses[0].neighborhood, customerAddresses[0].city, customerAddresses[0].state, customerAddresses[0].zipCode].filter(Boolean).join(", ")}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
+                                                            <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">Nenhum endereço cadastrado.</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Contact */}
+                                                    <div className="mt-6 pt-6 border-t border-brand-border dark:border-dark-border">
+                                                        <div className="flex justify-between items-center mb-4">
+                                                            <h3 className="font-bold text-lg text-brand-dark dark:text-dark-heading">Contato</h3>
+                                                        </div>
+                                                        {(customer.email || customer.phone) ? (
+                                                            <div className="space-y-3">
+                                                                {customer.email && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 truncate w-full">{customer.email}</span>
+                                                                    </div>
+                                                                )}
+                                                                {customer.phone && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium text-[#1e40af] dark:text-[#60a5fa] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 w-fit">{formatBrazilPhone(customer.phone)}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-brand-gray/30 dark:bg-dark-border/30 rounded-lg p-4 text-center">
+                                                                <p className="text-sm text-brand-inactive-text dark:text-dark-body italic">Nenhuma informação de contato disponível.</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </section>

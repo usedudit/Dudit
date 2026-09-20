@@ -1,17 +1,16 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback, useTransition } from "react"
+import { useState, useEffect, useRef, useCallback, useTransition } from "react"
 import {
     ChevronLeftIcon,
     ShareIcon,
     PackageIcon,
     ClockIcon,
-    UserIcon,
     ThreeDotsIcon,
     TrashIcon,
     AlertTriangleIcon,
     CheckCircleIcon,
-    RotateCcwIcon,
+    RotateIcon,
 } from "@/lib/icons"
 import {
     Button,
@@ -20,12 +19,15 @@ import {
     TabsList,
     TabsTrigger,
     TabsContent,
-    ThreeDotsLoader,
     FormSection,
     IconPlaceholder,
+    ListItem,
     DefaultModal,
+    Input,
     ActionsDropdown,
     DropdownItem,
+    SidebarCard,
+    ThreeDotsLoader,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatDateTime } from "@/lib/utils"
@@ -301,7 +303,7 @@ export function AdminReportDetailView({
                                                 )}
                                                 {report.status === "validated" && (
                                                     <DropdownItem onClick={() => setRevertModalOpen(true)} disabled={isPending}>
-                                                        <RotateCcwIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
+                                                        <RotateIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
                                                     </DropdownItem>
                                                 )}
                                                 <DropdownItem onClick={handleShare}>
@@ -369,11 +371,7 @@ export function AdminReportDetailView({
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                                     {/* Card do Item Denunciado */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Item Denunciado
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Item Denunciado">
                                                         <div className="space-y-3">
                                                             <div className="flex items-start justify-between gap-3">
                                                                 <div className="flex flex-col min-w-0">
@@ -420,7 +418,7 @@ export function AdminReportDetailView({
                                                                 )
                                                             })()}
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Card de Histórico do Alvo */}
                                                     {targetSummary && (
@@ -580,7 +578,7 @@ export function AdminReportDetailView({
                         )}
                         {report.status === "validated" && (
                             <DropdownItem onClick={() => setRevertModalOpen(true)} disabled={isPending}>
-                                <RotateCcwIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
+                                <RotateIcon size={16} className="text-orange-600" /> Reverter Validação (-5 pts)
                             </DropdownItem>
                         )}
                         <DropdownItem onClick={handleShare}>

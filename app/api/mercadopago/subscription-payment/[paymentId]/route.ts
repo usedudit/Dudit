@@ -112,6 +112,9 @@ export async function GET(
           })
 
           try {
+            const minuteBucket = Math.floor(Date.now() / 60000)
+            const idempotencyKey = `subscription_reactivated:${targetSub.partner_id}:${targetSub.mercado_pago_subscription_id}:${minuteBucket}`
+
             await adminClient.from("billing_events").insert({
               partner_id: targetSub.partner_id,
               event_type: "subscription_reactivated",
@@ -123,6 +126,7 @@ export async function GET(
                 payment_method: paymentData.payment_method_id || "pix",
                 sync_source: "status_poll",
               },
+              idempotency_key: idempotencyKey,
             })
           } catch {}
         }

@@ -26,7 +26,7 @@ export const SidebarCard: React.FC<SidebarCardProps> = ({
                 <div className="flex items-center justify-between mb-6 mt-2">
                     <div className="min-w-0 flex-1">
                         {title ? (
-                            <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading">{title}</h3>
+                            <h3 className="text-md lg:text-lg font-medium text-brand-dark dark:text-dark-heading">{title}</h3>
                         ) : null}
                     </div>
                     {headerRight && <div className="shrink-0 ml-4">{headerRight}</div>}

@@ -30,6 +30,7 @@ import {
     Input,
     ActionsDropdown,
     DropdownItem,
+    SidebarCard,
 } from "@/components/reusable"
 import { AdminEnforcementModal } from "../AdminEnforcementModal"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -650,11 +651,7 @@ export function AdminPartnerDetailView({
 
                                             {/* Sidebar */}
                                             <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                    <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                        Proprietário / Titular
-                                                    </h3>
+                                                <SidebarCard hasTopStrip hasSeparator title="Proprietário / Titular">
                                                     <div className="flex items-center gap-3">
                                                         <UserProfileImage
                                                             fullName={ownerProfile?.full_name || "Proprietário"}
@@ -681,7 +678,7 @@ export function AdminPartnerDetailView({
                                                             </Link>
                                                         </div>
                                                     )}
-                                                </div>
+                                                </SidebarCard>
 
                                                 <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
                                                     <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">

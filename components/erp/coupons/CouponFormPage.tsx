@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useMemo, useState, useCallback, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
@@ -570,7 +570,7 @@ export default function CouponFormPage({
                                 </div>
 
                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 space-y-6 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                    <SidebarCard hasTopStrip title="Limites de uso">
+                                    <SidebarCard hasSeparator hasTopStrip title="Limites de uso">
                                         <div className="space-y-5">
                                             <div>
                                                 <label className="flex items-start gap-3 mb-3">
@@ -613,7 +613,7 @@ export default function CouponFormPage({
                                         </div>
                                     </SidebarCard>
 
-                                    <SidebarCard hasTopStrip title="Validade">
+                                    <SidebarCard hasSeparator hasTopStrip title="Validade">
                                         <div className="space-y-4">
                                             <label className="flex items-start gap-3">
                                                 <Checkbox checked={form.unlimitedDate} onChange={(value) => setForm((prev) => ({ ...prev, unlimitedDate: Boolean(value) }))} />
@@ -715,3 +715,4 @@ export default function CouponFormPage({
         </FadeIn>
     )
 }
+

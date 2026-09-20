@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect } from "react"
-import { Input, FormDropdown, RichTextEditor, Checkbox, Accordion, Spinner } from "@/components/reusable"
+import { Input, FormDropdown, RichTextEditor, Checkbox, Accordion, Spinner, SidebarCard } from "@/components/reusable"
 import { SparklesIcon, LinkIcon } from "@/lib/icons"
 import { ITEM_TYPES, ORIGIN_OPTIONS } from "@/lib/constants/product-constants"
 import { detectMonophasicByNcm } from "@/lib/fiscal-utils"
@@ -242,26 +242,21 @@ export const ProductFiscalTab: React.FC<ProductFiscalTabProps> = ({
       </div>
 
       {/* COLUNA DIREITA (Info Adicional) */}
-      <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-        <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden shadow-sm">
-          <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border"></div>
-          <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-6 mt-2">
-            Outras informações
-          </h3>
-
-          <div className="space-y-6">
-            <RichTextEditor
-              label="Informações Adicionais (Rodapé da Nota)"
-              value={productData.inf_ad_prod || ""}
-              onChange={(value) => handleFieldChange({ target: { name: "inf_ad_prod", value } })}
-              disabled={!isEditing}
-            />
-            <div className="text-xs text-muted-foreground">
-              Este texto aparecerá no campo "Dados Adicionais" da DANFE.
+        <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
+          <SidebarCard hasTopStrip hasSeparator title="Outras informações">
+            <div className="space-y-6">
+              <RichTextEditor
+                label="Informações Adicionais (Rodapé da Nota)"
+                value={productData.inf_ad_prod || ""}
+                onChange={(value) => handleFieldChange({ target: { name: "inf_ad_prod", value } })}
+                disabled={!isEditing}
+              />
+              <div className="text-xs text-muted-foreground">
+                Este texto aparecerá no campo "Dados Adicionais" da DANFE.
+              </div>
             </div>
-          </div>
+          </SidebarCard>
         </div>
-      </div>
 
     </div>
   )

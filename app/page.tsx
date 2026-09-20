@@ -7,6 +7,7 @@ import { MarketplaceHeader } from "@/components/marketplace/MarketplaceHeader"
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter"
 import { Suspense } from "react"
 import type { Metadata } from "next"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import { getSponsoredAdsForSlot } from "@/app/actions/marketplace/ads"
 import type { SponsoredAd } from "@/lib/ads/types"
 import { cookies } from "next/headers"
@@ -205,8 +206,28 @@ export default async function HomePage() {
 
     const cartCount = sessionData?.cartCount || 0
 
+    const homeJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "Dudit",
+        url: "https://dudit.com.br",
+        description: "Encontre produtos, serviços e negócios perto de você. Descubra. Anuncie. Organize.",
+        potentialAction: {
+            "@type": "SearchAction",
+            target: {
+                "@type": "EntryPoint",
+                urlTemplate: "https://dudit.com.br/explorar?q={search_term_string}",
+            },
+            "query-input": "required name=search_term_string",
+        },
+    }
+
     return (
         <div className="bg-white min-h-screen font-sans text-brand-dark flex flex-col pt-[80px] lg:pt-[108px] dark:bg-dark-background dark:text-dark-heading">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: safeJsonLdStringify(homeJsonLd) }}
+            />
             <MarketplaceHeader currentView="home" userProfile={userProfile} cartCount={cartCount} />
 
             <Suspense fallback={<HomeFeedSkeleton />}>

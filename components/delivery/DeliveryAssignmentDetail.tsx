@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -705,7 +705,7 @@ export default function DeliveryAssignmentDetail({
                                                     <InfoCard title="Instruções do Pedido" message={assignment.notes} color="orange" />
                                                 )}
 
-                                                <SidebarCard title="Remuneração & Valores">
+                                                <SidebarCard hasSeparator title="Remuneração & Valores">
                                                     <InfoCard
                                                         title="Sua Taxa de Entrega (Total)"
                                                         message={formatCurrency(totalRouteDeliveryFee)}

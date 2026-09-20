@@ -1,22 +1,42 @@
 # Dudit
 
-> Dudit (dudit.com.br) é um marketplace local brasileiro que conecta consumidores a vendedores locais, profissionais autônomos e vitrines de negócios com contato direto via WhatsApp e sem intermediação ou comissão abusiva sobre vendas.
+> Dudit (https://dudit.com.br) é um ecossistema completo de comércio local brasileiro que une um Marketplace Hiperlocal com 0% de comissão por venda a um Mini-ERP de gestão operacional simples para micro e pequenos negócios, autônomos e prestadores de serviços.
 
 ## Sobre a Plataforma
-A Dudit permite que qualquer pessoa ou empresa encontre ou anuncie:
-- **Produtos**: Itens novos e seminovos em diversas categorias (Alimentação, Casa, Tecnologia, Moda e Beleza, Saúde, Automotivo, Pets, etc.).
-- **Serviços**: Profissionais liberais, manutenção, consultorias, serviços de beleza, reformas e serviços do dia a dia.
-- **Vitrines / Lojas**: Catálogo online e perfil completo de negócios locais com localização, horários de atendimento e link direto para WhatsApp.
+A Dudit resolve a dor de taxas abusivas cobradas por grandes marketplaces e a falta de visibilidade digital e ferramentas de gestão acessíveis para pequenos empreendedores brasileiros. A plataforma engloba:
+- **Marketplace Hiperlocal**: Descoberta de produtos, serviços e vitrines comerciais por proximidade geográfica e cidade, com contato direto via WhatsApp e sem taxa de intermediação.
+- **Mini-ERP Integrado**: Gestão completa para pequenas empresas e autônomos — incluindo Ordens de Serviço (OS), Agendamento Online 24h, Orçamentos e Recibos, Frente de Caixa / PDV e Controle de Estoque.
+- **Catálogo Online / Vitrine Digital**: Página própria do estabelecimento com catálogo de produtos/serviços, fotos, horário de funcionamento, localização e botão de pedido direto no WhatsApp.
 
-## Como as URLs são estruturadas
+## Estrutura de URLs Principais
 - **Página Inicial**: `https://dudit.com.br`
-- **Explorar por Cidade**: `https://dudit.com.br/explorar/{cidade-uf}` (ex: `https://dudit.com.br/explorar/sao-paulo-sp`)
+- **Explorar Marketplace por Cidade**: `https://dudit.com.br/explorar/{cidade-uf}` (ex: `https://dudit.com.br/explorar/franca-sp`)
+- **Explorar por Estado**: `https://dudit.com.br/explorar/estado-{uf}` (ex: `https://dudit.com.br/explorar/estado-sp`)
 - **Produtos**: `https://dudit.com.br/{cidade-uf}/{slug-produto}/p/{short_id}`
 - **Serviços**: `https://dudit.com.br/{cidade-uf}/{slug-servico}/s/{short_id}`
-- **Vitrines de Lojas**: `https://dudit.com.br/{cidade-uf}/{slug-loja}/v/{short_id}`
-- **Explorar por Categoria Nacional**: `https://dudit.com.br/explorar/brasil/{categoria}`
+- **Vitrines / Lojas**: `https://dudit.com.br/{cidade-uf}/{slug-loja}/v/{short_id}`
 
-## Diferenciais
-- **Contato Direto**: Clientes conversam diretamente com o vendedor ou prestador de serviço no WhatsApp.
-- **0% de Comissão por Venda**: O vendedor retém 100% do lucro da venda.
-- **Hiperlocal**: Foco em proximidade, permitindo encontrar o que precisa no próprio bairro ou cidade.
+### Soluções por Segmento (Vertical LPs)
+- **Oficinas Mecânicas e Assistências Técnicas**: `https://dudit.com.br/segmentos/oficinas-e-tecnicos` (Gestão de Ordens de Serviço, status via WhatsApp e controle de peças).
+- **Salões de Beleza e Barbearias**: `https://dudit.com.br/segmentos/saloes-e-barbearias` (Agendamento online 24h, lembretes automáticos e catálogo de serviços).
+- **Confeitarias, Docerias e Alimentação**: `https://dudit.com.br/segmentos/confeitarias-e-alimentacao` (Cardápio digital, pedidos via WhatsApp e 0% de comissão).
+
+### Ferramentas e Calculadoras Gratuitas (Tool SEO)
+- **Hub de Ferramentas**: `https://dudit.com.br/ferramentas`
+- **Calculadora de Taxas de Marketplace**: `https://dudit.com.br/ferramentas/calculadora-taxas-marketplace` (Simula o impacto de comissões de 12% a 27% vs 0% na Dudit).
+- **Calculadora de Margem de Lucro e Preço de Venda (Markup)**: `https://dudit.com.br/ferramentas/calculadora-margem-lucro-preco-venda`
+- **Calculadora de Ponto de Equilíbrio (Break-Even)**: `https://dudit.com.br/ferramentas/calculadora-ponto-equilibrio`
+- **Gerador de Link de WhatsApp**: `https://dudit.com.br/ferramentas/gerador-link-whatsapp`
+
+### Central de Ajuda e Base de Conhecimento (AEO / GEO)
+- **Central de Ajuda**: `https://dudit.com.br/ajuda`
+- Guias detalhados com passo a passo sobre emissão de ordens de serviço, agendamentos, precificação, marketing local e gestão de estoque.
+
+### Pesquisas e Estatísticas do Mercado
+- **Estatísticas do Comércio Local e Taxas de Marketplace**: `https://dudit.com.br/institucional/estatisticas`
+
+## Diferenciais e Posicionamento
+- **0% de Comissão por Venda**: O empreendedor não perde margem de lucro com taxas de 12% a 27% por pedido.
+- **Contato e Venda Direta no WhatsApp**: O cliente negocia diretamente com quem vende, sem intermediários.
+- **Foco Hiperlocal**: Conecta compradores a comércios e profissionais do mesmo bairro ou município, reduzindo custos e prazos de frete.
+- **Gestão Simplificada (ERP)**: Ferramentas operacionais nativas sem complexidade excessiva, acessíveis pelo celular ou computador.

@@ -195,6 +195,8 @@ export async function createMpSubscription(
 
   // Free plan doesn't need MP subscription
   if (plan.price <= 0) {
+    const now = new Date()
+    const nextMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
     const { data: sub, error } = await admin
       .from("subscriptions")
       .insert({
@@ -203,7 +205,8 @@ export async function createMpSubscription(
         plan_snapshot: plan,
         status: "active",
         billing_email: payerEmail,
-        current_period_start: new Date().toISOString(),
+        current_period_start: now.toISOString(),
+        current_period_end: nextMonth.toISOString(),
       })
       .select("id")
       .single()
@@ -664,15 +667,20 @@ async function logBillingEvent(
   metadata: Record<string, unknown>,
 ): Promise<void> {
   try {
+    const minuteBucket = Math.floor(Date.now() / 60000)
+    const resourceId = metadata.mp_subscription_id || metadata.subscription_id || ""
+    const idempotencyKey = `${eventType}:${partnerId}:${resourceId}:${minuteBucket}`
+
     await admin.from("billing_events").insert({
       partner_id: partnerId,
       event_type: eventType,
       amount,
       provider: "mercado_pago",
       metadata,
+      idempotency_key: idempotencyKey,
     })
   } catch (err) {
-    // Billing event logging must never break the primary action
+    if ((err as any)?.code === "23505") return
     console.error("[BILLING_EVENT] Failed to log:", {
       eventType,
       error: err instanceof Error ? err.message : String(err),

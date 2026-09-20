@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal, InfoCard } from "@/components/reusable"
+import { Button, Tabs, TabsList, TabsTrigger, TabsContent, FormSection, FormDropdown, IconPlaceholder, SavingStatusModal, InfoCard, SidebarCard } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -378,9 +378,7 @@ export function PaymentsPage({
 
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
                                             {/* Meios de recebimento */}
-                                            <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                                <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Meios de recebimento</h3>
+                                            <SidebarCard hasTopStrip hasSeparator title="Meios de recebimento">
                                                 <p className="text-xs text-brand-inactive-text mb-6">
                                                     {isWhatsAppFlow
                                                         ? "Configure seus métodos de pagamento para exibir na vitrine. O recebimento do sinal requer fluxo de pedidos via Dudit."
@@ -399,7 +397,7 @@ export function PaymentsPage({
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            </SidebarCard>
                                         </div>
                                     </motion.div>
                                 </TabsContent>

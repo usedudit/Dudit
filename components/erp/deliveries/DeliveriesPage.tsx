@@ -423,371 +423,371 @@ export default function DeliveriesPage({
 
     return (
         <>
-        <AnimatePresence mode="wait">
-            {wrapper === "create" || wrapper === "edit" ? (
-                <FadeIn key={wrapper} className="w-full h-full">
-                    <CreateDeliveryPage
-                        partnerId={partnerId}
-                        editDeliveryId={editDeliveryId || undefined}
-                        onBack={() => { setCreatePrefillOrderIds(null); closeEntity() }}
-                        onSuccess={() => { setCreatePrefillOrderIds(null); closeEntity() }}
-                        initialOrderIds={createPrefillOrderIds || undefined}
-                    />
-                </FadeIn>
-            ) : wrapper === "detail" && selectedDeliveryId ? (
-                <FadeIn key="detail" className="w-full h-full">
-                    <DeliveryDetailPage
-                        deliveryId={selectedDeliveryId}
-                        partnerId={partnerId}
-                        onBack={() => closeEntity()}
-                        onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
-                        planSlug={planSlug}
-                    />
-                </FadeIn>
-            ) : (
-                <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
-                    <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
-                        <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
-                            <div className="flex flex-col gap-2 pt-1">
-                                <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Entregas</h1>
-                                <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                {!isDelivery && (
-                                    <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
-                                        Exportar
-                                    </Button>
-                                )}
-                                {!isDelivery && (
-                                    <Button
-                                        variant="outline"
-                                        onClick={loadSuggestions}
-                                        disabled={!!planGate}
-                                        leftIcon={<SparklesIcon size={18} />}
-                                    >
-                                        Gerar sugestões
-                                    </Button>
-                                )}
-                                {!isDelivery && (
-                                    <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
-                                        Nova entrega
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-
-                        <DeliveryPageControls
-                            activeTab={activeTab}
-                            onActiveTabChange={setActiveTab}
-                            search={search}
-                            onSearchChange={setSearch}
-                            onOpenFilter={() => setIsFilterOpen(true)}
-                            onAdd={() => openEntity("create")}
-                            onOpenSuggestions={loadSuggestions}
-                            canSmartSuggest={canSmartSuggest}
-                            addDisabled={!!planGate}
-                            tabCounts={tabCounts}
-                            userRole={initialUserRole}
-                            filters={filters}
-                            setFilters={setFilters}
-                            hasActiveFilters={filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod)}
+            <AnimatePresence mode="wait">
+                {wrapper === "create" || wrapper === "edit" ? (
+                    <FadeIn key={wrapper} className="w-full h-full">
+                        <CreateDeliveryPage
+                            partnerId={partnerId}
+                            editDeliveryId={editDeliveryId || undefined}
+                            onBack={() => { setCreatePrefillOrderIds(null); closeEntity() }}
+                            onSuccess={() => { setCreatePrefillOrderIds(null); closeEntity() }}
+                            initialOrderIds={createPrefillOrderIds || undefined}
                         />
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
-                            <AnimatePresence mode="wait">
-                                {paginated.length === 0 ? (
-                                    <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
-                                        <IconPlaceholder
-                                            placeholderType="image"
-                                            imageSrc={
-                                                planGate
-                                                    ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
-                                                    : "https://img.dudit.com.br/static/mascots/Entregas.png"
-                                            }
-                                            imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
-                                            title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
-                                            subtitle={
-                                                planGate
-                                                    ? planGate.message
-                                                    : isDelivery
-                                                        ? "Nenhuma entrega atribuída a você no momento."
-                                                        : activeTab === "closed"
-                                                            ? "Nenhuma entrega cancelada ou com falha encontrada."
-                                                            : "Crie uma entrega a partir de um pedido para começar."
-                                            }
-                                            itemButton={
-                                                planGate ? {
-                                                    text: "Ver Plano Escalar",
-                                                    action: () => openPlanUpgrade("escalar"),
-                                                } : isDelivery ? undefined : {
-                                                    text: "Adicionar primeira entrega",
-                                                    action: () => openEntity("create"),
-                                                }
-                                            }
-                                        />
-                                    </FadeIn>
-                                ) : (
-                                    <FadeIn key="kanban" className="w-full">
-                                        <DeliveryKanbanBoard
-                                            deliveries={mapped}
-                                            activeTab={activeTab}
-                                            onDetails={(id) => openEntity("view", id)}
-                                            onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
-                                            onQuickStatusChange={handleQuickStatusChange}
-                                        />
-                                    </FadeIn>
-                                )}
-                            </AnimatePresence>
-                            {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
-                        </div>
-                    </div>
-                </FadeIn>
-            )}
-
-            <DefaultModal
-                isOpen={suggestionsOpen}
-                onClose={() => setSuggestionsOpen(false)}
-                title="Sugestões de entregas"
-                maxWidth="4xl"
-            >
-                <div className="space-y-4">
-                    {suggestionsLoading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between space-y-3">
-                                    <div className="h-[84px] w-full bg-gray-200 dark:bg-dark-border rounded-xl animate-pulse" />
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="space-y-2 flex-1 min-w-0">
-                                            <div className="h-4 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
-                                            <div className="flex gap-1.5 pt-1">
-                                                <div className="h-5 w-[70px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
-                                                <div className="h-5 w-[50px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
-                                            </div>
-                                        </div>
-                                        <div className="h-8 w-[90px] bg-gray-200 dark:bg-dark-border rounded-lg shrink-0 animate-pulse" />
-                                    </div>
-                                    <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
-                                        <div className="flex justify-between items-center">
-                                            <div className="h-3.5 w-[55%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
-                                            <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <div className="h-3.5 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
-                                            <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
-                                        </div>
-                                    </div>
+                    </FadeIn>
+                ) : wrapper === "detail" && selectedDeliveryId ? (
+                    <FadeIn key="detail" className="w-full h-full">
+                        <DeliveryDetailPage
+                            deliveryId={selectedDeliveryId}
+                            partnerId={partnerId}
+                            onBack={() => closeEntity()}
+                            onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
+                            planSlug={planSlug}
+                        />
+                    </FadeIn>
+                ) : (
+                    <FadeIn key="list" className="flex flex-col h-full bg-white dark:bg-dark-background transition-colors duration-300">
+                        <div className="mx-auto w-full pt-4 flex flex-col h-full overflow-hidden relative">
+                            <div className="hidden md:flex items-start justify-between mb-6 flex-none px-4 md:px-8">
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <h1 className="text-[32px] font-bold text-brand-dark dark:text-dark-heading tracking-tight leading-none">Entregas</h1>
+                                    <p className="text-brand-inactive-text dark:text-dark-body text-[15px] font-medium">Gerencie as entregas vinculadas aos pedidos.</p>
                                 </div>
-                            ))}
-                        </div>
-                    ) : suggestions.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-center">
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Nenhuma sugestão encontrada</p>
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Não há pedidos pendentes suficientes com CEPs agrupáveis no momento.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {suggestions.map((sug, idx) => (
-                                <motion.div
-                                    key={`${sug.groupKey}-${idx}`}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.2, delay: idx * 0.04 }}
-                                    className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between hover:border-brand-primary/40 transition-all duration-200"
-                                >
-                                    <div>
-                                        {/* Map Thumbnail Decorator */}
-                                        <div className="w-full h-[84px] bg-brand-gray dark:bg-dark-border/40 rounded-xl relative overflow-hidden mb-3.5 flex items-center justify-center group">
-                                            <img
-                                                src="https://img.dudit.com.br/static/MapLarge.png"
-                                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                                                alt="Mapa"
+                                <div className="flex items-center gap-3">
+                                    {!isDelivery && (
+                                        <Button variant="outline" leftIcon={<ExportFileIcon size={18} />}>
+                                            Exportar
+                                        </Button>
+                                    )}
+                                    {!isDelivery && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={loadSuggestions}
+                                            disabled={!!planGate}
+                                            leftIcon={<SparklesIcon size={18} />}
+                                        >
+                                            Gerar sugestões
+                                        </Button>
+                                    )}
+                                    {!isDelivery && (
+                                        <Button onClick={() => openEntity("create")} disabled={!!planGate} leftIcon={<PlusIcon size={18} />}>
+                                            Nova entrega
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <DeliveryPageControls
+                                activeTab={activeTab}
+                                onActiveTabChange={setActiveTab}
+                                search={search}
+                                onSearchChange={setSearch}
+                                onOpenFilter={() => setIsFilterOpen(true)}
+                                onAdd={() => openEntity("create")}
+                                onOpenSuggestions={loadSuggestions}
+                                canSmartSuggest={canSmartSuggest}
+                                addDisabled={!!planGate}
+                                tabCounts={tabCounts}
+                                userRole={initialUserRole}
+                                filters={filters}
+                                setFilters={setFilters}
+                                hasActiveFilters={filters.status.length > 0 || isDatePeriodFilterActive(filters.datePeriod)}
+                            />
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar relative pb-20 md:pb-2 px-4 md:px-8">
+                                <AnimatePresence mode="wait">
+                                    {paginated.length === 0 ? (
+                                        <FadeIn key="empty" className="flex flex-col items-center justify-center h-[500px] text-center p-8 w-full">
+                                            <IconPlaceholder
+                                                placeholderType="image"
+                                                imageSrc={
+                                                    planGate
+                                                        ? "https://img.dudit.com.br/static/mascots/PlanoVender.png"
+                                                        : "https://img.dudit.com.br/static/mascots/Entregas.png"
+                                                }
+                                                imageAlt={planGate ? "Plano necessário" : "Sem entregas"}
+                                                title={planGate ? "Plano necessário" : "Nenhuma entrega encontrada"}
+                                                subtitle={
+                                                    planGate
+                                                        ? planGate.message
+                                                        : isDelivery
+                                                            ? "Nenhuma entrega atribuída a você no momento."
+                                                            : activeTab === "closed"
+                                                                ? "Nenhuma entrega cancelada ou com falha encontrada."
+                                                                : "Crie uma entrega a partir de um pedido para começar."
+                                                }
+                                                itemButton={
+                                                    planGate ? {
+                                                        text: "Ver Plano Escalar",
+                                                        action: () => openPlanUpgrade("escalar"),
+                                                    } : isDelivery ? undefined : {
+                                                        text: "Adicionar primeira entrega",
+                                                        action: () => openEntity("create"),
+                                                    }
+                                                }
                                             />
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/5">
-                                                <div className="w-7 h-7 bg-brand-primary rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-md group-hover:scale-110 transition-transform">
-                                                    <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
+                                        </FadeIn>
+                                    ) : (
+                                        <FadeIn key="kanban" className="w-full">
+                                            <DeliveryKanbanBoard
+                                                deliveries={mapped}
+                                                activeTab={activeTab}
+                                                onDetails={(id) => openEntity("view", id)}
+                                                onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
+                                                onQuickStatusChange={handleQuickStatusChange}
+                                            />
+                                        </FadeIn>
+                                    )}
+                                </AnimatePresence>
+                                {hasNextPage ? <div ref={observerTarget} className="h-12 w-full shrink-0" aria-hidden /> : null}
+                            </div>
+                        </div>
+                    </FadeIn>
+                )}
+
+                <DefaultModal
+                    isOpen={suggestionsOpen}
+                    onClose={() => setSuggestionsOpen(false)}
+                    title="Sugestões de entregas"
+                    maxWidth="4xl"
+                >
+                    <div className="space-y-4">
+                        {suggestionsLoading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {[1, 2, 3, 4].map((i) => (
+                                    <div key={i} className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between space-y-3">
+                                        <div className="h-[84px] w-full bg-gray-200 dark:bg-dark-border rounded-xl animate-pulse" />
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="space-y-2 flex-1 min-w-0">
+                                                <div className="h-4 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                                <div className="flex gap-1.5 pt-1">
+                                                    <div className="h-5 w-[70px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
+                                                    <div className="h-5 w-[50px] bg-gray-200 dark:bg-dark-border rounded-full animate-pulse" />
                                                 </div>
                                             </div>
-                                            <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                                                <MapPinIcon size={10} />
-                                                <span>{sug.groupLabel}</span>
-                                            </div>
+                                            <div className="h-8 w-[90px] bg-gray-200 dark:bg-dark-border rounded-lg shrink-0 animate-pulse" />
                                         </div>
-
-                                        {/* Header Info */}
-                                        <div className="flex items-start justify-between gap-2 mb-3">
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                    {sug.groupLabel}
-                                                </h4>
-                                                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                                    <span className="bg-brand-primary/10 text-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                        {sug.orders?.length || 0} pedido(s)
-                                                    </span>
-                                                    {sug.totalDistanceKm != null ? (
-                                                        <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                            {formatDistance(Number(sug.totalDistanceKm))}
-                                                        </span>
-                                                    ) : null}
-                                                    {sug.estimatedDurationMinutes != null ? (
-                                                        <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                            ~{sug.estimatedDurationMinutes} min
-                                                        </span>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-
-                                            <Button
-                                                size="sm"
-                                                onClick={() => {
-                                                    const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
-                                                    setSuggestionsOpen(false)
-                                                    setCreatePrefillOrderIds(ids)
-                                                    openEntity("create")
-                                                }}
-                                                className="shrink-0 font-bold"
-                                            >
-                                                Criar entrega
-                                            </Button>
-                                        </div>
-
-                                        {/* Order Items List */}
                                         <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
-                                            {(sug.orders || []).map((o: any) => (
-                                                <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
-                                                    <div className="min-w-0 flex items-center gap-1.5">
-                                                        <span className="font-bold text-brand-dark dark:text-dark-heading shrink-0">{o.displayId}</span>
-                                                        <span className="text-brand-inactive-text dark:text-dark-body truncate">• {o.customerName}</span>
-                                                    </div>
-                                                    <div className="text-[11px] font-bold text-brand-primary shrink-0 bg-brand-primary/5 px-2 py-0.5 rounded">
-                                                        {o.distanceKm == null ? "-" : `${Number(o.distanceKm).toFixed(1)} km`}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                            <div className="flex justify-between items-center">
+                                                <div className="h-3.5 w-[55%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                                <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <div className="h-3.5 w-[65%] bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                                <div className="h-3.5 w-10 bg-gray-200 dark:bg-dark-border rounded-md animate-pulse" />
+                                            </div>
                                         </div>
                                     </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </DefaultModal>
+                                ))}
+                            </div>
+                        ) : suggestions.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Nenhuma sugestão encontrada</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">Não há pedidos pendentes suficientes com CEPs agrupáveis no momento.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {suggestions.map((sug, idx) => (
+                                    <motion.div
+                                        key={`${sug.groupKey}-${idx}`}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ duration: 0.2, delay: idx * 0.04 }}
+                                        className="rounded-2xl border border-brand-border dark:border-dark-border p-4 bg-white dark:bg-dark-surface shadow-xs flex flex-col justify-between hover:border-brand-primary/40 transition-all duration-200"
+                                    >
+                                        <div>
+                                            {/* Map Thumbnail Decorator */}
+                                            <div className="w-full h-[84px] bg-brand-gray dark:bg-dark-border/40 rounded-xl relative overflow-hidden mb-3.5 flex items-center justify-center group">
+                                                <img
+                                                    src="https://img.dudit.com.br/static/MapLarge.png"
+                                                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                                                    alt="Mapa"
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/5">
+                                                    <div className="w-7 h-7 bg-brand-primary rounded-full border-2 border-white flex items-center justify-center text-white z-10 shadow-md group-hover:scale-110 transition-transform">
+                                                        <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                                    <MapPinIcon size={10} />
+                                                    <span>{sug.groupLabel}</span>
+                                                </div>
+                                            </div>
 
-            <DefaultModal
-                isOpen={!!statusModal}
-                onClose={() => setStatusModal(null)}
-                title="Alterar Status de Entrega"
-                maxWidth="sm"
-                footer={
-                    <div className="flex gap-3 justify-end w-full">
-                        <Button variant="outline" onClick={() => setStatusModal(null)}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                if (statusModal) {
-                                    handleStatusTransition(statusModal.deliveryId, statusModal.currentStatus, statusModal.nextStatus)
-                                }
-                            }}
-                            disabled={!statusModal?.nextStatus}
-                        >
-                            Confirmar
-                        </Button>
+                                            {/* Header Info */}
+                                            <div className="flex items-start justify-between gap-2 mb-3">
+                                                <div className="min-w-0">
+                                                    <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">
+                                                        {sug.groupLabel}
+                                                    </h4>
+                                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                        <span className="bg-brand-primary/10 text-brand-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                            {sug.orders?.length || 0} pedido(s)
+                                                        </span>
+                                                        {sug.totalDistanceKm != null ? (
+                                                            <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                                {formatDistance(Number(sug.totalDistanceKm))}
+                                                            </span>
+                                                        ) : null}
+                                                        {sug.estimatedDurationMinutes != null ? (
+                                                            <span className="bg-gray-100 dark:bg-dark-border text-brand-dark dark:text-dark-heading text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                                ~{sug.estimatedDurationMinutes} min
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const ids = (sug.orders || []).map((o: any) => o.id).filter(Boolean)
+                                                        setSuggestionsOpen(false)
+                                                        setCreatePrefillOrderIds(ids)
+                                                        openEntity("create")
+                                                    }}
+                                                    className="shrink-0 font-bold"
+                                                >
+                                                    Criar entrega
+                                                </Button>
+                                            </div>
+
+                                            {/* Order Items List */}
+                                            <div className="space-y-2 border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
+                                                {(sug.orders || []).map((o: any) => (
+                                                    <div key={o.id} className="flex items-center justify-between gap-2 text-xs">
+                                                        <div className="min-w-0 flex items-center gap-1.5">
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading shrink-0">{o.displayId}</span>
+                                                            <span className="text-brand-inactive-text dark:text-dark-body truncate">• {o.customerName}</span>
+                                                        </div>
+                                                        <div className="text-[11px] font-bold text-brand-primary shrink-0 bg-brand-primary/5 px-2 py-0.5 rounded">
+                                                            {o.distanceKm == null ? "-" : `${Number(o.distanceKm).toFixed(1)} km`}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                }
-            >
-                <div className="space-y-4 py-2">
-                    <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Selecione o novo status para esta entrega:
-                    </p>
-                    <FormDropdown
-                        label="Status de Entrega"
-                        value={statusModal?.nextStatus || ""}
-                        setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
-                        options={[
-                            { value: "pending", label: "Não enviado" },
-                            { value: "preparing", label: "Em preparação" },
-                            { value: "sent", label: "Enviado" },
-                            { value: "delivered", label: "Entregue" },
-                            { value: "cancelled", label: "Cancelada" },
-                            { value: "delivery_failed", label: "Falha na entrega" },
-                        ]}
-                        placeholder="Selecione o status"
-                    />
-                </div>
-            </DefaultModal>
+                </DefaultModal>
 
-            <AlertModal
-                isOpen={deliveryWarningModal?.isOpen ?? false}
-                onClose={() => setDeliveryWarningModal(null)}
-                onConfirm={confirmDeliveryWarningStatusChange}
-                title="Atenção: Alteração de Status"
-                message={
-                    <div className="flex flex-col gap-4 text-left">
-                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                            Esta entrega já estava como{" "}
-                            <strong className="text-brand-dark dark:text-dark-heading">
-                                {getDeliveryStatusMeta(deliveryWarningModal?.currentStatus || "").label}
-                            </strong>{" "}
-                            e você está alterando para{" "}
-                            <strong className="text-brand-dark dark:text-dark-heading">
-                                {getDeliveryStatusMeta(deliveryWarningModal?.nextStatus || "").label}
-                            </strong>.
-                            Esta ação requer uma justificativa.
-                        </p>
-                        <div className="flex flex-col gap-4 mt-2">
-                            <FormDropdown
-                                label="Motivo da alteração"
-                                options={CHANGE_STATUS_REASONS}
-                                value={deliveryWarningModal?.reasonDropdownValue || ""}
-                                setValue={(val) => setDeliveryWarningModal(prev => prev ? { ...prev, reasonDropdownValue: val } : null)}
-                                placeholder="Selecione o motivo"
-                            />
-                            {deliveryWarningModal?.reasonDropdownValue === "other" && (
-                                <Input
-                                    label="Descreva o motivo"
-                                    placeholder="Digite o motivo aqui..."
-                                    value={deliveryWarningModal?.customReasonText || ""}
-                                    onChange={(e) => setDeliveryWarningModal(prev => prev ? { ...prev, customReasonText: e.target.value } : null)}
-                                />
-                            )}
+                <DefaultModal
+                    isOpen={!!statusModal}
+                    onClose={() => setStatusModal(null)}
+                    title="Alterar Status de Entrega"
+                    maxWidth="sm"
+                    footer={
+                        <div className="flex gap-3 justify-end w-full">
+                            <Button variant="outline" onClick={() => setStatusModal(null)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    if (statusModal) {
+                                        handleStatusTransition(statusModal.deliveryId, statusModal.currentStatus, statusModal.nextStatus)
+                                    }
+                                }}
+                                disabled={!statusModal?.nextStatus}
+                            >
+                                Confirmar
+                            </Button>
                         </div>
-                    </div>
-                }
-                confirmText="Confirmar Alteração"
-                cancelText="Cancelar"
-                variant="warning"
-                disabled={
-                    !deliveryWarningModal?.reasonDropdownValue ||
-                    (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
-                }
-            />
-
-            <AlertModal
-                isOpen={simpleConfirmModal?.isOpen ?? false}
-                title="Confirmar Alteração de Status"
-                description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
-                confirmText="Confirmar"
-                cancelText="Cancelar"
-                onClose={() => setSimpleConfirmModal(null)}
-                onConfirm={async () => {
-                    if (simpleConfirmModal) {
-                        const { deliveryId, nextStatus } = simpleConfirmModal;
-                        setSimpleConfirmModal(null);
-                        await executeStatusChange(deliveryId, nextStatus);
                     }
-                }}
-                variant="info"
-            />
-        </AnimatePresence>
+                >
+                    <div className="space-y-4 py-2">
+                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                            Selecione o novo status para esta entrega:
+                        </p>
+                        <FormDropdown
+                            label="Status de Entrega"
+                            value={statusModal?.nextStatus || ""}
+                            setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
+                            options={[
+                                { value: "pending", label: "Não enviado" },
+                                { value: "preparing", label: "Em preparação" },
+                                { value: "sent", label: "Enviado" },
+                                { value: "delivered", label: "Entregue" },
+                                { value: "cancelled", label: "Cancelada" },
+                                { value: "delivery_failed", label: "Falha na entrega" },
+                            ]}
+                            placeholder="Selecione o status"
+                        />
+                    </div>
+                </DefaultModal>
 
-        <FilterSheet
-            isOpen={isFilterOpen}
-            onClose={() => setIsFilterOpen(false)}
-            sections={filterSections}
-            filters={filters}
-            setFilters={setFilters}
-            onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
-        />
+                <AlertModal
+                    isOpen={deliveryWarningModal?.isOpen ?? false}
+                    onClose={() => setDeliveryWarningModal(null)}
+                    onConfirm={confirmDeliveryWarningStatusChange}
+                    title="Atenção: Alteração de Status"
+                    message={
+                        <div className="flex flex-col gap-4 text-left">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Esta entrega já estava como{" "}
+                                <strong className="text-brand-dark dark:text-dark-heading">
+                                    {getDeliveryStatusMeta(deliveryWarningModal?.currentStatus || "").label}
+                                </strong>{" "}
+                                e você está alterando para{" "}
+                                <strong className="text-brand-dark dark:text-dark-heading">
+                                    {getDeliveryStatusMeta(deliveryWarningModal?.nextStatus || "").label}
+                                </strong>.
+                                Esta ação requer uma justificativa.
+                            </p>
+                            <div className="flex flex-col gap-4 mt-2">
+                                <FormDropdown
+                                    label="Motivo da alteração"
+                                    options={CHANGE_STATUS_REASONS}
+                                    value={deliveryWarningModal?.reasonDropdownValue || ""}
+                                    setValue={(val) => setDeliveryWarningModal(prev => prev ? { ...prev, reasonDropdownValue: val } : null)}
+                                    placeholder="Selecione o motivo"
+                                />
+                                {deliveryWarningModal?.reasonDropdownValue === "other" && (
+                                    <Input
+                                        label="Descreva o motivo"
+                                        placeholder="Digite o motivo aqui..."
+                                        value={deliveryWarningModal?.customReasonText || ""}
+                                        onChange={(e) => setDeliveryWarningModal(prev => prev ? { ...prev, customReasonText: e.target.value } : null)}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    }
+                    confirmText="Confirmar Alteração"
+                    cancelText="Cancelar"
+                    variant="warning"
+                    disabled={
+                        !deliveryWarningModal?.reasonDropdownValue ||
+                        (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
+                    }
+                />
+
+                <AlertModal
+                    isOpen={simpleConfirmModal?.isOpen ?? false}
+                    title="Confirmar Alteração de Status"
+                    description={`Tem certeza que deseja alterar o status desta entrega para ${getDeliveryStatusMeta(simpleConfirmModal?.nextStatus || "").label}?`}
+                    confirmText="Confirmar"
+                    cancelText="Cancelar"
+                    onClose={() => setSimpleConfirmModal(null)}
+                    onConfirm={async () => {
+                        if (simpleConfirmModal) {
+                            const { deliveryId, nextStatus } = simpleConfirmModal;
+                            setSimpleConfirmModal(null);
+                            await executeStatusChange(deliveryId, nextStatus);
+                        }
+                    }}
+                    variant="danger"
+                />
+            </AnimatePresence>
+
+            <FilterSheet
+                isOpen={isFilterOpen}
+                onClose={() => setIsFilterOpen(false)}
+                sections={filterSections}
+                filters={filters}
+                setFilters={setFilters}
+                onClear={() => setFilters({ status: [], datePeriod: { ...EMPTY_DATE_PERIOD } })}
+            />
         </>
     )
 }

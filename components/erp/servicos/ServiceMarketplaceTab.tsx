@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import type React from "react"
 import { useState } from "react"
@@ -134,7 +134,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
 
                 {/* --- COLUNA DIREITA (Sidebar) --- */}
                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                    <SidebarCard hasTopStrip title="Configurações">
+                    <SidebarCard hasSeparator hasTopStrip title="Configurações">
                         <div className="space-y-4">
                             <div className="flex justify-between items-center py-2 border-b border-brand-border/50 dark:border-dark-border/50">
                                 <span className="text-sm text-brand-inactive-text dark:text-dark-body">Tipo de Serviço</span>
@@ -164,7 +164,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                         isEditing={false}
                     />
 
-                    <SidebarCard title="Tags e Buscas">
+                    <SidebarCard hasSeparator title="Tags e Buscas">
                         {tags && tags.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                                 {tags.map((tag: string, i: number) => (
@@ -411,7 +411,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                 {/* --- DESKTOP (>= lg): CARDS NA SIDEBAR --- */}
                 <div className="hidden lg:block">
                     {/* Card de Configurações */}
-                    <SidebarCard hasTopStrip title="Configurações">
+                    <SidebarCard hasSeparator hasTopStrip title="Configurações">
                         <div className="space-y-5">
                             <FormDropdown
                                 label="Tipo de Serviço"
@@ -491,7 +491,7 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
                     />
 
                     {/* Card de Tags */}
-                    <SidebarCard title="Tags e Buscas">
+                    <SidebarCard hasSeparator title="Tags e Buscas">
                         <p className="text-sm text-brand-inactive-text mb-4">
                             Adicione palavras-chave para ajudar os clientes a encontrarem este serviço na busca.
                         </p>
@@ -508,3 +508,4 @@ export const ServiceMarketplaceTab: React.FC<ServiceMarketplaceTabProps> = ({
         </div>
     )
 }
+

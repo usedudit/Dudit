@@ -154,7 +154,7 @@ function VitrineHeroCard({ partnerUrl, storeName }: { partnerUrl: string; storeN
     };
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col justify-between">
             <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
                     <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight">
@@ -270,23 +270,22 @@ function HelpCard() {
     ];
 
     return (
-        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 min-h-[200px] h-full flex flex-col justify-between">
+        <div className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-[24px] p-6 h-full flex flex-col justify-between">
             <div>
                 <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading leading-tight mb-1">
                     Ajuda e Suporte
                 </h3>
                 <p className="text-sm text-brand-inactive-text dark:text-dark-body leading-relaxed mb-4">
-                    Estamos aqui para ajudar sua empresa a crescer e vender mais.
+                    Estamos aqui para ajudar você e sua empresa a crescer e vender mais.
                 </p>
 
-                <div className="space-y-2 grid grid-cols-1 md:grid-cols-2">
+                <div className="space-y-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                     {helpItems.map((item) => (
                         <ListItem
                             key={item.label}
                             icon={helpIconMap[item.icon] || HelpCircleIcon}
                             title={item.label}
                             description={item.description}
-                            right={<ChevronRightIcon className="text-brand-inactive-text w-4 h-4" />}
                             onClick={() => router.push(item.href)}
                             className="border-0 !px-0 !py-0"
                         />

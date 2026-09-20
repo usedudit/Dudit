@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -1421,7 +1421,7 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
                                         <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-l-0 xl:border-l border-brand-border dark:border-dark-border space-y-6">
                                             {/* Desktop: SidebarCard with summary */}
                                             <div>
-                                                <SidebarCard hasTopStrip title="Resumo">
+                                                <SidebarCard hasSeparator hasTopStrip title="Resumo">
                                                     <div className="space-y-3 text-sm">
                                                         {/* Itens */}
                                                         <div className="flex items-center justify-between gap-3">
@@ -1896,3 +1896,4 @@ function ImportPreviewView({ importId, partnerId, storeId, onBack, onComplete, r
         </FadeIn>
     )
 }
+

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { cn } from "@/lib/utils"
 import { ShoppingCartIcon, SettingsIcon, XIcon, ChevronRightIcon, ChevronDownIcon, HomeIcon, Package, MegaphoneIcon, MoneyIcon, Users, GridIcon, ChartIcon, WrenchIcon } from "@/lib/icons"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
@@ -205,15 +206,14 @@ function ErpPlanGatedNavItem({
     }
 
     return (
-        <Link
+        <IntentPrefetchLink
             href={href}
-            prefetch={false}
             onClick={() => {
                 onNavigate?.()
             }}
             className={itemClass}>
             {content}
-        </Link>
+        </IntentPrefetchLink>
     )
 }
 
@@ -580,9 +580,8 @@ export function ERPSidebar() {
                                                 }
 
                                                 return (
-                                                    <Link
+                                                    <IntentPrefetchLink
                                                         href={item.href}
-                                                        prefetch={false}
                                                         onClick={() => {
                                                             setIsMobileOpen(false)
                                                             setHoveredItem(null)
@@ -614,7 +613,7 @@ export function ERPSidebar() {
                                                         >
                                                             {item.label}
                                                         </span>
-                                                    </Link>
+                                                    </IntentPrefetchLink>
                                                 )
                                             })()
                                         ) : (
@@ -856,9 +855,8 @@ export function ERPSidebar() {
                                     return (
                                         <div key={item.label} className="flex flex-col">
                                             {item.href && !hasSubmenu ? (
-                                                <Link
+                                                <IntentPrefetchLink
                                                     href={item.href}
-                                                    prefetch={false}
                                                     className={cn(
                                                         "flex items-center gap-3 p-3 rounded-xl transition-colors relative",
                                                         isActive ? activeClasses : inactiveClasses
@@ -873,7 +871,7 @@ export function ERPSidebar() {
                                                     {hasSubmenu && (
                                                         <ChevronDownIcon className={cn("w-4 h-4 opacity-50 transition-transform", isMenuExpanded ? "rotate-180" : "")} />
                                                     )}
-                                                </Link>
+                                                </IntentPrefetchLink>
                                             ) : (
                                                 <button
                                                     type="button"

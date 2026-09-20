@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } from "react"
 import {
@@ -639,7 +639,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 
                                         {/* Right Sidebar Column */}
                                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0">
-                                            <SidebarCard hasTopStrip title="Regra de Recorrência">
+                                            <SidebarCard hasSeparator hasTopStrip title="Regra de Recorrência">
                                                 <div className="space-y-5">
                                                     <FormDropdown
                                                         label="Frequência"
@@ -693,7 +693,7 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
                                                 </div>
                                             </SidebarCard>
 
-                                            <SidebarCard title="Cobrança e Créditos">
+                                            <SidebarCard hasSeparator title="Cobrança e Créditos">
                                                 <div className="space-y-5">
                                                     <FormDropdown
                                                         label="Modo de Cobrança"
@@ -995,3 +995,4 @@ export const NewRecurringPlanPage: FC<NewRecurringPlanPageProps> = ({
 }
 
 export default NewRecurringPlanPage
+

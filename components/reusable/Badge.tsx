@@ -26,17 +26,17 @@ interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, string> = {
     green:
-        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+        "bg-brand-green-secondary text-brand-green dark:bg-emerald-900/30 dark:text-emerald-400",
     red:
-        "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        "bg-brand-red-secondary text-brand-red dark:bg-red-900/30 dark:text-red-400",
     orange:
-        "bg-orange-100 text-brand-orange dark:bg-orange-900/30 dark:text-orange-400",
+        "bg-brand-orange-secondary text-brand-orange dark:bg-orange-900/30 dark:text-orange-400",
     blue:
-        "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+        "bg-brand-blue-secondary text-brand-blue dark:bg-blue-900/30 dark:text-blue-400",
     cyan:
-        "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+        "bg-brand-cyan-secondary text-brand-cyan dark:bg-cyan-900/30 dark:text-cyan-400",
     purple:
-        "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+        "bg-brand-purple-secondary text-brand-purple dark:bg-purple-900/30 dark:text-purple-400",
     gray:
         "bg-brand-gray text-brand-dark dark:bg-dark-border/30 dark:text-dark-heading",
 }
@@ -52,12 +52,12 @@ const defaultIcons: Partial<Record<BadgeVariant, React.ElementType>> = {
 }
 
 const defaultIconStyles: Partial<Record<BadgeVariant, string>> = {
-    green: "text-green-600 dark:text-green-400 fill-green-600/10",
+    green: "text-brand-green dark:text-green-400 fill-green-600/10",
     red: "text-brand-red dark:text-red-400 fill-red-600/10",
     orange: "text-brand-orange dark:text-orange-400 fill-orange-600/10",
-    blue: "text-blue-600 dark:text-blue-400",
-    cyan: "text-cyan-600 dark:text-cyan-400",
-    purple: "text-purple-600 dark:text-purple-400",
+    blue: "text-brand-blue dark:text-blue-400",
+    cyan: "text-brand-cyan dark:text-cyan-400",
+    purple: "text-brand-purple dark:text-purple-400",
     gray: "text-brand-inactive-text dark:text-dark-body",
 }
 
@@ -96,7 +96,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         return (
             <span
                 ref={ref}
-                className={`inline-flex items-center gap-1.5 ${paddingClass} rounded-full text-[11px] font-bold border ${variantStyles[variant]} ${className}`}
+                className={`inline-flex items-center gap-1.5 ${paddingClass} rounded-full text-[11px] font-bold ${variantStyles[variant]} ${className}`}
                 {...props}
             >
                 {renderIcon()}

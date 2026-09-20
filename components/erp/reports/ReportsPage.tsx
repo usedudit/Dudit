@@ -22,7 +22,7 @@ import {
     MoneyIcon, Users, MegaphoneIcon, AwardIcon, ReturnIcon,
     ShoppingBagIcon, TagIcon, TrendingUpIcon, CreditCardIcon,
     ListIcon, ClockIcon, CalendarIcon, TargetIcon, BoxIcon, ExportFileIcon,
-    AlertCircleIcon, RotateIcon, HistoryIcon, ShoppingCartIcon,
+    AlertCircleIcon, HistoryIcon, ShoppingCartIcon,
     CheckCircleIcon, StarIcon, RepeatIcon,
 } from "@/lib/icons"
 import { ReportTableCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
@@ -31,15 +31,17 @@ import type {
     SalesReportData, CustomerReportData, ReturnsReportData,
     DeliveryReportData, MarketingReportData, ProductivityReportData,
     ServiceOrderReportData, GoalReportData, SubscriptionReportData,
+    AppointmentsReportData,
 } from "@/lib/data/reports"
 import type { Period } from "@/lib/period-types"
 import {
     generateSalesInsights, generateProductsInsights, generateServicesInsights,
     generateFinancialInsights, generateCustomerInsights, generateMarketingInsights,
     generateReturnsInsights, generateDeliveryInsights, generateProductivityInsights,
+    generateAppointmentsInsights,
 } from "./insights"
 
-type TabId = "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas"
+type TabId = "vendas" | "produtos" | "servicos" | "entregas" | "ordens-servico" | "financeiro" | "clientes" | "marketing" | "produtividade" | "trocas" | "agendamentos"
 
 interface TabDefinition {
     id: TabId
@@ -51,6 +53,7 @@ const REPORT_TABS: TabDefinition[] = [
     { id: "vendas", label: "Vendas", icon: AnalyticsIcon },
     { id: "produtos", label: "Produtos", icon: PackageIcon },
     { id: "servicos", label: "Serviços", icon: WrenchIcon },
+    { id: "agendamentos", label: "Agendamentos", icon: CalendarIcon },
     { id: "entregas", label: "Entregas", icon: TruckIcon },
     { id: "ordens-servico", label: "Ordens de Serviço", icon: FileTextIcon },
     { id: "financeiro", label: "Financeiro", icon: MoneyIcon },
@@ -68,6 +71,7 @@ const TAB_MINIMUM_PLAN: Record<TabId, PlanTierSlug> = {
     clientes: "crescer",
     entregas: "crescer",
     servicos: "escalar",
+    agendamentos: "escalar",
     "ordens-servico": "escalar",
     marketing: "escalar",
     produtividade: "escalar",
@@ -89,6 +93,7 @@ interface ReportsPageProps {
     marketingData: MarketingReportData | null
     productivityData: ProductivityReportData | null
     serviceOrdersData: ServiceOrderReportData | null
+    appointmentsData: AppointmentsReportData | null
     goalData: GoalReportData | null
     subscriptionData: SubscriptionReportData | null
     stockValue: number
@@ -104,6 +109,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
         switch (tab.id) {
             case "produtos": case "vendas": case "marketing": return sellsProducts && productsData !== null
             case "servicos": return sellsServices && servicesData !== null
+            case "agendamentos": return sellsServices && props.appointmentsData !== null
             case "ordens-servico": return props.serviceOrdersData !== null
             case "entregas": return deliveryData !== null
             case "financeiro": return financialData !== null
@@ -112,7 +118,7 @@ function useAvailableTabs(props: ReportsPageProps): TabDefinition[] {
             case "trocas": return props.returnsData !== null
             default: return true
         }
-    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, planSlug])
+    }), [sellsProducts, sellsServices, productsData, servicesData, financialData, deliveryData, props.customerData, props.productivityData, props.returnsData, props.serviceOrdersData, props.appointmentsData, planSlug])
 }
 
 const INSIGHT_COLORS: Record<string, "green" | "red" | "orange" | "blue" | "gray" | "yellow" | "purple"> = {
@@ -226,6 +232,7 @@ export function ReportsPage(props: ReportsPageProps) {
             <TabsContent value="vendas"><SalesSection {...props} productsData={props.productsData} /></TabsContent>
             {props.productsData && <TabsContent value="produtos"><ProductsSection productsData={props.productsData} stockValue={props.stockValue} returnsData={props.returnsData} salesData={props.salesData} /></TabsContent>}
             {props.servicesData && <TabsContent value="servicos"><ServicesSection servicesData={props.servicesData} /></TabsContent>}
+            {props.appointmentsData && <TabsContent value="agendamentos"><AppointmentsSection appointmentsData={props.appointmentsData} /></TabsContent>}
             {props.deliveryData && <TabsContent value="entregas"><DeliveriesSection {...props} /></TabsContent>}
             {props.serviceOrdersData && <TabsContent value="ordens-servico"><ServiceOrdersSection {...props} /></TabsContent>}
             {props.financialData && <TabsContent value="financeiro"><FinancialSection financialData={props.financialData} /></TabsContent>}
@@ -285,7 +292,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
 
     const channelOptions = [
         { value: "pedidos", label: "Pedidos" },
-        { value: "dinheiro", label: "Dinheiro" },
+        { value: "dinheiro", label: "Receita" },
     ]
 
     const channelChartData = channelView === "dinheiro"
@@ -330,7 +337,7 @@ function SalesSection({ salesData, productsData }: { salesData: SalesReportData 
                     <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
                         <CardHeader
                             icon={TagIcon}
-                            title="Vendas por Canal"
+                            title="Vendas por Origem"
                             action={
                                 <FormDropdown
                                     options={channelOptions}
@@ -737,6 +744,150 @@ function ServicesSection({ servicesData }: { servicesData: ServicesDashboardData
 }
 
 // ─────────────────────────────────────────────────────────────
+// 3b. ABA DE AGENDAMENTOS
+// ─────────────────────────────────────────────────────────────
+function AppointmentsSection({ appointmentsData }: { appointmentsData: AppointmentsReportData }) {
+    const { setExportHandler } = useDashboard()
+
+    const parseBrl = (val?: string) => {
+        if (!val) return 0
+        const clean = val.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".")
+        return Number(clean) || 0
+    }
+
+    const totalAppts = appointmentsData.metrics.find((m: any) => m.title.includes("Total") || m.title.includes("total"))
+    const totalCount = Number(totalAppts?.value || 0)
+    const cancelledMetric = appointmentsData.metrics.find((m: any) => m.title.includes("Cancel") || m.title.includes("cancel"))
+    const cancelledCount = Number(cancelledMetric?.value || 0)
+    const noShowMetric = appointmentsData.metrics.find((m: any) => m.title.includes("Ausên") || m.title.includes("ausên") || m.title.includes("No-show"))
+    const noShowCount = Number(noShowMetric?.value || 0)
+    const topService = appointmentsData.servicePopularity?.[0]
+
+    const insights = useMemo(() => generateAppointmentsInsights({
+        totalAppointments: totalCount,
+        completedCount: totalCount - cancelledCount - noShowCount,
+        cancelledCount,
+        noShowCount,
+        repeatCustomerRate: appointmentsData.repeatCustomerRate || 0,
+        avgDuration: appointmentsData.avgDuration || 0,
+        topServiceName: topService?.label,
+        topServiceCount: topService?.value,
+        totalRevenue: appointmentsData.metrics.reduce((sum: number, m: any) => {
+            if (m.title.includes("Receita") || m.title.includes("receita") || m.title.includes("Faturamento")) return sum + parseBrl(m.value)
+            return sum
+        }, 0),
+    }), [appointmentsData, totalCount, cancelledCount, noShowCount, topService])
+
+    const mappedInsights = useMemo(() => insights.map(ins => ({
+        message: ins.message,
+        color: INSIGHT_COLORS[ins.tone] || "blue"
+    })), [insights])
+
+    const onExport = useCallback(async (fmt: "csv" | "xlsx") => {
+        const rows = appointmentsData.metrics.map((m: any) => [m.title, String(m.value)])
+        if (fmt === "csv") exportCSV("relatorio-agendamentos", ["Indicador", "Valor"], rows)
+        else await exportXLSX("relatorio-agendamentos", [{ name: "Agendamentos", headers: ["Indicador", "Valor"], rows }])
+    }, [appointmentsData])
+
+    useEffect(() => { setExportHandler(onExport); return () => setExportHandler(null) }, [onExport, setExportHandler])
+
+    const evoData = (appointmentsData.dailyEvolution || []).map(e => ({ label: e.label, value: e.value, secondary: e.secondary }))
+    const statusData = (appointmentsData.statusBreakdown || []).map(s => ({ label: s.label, value: s.value }))
+    const hourlyData = (appointmentsData.hourlyDistribution || []).map(h => ({ label: h.label, value: h.value }))
+    const serviceData = (appointmentsData.servicePopularity || []).map(s => ({ label: s.label, value: s.value }))
+    const sourceData = (appointmentsData.sourceBreakdown || []).map(s => ({ label: s.label, value: s.value }))
+
+    return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+            <InsightsRegister insights={mappedInsights} />
+
+            {/* Row 1: KPI Horizontal */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-12"><SummaryCards metrics={appointmentsData.metrics} variant="horizontal" /></div>
+            </div>
+
+            {/* Row 2: Evolução Diária (8) + Status (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={CalendarIcon}
+                            title="Evolução de Agendamentos"
+                            legendItems={[{ label: "Este Período", color: "#059669" }, { label: "Período Anterior", color: "#94a3b8" }]}
+                        />
+                        <DashboardLineChart data={evoData} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Status dos Agendamentos" />
+                        <DashboardDonutChart
+                            data={statusData}
+                            totalValue={String(totalCount)}
+                            totalLabel="Agendamentos"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 3: Agendamentos por Hora (8) + Serviços Populares (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-8">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader
+                            icon={ClockIcon}
+                            title="Agendamentos por Hora"
+                            legendItems={[{ label: "Volume", color: "#059669" }]}
+                        />
+                        <DashboardBarChart data={hourlyData} colors={["#059669"]} />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={ShoppingBagIcon} title="Serviços Mais Agendados" />
+                        <HorizontalBarRankingList items={serviceData.slice(0, 5)} colors={CHART_COLORS_VIVID} format="quantity" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 4: Origem (4) + Equipe (4) + Recentes (4) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+                <div className="lg:col-span-4">
+                    <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+                        <CardHeader icon={TagIcon} title="Origem dos Agendamentos" />
+                        <DashboardDonutChart
+                            data={sourceData}
+                            totalValue={String(totalCount)}
+                            totalLabel="Agendamentos"
+                            colors={CHART_COLORS_CATEGORY}
+                        />
+                    </div>
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Ranking da Equipe"
+                        items={(appointmentsData.staffPerformance || []).slice(0, 6).map(s => ({ id: s.id, label: s.label, value: s.value, subtitle: `${s.appointments} atend.` }))}
+                        variant="compact"
+                        icon={AwardIcon}
+                        className="h-full"
+                    />
+                </div>
+                <div className="lg:col-span-4">
+                    <ReportRankingCard
+                        title="Agendamentos Recentes"
+                        items={(appointmentsData.recentAppointments || []).slice(0, 6).map(a => ({ id: a.id, label: a.title, value: a.value || "", subtitle: a.subtitle }))}
+                        variant="compact"
+                        icon={CalendarIcon}
+                        className="h-full"
+                    />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─────────────────────────────────────────────────────────────
 // 4. ABA DE ENTREGAS
 // ─────────────────────────────────────────────────────────────
 function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData | null }) {
@@ -821,12 +972,14 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
                     <ReportTableCard
                         title="Últimas Entregas"
                         columns={[
-                            { key: "id", header: "Entrega", render: (v: string) => (
-                                <div className="flex items-center gap-2">
-                                    <TruckIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                    <span className="font-bold">{v}</span>
-                                </div>
-                            )},
+                            {
+                                key: "id", header: "Entrega", render: (v: string) => (
+                                    <div className="flex items-center gap-2">
+                                        <TruckIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                        <span className="font-bold">{v}</span>
+                                    </div>
+                                )
+                            },
                             { key: "status", header: "Status" },
                             { key: "deliveryPerson", header: "Entregador" },
                             { key: "date", header: "Data" },
@@ -980,12 +1133,14 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
                     <ReportTableCard
                         title="Últimas Ordens de Serviço"
                         columns={[
-                            { key: "orderNumber", header: "Número", render: (v: string) => (
-                                <div className="flex items-center gap-2">
-                                    <WrenchIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                    <span className="font-bold">{v}</span>
-                                </div>
-                            )},
+                            {
+                                key: "orderNumber", header: "Número", render: (v: string) => (
+                                    <div className="flex items-center gap-2">
+                                        <WrenchIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                        <span className="font-bold">{v}</span>
+                                    </div>
+                                )
+                            },
                             { key: "title", header: "Título" },
                             { key: "status", header: "Status" },
                             { key: "total", header: "Total" },
@@ -1830,12 +1985,14 @@ function ReturnsSection({ returnsData }: { returnsData: ReturnsReportData | null
                     <ReportTableCard
                         title="Últimas Devoluções"
                         columns={[
-                            { key: "id", header: "#", render: (v: string) => (
-                                <div className="flex items-center gap-2">
-                                    <ReturnIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                    <span className="font-bold">{v.slice(0, 8)}</span>
-                                </div>
-                            )},
+                            {
+                                key: "id", header: "#", render: (v: string) => (
+                                    <div className="flex items-center gap-2">
+                                        <ReturnIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                        <span className="font-bold">{v.slice(0, 8)}</span>
+                                    </div>
+                                )
+                            },
                             { key: "customer", header: "Cliente" },
                             { key: "reason", header: "Motivo" },
                             { key: "amount", header: "Valor" },

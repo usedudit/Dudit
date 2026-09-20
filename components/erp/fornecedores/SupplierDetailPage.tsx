@@ -445,41 +445,41 @@ export const SupplierDetailPage = ({ supplier, onBack, onEdit }: Props) => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="space-y-1">
+                                                    <div className="space-y-4">
                                                         <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fornecedor desde</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
                                                                 {supplier.created_at ? formatDate(supplier.created_at) : '-'}
                                                             </span>
                                                         </div>
-                                                        <div className="flex justify-between items-center py-2.5">
+                                                        <div className="flex justify-between items-center">
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Tipo de Pessoa</span>
                                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{isPJ ? 'Pessoa Jurídica' : 'Pessoa Física'}</span>
                                                         </div>
 
                                                         {isPJ ? (
-                                                            <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border space-y-2.5">
+                                                            <div>
                                                                 {supplier.cnpj && (
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CNPJ</span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CNPJ</span>
                                                                         <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.cnpj}</span>
                                                                     </div>
                                                                 )}
                                                                 {supplier.nome_fantasia && (
                                                                     <div className="flex justify-between items-center">
-                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Fantasia</span>
-                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right max-w-[60%] truncate">{supplier.nome_fantasia}</span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Fantasia</span>
+                                                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading max-w-[60%] truncate">{supplier.nome_fantasia}</span>
                                                                     </div>
                                                                 )}
                                                                 <div className="flex justify-between items-center">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">Insc. Est.</span>
-                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading text-right">{supplier.inscricao_estadual || 'Isento'}</span>
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">Insc. Est.</span>
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.inscricao_estadual || 'Isento'}</span>
                                                                 </div>
                                                             </div>
                                                         ) : (
                                                             supplier.cpf && (
-                                                                <div className="mt-2 pt-2 border-t border-brand-border dark:border-dark-border flex justify-between items-center">
-                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium">CPF</span>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body font-semibold">CPF</span>
                                                                     <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{supplier.cpf}</span>
                                                                 </div>
                                                             )

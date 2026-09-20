@@ -22,6 +22,7 @@ import { FormSection } from "@/components/reusable/FormSection"
 import { ListItem } from "@/components/reusable/ListItem"
 import { notFound } from "next/navigation"
 import { isValidCitySlug } from "@/lib/validation/city"
+import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 
 const CATEGORY_SLUG_MAP: { [key: string]: string } = {
     "alimentacao": "Alimentação",
@@ -382,7 +383,7 @@ export default async function ExplorarPage({
                                         const href = `/explorar/${landingCitySlug}/${cat.slug}`
                                         return (
                                             <div className="space-y-6">
-                                                <a key={cat.slug} href={href}>
+                                                <IntentPrefetchLink key={cat.slug} href={href}>
                                                     <ListItem
                                                         icon={
                                                             cat.icon_url ? (
@@ -399,7 +400,7 @@ export default async function ExplorarPage({
                                                         title={cat.name}
                                                         showChevron
                                                     />
-                                                </a>
+                                                </IntentPrefetchLink>
                                             </div>
                                         )
                                     })}
@@ -408,7 +409,7 @@ export default async function ExplorarPage({
                                 {serviceCategory && (
                                     <FormSection title="Categorias de Serviços" hasSeparator>
                                         <div className="space-y-6">
-                                            <a href={`/explorar/${landingCitySlug}?type=servicos`}>
+                                            <IntentPrefetchLink href={`/explorar/${landingCitySlug}?type=servicos`}>
                                                 <ListItem
                                                     icon={
                                                         serviceCategory.icon_url ? (
@@ -425,7 +426,7 @@ export default async function ExplorarPage({
                                                     title={serviceCategory.name}
                                                     showChevron
                                                 />
-                                            </a>
+                                            </IntentPrefetchLink>
                                         </div>
                                     </FormSection>
                                 )}

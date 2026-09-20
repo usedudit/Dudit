@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useTransition, useRef, useEffect, useCallback } from "react"
 import { SearchIcon, XIcon, InfoIcon, PlayIcon, CheckCircleIcon, CancelCircleIcon, TrashIcon, EditIcon, SaveIcon, StarIcon, AlertTriangleIcon } from "@/lib/icons"
@@ -12,7 +12,7 @@ import {
     removeImage, editVariant, hideReview, editReview,
     updatePartnerRiskScore, saveModerationChanges, deleteModerationTarget, deleteVariant,
 } from "@/app/actions/admin/moderation-v2"
-import { getAdminCommunityVideos, approveModeration, rejectModeration } from "@/app/actions/admin/moderation"
+import { getAdminCommunityVideos, approveModeration, rejectModeration, getModerationQueue } from "@/app/actions/admin/moderation"
 import type {
     FetchedProduct, FetchedVariant, FetchedService,
     FetchedRecurringPlan, FetchedPartner, FetchedReview,
@@ -761,11 +761,11 @@ function ProductGeneral({ data, isPending, onRefresh }: { data: FetchedProduct; 
             }
             right={
                 <>
-                    <SidebarCard hasTopStrip title="Status">
+                    <SidebarCard hasSeparator hasTopStrip title="Status">
                         <Badge variant={data.is_active ? "green" : "red"}>{data.is_active ? "Ativo" : "Inativo"}</Badge>
                         <p className="text-sm text-brand-inactive-text">Moderação: {data.moderation_status}</p>
                     </SidebarCard>
-                    <SidebarCard hasTopStrip title="Parceiro">
+                    <SidebarCard hasSeparator hasTopStrip title="Parceiro">
                         {data.partner ? (
                             <>
                                 <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
@@ -861,11 +861,11 @@ function ServiceGeneral({ data, isPending, onRefresh }: { data: FetchedService; 
             }
             right={
                 <>
-                    <SidebarCard hasTopStrip title="Status">
+                    <SidebarCard hasSeparator hasTopStrip title="Status">
                         <Badge variant={data.is_active ? "green" : "red"}>{data.is_active ? "Ativo" : "Inativo"}</Badge>
                         <p className="text-sm text-brand-inactive-text">Moderação: {data.moderation_status}</p>
                     </SidebarCard>
-                    <SidebarCard hasTopStrip title="Parceiro">
+                    <SidebarCard hasSeparator hasTopStrip title="Parceiro">
                         {data.partner ? (
                             <>
                                 <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
@@ -948,10 +948,10 @@ function RecurringPlanGeneral({ data, isPending, onRefresh }: { data: FetchedRec
             }
             right={
                 <>
-                    <SidebarCard hasTopStrip title="Status">
+                    <SidebarCard hasSeparator hasTopStrip title="Status">
                         <Badge variant={data.status === "active" ? "green" : "gray"}>{data.status}</Badge>
                     </SidebarCard>
-                    <SidebarCard hasTopStrip title="Parceiro">
+                    <SidebarCard hasSeparator hasTopStrip title="Parceiro">
                         {data.partner ? (
                             <>
                                 <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.store?.name || data.partner?.id}</p>
@@ -1028,7 +1028,7 @@ function PartnerGeneral({ data, isPending, onRefresh }: { data: FetchedPartner; 
             }
             right={
                 <>
-                    <SidebarCard hasTopStrip title="Proprietário">
+                    <SidebarCard hasSeparator hasTopStrip title="Proprietário">
                         {data.owner ? (
                             <>
                                 <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">{data.owner.full_name}</p>
@@ -1089,7 +1089,7 @@ function PartnerGallery({ data, isPending, onRefresh }: { data: FetchedPartner; 
                 </>
             }
             right={
-                <SidebarCard hasTopStrip title="Ações">
+                <SidebarCard hasSeparator hasTopStrip title="Ações">
                     <div className="space-y-5">
                         <FormDropdown label="Risk Score" options={RISK_LEVELS} value={riskScore} setValue={setRiskScore} placeholder="Não alterar" width="w-full" />
                         <FormTextarea label="Observações" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Observações sobre a ação (opcional)..." maxLength={500} showCharacterCount />
@@ -1177,7 +1177,7 @@ function ReviewGeneral({ data, isPending, onRefresh }: { data: FetchedReview; is
             }
             right={
                 <>
-                    <SidebarCard hasTopStrip title="Informações">
+                    <SidebarCard hasSeparator hasTopStrip title="Informações">
                         {data.user && <p className="text-sm text-brand-inactive-text">Por: <strong className="text-brand-dark dark:text-dark-heading">{data.user.full_name || "Anônimo"}</strong></p>}
                         {data.product && <p className="text-sm text-brand-inactive-text">Produto: <strong className="text-brand-dark dark:text-dark-heading">{data.product.name}</strong></p>}
                         {data.store && <p className="text-sm text-brand-inactive-text">Parceiro: <strong className="text-brand-dark dark:text-dark-heading">{data.store.name}</strong></p>}
@@ -1190,3 +1190,4 @@ function ReviewGeneral({ data, isPending, onRefresh }: { data: FetchedReview; is
         />
     )
 }
+

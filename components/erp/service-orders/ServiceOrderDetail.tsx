@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { ShareModal } from "@/components/marketplace/ShareModal"
@@ -643,7 +643,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Venda Vinculada Card */}
                                                 {order.sale && (
-                                                    <SidebarCard title="Venda Vinculada">
+                                                    <SidebarCard hasSeparator title="Venda Vinculada">
                                                         <div className="space-y-3">
                                                             <div className="flex justify-between items-center text-[13px]">
                                                                 <span className="text-brand-inactive-text">Venda</span>
@@ -683,7 +683,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Timing Info Card */}
                                                 {order.created_at && (
-                                                    <SidebarCard title="Tempo">
+                                                    <SidebarCard hasSeparator title="Tempo">
                                                         <div className="space-y-3">
                                                             <div className="flex justify-between items-center text-[13px]">
                                                                 <span className="text-brand-inactive-text">Abertura</span>
@@ -764,7 +764,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Online Signature Link & Code Card */}
                                                 {hasMinimumPlan(planSlug, "crescer") ? (
-                                                    <SidebarCard hasTopStrip title="Assinatura Online">
+                                                    <SidebarCard hasSeparator hasTopStrip title="Assinatura Online">
                                                         <p className="text-xs text-brand-inactive-text mb-4">Compartilhe o link da OS para o cliente visualizar e assinar online.</p>
 
                                                         <div className="space-y-3">
@@ -801,7 +801,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                         </div>
                                                     </SidebarCard>
                                                 ) : (
-                                                    <SidebarCard title="Link de Assinatura Online">
+                                                    <SidebarCard hasSeparator title="Link de Assinatura Online">
                                                         <div className="flex flex-col items-center text-center py-4">
                                                             <p className="text-sm font-semibold text-brand-dark dark:text-dark-heading mb-1">Disponível no plano Crescer</p>
                                                             <p className="text-xs text-brand-inactive-text mb-4">Compartilhe a OS online e receba a assinatura do cliente em tempo real.</p>
@@ -814,7 +814,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
                                                 {/* Client Signature Card where Totals used to be */}
                                                 {order.signature_image_key ? (
-                                                    <SidebarCard hasTopStrip title="Assinatura do Cliente">
+                                                    <SidebarCard hasSeparator hasTopStrip title="Assinatura do Cliente">
                                                         <div className="flex flex-col items-center">
                                                             <img
                                                                 src={buildImageUrl(order.signature_image_key)}
@@ -828,7 +828,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                                     </SidebarCard>
                                                 ) : (
                                                     order.status !== "cancelada" && order.status !== "entregue" && (
-                                                        <SidebarCard hasTopStrip title="Assinatura do Cliente">
+                                                        <SidebarCard hasSeparator hasTopStrip title="Assinatura do Cliente">
                                                             <div className="flex flex-col items-center justify-center p-4 border border-dashed border-brand-border dark:border-dark-border rounded-xl">
                                                                 <p className="text-sm text-brand-inactive-text text-center mb-4">A ordem de serviço ainda não foi assinada pelo cliente.</p>
                                                                 <Button variant="outline" size="sm" onClick={() => {
@@ -1167,3 +1167,4 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
         </FadeIn >
     )
 }
+

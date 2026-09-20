@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
+import { IntentPrefetchLink } from "@/components/navigation/IntentPrefetchLink"
 import { usePathname } from "next/navigation"
 import { useSupabase } from "@/providers/supabase-provider"
 import {
@@ -42,9 +43,9 @@ function MenuItem({
 
     if (href) {
         return (
-            <Link href={href} prefetch={false} onClick={onClose}>
+            <IntentPrefetchLink href={href} onClick={onClose}>
                 {content}
-            </Link>
+            </IntentPrefetchLink>
         )
     }
 
@@ -206,35 +207,32 @@ export function MarketplaceBottomMenu() {
                 <nav
                     className="lg:hidden print:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-white/10 pb-[calc(env(safe-area-inset-bottom,0px))] h-[60px] flex justify-around items-center"
                 >
-                    <Link
+                    <IntentPrefetchLink
                         href="/"
-                        prefetch={false}
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isHomeActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <HomeIcon size={22} className={isHomeActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Início</span>
-                    </Link>
+                    </IntentPrefetchLink>
 
-                    <Link
+                    <IntentPrefetchLink
                         href={explorePath}
-                        prefetch={false}
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isExploreActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <SearchIcon size={22} className={isExploreActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Explorar</span>
-                    </Link>
+                    </IntentPrefetchLink>
 
-                    <Link
+                    <IntentPrefetchLink
                         href="/pedidos"
-                        prefetch={false}
                         className={`flex flex-col items-center justify-center flex-1 h-full py-1 text-center transition-all duration-200 ${isOrdersActive ? "text-brand-green font-bold" : "text-brand-dark dark:text-dark-body font-medium"
                             }`}
                     >
                         <Package size={22} className={isOrdersActive ? "text-brand-green" : "text-brand-dark dark:text-dark-body"} />
                         <span className="text-[11px] mt-1">Pedidos</span>
-                    </Link>
+                    </IntentPrefetchLink>
 
                     <button
                         onClick={() => setIsMenuOpen(true)}

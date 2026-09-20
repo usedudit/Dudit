@@ -1,4 +1,12 @@
 -- ============================================================================
+-- BACKUP/DEV ONLY - Production uses lib/billing/sync-subscription.ts
+-- ============================================================================
+-- This SQL script is retained for manual testing, development, and emergency
+-- recovery. The production system uses the TypeScript implementation which
+-- has additional features (payment method resolution, MP payer info, etc.).
+-- ============================================================================
+
+-- ============================================================================
 -- Sincronizar assinatura → billing manualmente (para testes/dev/produção)
 -- ============================================================================
 -- Uso básico (mantém status atual da subscription):

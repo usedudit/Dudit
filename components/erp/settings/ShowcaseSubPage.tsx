@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React, { useState, useCallback, useRef, useTransition, useMemo, useEffect } from "react"
 import {
@@ -482,7 +482,7 @@ export const ShowcaseSubPage = ({
                                     </div>
 
                                     <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
-                                        <SidebarCard hasTopStrip title="Logo / Imagem de Perfil">
+                                        <SidebarCard hasSeparator hasTopStrip title="Logo / Imagem de Perfil">
                                             <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                                 <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                                     {imagePreview ? (
@@ -745,7 +745,7 @@ export const ShowcaseSubPage = ({
                             {/* Sidebar (Right Column) */}
                             <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border space-y-6">
                                 {/* Logo do Negócio */}
-                                <SidebarCard hasTopStrip title="Logo do Negócio">
+                                <SidebarCard hasSeparator hasTopStrip title="Logo do Negócio">
                                     <div className="flex items-center gap-4 dark:bg-dark-background/50">
                                         <div onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border cursor-pointer relative group overflow-hidden">
                                             {imagePreview ? (
@@ -847,3 +847,4 @@ export const ShowcaseSubPage = ({
         </FadeIn >
     )
 }
+

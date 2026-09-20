@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormSection, Checkbox, FormDropdown, FormTextarea, ThreeDotsLoader } from "@/components/reusable"
+import { Button, Input, FormSection, Checkbox, FormDropdown, FormTextarea, ThreeDotsLoader, SidebarCard } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
@@ -264,9 +264,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
 
                                 {/* Right Column / Sidebar */}
                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl" />
-                                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-2">Sobre Trocas e Devoluções</h3>
+                                    <SidebarCard hasTopStrip hasSeparator title="Sobre Trocas e Devoluções">
                                         <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
                                             <p>
                                                 <strong className="text-brand-dark dark:text-dark-heading">Validade do Vale-Compra:</strong>{" "}
@@ -281,7 +279,7 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                                                 Prazos baseados no Código de Defesa do Consumidor (CDC) para compras online e físicas.
                                             </p>
                                         </div>
-                                    </div>
+                                    </SidebarCard>
                                 </div>
                             </div>
                         </motion.div>

@@ -22,6 +22,7 @@ import {
     Input,
     ActionsDropdown,
     DropdownItem,
+    SidebarCard,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -200,10 +201,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
 
                                     {/* Desktop action buttons */}
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                        <ActionsDropdown
-                                            triggerVariant="outline"
-                                            triggerSize="sm"
-                                        >
+                                        <ActionsDropdown>
                                             {item.moderation_status !== "approved" && (
                                                 <DropdownItem onClick={() => setShowApproveModal(true)} disabled={isPending}>
                                                     <CheckCircleIcon size={16} className="text-brand-green" /> Aprovar {typeLabel}
@@ -336,11 +334,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 {/* Sidebar */}
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
                                                     {/* Store Card */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Informações da Loja
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Informações da Loja">
                                                         <div className="space-y-3">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
@@ -364,14 +358,10 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 </p>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* Owner Card */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Proprietário
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Proprietário">
                                                         <div className="space-y-3">
                                                             <div className="flex items-center gap-2">
                                                                 <UserIcon size={14} className="text-brand-inactive-text" />
@@ -389,16 +379,12 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 <span className="text-xs text-brand-inactive-text truncate">Enviado em {formatDate(item.created_at)}</span>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
 
                                                     {/* ID Card */}
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">
-                                                            ID do Item
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip title="ID do Item">
                                                         <p className="text-xs font-mono text-brand-inactive-text break-all">{item.id}</p>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>
@@ -458,11 +444,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                 </div>
 
                                                 <div className="col-span-12 xl:col-span-4 pl-0 xl:pl-12 border-0 xl:border-l border-brand-border dark:border-dark-border">
-                                                    <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border relative overflow-hidden mb-6 transition-colors">
-                                                        <div className="absolute top-0 left-0 w-full h-1 bg-brand-dark dark:bg-dark-border rounded-t-2xl"></div>
-                                                        <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-4">
-                                                            Proprietário
-                                                        </h3>
+                                                    <SidebarCard hasTopStrip hasSeparator title="Proprietário">
                                                         <div className="space-y-3">
                                                             <div className="flex items-center gap-2">
                                                                 <UserIcon size={14} className="text-brand-inactive-text" />
@@ -476,7 +458,7 @@ export default function AdminModerationDetailView({ item, onBack }: AdminModerat
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    </SidebarCard>
                                                 </div>
                                             </div>
                                         </FadeIn>

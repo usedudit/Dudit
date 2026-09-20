@@ -120,7 +120,7 @@ export default function HelpHeader({
                             {menuOpen ? <XIcon /> : <MenuIcon />}
                         </button>
 
-                        <Link href="/" className="hidden lg:flex items-center gap-2 shrink-0">
+                        <Link href="/" prefetch={false} className="hidden lg:flex items-center gap-2 shrink-0">
                             <img
                                 src="https://img.dudit.com.br/static/Logo.png"
                                 alt="Dudit"
