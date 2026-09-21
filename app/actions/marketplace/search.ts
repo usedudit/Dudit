@@ -378,7 +378,7 @@ async function getCachedGlobalVersion(): Promise<number> {
 
 const searchMemoryCache = new Map<string, { results: any[]; filteredIds: string[]; expiresAt: number }>()
 
-export function invalidateInMemoryVersionCache(): void {
+export async function invalidateInMemoryVersionCache(): Promise<void> {
     cachedGlobalVersion = null
     searchMemoryCache.clear()
 }

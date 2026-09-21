@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 import { motion } from "framer-motion"
-import { Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard } from "@/components/reusable"
+import { Button, Input, FormTextarea, Badge, FormSection, TagsInput, SidebarCard, ActionsDropdown } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import CommunityVideoUploadSection from "./CommunityVideoUploadSection"
 import SelectVideoProductSheet from "./SelectVideoProductSheet"
 import SelectVideoServiceSheet from "./SelectVideoServiceSheet"
-import { ChevronLeftIcon, LinkIcon } from "@/lib/icons"
+import { ChevronLeftIcon, LinkIcon, EditIcon, SaveIcon, ThreeDotsIcon } from "@/lib/icons"
 import { useSidebar } from "@/lib/sidebar-context"
 import type { VideoMetadata } from "@/lib/video/shared"
 
@@ -15,6 +15,8 @@ interface VideoFormPageProps {
     video?: any
     onSave: (data: any) => Promise<void>
     onBack: () => void
+    onEdit?: () => void
+    onDelete?: () => void
     isLoading?: boolean
     partnerId?: string
     readOnly?: boolean
@@ -28,7 +30,7 @@ const EMPTY_VIDEO: VideoMetadata = {
     video_provider_id: null,
 }
 
-export default function VideoFormPage({ video, onSave, onBack, isLoading, partnerId, readOnly }: VideoFormPageProps) {
+export default function VideoFormPage({ video, onSave, onBack, onEdit, onDelete, isLoading, partnerId, readOnly }: VideoFormPageProps) {
     const isEditing = !!video
     const [saving, setSaving] = useState(false)
 
@@ -129,7 +131,7 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                 <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-24 md:pb-8 scroll-smooth no-scrollbar">
 
                     {/* Sticky Header */}
-                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface transition-all duration-500 ease-in-out">
+                    <div className="sticky top-0 z-30 w-full max-w-[1300px] mx-auto bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border transition-all duration-500 ease-in-out">
                         <div className="max-w-[1300px] mx-auto relative px-4 md:px-6 md:pt-4">
 
                             {/* Back button - desktop only */}
@@ -140,10 +142,13 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                             </div>
 
                             {/* Title row */}
-                            <div className="hidden md:flex items-start justify-between">
+                            <div className="hidden md:flex items-start justify-between md:py-0 md:mb-0">
                                 <div className="flex flex-col gap-1 overflow-hidden min-w-0">
-                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
-                                        {readOnly ? "Vídeo" : isEditing ? "Editar Vídeo" : "Novo Vídeo"}
+                                    <h1 className={`font-bold text-brand-dark dark:text-dark-heading transition-all duration-500 ease-in-out flex items-center gap-3 ${isScrolled ? "text-xl" : "text-xl md:text-3xl"}`}>
+                                        <span className="hidden md:inline truncate">{readOnly ? (video?.title || "Vídeo") : isEditing ? "Editar Vídeo" : "Novo Vídeo"}</span>
+                                        {readOnly && (
+                                            <Badge variant="green" className="whitespace-nowrap scale-90 shrink-0">Publicado</Badge>
+                                        )}
                                     </h1>
 
                                     <div className={`hidden md:block text-brand-inactive-text dark:text-dark-body text-[15px] font-medium transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "max-h-0 opacity-0" : "max-h-20 opacity-100"}`}>
@@ -153,13 +158,25 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
 
                                 {/* Desktop action buttons */}
                                 <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
-                                    <Button variant="outline" onClick={handleBack}>
-                                        {readOnly ? "Voltar" : "Cancelar"}
-                                    </Button>
-                                    {!readOnly && (
-                                        <Button onClick={handleSubmit} disabled={saving || isLoading}>
-                                            {saving || isLoading ? "Salvando..." : isEditing ? "Atualizar" : "Criar"}
-                                        </Button>
+                                    {readOnly ? (
+                                        <>
+                                            <ActionsDropdown
+                                                onEdit={onEdit}
+                                                onDelete={onDelete}
+                                            />
+                                            <Button onClick={onEdit} className="whitespace-nowrap" leftIcon={<EditIcon size={18} />}>
+                                                Editar vídeo
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Button variant="outline" onClick={handleBack} disabled={saving || isLoading}>
+                                                Cancelar
+                                            </Button>
+                                            <Button onClick={handleSubmit} disabled={saving || isLoading} leftIcon={<SaveIcon size={18} />}>
+                                                {saving || isLoading ? "Salvando..." : isEditing ? "Salvar" : "Criar"}
+                                            </Button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -211,13 +228,6 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                                                 onChange={setVideoMeta}
                                             />
                                         )}
-                                        <TagsInput
-                                            label="Tags"
-                                            tags={tags}
-                                            onChange={setTags}
-                                            placeholder="Digite uma tag e pressione Enter"
-                                            disabled={readOnly}
-                                        />
                                     </div>
                                 </FormSection>
                             </div>
@@ -290,22 +300,52 @@ export default function VideoFormPage({ video, onSave, onBack, isLoading, partne
                                         />
                                     </div>
                                 </SidebarCard>
+
+                                {/* Sidebar Card: Tags */}
+                                <SidebarCard hasSeparator title="Palavras-chave de busca">
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mb-4">
+                                        Adicione termos relacionados para ajudar clientes a encontrarem este vídeo na busca.
+                                    </p>
+                                    <TagsInput
+                                        tags={tags}
+                                        onChange={setTags}
+                                        disabled={readOnly}
+                                        placeholder="Adicionar tag..."
+                                    />
+                                </SidebarCard>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Mobile Bottom Action Bar */}
-                {!readOnly && (
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
-                        <Button variant="outline" onClick={handleBack} className="flex-1 h-12">
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSubmit} disabled={saving || isLoading} className="flex-1 h-12">
-                            {saving || isLoading ? "Salvando..." : isEditing ? "Atualizar" : "Criar"}
-                        </Button>
-                    </div>
-                )}
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-dark-surface border-t border-brand-border dark:border-dark-border px-4 py-3 flex gap-3">
+                    {readOnly ? (
+                        <>
+                            <ActionsDropdown
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                                trigger={
+                                    <Button variant="outline" className="flex-1 h-12" leftIcon={<ThreeDotsIcon size={18} />}>
+                                        Opções
+                                    </Button>
+                                }
+                            />
+                            <Button onClick={onEdit} className="flex-1 h-12" leftIcon={<EditIcon size={18} />}>
+                                Editar
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button variant="outline" onClick={handleBack} disabled={saving || isLoading} className="flex-1 h-12">
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSubmit} disabled={saving || isLoading} className="flex-1 h-12" leftIcon={<SaveIcon size={18} />}>
+                                {saving || isLoading ? "Salvando..." : isEditing ? "Salvar" : "Criar"}
+                            </Button>
+                        </>
+                    )}
+                </div>
 
                 {!readOnly && (
                     <>

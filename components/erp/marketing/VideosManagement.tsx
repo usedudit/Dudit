@@ -242,6 +242,8 @@ export default function VideosManagement() {
                             video={isEditing || isViewing ? currentVideo : undefined}
                             onSave={handleSave}
                             onBack={handleCancel}
+                            onEdit={isViewing && currentVideo ? () => handleEdit(currentVideo) : undefined}
+                            onDelete={isViewing && currentVideo ? () => setVideoToDelete(currentVideo) : undefined}
                             partnerId={partnerId}
                             readOnly={isViewing}
                         />

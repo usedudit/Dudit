@@ -22,6 +22,46 @@ export type {
 
 const TELEMETRY_TTL_SECONDS = 60 * 60 * 24 * 90 // 90 days TTL
 
+type PendingTelemetryExpiry = {
+    key: string
+    commandIndex: number
+}
+
+/**
+ * Add a counter without refreshing its TTL on every event.
+ *
+ * The old implementation sent INCR + EXPIRE for every search. The counter
+ * only needs an expiry when it is created; keeping EXPIRE out of the hot path
+ * cuts the telemetry command count roughly in half after the first event of a
+ * key while preserving the 90-day retention policy.
+ */
+function addTelemetryCounter(
+    pipeline: ReturnType<typeof redis.pipeline>,
+    key: string,
+    pendingExpiry: PendingTelemetryExpiry[],
+): void {
+    const commandIndex = pendingExpiry.length
+    pipeline.incr(key)
+    pendingExpiry.push({ key, commandIndex })
+}
+
+async function expireNewTelemetryKeys(
+    pipelineResult: unknown[],
+    pendingExpiry: PendingTelemetryExpiry[],
+): Promise<void> {
+    const newKeys = pendingExpiry
+        .filter(({ commandIndex }) => Number(pipelineResult[commandIndex]) === 1)
+        .map(({ key }) => key)
+
+    if (newKeys.length === 0) return
+
+    const expiryPipeline = redis.pipeline()
+    for (const key of newKeys) {
+        expiryPipeline.expire(key, TELEMETRY_TTL_SECONDS)
+    }
+    await expiryPipeline.exec()
+}
+
 function formatDateKey(d: Date = new Date()): string {
     return d.toISOString().slice(0, 10) // YYYY-MM-DD
 }
@@ -109,39 +149,38 @@ export async function recordMarketplaceSearchTelemetry(input: SearchTelemetryInp
 
         // Multi / Pipeline operations in Redis
         const p = redis.pipeline()
+        const pendingExpiry: PendingTelemetryExpiry[] = []
 
         // 1. Daily global counters
-        p.incr(`ddt:search:${dateStr}:total`)
-        p.expire(`ddt:search:${dateStr}:total`, TELEMETRY_TTL_SECONDS)
+        addTelemetryCounter(p, `ddt:search:${dateStr}:total`, pendingExpiry)
 
         if (cleanCity) {
-            p.incr(`ddt:search:${cityPrefix}${dateStr}:total`)
-            p.expire(`ddt:search:${cityPrefix}${dateStr}:total`, TELEMETRY_TTL_SECONDS)
+            addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:total`, pendingExpiry)
         }
 
         if (input.hasResults) {
-            p.incr(`ddt:search:${dateStr}:with_results`)
-            p.expire(`ddt:search:${dateStr}:with_results`, TELEMETRY_TTL_SECONDS)
+            addTelemetryCounter(p, `ddt:search:${dateStr}:with_results`, pendingExpiry)
 
             if (cleanCity) {
-                p.incr(`ddt:search:${cityPrefix}${dateStr}:with_results`)
-                p.expire(`ddt:search:${cityPrefix}${dateStr}:with_results`, TELEMETRY_TTL_SECONDS)
+                addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:with_results`, pendingExpiry)
             }
         } else {
             // Apenas contabiliza a métrica quantitativa de buscas sem resultado para a taxa de sucesso.
             // NÃO salva o termo como demanda (demanda só é registrada se o usuário clicar em 'Estou procurando isso' e enviar).
-            p.incr(`ddt:search:${dateStr}:zero_results`)
-            p.expire(`ddt:search:${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
+            addTelemetryCounter(p, `ddt:search:${dateStr}:zero_results`, pendingExpiry)
 
             if (cleanCity) {
-                p.incr(`ddt:search:${cityPrefix}${dateStr}:zero_results`)
-                p.expire(`ddt:search:${cityPrefix}${dateStr}:zero_results`, TELEMETRY_TTL_SECONDS)
+                addTelemetryCounter(p, `ddt:search:${cityPrefix}${dateStr}:zero_results`, pendingExpiry)
             }
         }
 
-        await p.exec().catch((err) => {
+        const pipelineResult = await p.exec().catch((err) => {
             console.warn("[ANALYTICS_TELEMETRY] Redis pipeline failed gracefully:", err?.message)
+            return null
         })
+        if (pipelineResult) {
+            await expireNewTelemetryKeys(pipelineResult, pendingExpiry)
+        }
     } catch (err: any) {
         // Fail-safe: search must never fail because of analytics
         console.warn("[ANALYTICS_TELEMETRY] Error logging search telemetry:", err?.message)

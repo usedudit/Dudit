@@ -55,6 +55,12 @@ const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/emails/send",
   "/api/ai/suggest-ncm",
   "/api/ai/suggest-cest",
+  "/api/billing/subscriptions",
+  "/api/cron/sync-redis",
+  "/api/r2/community-video-upload",
+  "/api/webhooks/supabase",
+  "/api/whatsapp/webhook",
+  "/api/mercadopago/subscription-payment",
 ]
 
 function isPublicPath(pathname: string): boolean {
@@ -256,7 +262,9 @@ export async function middleware(request: NextRequest) {
   // Uses category-based system with explicit limits. Exempts routes with custom rate limits.
   // Server Actions have their own in-action rate limiter and return RSC streams, so they are not intercepted with JSON 429.
   const isApiOrAuthPost = !isServerAction && (pathname.startsWith("/api/") || (pathname.startsWith("/auth/") && request.method === "POST"))
-  const isRateLimitExempt = RATE_LIMIT_EXEMPT_PATHS.includes(pathname)
+  const isRateLimitExempt = RATE_LIMIT_EXEMPT_PATHS.some((path) =>
+    pathname === path || pathname.startsWith(`${path}/`),
+  )
 
   if (isApiOrAuthPost && !isRateLimitExempt) {
     const category = (pathname.startsWith("/auth/") && request.method === "POST")

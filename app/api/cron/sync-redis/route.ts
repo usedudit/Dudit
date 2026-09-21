@@ -4,6 +4,7 @@ import { redis } from '@/lib/redis'
 import { syncToExploreRedis, getExploreRedisDataKey } from '@/lib/redis-sync'
 import { removeFromExploreRedis } from '@/lib/redis-sync'
 import { isExploreItemProjection, isExploreProductPublic, isExploreServicePublic, isExploreStorePublic } from '@/lib/redis-explore-serializer'
+import { revalidateExploreSearch } from '@/lib/utils/revalidation'
 import { checkRateLimitForAPI } from '@/lib/security/require-rate-limit'
 import { RateLimitCategory } from '@/lib/rate-limiter'
 
@@ -152,11 +153,16 @@ export async function GET(req: Request) {
       // Sincronizar em lotes via Action nativa
       const batches = []
       for (const p of missingOrStaleItems) {
-        batches.push(syncToExploreRedis({ id: p.id, type: p.type, data: {} }))
+        // Revalidate once after the batch instead of incrementing the search
+        // version for every repaired item.
+        batches.push(syncToExploreRedis({ id: p.id, type: p.type, data: {}, silent: true }))
         synced++
       }
       
       await Promise.allSettled(batches)
+      if (missingOrStaleItems.length > 0) {
+        await revalidateExploreSearch({ silent: false })
+      }
     }
 
     const orphanReconciliation = await reconcileOrphanedExploreIndex()

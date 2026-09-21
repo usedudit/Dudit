@@ -141,7 +141,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined) {
                 const globalId = `produto:${item.id}`
 
                 // Salvar Data JSON
-                pipeline.set(`data:v2:${globalId}`, JSON.stringify(produtoNormalizado))
+                pipeline.set(`data:v2:${globalId}`, JSON.stringify(produtoNormalizado), { ex: 60 * 60 * 24 * 7 })
                 // Salvar no index específico
                 pipeline.zadd("explore:index:produtos", { score, member: globalId })
                 // Salvar no index ALL
@@ -209,7 +209,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined) {
                 const score = new Date(item.created_at).getTime()
                 const globalId = `servico:${item.id}`
 
-                pipeline.set(`data:v2:${globalId}`, JSON.stringify(servicoNormalizado))
+                pipeline.set(`data:v2:${globalId}`, JSON.stringify(servicoNormalizado), { ex: 60 * 60 * 24 * 7 })
                 pipeline.zadd("explore:index:servicos", { score, member: globalId })
                 pipeline.zadd("explore:index:all", { score, member: globalId })
                 count += 3
@@ -279,7 +279,7 @@ function extractFirstVariantFallback(variants: any[] | null | undefined) {
                 const score = new Date(item.created_at).getTime()
                 const globalId = `loja:${item.id}`
 
-                pipeline.set(`data:v2:${globalId}`, JSON.stringify(vitrineNormalizada))
+                pipeline.set(`data:v2:${globalId}`, JSON.stringify(vitrineNormalizada), { ex: 60 * 60 * 24 * 7 })
                 pipeline.zadd("explore:index:vitrines", { score, member: globalId })
                 pipeline.zadd("explore:index:all", { score, member: globalId })
                 count += 3

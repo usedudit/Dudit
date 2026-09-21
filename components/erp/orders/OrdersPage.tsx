@@ -601,8 +601,9 @@ export default function OrdersPage({
         const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
         const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
         const isPaid = order.situation === "paid" || (Number(order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
-                                const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
-        if (hasDeposit) {
+        const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
+        const hasAlreadyPaid = Number(order.paidAmount || 0) > 0.009
+        if (hasDeposit && !hasAlreadyPaid) {
             router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
         } else if (isMarketplace || hasMethod || isPaid) {
             openPaymentStatusModal(order)
@@ -869,8 +870,9 @@ export default function OrdersPage({
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
                                 const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
                                 const isPaid = order.situation === "paid" || (Number(order.paid_amount || order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
-        const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
-                                if (hasDeposit) {
+                                const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
+                                const hasAlreadyPaid = Number(order.paid_amount || order.paidAmount || 0) > 0.009
+                                if (hasDeposit && !hasAlreadyPaid) {
                                     router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
                                 } else if (isMarketplace || hasMethod || isPaid) {
                                     const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
