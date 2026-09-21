@@ -774,10 +774,11 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const paymentMethodName = isExchangeOrder
         ? (exchangeShortfall > 0 ? "Troca (com diferença)" : "Troca (Quitada)")
         : getPaymentTypeLabel();
-    const isMercadoPago = hasReceivedMpPayment(order) || (isExchangeOrder && hasMercadoPagoOnline);
+    const isMercadoPago = hasReceivedMpPayment(order) || (isExchangeOrder && hasMercadoPagoOnline) || (Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly) && hasMercadoPagoOnline);
     const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
     const isBoletoPayment = paymentMethodName.toLowerCase().includes("boleto") || paymentMethodName.toLowerCase().includes("bolbradesco");
-    const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment);
+    const isPaymentExpired = Boolean(order.payment_expires_at && new Date(order.payment_expires_at) < new Date());
+    const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment) && !isPaymentExpired;
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
@@ -836,7 +837,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const depositSummary = isDepositOrder ? {
         depositPercent: Number(order?.checkout_fulfillment?.depositCheckout?.depositPercent || 0),
         initialChargeAmount: Number(order?.checkout_fulfillment?.depositCheckout?.initialChargeAmount || 0),
-        depositStatus: order?.checkout_fulfillment?.depositCheckout?.depositStatus || "pending",
+        depositStatus: (() => {
+            const raw = order?.checkout_fulfillment?.depositCheckout?.depositStatus || "pending";
+            const paidAmount = Number(order?.paid_amount || 0);
+            const isExpired = order?.payment_expires_at && new Date(order.payment_expires_at) < new Date() && paidAmount <= 0.009;
+            return isExpired ? "expired" : raw;
+        })(),
         paymentProvider: order?.checkout_fulfillment?.depositCheckout?.paymentProvider || null,
     } : null;
     const cashEntry = Array.isArray(order.payment_breakdown)
@@ -1719,7 +1725,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         {isExchangeOrder
                                                             ? (exchangeShortfall > 0 ? "Diferença pendente de pagamento" : "Crédito da devolução anterior aplicado")
                                                             : isDepositOrder
-                                                                ? `Sinal de ${depositSummary?.depositPercent || 0}% · ${depositSummary?.depositStatus === "paid" ? "Pago" : "Pendente"}`
+                                                                ? `Sinal de ${depositSummary?.depositPercent || 0}% · ${depositSummary?.depositStatus === "paid" ? "Pago" : depositSummary?.depositStatus === "expired" ? "Expirado" : "Pendente"}`
                                                                 : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto")}
                                                     </span>
                                                 }

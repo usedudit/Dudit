@@ -2798,6 +2798,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             order_number,
             partner_id,
             customer_name,
+            buyer_id,
             order_source,
             delivery_type,
             situation,
@@ -3134,7 +3135,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     const orderUpdatePayload: Record<string, unknown> = {
         customer_id: customerId,
-        buyer_id: customerId,
+        buyer_id: currentOrder.buyer_id || customerId,
         customer_name: data.customerName || null,
         order_source: buildOrderSource(data.salesChannel, data.deliveryMethod),
         delivery_type: data.deliveryMethod,

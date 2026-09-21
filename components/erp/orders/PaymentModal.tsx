@@ -486,6 +486,28 @@ const PaymentModal = ({
     const [generatingDepositPix, setGeneratingDepositPix] = useState(false);
     const [showDepositPixModal, setShowDepositPixModal] = useState(false);
     const [isCheckingDepositStatus, setIsCheckingDepositStatus] = useState(false);
+    const [existingSinalLoaded, setExistingSinalLoaded] = useState(false);
+
+    // Load existing sinal QR code data from MP when order already has a deposit
+    useEffect(() => {
+        if (!isOpen || !orderId || !allowDepositCharge) return;
+        if (existingPaidAmount > 0.009 || existingSinalLoaded) return;
+
+        fetch("/api/orders/retry-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId }),
+        })
+            .then(async (res) => { return res.ok ? res.json() : null; })
+            .then((data) => {
+                if (data && data.pixData && depositChargeAmount > 0.009) {
+                    setDepositMpPixData({ qrCode: data.pixData.qrCode, qrCodeBase64: data.pixData.qrCodeBase64 });
+                    setDepositMpPaymentId(data.mpPaymentId || null);
+                    setExistingSinalLoaded(true);
+                }
+            })
+            .catch(() => {})
+    }, [isOpen, orderId, allowDepositCharge, existingPaidAmount, existingSinalLoaded, depositChargeAmount]);
 
     const handleVerifyDepositPayment = async () => {
         if (!depositMpPaymentId) return;
@@ -2578,16 +2600,47 @@ const PaymentModal = ({
                                             ) : (
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
-                                                        <div className="p-4 border border-brand-border dark:border-dark-border rounded-xl bg-brand-gray/30 dark:bg-dark-border/20">
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Gerar cobrança de sinal{effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""}</p>
-                                                                    <p className="text-xs text-brand-inactive-text">Pix Mercado Pago - {formatCurrency(depositChargeAmount)}</p>
-                                                                </div>
-                                                                <Button variant="filled" onClick={handleGenerateDepositCharge} isLoading={generatingDepositPix}>
-                                                                    {depositMpPixData ? "Visualizar Pix" : "Gerar Pix"}
-                                                                </Button>
+                                                        <div
+                                                            className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors"
+                                                            onClick={() => {
+                                                                if (depositMpPixData) {
+                                                                    setShowDepositPixModal(true);
+                                                                } else {
+                                                                    handleGenerateDepositCharge();
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                                <img
+                                                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                                    alt="Mercado Pago"
+                                                                    className="w-5 h-5 object-contain"
+                                                                />
                                                             </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">
+                                                                    Sinal{orderId ? ` - ${orderId.slice(0, 13)}` : ""}
+                                                                </span>
+                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate">
+                                                                    {depositMpPixData ? "Pix Mercado Pago" : `Gerar cobrança de sinal${effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""} - ${formatCurrency(depositChargeAmount)}`}
+                                                                </span>
+                                                            </div>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (depositMpPixData) {
+                                                                        handleVerifyDepositPayment();
+                                                                    } else {
+                                                                        handleGenerateDepositCharge();
+                                                                    }
+                                                                }}
+                                                                isLoading={generatingDepositPix || isCheckingDepositStatus}
+                                                                className="h-8"
+                                                            >
+                                                                {depositMpPixData ? "Verificar" : (generatingDepositPix ? "Gerando..." : "Gerar Pix")}
+                                                            </Button>
                                                         </div>
                                                     )}
                                                     {customerCredit > 0.009 && (

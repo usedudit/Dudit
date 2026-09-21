@@ -45,6 +45,7 @@ const DEPOSIT_STATUS_LABELS: Record<string, string> = {
     partially_paid: "Sinal pago - saldo pendente",
     paid: "Quitado",
     not_required: "Sem sinal",
+    expired: "Sinal expirado",
 };
 
 const standardTransition = { type: "spring" as const, stiffness: 380, damping: 30 };

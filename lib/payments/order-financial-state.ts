@@ -6,6 +6,7 @@ export type OrderFinancialSnapshot = {
   situation?: string | null
   payment_breakdown?: unknown[] | null
   checkout_fulfillment?: Record<string, unknown> | null
+  payment_expires_at?: string | null
 }
 
 export function getOrderPaidAmount(order: OrderFinancialSnapshot): number {
@@ -64,7 +65,7 @@ export type OrderDepositSummary = {
   usesDeposit: boolean
   depositAmount: number
   depositPercent: number
-  depositStatus: "pending" | "partially_paid" | "paid" | "not_required"
+  depositStatus: "pending" | "partially_paid" | "paid" | "not_required" | "expired"
   fullOrderTotal: number
   paidAmount: number
   remainingBalance: number
@@ -82,7 +83,10 @@ export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepo
 
   let depositStatus: OrderDepositSummary["depositStatus"] = "not_required"
   if (usesDeposit) {
-    if (paidAmount <= 0.009) {
+    const isExpired = order.payment_expires_at && new Date(order.payment_expires_at) < new Date() && paidAmount <= 0.009
+    if (isExpired) {
+      depositStatus = "expired"
+    } else if (paidAmount <= 0.009) {
       depositStatus = "pending"
     } else if (paidAmount >= fullOrderTotal - 0.005) {
       depositStatus = "paid"

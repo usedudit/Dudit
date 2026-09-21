@@ -795,7 +795,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     useEffect(() => {
         let active = true
-        if (deliveryMethod !== "delivery" || isCustomShipping) {
+        const allItemsAreServices = items.length > 0 && items.every((item) => Boolean(item.isService))
+        if (deliveryMethod !== "delivery" || isCustomShipping || allItemsAreServices) {
             return
         }
 

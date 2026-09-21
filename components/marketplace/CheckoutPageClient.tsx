@@ -1398,45 +1398,34 @@ export function CheckoutPageClient() {
 
     const renderOrderBumpSection = () => {
         if (!bumpCandidates.length) return null
+        const bump = bumpCandidates[0]
+        const imgUrl = bump.images?.[0] ? getR2ImageUrl(bump.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
+        const isAdding = addingBumpId === bump.id
         return (
-            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
-                <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
-                    Adicione ao seu pedido
-                </div>
-                <div className="p-4 space-y-2">
-                    {bumpCandidates.map((p: any) => {
-                        const imgUrl = p.images?.[0] ? getR2ImageUrl(p.images[0]) : null
-                        const isAdding = addingBumpId === p.id
-                        return (
-                            <ListItem
-                                key={p.id}
-                                icon={
-                                    imgUrl ? (
-                                        <img
-                                            src={imgUrl}
-                                            alt={p.name}
-                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
-                                        />
-                                    ) : undefined
-                                }
-                                title={p.name}
-                                description={formatCurrency(Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price))}
-                                onClick={() => handleAddBumpProduct(p)}
-                                right={
-                                    isAdding ? (
-                                        <Spinner size={16} />
-                                    ) : (
-                                        <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(p) }}>
-                                            Adicionar
-                                        </Button>
-                                    )
-                                }
-                                className="!border-brand-border/50 dark:!border-dark-border/50"
-                            />
+            <FormSection title="Aproveite e leve junto!">
+                <ListItem
+                    icon={
+                        <img
+                            src={imgUrl}
+                            alt={bump.name}
+                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                        />
+                    }
+                    title={bump.name}
+                    description={formatCurrency(Number(bump.promotional_price && bump.promotional_price < bump.price ? bump.promotional_price : bump.price))}
+                    onClick={() => handleAddBumpProduct(bump)}
+                    right={
+                        isAdding ? (
+                            <Spinner size={16} />
+                        ) : (
+                            <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(bump) }}>
+                                Adicionar
+                            </Button>
                         )
-                    })}
-                </div>
-            </div>
+                    }
+                    className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                />
+            </FormSection>
         )
     }
 
@@ -2692,6 +2681,9 @@ export function CheckoutPageClient() {
                                 />
                             )}
 
+                            {/* ORDER BUMP */}
+                            {renderOrderBumpSection()}
+
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
@@ -3070,8 +3062,6 @@ export function CheckoutPageClient() {
                                 </div>
                             </div>
 
-                            {renderOrderBumpSection()}
-
                         </div>
                     </div>
 
@@ -3198,6 +3188,39 @@ export function CheckoutPageClient() {
                                         )}
                                     </div>
                                 )}
+                                {/* Order Bump */}
+                                {bumpCandidates.length > 0 && (() => {
+                                    const bump = bumpCandidates[0]
+                                    const imgUrl = bump.images?.[0] ? getR2ImageUrl(bump.images[0]) : "https://img.dudit.com.br/static/Placeholder.png"
+                                    const isAdding = addingBumpId === bump.id
+                                    return (
+                                        <FormSection title="Aproveite e leve junto!">
+                                            <ListItem
+                                                icon={
+                                                    <img
+                                                        src={imgUrl}
+                                                        alt={bump.name}
+                                                        className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                                                    />
+                                                }
+                                                title={bump.name}
+                                                description={formatCurrency(Number(bump.promotional_price && bump.promotional_price < bump.price ? bump.promotional_price : bump.price))}
+                                                onClick={() => handleAddBumpProduct(bump)}
+                                                right={
+                                                    isAdding ? (
+                                                        <Spinner size={16} />
+                                                    ) : (
+                                                        <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(bump) }}>
+                                                            Adicionar
+                                                        </Button>
+                                                    )
+                                                }
+                                                className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
+                                            />
+                                        </FormSection>
+                                    )
+                                })()}
+
                                 {/* Payment Selector */}
                                 <FormSection title="Forma de Pagamento">
                                     {!partnerInfo.mpConnected && !storefrontMethods.length ? (
@@ -3439,44 +3462,6 @@ export function CheckoutPageClient() {
                                             </p>
                                         )}
                                     </FormSection>
-                                )}
-
-                                {/* Order Bump */}
-                                {bumpCandidates.length > 0 && (
-                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface p-4 space-y-3">
-                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Adicione ao seu pedido</p>
-                                        {bumpCandidates.map((p: any) => {
-                                            const imgUrl = p.images?.[0] ? getR2ImageUrl(p.images[0]) : null
-                                            const isAdding = addingBumpId === p.id
-                                            return (
-                                                <ListItem
-                                                    key={p.id}
-                                                    icon={
-                                                        imgUrl ? (
-                                                            <img
-                                                                src={imgUrl}
-                                                                alt={p.name}
-                                                                className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
-                                                            />
-                                                        ) : undefined
-                                                    }
-                                                    title={p.name}
-                                                    description={formatCurrency(Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price))}
-                                                    onClick={() => handleAddBumpProduct(p)}
-                                                    right={
-                                                        isAdding ? (
-                                                            <Spinner size={16} />
-                                                        ) : (
-                                                            <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(p) }}>
-                                                                Adicionar
-                                                            </Button>
-                                                        )
-                                                    }
-                                                    className="!border-brand-border/50 dark:!border-dark-border/50"
-                                                />
-                                            )
-                                        })}
-                                    </div>
                                 )}
 
                                 {/* Totals Summary */}
