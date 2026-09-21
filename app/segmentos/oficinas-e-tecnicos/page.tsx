@@ -1,10 +1,11 @@
-"use client";
+"use client"
 
-import React from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { GridLines, CTA, Navbar, Footer } from "@/components/InstitucionalShared";
-import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld";
+import React from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { motion } from "framer-motion"
+import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
+import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
     Wrench,
     FileText,
@@ -15,7 +16,7 @@ import {
     Shield,
     ArrowRight,
     Star
-} from "lucide-react";
+} from "lucide-react"
 
 const softwareSchema = {
     "@context": "https://schema.org",
@@ -29,20 +30,20 @@ const softwareSchema = {
         priceCurrency: "BRL",
     },
     description: "Sistema completo de ordens de serviço (OS), orçamentos, estoque de peças e controle financeiro para oficinas mecânicas e assistências técnicas.",
-};
+}
 
 export default function OficinasETecnicosSegmentPage() {
-    const router = useRouter();
+    const router = useRouter()
 
     const onNavigate = (page: string) => {
-        if (page === 'home') router.push('/institucional/inicio');
-        else if (page === 'start-selling') router.push('/auth/login?mode=partner');
-        else if (page === 'explore') router.push('/');
-        else if (page === 'segments') router.push('/institucional/segmentos');
-        else if (page === 'pricing') router.push('/institucional/planos');
-        else if (page === 'about') router.push('/institucional/sobre');
-        else router.push('/');
-    };
+        if (page === 'home') router.push('/institucional/inicio')
+        else if (page === 'start-selling') router.push('/auth/login?mode=partner')
+        else if (page === 'explore') router.push('/')
+        else if (page === 'segments') router.push('/institucional/segmentos')
+        else if (page === 'pricing') router.push('/institucional/planos')
+        else if (page === 'about') router.push('/institucional/sobre')
+        else router.push('/')
+    }
 
     return (
         <div className="min-h-screen bg-white">
@@ -54,24 +55,22 @@ export default function OficinasETecnicosSegmentPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                {/* HERO SECTION */}
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden">
+                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
-                        <div className="grid lg:grid-cols-12 gap-12 items-center">
+                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                        <div className="grid lg:grid-cols-2 gap-12 items-center">
                             <motion.div
                                 initial={{ opacity: 0, y: 30 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.6 }}
-                                className="lg:col-span-7"
                             >
                                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider mb-6 border border-blue-100">
                                     <Wrench className="w-3.5 h-3.5" />
                                     Especial para Oficinas, Mecânicos e Técnicos
                                 </div>
 
-                                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-dark tracking-tight mb-6 leading-tight">
-                                    Ordens de Serviço e Orçamentos{" "}
+                                <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-6 leading-tight">
+                                    Ordens de Serviço e Orçamentos <br />
                                     <span className="text-brand-green">sem papelada ou confusão.</span>
                                 </h1>
 
@@ -80,31 +79,30 @@ export default function OficinasETecnicosSegmentPage() {
                                 </p>
 
                                 <div className="flex flex-wrap gap-4">
-                                    <button
-                                        onClick={() => onNavigate('start-selling')}
+                                    <Link
+                                        href="/auth/login?mode=partner"
                                         className="px-8 py-4 rounded-xl bg-brand-green text-white font-bold hover:bg-brand-green/90 transition-all shadow-lg hover:scale-105 inline-flex items-center gap-2"
                                     >
                                         <span>Começar Gratuitamente</span>
                                         <ArrowRight className="w-4 h-4" />
-                                    </button>
+                                    </Link>
 
-                                    <button
-                                        onClick={() => onNavigate('pricing')}
+                                    <Link
+                                        href="/institucional/planos"
                                         className="px-8 py-4 rounded-xl border border-gray-200 text-brand-dark font-bold hover:bg-gray-50 transition-all inline-flex items-center"
                                     >
                                         Ver Planos
-                                    </button>
+                                    </Link>
                                 </div>
                             </motion.div>
 
-                            {/* MOCKUP CARD */}
                             <motion.div
                                 initial={{ opacity: 0, x: 50 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ duration: 0.8, delay: 0.2 }}
-                                className="lg:col-span-5"
+                                className="relative"
                             >
-                                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 relative">
+                                <div className="bg-brand-slate border border-gray-100 rounded-xl p-6 sm:p-8 shadow-xl relative">
                                     <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-4">
                                         <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                                             <div>
@@ -142,54 +140,62 @@ export default function OficinasETecnicosSegmentPage() {
                     </div>
                 </section>
 
-                {/* FEATURES SECTION */}
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                         <div className="text-center max-w-2xl mx-auto mb-16">
                             <span className="text-xs font-bold uppercase tracking-widest text-brand-green mb-2 block">RECURSOS NATIVOS</span>
-                            <h2 className="text-3xl sm:text-4xl font-bold text-brand-dark tracking-tight">Tudo que sua oficina precisa no dia a dia</h2>
+                            <h2 className="text-4xl font-bold text-brand-dark tracking-tight">Tudo que sua oficina precisa no dia a dia</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {[
-                                {
-                                    icon: <FileText className="w-6 h-6" />,
-                                    color: "blue",
-                                    title: "Orçamentos com Aprovação Online",
-                                    description: "Envie propostas comerciais pelo WhatsApp com fotos e valores. O cliente clica no link e aprova na hora, gerando a OS automaticamente."
-                                },
-                                {
-                                    icon: <Wrench className="w-6 h-6" />,
-                                    color: "green",
-                                    title: "Ordens de Serviço Completas",
-                                    description: "Acompanhe o status do serviço (Aguardando peças, Em andamento, Concluído) e anexe diagnósticos técnicos sem perder o histórico."
-                                },
-                                {
-                                    icon: <DollarSign className="w-6 h-6" />,
-                                    color: "purple",
-                                    title: "Comissão de Mecânicos & Técnicos",
-                                    description: "Calcule automaticamente a comissão da equipe por serviço realizado, com relatório detalhado e integração ao fluxo de caixa."
-                                }
-                            ].map((card, idx) => (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.1 }}
-                                    viewport={{ once: true }}
-                                >
-                                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm h-full">
-                                        <div className={`w-12 h-12 rounded-xl bg-${card.color}-50 text-${card.color}-600 flex items-center justify-center mb-6`}>
-                                            {card.icon}
-                                        </div>
-                                        <h3 className="text-xl font-bold text-brand-dark mb-3">{card.title}</h3>
-                                        <p className="text-sm text-brand-inactive-text leading-relaxed">
-                                            {card.description}
-                                        </p>
-                                    </div>
-                                </motion.div>
-                            ))}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0 }}
+                                viewport={{ once: true }}
+                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-brand-dark mb-3">Orçamentos com Aprovação Online</h3>
+                                <p className="text-sm text-brand-inactive-text leading-relaxed">
+                                    Envie propostas comerciais pelo WhatsApp com fotos e valores. O cliente clica no link e aprova na hora, gerando a OS automaticamente.
+                                </p>
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 }}
+                                viewport={{ once: true }}
+                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center mb-6">
+                                    <Wrench className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-brand-dark mb-3">Ordens de Serviço Completas</h3>
+                                <p className="text-sm text-brand-inactive-text leading-relaxed">
+                                    Acompanhe o status do serviço (Aguardando peças, Em andamento, Concluído) e anexe diagnósticos técnicos sem perder o histórico.
+                                </p>
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                                viewport={{ once: true }}
+                                className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-6">
+                                    <DollarSign className="w-6 h-6" />
+                                </div>
+                                <h3 className="text-xl font-bold text-brand-dark mb-3">Comissão de Mecânicos & Técnicos</h3>
+                                <p className="text-sm text-brand-inactive-text leading-relaxed">
+                                    Calcule automaticamente a comissão da equipe por serviço realizado, com relatório detalhado e integração ao fluxo de caixa.
+                                </p>
+                            </motion.div>
                         </div>
                     </div>
                 </section>
@@ -198,5 +204,5 @@ export default function OficinasETecnicosSegmentPage() {
             <CTA onNavigate={onNavigate} />
             <Footer onNavigate={onNavigate} />
         </div>
-    );
+    )
 }

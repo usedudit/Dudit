@@ -1,7 +1,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import { TransactionsPage } from "@/components/erp/transactions"
 import { checkPermission } from "@/lib/permissions/access"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { PlanGatePage } from "@/components/erp/PlanGatePage"
 import { AccessDenied } from "@/components/erp/access-denied"
@@ -18,7 +18,7 @@ import {
 export const dynamic = "force-dynamic"
 
 export default async function FinancialTransactionsRoute() {
-  const context = await getCurrentPartnerContext()
+  const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
   if (context.businessInfo?.mode === "quick") return <AccessDenied />
 

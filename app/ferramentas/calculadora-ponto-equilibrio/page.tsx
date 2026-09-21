@@ -2,8 +2,8 @@
 
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import Link from "next/link"
+import { motion } from "framer-motion"
 import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
@@ -17,6 +17,10 @@ import {
 
 export default function CalculadoraPontoEquilibrioPage() {
     const router = useRouter()
+    const [custosFixos, setCustosFixos] = useState<number>(4500)
+    const [precoVendaMedio, setPrecoVendaMedio] = useState<number>(80)
+    const [custoVariavelMedio, setCustoVariavelMedio] = useState<number>(35)
+    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
@@ -27,11 +31,6 @@ export default function CalculadoraPontoEquilibrioPage() {
         else if (page === 'about') router.push('/institucional/sobre')
         else router.push('/')
     }
-
-    const [custosFixos, setCustosFixos] = useState<number>(4500)
-    const [precoVendaMedio, setPrecoVendaMedio] = useState<number>(80)
-    const [custoVariavelMedio, setCustoVariavelMedio] = useState<number>(35)
-    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const margemContribuicaoUnit = Math.max(0.01, precoVendaMedio - custoVariavelMedio)
     const indiceMargemContribuicao = precoVendaMedio > 0 ? (margemContribuicaoUnit / precoVendaMedio) : 0
@@ -94,45 +93,41 @@ export default function CalculadoraPontoEquilibrioPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                {/* HERO SECTION */}
-                <section className="pt-32 pb-20 bg-white relative overflow-hidden">
+                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
                         <motion.div
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="text-center"
                         >
                             <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
-                                <Link href="/" prefetch={false} className="hover:text-brand-green">Início</Link>
+                                <Link href="/" className="hover:text-brand-green">Início</Link>
                                 <span>/</span>
                                 <Link href="/ferramentas" className="hover:text-brand-green">Ferramentas</Link>
                                 <span>/</span>
                                 <span className="text-brand-dark font-semibold">Ponto de Equilíbrio</span>
                             </nav>
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4">
+                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
                                 Calculadora de Ponto de Equilíbrio (Break-Even)
                             </h1>
-                            <p className="text-base sm:text-lg text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
+                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
                                 Descubra quantas vendas você precisa fazer por mês para cobrir seus custos fixos e começar a ter lucro.
                             </p>
                         </motion.div>
                     </div>
                 </section>
 
-                {/* CALCULATOR CONTAINER */}
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                            {/* INPUTS COLUMN */}
                             <motion.div
                                 initial={{ opacity: 0, x: -30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
-                                viewport={{ once: true }}
                                 transition={{ duration: 0.6 }}
+                                viewport={{ once: true }}
                                 className="lg:col-span-6 bg-white rounded-xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-6"
                             >
                                 <h2 className="text-xl font-bold text-brand-dark flex items-center gap-2">
@@ -140,7 +135,6 @@ export default function CalculadoraPontoEquilibrioPage() {
                                     Entradas Financeiras
                                 </h2>
 
-                                {/* Custos Fixos */}
                                 <div>
                                     <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
                                         Custos Fixos Mensais Totais (R$)
@@ -159,7 +153,6 @@ export default function CalculadoraPontoEquilibrioPage() {
                                     <span className="text-[11px] text-gray-400 mt-1 block">Aluguel, contas, internet, folha e pró-labore.</span>
                                 </div>
 
-                                {/* Preço de Venda Médio */}
                                 <div>
                                     <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
                                         Preço Médio de Venda (R$)
@@ -178,7 +171,6 @@ export default function CalculadoraPontoEquilibrioPage() {
                                     <span className="text-[11px] text-gray-400 mt-1 block">Ticket médio de venda por produto ou serviço.</span>
                                 </div>
 
-                                {/* Custo Variável Médio */}
                                 <div>
                                     <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
                                         Custo Variável Médio por Unidade (R$)
@@ -198,12 +190,11 @@ export default function CalculadoraPontoEquilibrioPage() {
                                 </div>
                             </motion.div>
 
-                            {/* RESULTS COLUMN */}
                             <motion.div
                                 initial={{ opacity: 0, x: 30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.6 }}
                                 viewport={{ once: true }}
-                                transition={{ duration: 0.6, delay: 0.15 }}
                                 className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
                             >
                                 <div>
@@ -256,56 +247,43 @@ export default function CalculadoraPontoEquilibrioPage() {
                     </div>
                 </section>
 
-                {/* FAQ SECTION */}
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            className="text-center mb-16"
-                        >
-                            <h2 className="text-4xl font-bold text-brand-dark mb-4 flex items-center justify-center gap-2">
-                                <HelpCircle className="w-6 h-6 text-brand-green" />
-                                Entenda o Ponto de Equilíbrio
-                            </h2>
-                        </motion.div>
+                        <h3 className="text-2xl font-bold text-brand-dark mb-6 flex items-center gap-2">
+                            <HelpCircle className="w-5 h-5 text-brand-green" />
+                            Entenda o Ponto de Equilíbrio
+                        </h3>
 
-                        <div className="space-y-4 max-w-4xl mx-auto">
+                        <div className="space-y-4">
                             {faqs.map((faq, i) => {
                                 const isOpen = openFaq === i
                                 return (
-                                    <motion.div
+                                    <div
                                         key={i}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }}
-                                        transition={{ delay: i * 0.1 }}
-                                        className="border border-gray-100 rounded-2xl overflow-hidden bg-white"
+                                        className="border border-gray-100 rounded-xl overflow-hidden bg-white"
                                     >
                                         <button
                                             onClick={() => setOpenFaq(isOpen ? null : i)}
-                                            className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors"
+                                            className="w-full flex items-center justify-between p-5 text-left font-bold text-brand-dark text-base hover:bg-gray-50 transition-colors"
                                         >
-                                            <span className="font-semibold text-brand-dark text-lg">{faq.q}</span>
+                                            <span>{faq.q}</span>
                                             <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                                         </button>
                                         {isOpen && (
-                                            <div className="px-6 pb-6 text-sm text-brand-inactive-text leading-relaxed">
+                                            <div className="px-5 pb-5 text-sm text-brand-inactive-text leading-relaxed">
                                                 {faq.a}
                                             </div>
                                         )}
-                                    </motion.div>
+                                    </div>
                                 )
                             })}
                         </div>
                     </div>
                 </section>
-
-                <CTA onNavigate={onNavigate} />
             </main>
 
+            <CTA onNavigate={onNavigate} />
             <Footer onNavigate={onNavigate} />
         </div>
     )

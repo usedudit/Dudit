@@ -1,4 +1,5 @@
 import "server-only"
+import { cache } from "react"
 import { createAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/auth/server-user"
 import type { PartnerRole, PartnerPermissions } from "@/lib/permissions/types"
@@ -29,10 +30,10 @@ export interface EffectivePermissions {
  * Esta é a ÚNICA fonte de verdade para resolução de permissões por loja.
  * Nenhuma Server Action deve implementar lógica alternativa.
  */
-export async function resolveEffectivePermissions(
+export const resolveEffectivePermissions = cache(async (
     partnerId: string,
     storeId: string | null
-): Promise<EffectivePermissions | null> {
+): Promise<EffectivePermissions | null> => {
     const user = await getCurrentUser()
     if (!user) return null
 
@@ -117,7 +118,7 @@ export async function resolveEffectivePermissions(
         role: effectiveRoleUpper,
         permissions: effectivePermissions as unknown as PartnerPermissions,
     }
-}
+})
 
 /**
  * Verifica se o usuário autenticado tem acesso a uma store específica.

@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { getUnifiedDashboardAction } from "@/app/actions/erp/quick-mode"
 import QuickModeHome from "@/components/erp/quick-mode/QuickModeHome"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -11,7 +11,7 @@ import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 export const dynamic = "force-dynamic"
 
 export default async function InicioPage() {
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
 
     if (!context) {
         redirect("/select-erp")

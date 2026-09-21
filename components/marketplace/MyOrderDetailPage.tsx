@@ -25,6 +25,7 @@ import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityW
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
+import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -600,7 +601,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
         orderItems.forEach((item: any) => {
             const returned = returnedQtyMap[item.id] || 0
-            remaining[item.id] = Math.max(0, (item.quantity || 0) - returned)
+            const isServiceItem = !!item.service_id || item.line_type === "service_booking"
+            const itemQuantity = isServiceItem ? (item.quantity || 1) : (item.quantity || 0)
+            remaining[item.id] = Math.max(0, itemQuantity - returned)
         })
 
         return remaining
@@ -752,7 +755,10 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 baseLabel = `${baseLabel} - ${installmentCount}x`;
             }
         }
-        if (order.payment_provider === "Mercado Pago" && !baseLabel.toLowerCase().includes("mercado pago")) {
+        if (hasMultipleMethods) {
+            return baseLabel;
+        }
+        if (hasReceivedMpPayment(order) && !baseLabel.toLowerCase().includes("mercado pago")) {
             return `Mercado Pago (${baseLabel})`;
         }
         return baseLabel;
@@ -768,7 +774,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const paymentMethodName = isExchangeOrder
         ? (exchangeShortfall > 0 ? "Troca (com diferença)" : "Troca (Quitada)")
         : getPaymentTypeLabel();
-    const isMercadoPago = order.payment_provider === "Mercado Pago" || (isExchangeOrder && hasMercadoPagoOnline);
+    const isMercadoPago = hasReceivedMpPayment(order) || (isExchangeOrder && hasMercadoPagoOnline);
     const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
     const isBoletoPayment = paymentMethodName.toLowerCase().includes("boleto") || paymentMethodName.toLowerCase().includes("bolbradesco");
     const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment);
@@ -826,6 +832,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
+    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
+    const depositSummary = isDepositOrder ? {
+        depositPercent: Number(order?.checkout_fulfillment?.depositCheckout?.depositPercent || 0),
+        initialChargeAmount: Number(order?.checkout_fulfillment?.depositCheckout?.initialChargeAmount || 0),
+        depositStatus: order?.checkout_fulfillment?.depositCheckout?.depositStatus || "pending",
+        paymentProvider: order?.checkout_fulfillment?.depositCheckout?.paymentProvider || null,
+    } : null;
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => {
             const m = String(entry?.method || "").toLowerCase().trim();
@@ -836,8 +849,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const payWithAmount = Number(cashEntry?.payWithAmount ?? order.pay_with_amount ?? order.payWithAmount ?? 0);
     const changeAmount = Math.max(0, payWithAmount > 0 && wantsChange ? payWithAmount - totalVal : 0);
 
-    const hasItemDiscount = itemsSubtotal > 0 && subtotalVal > 0 && Math.abs(itemsSubtotal - subtotalVal) > 0.005
-    const itemDiscountRatio = hasItemDiscount ? subtotalVal / itemsSubtotal : 1
+    const effectiveSubtotal = isDepositOrder ? itemsSubtotal : subtotalVal;
+    const hasItemDiscount = !isDepositOrder && itemsSubtotal > 0 && effectiveSubtotal > 0 && Math.abs(itemsSubtotal - effectiveSubtotal) > 0.005
+    const itemDiscountRatio = hasItemDiscount ? effectiveSubtotal / itemsSubtotal : 1
 
     const getItemDiscountedPrice = (item: any) => {
         const basePrice = Number(item.product_price || 0)
@@ -877,7 +891,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             <div className="space-y-3">
                 <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
                     <span>Subtotal</span>
-                    <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(subtotalVal)}</span>
+                    <span className="text-brand-dark dark:text-dark-heading font-medium">{formatCurrency(itemsSubtotal)}</span>
                 </div>
                 {shippingVal > 0 ? (
                     <div className="flex justify-between text-sm text-brand-inactive-text dark:text-dark-body">
@@ -1697,21 +1711,23 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 title={
                                                     loadingPayment ? <Spinner size={14} className="text-brand-dark dark:text-dark-heading" /> :
                                                         <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                            {paymentMethodName}
+                                                            {isDepositOrder ? `Sinal${order.order_number ? ` - ${order.order_number}` : ""}` : paymentMethodName}
                                                         </span>
                                                 }
                                                 description={
                                                     <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
                                                         {isExchangeOrder
                                                             ? (exchangeShortfall > 0 ? "Diferença pendente de pagamento" : "Crédito da devolução anterior aplicado")
-                                                            : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto")}
+                                                            : isDepositOrder
+                                                                ? `Sinal de ${depositSummary?.depositPercent || 0}% · ${depositSummary?.depositStatus === "paid" ? "Pago" : "Pendente"}`
+                                                                : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto")}
                                                     </span>
                                                 }
                                                 className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
                                                 onClick={canRetryPayment ? handlePixClick : undefined}
                                                 right={
                                                     <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : totalAmount)}
+                                                        {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : isDepositOrder ? (depositSummary?.initialChargeAmount || 0) : totalAmount)}
                                                     </span>
                                                 }
                                             />
@@ -2362,7 +2378,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0 pl-8 md:pl-0">
                                                     <div className="flex flex-col gap-1 w-24">
-                                                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase">Qtd</span>
+                                                        <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Qtd</span>
                                                         <QuantitySelector
                                                             value={returnItems[item.id] || 1}
                                                             onChange={(val) => setReturnItems(prev => ({ ...prev, [item.id]: val }))}
@@ -2373,8 +2389,8 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         />
                                                     </div>
                                                     <div className="flex flex-col gap-1 w-32">
-                                                        <span className="text-[10px] text-brand-inactive-text dark:text-dark-body font-bold uppercase">Condição</span>
                                                         <FormDropdown
+                                                            label="Condição"
                                                             value={returnConditions[item.id] || "opened"}
                                                             setValue={(val) => setReturnConditions(prev => ({ ...prev, [item.id]: val as any }))}
                                                             disabled={!returnItems[item.id]}
@@ -2395,11 +2411,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                         {/* Servicos */}
                         {order.order_items?.filter((item: any) => item.service_id || item.line_type === "service_booking").length > 0 && (
                             <div className="space-y-3">
-                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Servicos</h4>
+                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Serviços</h4>
                                 {order.order_items
                                     ?.filter((item: any) => item.service_id || item.line_type === "service_booking")
                                     .map((item: any) => {
                                         const isCancelled = order.situation === "cancelled";
+                                        const serviceImage = item.services?.images?.[0] || item.services?.video_thumbnail || null;
                                         return (
                                             <div key={item.id} className="flex items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
                                                 <Checkbox
@@ -2407,6 +2424,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     onChange={(checked) => setReturnServiceItems(prev => ({ ...prev, [item.id]: checked }))}
                                                     disabled={isCancelled || returnResolution === "exchange"}
                                                 />
+                                                {serviceImage ? (
+                                                    <img
+                                                        src={getR2ImageUrl(serviceImage)}
+                                                        alt={item.services?.name || item.product_name}
+                                                        className="h-12 w-12 rounded-lg border border-brand-border object-contain shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="h-12 w-12 rounded-lg border border-brand-border dark:border-dark-border bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center shrink-0">
+                                                        <svg className="w-6 h-6 text-brand-inactive-text dark:text-dark-body" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                    </div>
+                                                )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-bold text-sm text-brand-dark dark:text-dark-heading truncate">{item.services?.name || item.product_name}</p>
@@ -2414,7 +2445,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             <Badge variant="red">Cancelado</Badge>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Servico</p>
+                                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">Serviço</p>
                                                 </div>
                                             </div>
                                         )

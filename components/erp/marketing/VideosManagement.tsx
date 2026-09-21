@@ -148,9 +148,25 @@ export default function VideosManagement() {
 
     const handleSave = async (data: any) => {
         if (isEditing && es.entityId) {
+            let linkedItemType: "product" | "service" | "collection" | null = null
+            let linkedItemId: string | null = null
+            if (data.linked_product_id) {
+                linkedItemType = "product"
+                linkedItemId = data.linked_product_id
+            } else if (data.linked_service_id) {
+                linkedItemType = "service"
+                linkedItemId = data.linked_service_id
+            } else if (data.linked_collection_url) {
+                linkedItemType = "collection"
+                const match = data.linked_collection_url.match(/\/colecoes\/([^/?]+)/)
+                linkedItemId = match ? match[1] : data.linked_collection_url
+            }
+
             const result = await updateCommunityVideo(es.entityId, {
                 title: data.title,
                 description: data.description,
+                linkedItemType,
+                linkedItemId,
             })
             if (!result.success) throw new Error(result.error)
             toast({ title: "Vídeo atualizado" })

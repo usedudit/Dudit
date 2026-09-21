@@ -38,10 +38,12 @@ import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
 export const ShowcaseSubPage = ({
     store,
     partnerId,
+    partnerOrderFlow,
     onBack,
 }: {
     store: any
     partnerId: string
+    partnerOrderFlow?: string | null
     onBack: () => void
 }) => {
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -66,7 +68,7 @@ export const ShowcaseSubPage = ({
         isShowcaseActive: store.is_showcase_active ?? true,
         acceptOrdersWhenClosed: store.accept_orders_when_closed ?? true,
         gallery: store.gallery || [],
-        orderFlow: store.order_flow || (isQuickMode ? "whatsapp" : "dudit"),
+        orderFlow: partnerOrderFlow || store.order_flow || (isQuickMode ? "whatsapp" : "dudit"),
     })
 
     const initialStoreAddr = store.addresses?.[0] || store.address || {}
@@ -94,7 +96,7 @@ export const ShowcaseSubPage = ({
                 .single()
             if (storeData?.addresses?.[0]) {
                 const addr = storeData.addresses[0] as any
-                setAddress({
+                const newAddress = {
                     zipCode: addr.zip_code || "",
                     street: addr.street || "",
                     number: addr.number || "",
@@ -106,7 +108,12 @@ export const ShowcaseSubPage = ({
                     ibge: addr.municipio_codigo_ibge || "",
                     latitude: addr.latitude ?? null,
                     longitude: addr.longitude ?? null,
-                })
+                }
+                setAddress(newAddress)
+                setInitialState((prev) => ({
+                    ...prev,
+                    address: { ...newAddress },
+                }))
             }
         }
         fetchAddress()

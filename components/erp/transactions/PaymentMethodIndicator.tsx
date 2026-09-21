@@ -139,11 +139,12 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = fa
 
     const providerIsMP = !!provider?.toLowerCase().includes("mercado pago")
     const normalized = displayPart.toLowerCase()
-    const { icons, colorClass } = resolveIcons(normalized, providerIsMP)
+    const isMultipleMethods = normalized.includes("multiplos") || normalized.includes("múltiplos")
+    const { icons, colorClass } = resolveIcons(normalized, providerIsMP && !isMultipleMethods)
 
-    // Build display text: always append " (Mercado Pago)" if provider is MP and text doesn't already include it
+    // Build display text: append " (Mercado Pago)" only for single-method payments via MP
     let displayText = displayPart
-    if (providerIsMP && !normalized.includes("mercado pago") && !normalized.includes("mercadopago")) {
+    if (providerIsMP && !isMultipleMethods && !normalized.includes("mercado pago") && !normalized.includes("mercadopago")) {
         displayText = `${displayPart} (Mercado Pago)`
     }
 

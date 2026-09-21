@@ -75,6 +75,7 @@ interface ReturnItemState extends Omit<ReturnItem, "reason" | "condition"> {
     checked: boolean
     reason: ReturnItem["reason"]
     condition: ReturnItem["condition"]
+    lineType?: string
 }
 
 type ReplacementItemState = {
@@ -285,6 +286,9 @@ export default function CreateReturnPage({
     }, [selectedOrder])
 
     const checkedItems = useMemo(() => returnItems.filter(item => item.checked), [returnItems])
+
+    const hasServices = useMemo(() => returnItems.some(item => item.lineType === "service_booking"), [returnItems])
+    const hasOnlyServices = useMemo(() => returnItems.length > 0 && returnItems.every(item => item.lineType === "service_booking"), [returnItems])
 
     const isDirty = useMemo(() => {
         if (isViewOnly || isSaving || isUploading) return false
@@ -990,30 +994,31 @@ export default function CreateReturnPage({
                                                                                     orderPicker.setSearchQuery(order.displayId)
                                                                                     setIsOrderSearchOpen(false)
                                                                                     // Map order items to returns checklist items
-                                                                                    const mappedItems = (order.order_items || []).map((item: any) => {
-                                                                                        const isServiceItem = !!item.service_id || item.line_type === "service_booking"
-                                                                                        const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
-                                                                                            ? item.products.images[0]
-                                                                                            : (item.products?.video_thumbnail || item.products?.images
-                                                                                                || (Array.isArray(item.services?.images) && item.services.images[0]
-                                                                                                    ? item.services.images[0]
-                                                                                                    : item.services?.video_thumbnail || item.services?.images || null))
-                                                                                        const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
-                                                                                        return {
-                                                                                            id: item.id,
-                                                                                            productId: item.product_id || item.services?.id || item.id,
-                                                                                            productName: item.product_name || item.products?.name || item.services?.name || (isServiceItem ? "Serviço" : "Produto"),
-                                                                                            sku: item.products?.sku || item.services?.sku || "",
-                                                                                            image: getR2ImageUrl(imgKey, "thumb"),
-                                                                                            price: item.product_price || 0,
-                                                                                            netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
-                                                                                            quantity: Math.min(item.quantity || 1, remainingQty),
-                                                                                            maxQuantity: remainingQty,
-                                                                                            checked: false,
-                                                                                            reason: "defeito" as const,
-                                                                                            condition: "aberto" as const,
-                                                                                        }
-                                                                                    })
+                                                                                        const mappedItems = (order.order_items || []).map((item: any) => {
+                                                                                         const isServiceItem = !!item.service_id || item.line_type === "service_booking"
+                                                                                         const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
+                                                                                             ? item.products.images[0]
+                                                                                             : (item.products?.video_thumbnail || item.products?.images
+                                                                                                 || (Array.isArray(item.services?.images) && item.services.images[0]
+                                                                                                     ? item.services.images[0]
+                                                                                                     : item.services?.video_thumbnail || item.services?.images || null))
+                                                                                         const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
+                                                                                         return {
+                                                                                             id: item.id,
+                                                                                             productId: item.product_id || item.services?.id || item.id,
+                                                                                             productName: item.product_name || item.products?.name || item.services?.name || (isServiceItem ? "Serviço" : "Produto"),
+                                                                                             sku: item.products?.sku || item.services?.sku || "",
+                                                                                             image: getR2ImageUrl(imgKey, "thumb"),
+                                                                                             price: item.product_price || 0,
+                                                                                             netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
+                                                                                             quantity: Math.min(item.quantity || 1, remainingQty),
+                                                                                             maxQuantity: remainingQty,
+                                                                                             checked: false,
+                                                                                             reason: "defeito" as const,
+                                                                                             condition: "aberto" as const,
+                                                                                             lineType: item.line_type || (isServiceItem ? "service_booking" : "product"),
+                                                                                         }
+                                                                                     })
                                                                                     setReturnItems(mappedItems)
                                                                                 }}
                                                                             >
@@ -1119,7 +1124,7 @@ export default function CreateReturnPage({
 
                                             {/* Return Item Checklist */}
                                             {selectedOrder && (
-                                                <FormSection hasSeparator title="Produtos para Devolução">
+                                                <FormSection hasSeparator title={hasServices ? "Itens para Devolução" : "Produtos para Devolução"}>
                                                     {isViewOnly ? (
                                                         <div className="flex flex-col gap-6">
                                                             {returnItems.filter(item => item.checked).map((item) => {
@@ -1158,10 +1163,14 @@ export default function CreateReturnPage({
                                                                                 <span>
                                                                                     Motivo: <strong className="text-brand-dark dark:text-dark-heading">{getLegacyReasonLabel(item.reason)}</strong>
                                                                                 </span>
-                                                                                <span>•</span>
-                                                                                <span>
-                                                                                    Condição: <strong className="text-brand-dark dark:text-dark-heading">{getLegacyConditionLabel(item.condition)}</strong>
-                                                                                </span>
+                                                                                {item.lineType !== "service_booking" && (
+                                                                                    <>
+                                                                                        <span>•</span>
+                                                                                        <span>
+                                                                                            Condição: <strong className="text-brand-dark dark:text-dark-heading">{getLegacyConditionLabel(item.condition)}</strong>
+                                                                                        </span>
+                                                                                    </>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1176,11 +1185,13 @@ export default function CreateReturnPage({
                                                                     <thead>
                                                                         <tr className="bg-brand-gray dark:bg-dark-border/50">
                                                                             <th className="py-3 pl-6 pr-2 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg w-12"></th>
-                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Produto</th>
+                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body">Item</th>
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-28">Preço</th>
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-28">Comprado</th>
                                                                             <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40 text-center">Motivo</th>
-                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40 text-center">Condição</th>
+                                                                            {!hasOnlyServices && (
+                                                                                <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body w-40 text-center">Condição</th>
+                                                                            )}
                                                                             <th className="py-3 pl-4 pr-6 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36 rounded-r-lg">Qtd Devolver</th>
                                                                         </tr>
                                                                     </thead>
@@ -1261,24 +1272,30 @@ export default function CreateReturnPage({
                                                                                         ]}
                                                                                     />
                                                                                 </td>
-                                                                                <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
-                                                                                    <FormDropdown
-                                                                                        disabled={!item.checked || isMarketplaceRequest}
-                                                                                        value={item.condition}
-                                                                                        setValue={(val) => {
-                                                                                            setReturnItems(prev => {
-                                                                                                const next = [...prev]
-                                                                                                next[idx] = { ...next[idx], condition: val as any }
-                                                                                                return next
-                                                                                            })
-                                                                                        }}
-                                                                                        options={[
-                                                                                            { value: "aberto", label: "Aberto" },
-                                                                                            { value: "lacrado", label: "Lacrado" },
-                                                                                            { value: "danificado", label: "Danificado" }
-                                                                                        ]}
-                                                                                    />
-                                                                                </td>
+                                                                                {!hasOnlyServices && (
+                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border align-middle">
+                                                                                        {item.lineType === "service_booking" ? (
+                                                                                            <span className="text-sm text-brand-inactive-text dark:text-dark-body">N/A</span>
+                                                                                        ) : (
+                                                                                            <FormDropdown
+                                                                                                disabled={!item.checked || isMarketplaceRequest}
+                                                                                                value={item.condition}
+                                                                                                setValue={(val) => {
+                                                                                                    setReturnItems(prev => {
+                                                                                                        const next = [...prev]
+                                                                                                        next[idx] = { ...next[idx], condition: val as any }
+                                                                                                        return next
+                                                                                                    })
+                                                                                                }}
+                                                                                                options={[
+                                                                                                    { value: "aberto", label: "Aberto" },
+                                                                                                    { value: "lacrado", label: "Lacrado" },
+                                                                                                    { value: "danificado", label: "Danificado" }
+                                                                                                ]}
+                                                                                            />
+                                                                                        )}
+                                                                                    </td>
+                                                                                )}
                                                                                 <td className="py-4 pl-4 pr-6 border-b border-brand-border dark:border-dark-border align-middle">
                                                                                     <div className="flex justify-center">
                                                                                         <QuantitySelector
@@ -1359,7 +1376,7 @@ export default function CreateReturnPage({
 
                                                                         {/* Input elements only visible/interactive when checked */}
                                                                         {item.checked && (
-                                                                            <div className="grid grid-cols-2 gap-4 pl-7">
+                                                                            <div className={`grid gap-4 pl-7 ${hasOnlyServices ? "grid-cols-1" : "grid-cols-2"}`}>
                                                                                 <FormDropdown
                                                                                     label="Motivo"
                                                                                     disabled={!item.checked || isMarketplaceRequest}
@@ -1382,23 +1399,25 @@ export default function CreateReturnPage({
                                                                                         { value: "other", label: "Outro" }
                                                                                     ]}
                                                                                 />
-                                                                                <FormDropdown
-                                                                                    label="Condição"
-                                                                                    disabled={!item.checked || isMarketplaceRequest}
-                                                                                    value={item.condition}
-                                                                                    setValue={(val) => {
-                                                                                        setReturnItems(prev => {
-                                                                                            const next = [...prev]
-                                                                                            next[idx] = { ...next[idx], condition: val as any }
-                                                                                            return next
-                                                                                        })
-                                                                                    }}
-                                                                                    options={[
-                                                                                        { value: "aberto", label: "Aberto" },
-                                                                                        { value: "lacrado", label: "Lacrado" },
-                                                                                        { value: "danificado", label: "Danificado" }
-                                                                                    ]}
-                                                                                />
+                                                                                {item.lineType !== "service_booking" && (
+                                                                                    <FormDropdown
+                                                                                        label="Condição"
+                                                                                        disabled={!item.checked || isMarketplaceRequest}
+                                                                                        value={item.condition}
+                                                                                        setValue={(val) => {
+                                                                                            setReturnItems(prev => {
+                                                                                                const next = [...prev]
+                                                                                                next[idx] = { ...next[idx], condition: val as any }
+                                                                                                return next
+                                                                                            })
+                                                                                        }}
+                                                                                        options={[
+                                                                                            { value: "aberto", label: "Aberto" },
+                                                                                            { value: "lacrado", label: "Lacrado" },
+                                                                                            { value: "danificado", label: "Danificado" }
+                                                                                        ]}
+                                                                                    />
+                                                                                )}
                                                                                 <div className="flex flex-col">
                                                                                     <span className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5">Qtd Devolver</span>
                                                                                     <QuantitySelector

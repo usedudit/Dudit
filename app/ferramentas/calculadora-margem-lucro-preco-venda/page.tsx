@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { motion } from "framer-motion"
 import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
@@ -19,6 +19,11 @@ import {
 
 export default function CalculadoraMargemLucroPage() {
     const router = useRouter()
+    const [custoProduto, setCustoProduto] = useState<number>(50)
+    const [despesasVariaveis, setDespesasVariaveis] = useState<number>(10)
+    const [despesasFixas, setDespesasFixas] = useState<number>(15)
+    const [margemLucroDesejada, setMargemLucroDesejada] = useState<number>(25)
+    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
@@ -29,12 +34,6 @@ export default function CalculadoraMargemLucroPage() {
         else if (page === 'about') router.push('/institucional/sobre')
         else router.push('/')
     }
-
-    const [custoProduto, setCustoProduto] = useState<number>(50)
-    const [despesasVariaveis, setDespesasVariaveis] = useState<number>(10)
-    const [despesasFixas, setDespesasFixas] = useState<number>(15)
-    const [margemLucroDesejada, setMargemLucroDesejada] = useState<number>(25)
-    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const somaPercentuais = (despesasVariaveis + despesasFixas + margemLucroDesejada) / 100
     const markupDivisor = Math.max(0.01, 1 - somaPercentuais)
@@ -101,15 +100,13 @@ export default function CalculadoraMargemLucroPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                {/* HERO SECTION */}
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden">
+                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
                         <motion.div
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="text-center"
                         >
                             <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
                                 <Link href="/" prefetch={false} className="hover:text-brand-green">Início</Link>
@@ -119,22 +116,20 @@ export default function CalculadoraMargemLucroPage() {
                                 <span className="text-brand-dark font-semibold">Calculadora de Preço de Venda</span>
                             </nav>
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4">
+                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
                                 Calculadora de Margem de Lucro & Preço de Venda
                             </h1>
-                            <p className="text-base sm:text-lg text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
+                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
                                 Calcule o preço de venda ideal (Markup Divisor) para nunca mais ter prejuízo nas suas vendas.
                             </p>
                         </motion.div>
                     </div>
                 </section>
 
-                {/* CALCULATOR CONTAINER */}
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                            {/* INPUTS COLUMN */}
                             <motion.div
                                 initial={{ opacity: 0, x: -30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
@@ -176,7 +171,7 @@ export default function CalculadoraMargemLucroPage() {
                                             max="50"
                                             value={despesasVariaveis}
                                             onChange={(e) => setDespesasVariaveis(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green outline-none text-brand-dark font-bold"
+                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
                                     </div>
@@ -194,7 +189,7 @@ export default function CalculadoraMargemLucroPage() {
                                             max="50"
                                             value={despesasFixas}
                                             onChange={(e) => setDespesasFixas(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green outline-none text-brand-dark font-bold"
+                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
                                     </div>
@@ -212,7 +207,7 @@ export default function CalculadoraMargemLucroPage() {
                                             max="80"
                                             value={margemLucroDesejada}
                                             onChange={(e) => setMargemLucroDesejada(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green outline-none text-brand-dark font-bold text-brand-green"
+                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-brand-green"
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
                                     </div>
@@ -220,11 +215,10 @@ export default function CalculadoraMargemLucroPage() {
                                 </div>
                             </motion.div>
 
-                            {/* RESULTS COLUMN */}
                             <motion.div
                                 initial={{ opacity: 0, x: 30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6, delay: 0.2 }}
+                                transition={{ duration: 0.6 }}
                                 viewport={{ once: true }}
                                 className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
                             >
@@ -282,7 +276,6 @@ export default function CalculadoraMargemLucroPage() {
                     </div>
                 </section>
 
-                {/* FAQ SECTION */}
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">

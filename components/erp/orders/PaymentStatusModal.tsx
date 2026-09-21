@@ -38,6 +38,7 @@ import type { PaymentBreakdownLeg } from '@/components/erp/payments/shared/payme
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { ReceiptScallopEdge } from '../POSComponents';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
+import { PixQrDisplayModal } from '@/components/erp/payments/shared/PixQrDisplayModal';
 
 const DEPOSIT_STATUS_LABELS: Record<string, string> = {
     pending: "Sinal pendente",
@@ -205,6 +206,7 @@ export default function PaymentStatusModal({
         chargeAmount?: number;
     } | null>(null);
     const [copiedMp, setCopiedMp] = useState(false);
+    const [showMpPixModal, setShowMpPixModal] = useState(false);
     const loading = paymentStatus === 'processing';
 
     useEffect(() => {
@@ -219,6 +221,7 @@ export default function PaymentStatusModal({
             setMpLoading(false);
             setMpPaymentData(null);
             setCopiedMp(false);
+            setShowMpPixModal(false);
             const id = setTimeout(() => setIsAnimating(true), 50);
             return () => clearTimeout(id);
         } else {
@@ -606,7 +609,47 @@ export default function PaymentStatusModal({
                                         )}
                                     </div>
 
-                                    {isMpOrder && !isFullyPaid && (
+                                    {isMpOrder && !isFullyPaid && depositSummary?.usesDeposit && (
+                                        <div
+                                            className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
+                                            onClick={() => {
+                                                if (mpPaymentData?.pixData || mpPaymentData?.boletoData) {
+                                                    setShowMpPixModal(true);
+                                                }
+                                            }}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                <img
+                                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                    alt="Mercado Pago"
+                                                    className="w-5 h-5 object-contain"
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">
+                                                    Sinal{targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}
+                                                </span>
+                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate">
+                                                    {mpPaymentData ? (mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago") : "Carregando..."}
+                                                </span>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSyncMpPayment();
+                                                }}
+                                                disabled={syncing}
+                                                className="h-8"
+                                            >
+                                                {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
+                                                Verificar
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {isMpOrder && !isFullyPaid && !depositSummary?.usesDeposit && (
                                         <div className="flex flex-col gap-4">
                                             {/* Header do card MP */}
                                             <div className="flex items-center justify-between gap-3">
@@ -955,6 +998,19 @@ export default function PaymentStatusModal({
                     isOpen={!!printOrderId}
                     onClose={() => setPrintOrderId(null)}
                     orderId={printOrderId}
+                />
+            )}
+
+            {showMpPixModal && mpPaymentData && (
+                <PixQrDisplayModal
+                    isOpen={showMpPixModal}
+                    onClose={() => setShowMpPixModal(false)}
+                    qrCode={mpPaymentData.pixData?.qrCodeBase64 ? `data:image/png;base64,${mpPaymentData.pixData.qrCodeBase64}` : ""}
+                    payload={mpPaymentData.pixData?.qrCode || mpPaymentData.boletoData?.barcode || ""}
+                    amount={mpPaymentData.chargeAmount || totalRemaining}
+                    subtitle={`Sinal${targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}`}
+                    onVerifyPayment={handleSyncMpPayment}
+                    isVerifying={syncing}
                 />
             )}
         </div>

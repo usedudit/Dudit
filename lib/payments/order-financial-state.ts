@@ -27,6 +27,15 @@ export function isOrderFinanciallyFrozen(order: OrderFinancialSnapshot): boolean
   return getOrderPaidAmount(order) > 0.009
 }
 
+/** Check if the order actually received payment via Mercado Pago (approved or received > 0). */
+export function hasReceivedMpPayment(order: OrderFinancialSnapshot): boolean {
+  const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+  return breakdown.some((entry: any) =>
+    String(entry?.provider || "").toLowerCase().includes("mercado pago") &&
+    (entry?.paymentStatus === "approved" || Number(entry?.amountReceived ?? 0) > 0.009)
+  );
+}
+
 export function resolveSituationFromPaid(paidAmount: number, totalAmount: number): "pending" | "partially_paid" | "paid" {
   const paid = Math.max(0, Number(paidAmount || 0))
   const total = Math.max(0, Number(totalAmount || 0))

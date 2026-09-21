@@ -1,5 +1,5 @@
 import CustomersPage from "@/components/erp/clientes/CustomersPage"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { ERPPageHeader } from "@/components/erp/page-header-state"
@@ -9,7 +9,7 @@ import { can } from "@/lib/permissions/can"
 import type { RbacUserLike } from "@/lib/permissions/rbac-types"
 
 export default async function CustomersRoute() {
-  const context = await getCurrentPartnerContext()
+  const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
 
   if (!can(context as RbacUserLike, "customers.list")) {

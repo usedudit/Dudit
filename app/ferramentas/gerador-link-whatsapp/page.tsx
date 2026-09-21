@@ -2,8 +2,8 @@
 
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import Link from "next/link"
+import { motion } from "framer-motion"
 import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
 import {
@@ -101,14 +101,13 @@ export default function GeradorLinkWhatsAppPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden">
+                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
                     <GridLines />
-                    <div className="container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10">
+                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
                         <motion.div
                             initial={{ opacity: 0, y: 30 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6 }}
-                            className="text-center max-w-3xl mx-auto"
                         >
                             <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
                                 <Link href="/" className="hover:text-brand-green">Início</Link>
@@ -118,10 +117,10 @@ export default function GeradorLinkWhatsAppPage() {
                                 <span className="text-brand-dark font-semibold">Gerador de Link de WhatsApp</span>
                             </nav>
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4">
+                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
                                 Gerador de Link de WhatsApp Gratuito
                             </h1>
-                            <p className="text-base sm:text-lg text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
+                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
                                 Crie seu link personalizado com mensagem pronta para usar na bio do Instagram, redes sociais ou anúncios.
                             </p>
                         </motion.div>
@@ -130,7 +129,7 @@ export default function GeradorLinkWhatsAppPage() {
 
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                             <motion.div
                                 initial={{ opacity: 0, x: -30 }}
@@ -153,7 +152,7 @@ export default function GeradorLinkWhatsAppPage() {
                                         placeholder="Ex: 11999998888"
                                         value={telefone}
                                         onChange={(e) => setTelefone(e.target.value)}
-                                        className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-brand-green outline-none text-brand-dark font-bold text-lg"
+                                        className="w-full px-4 py-3.5 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-lg"
                                     />
                                     <span className="text-[11px] text-gray-400 mt-1 block">Insira DDD + 9 dígitos (o código +55 do Brasil é adicionado automaticamente).</span>
                                 </div>
@@ -167,7 +166,7 @@ export default function GeradorLinkWhatsAppPage() {
                                         value={mensagem}
                                         onChange={(e) => setMensagem(e.target.value)}
                                         placeholder="Digite o texto que o cliente enviará quando clicar..."
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green outline-none text-brand-dark text-sm leading-relaxed"
+                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark text-sm leading-relaxed"
                                     />
                                     <span className="text-[11px] text-gray-400 mt-1 block">Ex: "Olá! Gostaria de agendar um horário" ou "Quero ver o catálogo da loja".</span>
                                 </div>
@@ -176,7 +175,7 @@ export default function GeradorLinkWhatsAppPage() {
                             <motion.div
                                 initial={{ opacity: 0, x: 30 }}
                                 whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6, delay: 0.1 }}
+                                transition={{ duration: 0.6 }}
                                 viewport={{ once: true }}
                                 className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
                             >
@@ -244,22 +243,18 @@ export default function GeradorLinkWhatsAppPage() {
 
                 <section className="py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 relative z-10">
+                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
                         <h3 className="text-2xl font-bold text-brand-dark mb-6 flex items-center gap-2">
                             <HelpCircle className="w-5 h-5 text-brand-green" />
                             Dúvidas sobre Links de WhatsApp
                         </h3>
 
-                        <div className="space-y-4 max-w-3xl">
+                        <div className="space-y-4">
                             {faqs.map((faq, i) => {
                                 const isOpen = openFaq === i
                                 return (
-                                    <motion.div
+                                    <div
                                         key={i}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        whileInView={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: i * 0.1 }}
-                                        viewport={{ once: true }}
                                         className="border border-gray-100 rounded-xl overflow-hidden bg-white"
                                     >
                                         <button
@@ -274,16 +269,15 @@ export default function GeradorLinkWhatsAppPage() {
                                                 {faq.a}
                                             </div>
                                         )}
-                                    </motion.div>
+                                    </div>
                                 )
                             })}
                         </div>
                     </div>
                 </section>
-
-                <CTA onNavigate={onNavigate} />
             </main>
 
+            <CTA onNavigate={onNavigate} />
             <Footer onNavigate={onNavigate} />
         </div>
     )

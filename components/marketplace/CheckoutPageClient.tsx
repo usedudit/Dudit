@@ -18,7 +18,7 @@ import { listApplicableMarketplaceCouponsAction, validateMarketplaceCouponAction
 import { useRouter } from "next/navigation"
 import { PaymentWrapper } from "@/components/PaymentWrapper"
 import { checkoutCartAction, bulkUpdateFulfillmentModesAction, deleteCartItemsAction } from "@/app/actions/marketplace/cart"
-import { prepareProductBuyNowCheckoutAction } from "@/app/actions/marketplace/cart-extensions"
+import { prepareProductBuyNowCheckoutAction, addBumpProductToCartAction } from "@/app/actions/marketplace/cart-extensions"
 import { createOrderAction } from "@/app/actions/marketplace/orders"
 import { trackEvent } from "@/lib/analytics"
 import { useCSRFToken, fetchCSRFTokenSingleton } from "@/hooks/use-csrf-token"
@@ -508,56 +508,78 @@ export function CheckoutPageClient() {
 
     const [partnerProducts, setPartnerProducts] = useState<any[]>([])
     const [loadingBumps, setLoadingBumps] = useState(false)
+    const [addingBumpId, setAddingBumpId] = useState<string | null>(null)
 
     const bumpCandidates = useMemo(() => {
-        const checkoutIds = new Set(products.map(p => p.id))
+        const checkoutProductIds = new Set(
+            (sessionData?.cartItems || []).map((item) => item.productId).filter(Boolean)
+        )
         return partnerProducts.filter((p: any) => {
             const isStock = (p.stock_available ?? p.stock_quantity ?? 0) > 0
-            return isStock && !checkoutIds.has(p.id)
+            return isStock && !checkoutProductIds.has(p.id)
         })
-    }, [partnerProducts, products])
+    }, [partnerProducts, sessionData?.cartItems])
 
-    const handleAddBumpProduct = (p: any) => {
-        if (!sessionData) return
+    const handleAddBumpProduct = async (p: any) => {
+        if (!sessionData || addingBumpId) return
+        setAddingBumpId(p.id)
+        try {
+            const result = await addBumpProductToCartAction({
+                productId: p.id,
+                partnerId,
+                storeId,
+                csrf_token: csrfToken || undefined,
+            })
+            if (result.error) {
+                notifyError("Erro", result.error)
+                return
+            }
+            const realCartItemId = result.cartItemId!
 
-        const newProductItem: ProductItem = {
-            id: p.id,
-            name: p.name,
-            price: Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price),
-            quantity: 1,
-            image: p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png",
-            availabilityValue: p.availability_value,
-            availabilityUnit: p.availability_unit
+            const newProductItem: ProductItem = {
+                id: p.id,
+                name: p.name,
+                price: Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price),
+                quantity: 1,
+                image: p.images?.[0] || p.fallback_variant_image || "https://img.dudit.com.br/static/Placeholder.png",
+                availabilityValue: p.availability_value,
+                availabilityUnit: p.availability_unit
+            }
+
+            const updatedProducts = [...products, newProductItem]
+
+            const updatedCartItems = sessionData.source === "cart"
+                ? [...(sessionData.cartItems || [])]
+                : products.map((item) => ({
+                    cartItemId: "bump-" + item.id,
+                    productId: item.id,
+                    variantId: item.variant || undefined,
+                    quantity: item.quantity
+                }))
+
+            updatedCartItems.push({
+                cartItemId: realCartItemId,
+                productId: p.id,
+                variantId: undefined,
+                quantity: 1
+            })
+
+            const newSessionData: CheckoutSessionData = {
+                ...sessionData,
+                source: "cart",
+                products: updatedProducts,
+                cartItems: updatedCartItems
+            }
+
+            setSessionData(newSessionData)
+            sessionStorage.setItem("checkout_session", JSON.stringify(newSessionData))
+            setRefreshTrigger(prev => prev + 1)
+            notifySuccess("Produto adicionado", `${p.name} foi adicionado ao seu pedido!`)
+        } catch {
+            notifyError("Erro", "Não foi possível adicionar o produto. Tente novamente.")
+        } finally {
+            setAddingBumpId(null)
         }
-
-        const updatedProducts = [...products, newProductItem]
-
-        const updatedCartItems = sessionData.source === "cart"
-            ? [...(sessionData.cartItems || [])]
-            : products.map((item) => ({
-                cartItemId: "bump-" + item.id,
-                productId: item.id,
-                variantId: item.variant || undefined,
-                quantity: item.quantity
-            }))
-
-        updatedCartItems.push({
-            cartItemId: "bump-" + p.id,
-            productId: p.id,
-            variantId: undefined,
-            quantity: 1
-        })
-
-        const newSessionData: CheckoutSessionData = {
-            ...sessionData,
-            source: "cart",
-            products: updatedProducts,
-            cartItems: updatedCartItems
-        }
-
-        setSessionData(newSessionData)
-        sessionStorage.setItem("checkout_session", JSON.stringify(newSessionData))
-        notifySuccess("Produto adicionado", `${p.name} foi adicionado ao seu pedido!`)
     }
 
 
@@ -1373,6 +1395,50 @@ export function CheckoutPageClient() {
     const disableCheckoutSubmit = isLoading || hasUnavailableService
         || (paymentOption === "traditional" && (paymentPreviewLoading || storefrontMethodsLoading || (!paymentPreview?.success && shouldPreviewTraditionalPayment)))
         || (productDeliveryQuoteActive && (deliveryQuoteLoading || !!deliveryError))
+
+    const renderOrderBumpSection = () => {
+        if (!bumpCandidates.length) return null
+        return (
+            <div className="border border-brand-border dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface">
+                <div className="text-md bg-brand-gray dark:bg-dark-border/50 px-6 py-4 border-b border-brand-border dark:border-dark-border font-bold text-brand-dark dark:text-dark-heading">
+                    Adicione ao seu pedido
+                </div>
+                <div className="p-4 space-y-2">
+                    {bumpCandidates.map((p: any) => {
+                        const imgUrl = p.images?.[0] ? getR2ImageUrl(p.images[0]) : null
+                        const isAdding = addingBumpId === p.id
+                        return (
+                            <ListItem
+                                key={p.id}
+                                icon={
+                                    imgUrl ? (
+                                        <img
+                                            src={imgUrl}
+                                            alt={p.name}
+                                            className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                                        />
+                                    ) : undefined
+                                }
+                                title={p.name}
+                                description={formatCurrency(Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price))}
+                                onClick={() => handleAddBumpProduct(p)}
+                                right={
+                                    isAdding ? (
+                                        <Spinner size={16} />
+                                    ) : (
+                                        <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(p) }}>
+                                            Adicionar
+                                        </Button>
+                                    )
+                                }
+                                className="!border-brand-border/50 dark:!border-dark-border/50"
+                            />
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
 
     const renderSummaryContent = (showSubmitButton = false) => (
         <>
@@ -3004,6 +3070,7 @@ export function CheckoutPageClient() {
                                 </div>
                             </div>
 
+                            {renderOrderBumpSection()}
 
                         </div>
                     </div>
@@ -3372,6 +3439,44 @@ export function CheckoutPageClient() {
                                             </p>
                                         )}
                                     </FormSection>
+                                )}
+
+                                {/* Order Bump */}
+                                {bumpCandidates.length > 0 && (
+                                    <div className="border border-brand-border dark:border-dark-border rounded-2xl overflow-hidden bg-white dark:bg-dark-surface p-4 space-y-3">
+                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Adicione ao seu pedido</p>
+                                        {bumpCandidates.map((p: any) => {
+                                            const imgUrl = p.images?.[0] ? getR2ImageUrl(p.images[0]) : null
+                                            const isAdding = addingBumpId === p.id
+                                            return (
+                                                <ListItem
+                                                    key={p.id}
+                                                    icon={
+                                                        imgUrl ? (
+                                                            <img
+                                                                src={imgUrl}
+                                                                alt={p.name}
+                                                                className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal rounded-full"
+                                                            />
+                                                        ) : undefined
+                                                    }
+                                                    title={p.name}
+                                                    description={formatCurrency(Number(p.promotional_price && p.promotional_price < p.price ? p.promotional_price : p.price))}
+                                                    onClick={() => handleAddBumpProduct(p)}
+                                                    right={
+                                                        isAdding ? (
+                                                            <Spinner size={16} />
+                                                        ) : (
+                                                            <Button variant="link" size="sm" onClick={(e) => { e.stopPropagation(); handleAddBumpProduct(p) }}>
+                                                                Adicionar
+                                                            </Button>
+                                                        )
+                                                    }
+                                                    className="!border-brand-border/50 dark:!border-dark-border/50"
+                                                />
+                                            )
+                                        })}
+                                    </div>
                                 )}
 
                                 {/* Totals Summary */}

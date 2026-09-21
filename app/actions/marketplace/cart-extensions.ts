@@ -267,6 +267,45 @@ export async function addServiceBookingToCartAction(
   return { success: true, cartItemId: data.id }
 }
 
+/** Order bump: adds a suggested product to cart with full server-side validation. */
+export async function addBumpProductToCartAction(input: {
+  productId: string
+  partnerId: string
+  storeId?: string
+  csrf_token?: string
+}) {
+  const addResult = await addToCartAction(
+    input.productId,
+    1,
+    input.csrf_token,
+    undefined,
+    input.storeId,
+  )
+  if (addResult.error) return { error: addResult.error }
+
+  const supabase = await getSupabaseServerClient()
+  const user = await requireUser()
+
+  const { data: row } = await supabase
+    .from("cart_items")
+    .select("id, product_id, quantity")
+    .eq("user_id", user.id)
+    .eq("partner_id", input.partnerId)
+    .eq("item_type", "product")
+    .eq("product_id", input.productId)
+    .is("variant_id", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!row?.id) return { error: "Item não encontrado na sacola." }
+
+  await supabase.from("cart_items").update({ selected: true }).eq("id", row.id)
+  await revalidateCart(user.id)
+
+  return { success: true, cartItemId: row.id as string, quantity: row.quantity }
+}
+
 /** Buy-now: adds product to cart and returns cart line id for unified checkout. */
 export async function prepareProductBuyNowCheckoutAction(input: {
   productId: string

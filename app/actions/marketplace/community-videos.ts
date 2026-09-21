@@ -290,7 +290,12 @@ export async function createCommunityVideo(data: {
 
 export async function updateCommunityVideo(
   id: string,
-  data: { title?: string; description?: string }
+  data: {
+    title?: string
+    description?: string
+    linkedItemType?: "product" | "service" | "collection" | null
+    linkedItemId?: string | null
+  }
 ): Promise<ActionResult> {
   try {
     const user = await requireUser()
@@ -307,6 +312,8 @@ export async function updateCommunityVideo(
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
     if (data.title !== undefined) updateData.title = data.title.trim().substring(0, 150) || null
     if (data.description !== undefined) updateData.description = data.description.trim() || null
+    if (data.linkedItemType !== undefined) updateData.linked_item_type = data.linkedItemType
+    if (data.linkedItemId !== undefined) updateData.linked_item_id = data.linkedItemId
 
     const { error } = await supabase
       .from("community_videos")

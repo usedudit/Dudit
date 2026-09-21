@@ -914,7 +914,7 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
                 await createNotificationsForUsers(teamUserIds, (userId) => ({
                     userId,
                     type: "order_cancelled",
-                    title: "Nova solicitação de cancelamento",
+                    title: "❌ Nova solicitação de cancelamento",
                     message: `O cliente solicitou o cancelamento do pedido #${orderNum}.`,
                     entityType: "order",
                     entityId: order.id,
@@ -934,7 +934,6 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
         return errorResponse(e?.message || "Erro ao solicitar cancelamento")
     }
 }
-
 
 async function maybeRefundMercadoPago(params: {
     partnerId: string
@@ -2100,10 +2099,14 @@ export async function saveReturnEvidenceAction(
 
         const fileUrl = fileKey.startsWith("http") ? fileKey : `https://img.dudit.com.br/${fileKey}`
 
+        const ctx = await getCurrentPartnerContext()
+
         const { data, error } = await admin
             .from("return_evidence")
             .insert({
                 return_request_id: returnRequestId,
+                partner_id: partnerId,
+                store_id: ctx?.activeStoreId || null,
                 file_url: fileUrl,
                 file_key: fileKey,
                 file_name: fileName,

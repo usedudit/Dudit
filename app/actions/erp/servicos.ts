@@ -15,6 +15,7 @@ import { getCachedErpPage } from "@/lib/data/erp-page-cache"
 import { TAGS } from "@/lib/utils/revalidation-tags"
 import { revalidatePath } from "next/cache"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
+import { incrementCacheVersion } from "@/lib/cache/invalidation"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { EMPTY_VIDEO_METADATA, normalizeVideoMetadata } from "@/lib/video/shared"
@@ -425,6 +426,7 @@ export async function updateServiceAction(data: any): Promise<ActionResponse<any
         }
 
         await syncToExploreRedis({ id: serviceId, type: "servico", data: {}, silent: true })
+        await incrementCacheVersion()
         revalidatePath("/erp/servicos")
         return successResponse(updated)
     } catch (error: any) {

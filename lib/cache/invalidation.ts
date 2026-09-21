@@ -2,6 +2,7 @@ import "server-only"
 import { redis } from "@/lib/redis"
 import { syncToExploreRedis, removeFromExploreRedis } from "@/lib/redis-sync"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { invalidateInMemoryVersionCache } from "@/app/actions/marketplace/search"
 
 const GLOBAL_VERSION_KEY = "marketplace:global_cache_version"
 
@@ -19,6 +20,7 @@ export async function incrementCacheVersion(): Promise<number> {
   try {
     const newVersion = await redis.incr(GLOBAL_VERSION_KEY)
     console.log(`[REDIS] CACHE VERSION BUMPED TO: v${newVersion}`)
+    invalidateInMemoryVersionCache()
     return newVersion
   } catch (err) {
     console.error(`[REDIS] Error incrementing cache version`, err)

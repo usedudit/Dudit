@@ -3,13 +3,13 @@ import ProductsPage from "@/components/erp/product/ProductsPage"
 import { getERPProductsPageAction } from "@/app/actions/erp/products"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { AccessDenied } from "@/components/erp/access-denied"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { getPartnerProfile } from "@/app/actions/marketplace/partners"
 
 export const dynamic = "force-dynamic"
 
 export default async function ProductsPageServer() {
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
     const partnerId = context.partnerId
     const activeStoreId = context.activeStoreId || null

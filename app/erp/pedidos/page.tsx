@@ -1,7 +1,7 @@
 import { ERPPageHeader } from "@/components/erp/page-header-state"
 import OrdersPage from "@/components/erp/orders/OrdersPage"
 import { checkPermission } from "@/lib/permissions/access"
-import { getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { AccessDenied } from "@/components/erp/access-denied"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { getERPOrdersPageAction } from "@/app/actions/erp/orders"
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
 
 export default async function OrdersPageServer() {
   // Layout already guarantees auth + valid context
-  const context = await getCurrentPartnerContext()
+  const context = await getErpRequestContext()
   if (!context) return <AccessDenied />
 
   if (!can(context as RbacUserLike, "orders.list")) {

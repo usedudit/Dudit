@@ -6,7 +6,8 @@ import { GeneralTab } from "@/components/erp/dashboard/widgets/GeneralTab"
 import { GlobalPeriodFilter } from "@/components/erp/GlobalPeriodFilter"
 import { DashboardProvider } from "@/components/erp/dashboard/DashboardContext"
 import { ReportsSkeleton } from "@/components/erp/reports/ReportsSkeleton"
-import { getAllUserPartnerAccess, getCurrentPartnerContext } from "@/lib/auth/partner-context"
+import { getAllUserPartnerAccess } from "@/lib/auth/partner-context"
+import { getErpRequestContext } from "@/lib/auth/erp-context"
 import { checkPermission } from "@/lib/permissions/access"
 import { IconPlaceholder } from "@/components/reusable"
 import { normalizeBusinessInfo } from "@/lib/business-info"
@@ -17,7 +18,7 @@ import type { Period, CompareMode } from "@/lib/period-types"
 export const dynamic = "force-dynamic"
 
 export default async function ERPDashboardPage(props: { searchParams?: Promise<{ period?: string; compare?: string; compareFrom?: string; compareTo?: string }> }) {
-    const context = await getCurrentPartnerContext()
+    const context = await getErpRequestContext()
     if (!context) return <AccessDenied />
 
     const partnerId = context.partnerId

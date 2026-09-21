@@ -377,6 +377,12 @@ async function getCachedGlobalVersion(): Promise<number> {
 }
 
 const searchMemoryCache = new Map<string, { results: any[]; filteredIds: string[]; expiresAt: number }>()
+
+export function invalidateInMemoryVersionCache(): void {
+    cachedGlobalVersion = null
+    searchMemoryCache.clear()
+}
+
 const SEARCH_MEMORY_TTL_MS = 20_000 // 20s in-memory SWR cache
 
 const serializeSearchKey = (query: string, type: string, limits: any) => {

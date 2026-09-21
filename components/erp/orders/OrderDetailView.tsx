@@ -49,6 +49,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
+import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state'
 import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
@@ -461,13 +462,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         if (installmentCount && installmentCount > 1) {
             label = `${label} - ${installmentCount}x`;
         }
-        if (order.payment_provider === "Mercado Pago" && !label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
+        if (hasReceivedMpPayment(order) && !label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
             label = `${label} (Mercado Pago)`;
         }
         return label;
     };
     const paymentMethodLabel = `${getPaymentTypeLabel()}${pendingSuffix}`
-    const isMercadoPago = order.payment_provider === "Mercado Pago";
+    const isMercadoPago = hasReceivedMpPayment(order);
     const getPaymentIcon = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const methodEntries = breakdown.filter((e: any) => e?.method);

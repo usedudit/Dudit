@@ -50,6 +50,7 @@ import {
     requireCSRF,
     extractCSRFTokenFromObject,
 } from "@/lib/security/csrf-action-wrapper"
+import { sendMarketplaceReport, sendContentReported } from "@/lib/services/discord-marketplace-webhook.service"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -317,6 +318,36 @@ export async function createReport(data: {
         }
         console.error("[REPORTS] insert error:", insertError.message, insertError)
         return { success: false, error: "Não foi possível registrar a denúncia" }
+    }
+
+    // Discord webhook: notificar denúncia criada (fail-open, não bloqueia fluxo)
+    try {
+        let entityName = ""
+        if (data.targetType === "product") {
+            const { data: p } = await adminClient.from("products").select("name").eq("id", finalTargetId).maybeSingle()
+            entityName = p?.name || ""
+        } else if (data.targetType === "service") {
+            const { data: s } = await adminClient.from("services").select("name").eq("id", finalTargetId).maybeSingle()
+            entityName = s?.name || ""
+        } else if (data.targetType === "partner") {
+            const { data: st } = await adminClient.from("stores").select("name").eq("partner_id", finalTargetId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
+            entityName = st?.name || ""
+        } else if (data.targetType === "review") {
+            const { data: r } = await adminClient.from("reviews").select("comment").eq("id", finalTargetId).maybeSingle()
+            entityName = r?.comment ? r.comment.slice(0, 80) : ""
+        }
+
+        sendContentReported({
+            entityType: data.targetType as "product" | "service",
+            entityId: finalTargetId,
+            entityName,
+            reasonCode: data.reasonCode,
+            reasonLabel,
+            reporterUserId: user.id,
+            reporterEmail: user.email,
+        }).catch(err => console.warn("[REPORTS] Discord webhook failed (non-blocking):", err))
+    } catch {
+        // Non-critical: don't fail the report creation
     }
 
     return { success: true }

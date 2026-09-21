@@ -98,7 +98,16 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                 <div className="flex flex-col items-center gap-1">
                     {situationBadge(order.situation)}
                     {(() => {
-                        let pmLabel = order.payment_method || null
+                        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
+                        const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing);
+                        let pmLabel: string | null = null;
+                        if (methodEntries.length > 1) {
+                            pmLabel = "Múltiplos meios";
+                        } else if (methodEntries.length === 1) {
+                            pmLabel = methodEntries[0]?.method || order.payment_method || null;
+                        } else {
+                            pmLabel = order.payment_method || null;
+                        }
                         return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify />
                     })()}
                 </div>

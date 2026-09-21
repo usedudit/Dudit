@@ -206,6 +206,63 @@ export async function sendSuspiciousReview(payload: {
   })
 }
 
+// --- Conteúdo Reportado (Produto/Serviço/Vendedor/Avaliação) ---
+
+export async function sendContentReported(payload: {
+  entityType: string
+  entityId: string
+  entityName: string
+  reasonCode: string
+  reasonLabel: string
+  reporterUserId: string
+  reporterEmail?: string
+  description?: string | null
+}): Promise<{ success: boolean; error?: string }> {
+  const url = MODERATION_URL()
+  if (!isValidUrl(url)) return { success: true }
+
+  const typeLabels: Record<string, string> = {
+    product: "Produto",
+    service: "Serviço",
+    partner: "Vendedor",
+    review: "Avaliação",
+  }
+
+  const severityMap: Record<string, { emoji: string; color: number }> = {
+    scam_or_fraud: { emoji: "🚨", color: 0xef4444 },
+    illegal_or_dangerous: { emoji: "🚨", color: 0xef4444 },
+    counterfeit: { emoji: "🚨", color: 0xef4444 },
+    harassment_or_hate: { emoji: "🚨", color: 0xef4444 },
+    copyright_violation: { emoji: "©️", color: 0xf59e0b },
+    inappropriate_content: { emoji: "🚫", color: 0xf59e0b },
+    fake_listing: { emoji: "📋", color: 0xf59e0b },
+    spam_or_misleading: { emoji: "📢", color: 0x6b7280 },
+  }
+  const severity = severityMap[payload.reasonCode] || { emoji: "📌", color: 0x6b7280 }
+
+  const fields: Array<{ name: string; value: string; inline?: boolean }> = [
+    { name: "📋 Motivo", value: `${severity.emoji} **${payload.reasonLabel}**`, inline: false },
+    { name: "📌 Tipo", value: typeLabels[payload.entityType] || payload.entityType, inline: true },
+    { name: "👤 Denunciante", value: maskEmail(payload.reporterEmail), inline: true },
+  ]
+
+  if (payload.entityName) {
+    fields.push({ name: "🎯 Item Reportado", value: truncate(payload.entityName, 100), inline: false })
+  }
+
+  return postToDiscord(url, {
+    username: "Dudit Moderação",
+    avatar_url: "https://dudit.com.br/icon-192x192.png",
+    embeds: [{
+      title: `${severity.emoji} ${typeLabels[payload.entityType] || "Item"} Reportado`,
+      color: severity.color,
+      fields,
+      footer: { text: `ID: ${maskId(payload.entityId)} • ${formatDateTime()}` },
+      timestamp: new Date().toISOString(),
+    }],
+  })
+}
+
 // --- Vendedor com Risk Score Alto ---
 
 export async function sendHighRiskSeller(payload: {
