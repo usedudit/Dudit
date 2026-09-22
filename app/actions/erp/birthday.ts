@@ -102,6 +102,8 @@ export async function sendBirthdayNotificationAction(
     data: {
       url: "/cupons",
       audience: "customer",
+      partner_id: canonicalPartnerId,
+      partnerName,
     },
     idempotencyKey,
   })

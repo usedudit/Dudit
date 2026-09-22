@@ -1088,6 +1088,7 @@ export async function banUser(
                     case_id: caseId,
                     reason: reason.trim(),
                     audience: "customer",
+                    scope: "platform",
                     url: "/banned",
                 },
                 idempotencyKey: `user_banned:${targetUserId}:${caseId}:${Date.now()}`,

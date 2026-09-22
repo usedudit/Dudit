@@ -70,7 +70,7 @@ const MODE_OPTIONS: Array<{
             value: "erp",
             icon: BriefcaseIcon,
             title: "Gerenciar meu negócio",
-            description: "Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios",
+            description: "Controle completo do seu negócio, financeiro, equipe e relatórios",
         },
     ]
 

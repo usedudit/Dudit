@@ -100,9 +100,13 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                     {(() => {
                         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
                         const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing);
+                        const paidMethodEntries = methodEntries.filter((b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009);
+                        const paidLabels = Array.from(new Set(paidMethodEntries.map((b: any) => String(b?.method || "").toLowerCase().trim()).filter(Boolean)));
                         let pmLabel: string | null = null;
-                        if (methodEntries.length > 1) {
+                        if (paidLabels.length > 1) {
                             pmLabel = "Múltiplos meios";
+                        } else if (paidMethodEntries.length === 1) {
+                            pmLabel = paidMethodEntries[0]?.method || order.payment_method || null;
                         } else if (methodEntries.length === 1) {
                             pmLabel = methodEntries[0]?.method || order.payment_method || null;
                         } else {

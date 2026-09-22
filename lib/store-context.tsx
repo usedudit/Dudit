@@ -276,6 +276,10 @@ export function useStore() {
   return context
 }
 
+export function useStoreOrNull(): StoreContextType | null {
+  return useContext(StoreContext) ?? null
+}
+
 export function usePartnerTimezone(): string {
   const context = useContext(StoreContext)
   return context?.partnerTimezone || getDefaultTimezone()

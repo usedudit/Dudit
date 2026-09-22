@@ -49,8 +49,11 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
-import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state'
+import { hasReceivedMpPayment, getOrderDepositSummary, DEPOSIT_STATUS_LABELS, DEPOSIT_ICON_COLORS, shouldShowSinal, getSinalBadgeText } from '@/lib/payments/order-financial-state'
 import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
+
+const MERCADO_PAGO_ICON = "https://img.dudit.com.br/static/icons/payments/MercadoPago.png";
+const PIX_ICON_URL = "https://img.dudit.com.br/static/icons/payments/Pix.png";
 
 const formatProductQuantity = (qty: number, unit?: string | null) => {
     return formatQuantityWithUnit(qty, unit);
@@ -438,23 +441,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
     const getPaymentTypeLabel = () => {
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const hasMultipleMethods = breakdown.filter((e: any) => e?.method).length > 1;
+        const methodEntries = breakdown.filter((e: any) => e?.method);
+        const paidMethodEntries = methodEntries.filter((e: any) => Number(e?.amountReceived ?? e?.amount ?? 0) > 0.009);
+        const paidLabels = Array.from(new Set(
+            paidMethodEntries
+                .map((e: any) => formatPaymentMethodLabel(e.method, null))
+                .filter(Boolean)
+        ));
+        const hasMultiplePaidMethods = paidLabels.length > 1;
 
-        if (hasMultipleMethods) {
-            const labels = Array.from(new Set(
-                breakdown
-                    .filter((e: any) => e?.method)
-                    .map((e: any) => formatPaymentMethodLabel(e.method, null))
-                    .filter(Boolean)
-            ));
-            let label = labels.length > 1 ? "Múltiplos meios" : (labels[0] || order.payment_method || "Não informado");
+        if (hasMultiplePaidMethods) {
+            let label = "Múltiplos meios";
             if (installmentCount && installmentCount > 1) {
                 label = `${label} - ${installmentCount}x`;
             }
             return label;
         }
 
-        const rawMethod = breakdown.find((e: any) => e?.method)?.method || order.payment_method;
+        const preferredEntry = paidMethodEntries[0] || methodEntries[0];
+        const rawMethod = preferredEntry?.method || order.payment_method;
 
         let label = formatPaymentMethodLabel(rawMethod, null);
         if (!label) label = "Não informado";
@@ -604,10 +609,18 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const paymentMethodExtraAmount = Math.max(0, Number(order.payment_method_extra_amount || 0))
 
     const hasDetailedAmounts = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined)
+    // When legs carry explicit fee fields (even zeros), trust those sums and ignore
+    // a stale payment_method_extra_amount column (e.g. wrongly set to the sinal amount).
+    const breakdownFeeFieldTotal = hasDetailedAmounts
+        ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
+        : 0
+    const effectivePaymentMethodExtraAmount = hasDetailedAmounts
+        ? (breakdownFeeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+        : paymentMethodExtraAmount
 
     const detailedInterestAmount = hasDetailedAmounts
         ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0)
-        : paymentMethodExtraAmount
+        : effectivePaymentMethodExtraAmount
     const detailedFeeAmount = hasDetailedAmounts
         ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0)
         : 0
@@ -616,7 +629,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         : 0
     const subtotalValue = Number(order.subtotal_value || 0) > 0
         ? Number(order.subtotal_value || 0)
-        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - paymentMethodExtraAmount
+        : Number(order.total_amount || 0) - Number(order.delivery_fee || 0) - Number(order.additional_costs || 0) + Number(order.discount_value || 0) + couponDiscountAmount + paymentMethodDiscountAmount - effectivePaymentMethodExtraAmount
     const changeAmount = Math.max(0, Number(order.paid_amount || 0) - Number(order.total_amount || 0))
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => {
@@ -659,6 +672,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         (sum: number, item: any) => sum + Number(item.subtotal || item.product_price * item.quantity || 0), 0
     )
     const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly)
+    const depositSummary = getOrderDepositSummary(order)
     const hasItemDiscount = isMarketplaceOrder && !isDepositOrder && itemsBaseSubtotal > 0 && subtotalValue > 0 && Math.abs(itemsBaseSubtotal - subtotalValue) > 0.005
     const itemDiscountRatio = hasItemDiscount ? subtotalValue / itemsBaseSubtotal : 1
 
@@ -1153,6 +1167,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Método de Pagamento"
                                                                 value={renderPaymentMethodValue()} />
 
+                                                            {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (() => {
+                                                                const badge = getSinalBadgeText(depositSummary);
+                                                                return (
+                                                                    <PaymentRow
+                                                                        label="Sinal"
+                                                                        value={
+                                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                                {formatCurrency(depositSummary.depositAmount)}
+                                                                                {badge && (
+                                                                                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${badge.colorClass}`}>
+                                                                                        {badge.text}
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        }
+                                                                    />
+                                                                );
+                                                            })()}
+
                                                             {isMercadoPago && (
                                                                 <>
                                                                     {mpPaymentStatus && (
@@ -1215,11 +1248,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 <PaymentRow
                                                                     label="Valores por meio"
                                                                     value={<div className="flex flex-col gap-1">
-                                                                        {paymentBreakdown.map((entry: any, index: number) => (
-                                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                                            </span>
-                                                                        ))}
+                                                                        {paymentBreakdown.map((entry: any, index: number) => {
+                                                                            const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                                            const baseAmount = Number(entry.amount || 0)
+                                                                            const displayAmount = received > 0.009 ? received : baseAmount
+                                                                            return (
+                                                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                                    {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                                    {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                                        ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                                        : null}
+                                                                                </span>
+                                                                            )
+                                                                        })}
                                                                     </div>} />
                                                             )}
 
@@ -1275,10 +1316,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                     }
                                                                     value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                             )}
-                                                            {!hasDetailedAmounts && paymentMethodExtraAmount > 0 && (
+                                                            {!hasDetailedAmounts && effectivePaymentMethodExtraAmount > 0 && (
                                                                 <PaymentRow
                                                                     label="Taxa do Método"
-                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>} />
                                                             )}
                                                             {hasDetailedAmounts && detailedInterestAmount > 0 && (
                                                                 <PaymentRow
@@ -1698,6 +1739,25 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             label="Método de Pagamento"
                                                             value={renderPaymentMethodValue()} />
 
+                                                        {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (() => {
+                                                            const badge = getSinalBadgeText(depositSummary);
+                                                            return (
+                                                                <PaymentRow
+                                                                    label="Sinal"
+                                                                    value={
+                                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                            {formatCurrency(depositSummary.depositAmount)}
+                                                                            {badge && (
+                                                                                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${badge.colorClass}`}>
+                                                                                    {badge.text}
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                    }
+                                                                />
+                                                            );
+                                                        })()}
+
                                                         {isMercadoPago && (
                                                             <>
                                                                 {order.mp_payment_status && (
@@ -1747,11 +1807,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             <PaymentRow
                                                                 label="Valores por meio"
                                                                 value={<div className="flex flex-col gap-1">
-                                                                    {paymentBreakdown.map((entry: any, index: number) => (
-                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                                        </span>
-                                                                    ))}
+                                                                    {paymentBreakdown.map((entry: any, index: number) => {
+                                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                                        const baseAmount = Number(entry.amount || 0)
+                                                                        const displayAmount = received > 0.009 ? received : baseAmount
+                                                                        return (
+                                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                                    : null}
+                                                                            </span>
+                                                                        )
+                                                                    })}
                                                                 </div>} />
                                                         )}
 
@@ -1803,12 +1871,12 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Desconto do Método"
                                                                 value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                         )}
-                                                        {!hasDetailedAmounts && paymentMethodExtraAmount > 0 && (
-                                                            <PaymentRow
-                                                                label="Taxa do Método"
-                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>} />
-                                                        )}
-                                                        {hasDetailedAmounts && detailedInterestAmount > 0 && (
+                                                        {!hasDetailedAmounts && effectivePaymentMethodExtraAmount > 0 && (
+                                                                <PaymentRow
+                                                                    label="Taxa do Método"
+                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>} />
+                                                            )}
+                                                            {hasDetailedAmounts && detailedInterestAmount > 0 && (
                                                             <PaymentRow
                                                                 label="Juros do Método"
                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />

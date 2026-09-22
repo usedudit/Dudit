@@ -41,7 +41,12 @@ export async function notifyLowStockAction(productId: string) {
             message,
             entityType: "product" as const,
             entityId: product.id,
-            data: { productName: product.name, stock: product.stock_quantity, minStock: product.min_stock },
+            data: {
+                partner_id: product.partner_id,
+                productName: product.name,
+                stock: product.stock_quantity,
+                minStock: product.min_stock,
+            },
             idempotencyKey: buildIdempotencyKey("low_stock", "product", product.id, uid),
         }))
     } catch (err) {
@@ -81,7 +86,7 @@ export async function notifyReplenishmentSuggestedAction() {
             message,
             entityType: "product" as const,
             entityId: null,
-            data: { count },
+            data: { partner_id: partnerId, count },
             idempotencyKey: buildIdempotencyKey("replenishment_suggested", "product", partnerId, uid),
         }))
     } catch (err) {

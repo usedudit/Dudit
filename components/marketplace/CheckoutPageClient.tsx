@@ -2681,9 +2681,6 @@ export function CheckoutPageClient() {
                                 />
                             )}
 
-                            {/* ORDER BUMP */}
-                            {renderOrderBumpSection()}
-
                             {/* PAGAMENTO */}
                             <FormSection hasSeparator title="Pagamento">
                                 <div className="space-y-6">
@@ -3061,6 +3058,8 @@ export function CheckoutPageClient() {
                                     {renderSummaryContent(true)}
                                 </div>
                             </div>
+
+                            {renderOrderBumpSection()}
 
                         </div>
                     </div>

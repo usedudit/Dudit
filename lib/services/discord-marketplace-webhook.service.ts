@@ -10,6 +10,8 @@ const GENERAL_URL = () => process.env.DISCORD_GENERAL_WEBHOOK_URL
 
 const DISCORD_VALID_PREFIX = "https://discord.com/api/webhooks/"
 
+const SITE_BASE_URL = () => process.env.NEXT_PUBLIC_APP_URL || "https://dudit.com.br"
+
 function maskEmail(email: string | null | undefined): string {
   if (!email) return "N/A"
   const [local, domain] = email.split("@")
@@ -120,8 +122,9 @@ export async function sendMarketplaceReport(payload: {
   userId: string
   userEmail?: string
   userName?: string
-  partnerId?: string
-  partnerName?: string
+  partnerId?: string | null
+  partnerName?: string | null
+  partnerUrl?: string | null
   storeName?: string
   orderNumber?: string
   createdAt?: string
@@ -140,14 +143,23 @@ export async function sendMarketplaceReport(payload: {
   }
   const severity = severityMap[payload.reasonCode] || { emoji: "📌", color: 0x6b7280 }
 
+  const reporterValue = payload.userName
+    ? `${payload.userName} (${payload.userEmail || "N/A"})`
+    : payload.userEmail || "N/A"
+
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: "📋 Motivo", value: `${severity.emoji} **${payload.reasonLabel}**`, inline: false },
-    { name: "👤 Denunciante", value: payload.userName ? `${payload.userName} (${maskEmail(payload.userEmail)})` : maskEmail(payload.userEmail), inline: true },
+    { name: "👤 Denunciante", value: truncate(reporterValue, 100), inline: true },
   ]
 
   if (payload.orderNumber) fields.push({ name: "📦 Pedido", value: payload.orderNumber, inline: true })
-  if (payload.partnerName) fields.push({ name: "🏢 Parceiro Denunciado", value: `${payload.partnerName} (${maskId(payload.partnerId)})`, inline: true })
-  if (payload.storeName) fields.push({ name: "🏪 Loja", value: payload.storeName, inline: true })
+  if (payload.partnerName) {
+    const partnerDisplay = payload.partnerUrl
+      ? `[${payload.partnerName}](${payload.partnerUrl.startsWith("http") ? payload.partnerUrl : SITE_BASE_URL() + payload.partnerUrl})`
+      : payload.partnerName
+    fields.push({ name: "🏢 Parceiro Denunciado", value: `${partnerDisplay}${payload.partnerId ? ` (ID: ${payload.partnerId})` : ""}`, inline: false })
+  }
+  if (payload.storeName) fields.push({ name: "🏪 Loja", value: payload.storeName, inline: false })
   if (payload.description) fields.push({ name: "📝 Descrição", value: truncate(payload.description), inline: false })
 
   return postToDiscord(url, {
@@ -157,7 +169,7 @@ export async function sendMarketplaceReport(payload: {
       title: "🚨 Nova Denúncia no Marketplace",
       color: severity.color,
       fields,
-      footer: { text: `Request: ${maskId(payload.returnRequestId)} • ${formatDateTime(payload.createdAt)}` },
+      footer: { text: `Request: ${payload.returnRequestId} • ${formatDateTime(payload.createdAt)}` },
       timestamp: new Date().toISOString(),
     }],
   })
@@ -169,14 +181,19 @@ export async function sendSuspiciousReview(payload: {
   reviewId?: string
   userId: string
   userEmail?: string
+  userName?: string
   productId?: string | null
   productName?: string
   serviceId?: string | null
   serviceName?: string
   partnerId?: string
-  partnerName?: string
+  partnerName?: string | null
   reason: string
   rating?: number
+  comment?: string | null
+  productUrl?: string | null
+  serviceUrl?: string | null
+  partnerUrl?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   const url = MODERATION_URL()
   if (!isValidUrl(url)) return { success: true }
@@ -186,12 +203,22 @@ export async function sendSuspiciousReview(payload: {
 
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: "⚠️ Motivo", value: truncate(payload.reason), inline: false },
-    { name: "👤 Usuário", value: maskEmail(payload.userEmail), inline: true },
+    { name: "👤 Usuário", value: payload.userName ? `${payload.userName} (${payload.userEmail || "N/A"})` : payload.userEmail || "N/A", inline: true },
     { name: `📌 ${entityType}`, value: truncate(entityName, 100), inline: true },
   ]
 
   if (payload.rating) fields.push({ name: "⭐ Nota", value: `${payload.rating}/5`, inline: true })
-  if (payload.partnerName) fields.push({ name: "🏢 Parceiro", value: `${payload.partnerName} (${maskId(payload.partnerId)})`, inline: true })
+  if (payload.comment) fields.push({ name: "💬 Comentário da Avaliação", value: truncate(payload.comment, 1000), inline: false })
+  if (payload.partnerName) fields.push({ name: "🏢 Vendedor", value: `${payload.partnerName}${payload.partnerId ? ` (ID: ${payload.partnerId})` : ""}`, inline: true })
+
+  const entityLink = payload.productUrl || payload.serviceUrl
+  if (entityLink) {
+    fields.push({ name: "🔗 Link", value: `[Clique aqui](${entityLink.startsWith("http") ? entityLink : SITE_BASE_URL() + entityLink})`, inline: true })
+  }
+
+  const footerParts = []
+  if (payload.reviewId) footerParts.push(`Review ID: ${payload.reviewId}`)
+  footerParts.push(formatDateTime())
 
   return postToDiscord(url, {
     username: "Dudit Moderação",
@@ -200,7 +227,7 @@ export async function sendSuspiciousReview(payload: {
       title: "🚩 Review Suspeita Detectada",
       color: 0xf97316,
       fields,
-      footer: { text: `Review: ${maskId(payload.reviewId)} • ${formatDateTime()}` },
+      footer: { text: footerParts.join(" • ") },
       timestamp: new Date().toISOString(),
     }],
   })
@@ -216,7 +243,12 @@ export async function sendContentReported(payload: {
   reasonLabel: string
   reporterUserId: string
   reporterEmail?: string
+  reporterName?: string
   description?: string | null
+  entityUrl?: string | null
+  partnerId?: string | null
+  partnerName?: string | null
+  partnerUrl?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   const url = MODERATION_URL()
   if (!isValidUrl(url)) return { success: true }
@@ -240,14 +272,34 @@ export async function sendContentReported(payload: {
   }
   const severity = severityMap[payload.reasonCode] || { emoji: "📌", color: 0x6b7280 }
 
+  const reporterValue = payload.reporterName
+    ? `${payload.reporterName} (${payload.reporterEmail || "N/A"})`
+    : payload.reporterEmail || "N/A"
+
   const fields: Array<{ name: string; value: string; inline?: boolean }> = [
     { name: "📋 Motivo", value: `${severity.emoji} **${payload.reasonLabel}**`, inline: false },
     { name: "📌 Tipo", value: typeLabels[payload.entityType] || payload.entityType, inline: true },
-    { name: "👤 Denunciante", value: maskEmail(payload.reporterEmail), inline: true },
+    { name: "👤 Denunciante", value: truncate(reporterValue, 100), inline: true },
   ]
 
   if (payload.entityName) {
-    fields.push({ name: "🎯 Item Reportado", value: truncate(payload.entityName, 100), inline: false })
+    const fieldName = payload.entityType === "review" ? "💬 Comentário da Avaliação" : "🎯 Item Reportado"
+    fields.push({ name: fieldName, value: truncate(payload.entityName, 100), inline: false })
+  }
+
+  if (payload.description) {
+    fields.push({ name: "📝 Descrição da Denúncia", value: truncate(payload.description, 1000), inline: false })
+  }
+
+  if (payload.entityUrl) {
+    fields.push({ name: "🔗 Link do Item", value: `[Clique aqui](${payload.entityUrl.startsWith("http") ? payload.entityUrl : SITE_BASE_URL() + payload.entityUrl})`, inline: false })
+  }
+
+  if (payload.partnerName) {
+    const partnerDisplay = payload.partnerUrl
+      ? `[${payload.partnerName}](${payload.partnerUrl.startsWith("http") ? payload.partnerUrl : SITE_BASE_URL() + payload.partnerUrl})`
+      : payload.partnerName
+    fields.push({ name: "🏢 Vendedor", value: `${partnerDisplay}${payload.partnerId ? ` (ID: ${payload.partnerId})` : ""}`, inline: false })
   }
 
   return postToDiscord(url, {
@@ -257,7 +309,7 @@ export async function sendContentReported(payload: {
       title: `${severity.emoji} ${typeLabels[payload.entityType] || "Item"} Reportado`,
       color: severity.color,
       fields,
-      footer: { text: `ID: ${maskId(payload.entityId)} • ${formatDateTime()}` },
+      footer: { text: `ID: ${payload.entityId} • ${formatDateTime()}` },
       timestamp: new Date().toISOString(),
     }],
   })

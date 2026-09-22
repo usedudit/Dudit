@@ -2818,7 +2818,8 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             delivery_address,
             inventory_deducted,
             exchange_return_request_id,
-            order_items(product_id, variant_id, product_name, quantity, product_price)
+            checkout_fulfillment,
+            order_items(id, product_id, variant_id, product_name, quantity, product_price, service_id, sort_order)
         `)
         .eq("id", orderId)
         .eq("partner_id", data.partnerId)
@@ -3064,14 +3065,19 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     let adjustedPaymentBreakdown = sanitizedPaymentBreakdown
 
     const isUnpaidOrder = currentOrder.situation !== 'paid' && currentOrder.situation !== 'partially_paid'
+    const payloadPaidAmount = Math.max(0, Number(data.paidAmount || 0))
+    const hasReceivedMoney = payloadPaidAmount > 0.009 ||
+        adjustedPaymentBreakdown.some((e) => Number(e.amountReceived || 0) > 0.009)
 
-    if (isUnpaidOrder && adjustedPaymentBreakdown.length > 0) {
+    // Only rescale breakdown to the order total when nothing was actually received yet.
+    // Partial payments must keep their real amounts (e.g. R$5 sinal + R$5 resto).
+    if (isUnpaidOrder && adjustedPaymentBreakdown.length > 0 && !hasReceivedMoney) {
         if (adjustedPaymentBreakdown.length === 1) {
             adjustedPaymentBreakdown = [{
                 ...adjustedPaymentBreakdown[0],
                 amount: updateServerTotal,
                 effectiveAmount: updateServerTotal,
-                amountReceived: updateServerTotal,
+                amountReceived: 0,
             }]
         } else {
             const oldSum = adjustedPaymentBreakdown.reduce((s, e) => s + e.amount, 0)
@@ -3083,7 +3089,7 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
                         ...e,
                         amount: newAmount,
                         effectiveAmount: Math.round((e.effectiveAmount ?? e.amount) * ratio * 100) / 100,
-                        amountReceived: Math.round((e.amountReceived ?? e.amount) * ratio * 100) / 100,
+                        amountReceived: 0,
                     }
                 })
             }
@@ -3259,6 +3265,19 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
             .eq("partner_id", data.partnerId)
     }
 
+    // Preserve appointment↔item links across the delete/re-insert below.
+    // Old item IDs die on delete (FK SET NULL); we remap by sort_order/service identity.
+    const oldItemsForRemap = ((currentOrder as any).order_items || []).map((it: any, idx: number) => ({
+        oldId: it.id,
+        serviceId: it.service_id || null,
+        productName: it.product_name || "",
+        sortKey: it.sort_order ?? idx,
+    }))
+    const { data: appointmentsToRemap } = await supabase
+        .from("appointments")
+        .select("id, order_item_id, service_id, service_name")
+        .eq("marketplace_order_id", orderId)
+
     await supabase.from("order_items").delete().eq("order_id", orderId)
 
     const giftItemsToInsert = giftItems.map((item, idx) => ({
@@ -3298,6 +3317,46 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
 
     const { error: itemsError } = await supabase.from("order_items").insert(itemsToInsert)
     if (itemsError) return { error: itemsError.message }
+
+    // Restore appointment↔item links: old IDs were nulled by the delete; remap via sort_order/service identity.
+    if (appointmentsToRemap && appointmentsToRemap.length > 0 && oldItemsForRemap.length > 0) {
+        try {
+            const { data: newItems } = await supabase
+                .from("order_items")
+                .select("id, product_name, service_id, sort_order")
+                .eq("order_id", orderId)
+            if (newItems && newItems.length > 0) {
+                const oldIdToKey = new Map<string, { serviceId: string | null; productName: string; sortKey: number }>()
+                for (const it of oldItemsForRemap) {
+                    oldIdToKey.set(it.oldId, { serviceId: it.serviceId, productName: it.productName, sortKey: it.sortKey })
+                }
+                const findNewItemId = (oldItemId: string | null): string | null => {
+                    if (!oldItemId) return null
+                    const key = oldIdToKey.get(oldItemId)
+                    if (!key) return null
+                    let match = newItems.find((ni: any) => ni.sort_order === key.sortKey)
+                    if (!match && key.serviceId) {
+                        match = newItems.find((ni: any) => ni.service_id === key.serviceId)
+                    }
+                    if (!match && key.productName) {
+                        match = newItems.find((ni: any) => (ni.product_name || "").toLowerCase() === key.productName.toLowerCase())
+                    }
+                    return match?.id || null
+                }
+                for (const appt of appointmentsToRemap) {
+                    const newId = findNewItemId(appt.order_item_id)
+                    if (newId && newId !== appt.order_item_id) {
+                        await supabase
+                            .from("appointments")
+                            .update({ order_item_id: newId })
+                            .eq("id", appt.id)
+                    }
+                }
+            }
+        } catch {
+            // Best-effort remap; display falls back to service_name matching.
+        }
+    }
 
     const stockItems = [
         ...sanitizedItems
@@ -4402,12 +4461,13 @@ export async function updateOrdersStatusInBatchAction(payload: {
         const { buildNotificationContent } = await import("@/lib/notifications/templates")
         const { data: store } = await supabase
             .from("stores")
-            .select("name")
+            .select("id, name")
             .eq("partner_id", payload.partnerId)
             .order("is_headquarters", { ascending: false })
             .limit(1)
             .maybeSingle()
         const storeName = store?.name || "Vendedor"
+        const storeId = store?.id || null
 
         if (payload.actionType === "payment_status" && payload.statusValue) {
             const paymentStatusMap: Record<string, string> = {
@@ -4448,6 +4508,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         data: {
                             audience: "customer",
                             partner_id: payload.partnerId,
+                            store_id: storeId,
+                            store_name: storeName,
                             storeName,
                             isBatch,
                             batchCount: orderCount,
@@ -4470,7 +4532,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         data: {
                             audience: "seller",
                             partner_id: payload.partnerId,
-                            count: orderCount,
+                            store_id: storeId,
+                            store_name: storeName,
                             isBatch,
                             batchCount: orderCount,
                             order_number: firstOrder.order_number,
@@ -4516,6 +4579,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         data: {
                             audience: "customer",
                             partner_id: payload.partnerId,
+                            store_id: storeId,
+                            store_name: storeName,
                             storeName,
                             isBatch,
                             batchCount: orderCount,
@@ -4538,6 +4603,8 @@ export async function updateOrdersStatusInBatchAction(payload: {
                         data: {
                             audience: "seller",
                             partner_id: payload.partnerId,
+                            store_id: storeId,
+                            store_name: storeName,
                             count: orderCount,
                             isBatch,
                             batchCount: orderCount,
@@ -4792,6 +4859,17 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
         if (payload.servicePrice !== undefined) {
             orderPrice = Number(payload.servicePrice || 0)
 
+            // Preserve appointment links before delete/re-insert
+            const { data: oldSvcItems } = await supabase
+                .from("order_items")
+                .select("id, product_name, service_id, sort_order")
+                .eq("order_id", payload.orderId)
+                .neq("is_gift", true)
+            const { data: apptsBefore } = await supabase
+                .from("appointments")
+                .select("id, order_item_id, service_id, service_name")
+                .eq("marketplace_order_id", payload.orderId)
+
             // Delete existing non-gift service items then recreate individual items
             await supabase
                 .from("order_items")
@@ -4802,7 +4880,7 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
             const svcNames = String(payload.serviceName || "Serviço").split(',').map((s: string) => s.trim()).filter(Boolean)
             const svcCount = svcNames.length
             const svcUnitPrice = svcCount > 1 ? Math.round((orderPrice / svcCount) * 100) / 100 : orderPrice
-            const serviceItems = svcNames.map((name: string) => ({
+            const serviceItems = svcNames.map((name: string, idx: number) => ({
                 order_id: payload.orderId,
                 product_id: null,
                 variant_id: null,
@@ -4812,12 +4890,46 @@ export async function confirmAppointmentOrderPaymentAction(payload: {
                 subtotal: svcUnitPrice,
                 line_type: "service_booking",
                 service_id: payload.serviceId || null,
+                sort_order: idx + 1,
                 is_gift: false,
                 original_price: null,
                 is_promotional: false,
                 promotion_id: null,
             }))
             await supabase.from("order_items").insert(serviceItems)
+
+            // Remap appointment order_item_id to the new items
+            if (apptsBefore && apptsBefore.length > 0 && oldSvcItems && oldSvcItems.length > 0) {
+                try {
+                    const { data: newSvcItems } = await supabase
+                        .from("order_items")
+                        .select("id, product_name, service_id, sort_order")
+                        .eq("order_id", payload.orderId)
+                        .neq("is_gift", true)
+                    if (newSvcItems && newSvcItems.length > 0) {
+                        for (const appt of apptsBefore) {
+                            if (!appt.order_item_id) continue
+                            const oldItem = oldSvcItems.find((oi: any) => oi.id === appt.order_item_id)
+                            if (!oldItem) continue
+                            let match = newSvcItems.find((ni: any) => ni.sort_order === oldItem.sort_order)
+                            if (!match && oldItem.service_id) {
+                                match = newSvcItems.find((ni: any) => ni.service_id === oldItem.service_id)
+                            }
+                            if (!match) {
+                                match = newSvcItems.find((ni: any) => (ni.product_name || "").toLowerCase() === (oldItem.product_name || "").toLowerCase())
+                            }
+                            if (match && match.id !== appt.order_item_id) {
+                                await supabase
+                                    .from("appointments")
+                                    .update({ order_item_id: match.id })
+                                    .eq("id", appt.id)
+                            }
+                        }
+                    }
+                } catch {
+                    // Best-effort remap
+                }
+            }
         }
 
         const breakdownTotal = (payload.paymentBreakdown || []).reduce((s, e) => s + Number(e.amount || 0), 0)

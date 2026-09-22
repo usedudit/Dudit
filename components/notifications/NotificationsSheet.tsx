@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { XIcon } from "@/lib/icons"
 import { Button } from "@/components/reusable"
@@ -16,6 +16,8 @@ interface NotificationsSheetProps {
   notifications: NotificationsController
 }
 
+const OPEN_GRACE_MS = 300
+
 export function NotificationsSheet({ isOpen, onClose, notifications }: NotificationsSheetProps) {
   const {
     grouped,
@@ -26,9 +28,41 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
     registerVisible,
     markAllAsRead,
     unreadCount,
+    erpOptions,
+    erpFilter,
+    setErpFilter,
+    activePartnerId,
   } = notifications
 
   const isMobile = useMediaQuery("(max-width: 1023px)")
+
+  // Click-through guard: the tap that opens the sheet can be replayed onto the
+  // (just mounted) invisible overlay/backdrop on touch devices, closing it
+  // instantly. We swallow close requests for a brief grace period right after
+  // opening so the sheet actually becomes visible.
+  const graceRef = useRef(false)
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      graceRef.current = true
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
+      graceTimerRef.current = setTimeout(() => {
+        graceRef.current = false
+      }, OPEN_GRACE_MS)
+    } else {
+      graceRef.current = false
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
+    }
+    return () => {
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
+    }
+  }, [isOpen])
+
+  const guardedClose = useCallback(() => {
+    if (graceRef.current) return
+    onClose()
+  }, [onClose])
 
   const handleNavigate = useCallback(() => {
     onClose()
@@ -56,6 +90,10 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
           onNavigate={handleNavigate}
           onMarkAllAsRead={markAllAsRead}
           unreadCount={unreadCount}
+          erpOptions={erpOptions}
+          erpFilter={erpFilter}
+          onErpFilter={setErpFilter}
+          activePartnerId={activePartnerId}
         />
       </div>
     </div>
@@ -63,7 +101,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
 
   if (isMobile) {
     return (
-      <BottomSheet isOpen={isOpen} onClose={onClose}>
+      <BottomSheet isOpen={isOpen} onClose={guardedClose}>
         {content}
       </BottomSheet>
     )
@@ -79,7 +117,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={onClose}
+            onClick={guardedClose}
           >
             <motion.div
               className="fixed right-4 top-4 bottom-4 w-[450px] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-surface"

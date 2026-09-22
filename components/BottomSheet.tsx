@@ -6,7 +6,6 @@ import {
     motion,
     AnimatePresence,
     useMotionValue,
-    useTransform,
     animate
 } from "framer-motion";
 
@@ -34,8 +33,6 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     // y=windowHeight → sheet fora da tela (embaixo)
     const y = useMotionValue(windowHeight);
 
-    const overlayOpacity = useTransform(y, [0, windowHeight], [0.6, 0]);
-
     useEffect(() => {
         setWindowHeight(window.innerHeight);
         setIsMounted(true);
@@ -59,6 +56,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         const currentY = y.get();
 
         // Fecha se arrastou mais de 120px pra baixo OU velocidade alta pra baixo
+        // Só considera fechar se o arraste foi deliberado (fora da animação de entrada)
         if (currentY > 120 || info.velocity.y > 500) {
             onClose();
         } else {
@@ -78,11 +76,14 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                 {isOpen && (
                     <div className="fixed inset-0 z-[100] flex items-end pointer-events-none">
 
-                        {/* Overlay */}
+                        {/* Overlay (backdrop click-to-close) — opacity animado
+                            de forma independente do motion value `y` para não
+                            ficar invisível após a atualização de windowHeight */}
                         <motion.div
-                            className="absolute inset-0 bg-black pointer-events-auto"
-                            style={{ opacity: overlayOpacity }}
-                            onClick={onClose}
+                            className="absolute inset-0 bg-black/60 pointer-events-auto"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.6 }}
+                            exit={{ opacity: 0 }}
                         />
 
                         {/* Sheet */}

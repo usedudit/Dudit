@@ -15,10 +15,10 @@ import type { CustomersExportFilters } from "../types"
 import { EXPORT_CHUNK_SIZE } from "../constants"
 
 const CUSTOMER_SELECT =
-  "id, name, email, phone, status, person_type, cpf, cnpj, city, state, created_at"
+  "id, name, email, phone, status, person_type, cpf, cnpj, created_at, addresses!customer_id(city, state)"
 
 const CUSTOMER_SELECT_ALL =
-  "id, name, email, phone, phone_fixed, birth_date, status, person_type, cpf, cnpj, inscricao_estadual, zip_code, street, number, complement, neighborhood, city, state, notes, created_at"
+  "id, name, email, phone, phone_fixed, birth_date, status, person_type, cpf, cnpj, inscricao_estadual, notes, created_at, addresses!customer_id(zip_code, street, number, complement, neighborhood, city, state)"
 
 export async function fetchCustomersExport(
   supabase: SupabaseClient,

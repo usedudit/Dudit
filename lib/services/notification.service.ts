@@ -11,6 +11,7 @@ import type {
   NotificationType,
 } from "@/lib/notifications/types"
 import { resolveAndDeliverNotification } from "./notification-resolver.service"
+import { resolveNotificationOrigin } from "./notification-origin.service"
 
 const PAGE_SIZE = 30
 
@@ -51,6 +52,13 @@ export async function createNotification(
     return { notification: null, created: false }
   }
 
+  const originMeta = await resolveNotificationOrigin(input.data)
+
+  const scope: "platform" | "partner" =
+    ((input.data?.scope as string | undefined) === "partner" ? "partner" :
+     (input.data?.scope as string | undefined) === "platform" ? "platform" :
+     (originMeta.partnerId ? "partner" : "platform"))
+
   const href = getNotificationHref({
     type: input.type,
     entityType: input.entityType ?? null,
@@ -66,7 +74,17 @@ export async function createNotification(
     message: input.message,
     entity_type: input.entityType ?? null,
     entity_id: input.entityId ?? null,
-    data: { ...input.data, href, audience, origin },
+    data: {
+      ...input.data,
+      partner_id: originMeta.partnerId,
+      store_id: originMeta.storeId,
+      store_name: originMeta.storeName,
+      partner_name: originMeta.partnerName,
+      scope,
+      href,
+      audience,
+      origin,
+    },
     idempotency_key: input.idempotencyKey,
   }
 

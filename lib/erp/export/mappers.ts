@@ -202,6 +202,7 @@ export const CUSTOMER_EXPORT_ALL_COLUMNS: ExportColumnDef[] = [
 export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow {
   const isPJ = String(row.person_type || "").toLowerCase() === "pj"
   const statusMap: Record<string, string> = { ativo: "Ativo", inativo: "Inativo", bloqueado: "Bloqueado" }
+  const addr = Array.isArray(row.addresses) ? row.addresses[0] : row.addresses || {}
 
   const base = {
     name: row.name || "-",
@@ -211,8 +212,8 @@ export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow
     email: row.email || "-",
     phone: row.phone || "-",
     status: statusMap[row.status] || row.status || "Ativo",
-    city: row.city || "-",
-    state: row.state || "-",
+    city: addr.city || "-",
+    state: addr.state || "-",
   }
 
   if (!includeAllColumns) return base
@@ -221,11 +222,11 @@ export function mapCustomerRow(row: any, includeAllColumns?: boolean): ExportRow
     ...base,
     phoneFixed: row.phone_fixed || "-",
     birthDate: row.birth_date ? formatDate(row.birth_date) : "-",
-    zipCode: row.zip_code || "-",
-    street: row.street || "-",
-    number: row.number || "-",
-    complement: row.complement || "-",
-    neighborhood: row.neighborhood || "-",
+    zipCode: addr.zip_code || "-",
+    street: addr.street || "-",
+    number: addr.number || "-",
+    complement: addr.complement || "-",
+    neighborhood: addr.neighborhood || "-",
     stateInscription: row.inscricao_estadual || "-",
     notes: row.notes || "-",
   }

@@ -14,9 +14,15 @@ import type {
   NotificationsPageResult,
 } from "@/lib/notifications/types"
 import { useSupabase } from "@/providers/supabase-provider"
+import { useStoreOrNull } from "@/lib/store-context"
 
 const READ_DELAY_MS = 2000
 const READ_INTERVAL_MS = 10000
+
+function getPartnerId(notification: { data: Record<string, unknown> | null }): string | null {
+  const d = (notification.data as Record<string, unknown> | null) || {}
+  return (d.partner_id as string | undefined) || (d.partnerId as string | undefined) || null
+}
 
 function groupNotificationsByDate(items: NotificationRecord[]) {
   const groups: { label: string; items: NotificationRecord[] }[] = []
@@ -54,6 +60,7 @@ function groupNotificationsByDate(items: NotificationRecord[]) {
 export function useNotifications() {
   const { user } = useSupabase()
   const queryClient = useQueryClient()
+  const store = useStoreOrNull()
   const [panelOpen, setPanelOpen] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const visibleTimestampsRef = useRef<Map<string, number>>(new Map())
@@ -132,14 +139,62 @@ export function useNotifications() {
     [listQuery.data],
   )
 
-  const grouped = useMemo(() => groupNotificationsByDate(allItems), [allItems])
+  const activePartnerId = store?.selectedStore?.partner_id ?? null
+
+  const erpOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string }>()
+    for (const n of allItems) {
+      const pid = getPartnerId(n)
+      if (!pid) continue
+      if (!map.has(pid)) {
+        const d = (n.data as Record<string, unknown>) || {}
+        const label =
+          (d.store_name as string | undefined) ||
+          (d.storeName as string | undefined) ||
+          (d.partner_name as string | undefined) ||
+          (d.partnerName as string | undefined) ||
+          "ERP"
+        const truncated =
+          label.length > 24 ? `${label.slice(0, 23)}…` : label
+        map.set(pid, { id: pid, label: truncated })
+      }
+    }
+    return Array.from(map.values())
+  }, [allItems, activePartnerId])
+
+  const [erpFilter, setErpFilter] = useState<"all" | "current" | string>("all")
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const saved = window.localStorage.getItem("notifications.erpFilter")
+    if (saved === "all" || saved === "current" || (saved && erpOptions.some((o) => o.id === saved))) {
+      setErpFilter(saved)
+    }
+  }, [erpOptions])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem("notifications.erpFilter", String(erpFilter))
+  }, [erpFilter])
+
+  const filteredItems = useMemo(() => {
+    if (erpFilter === "all" || !activePartnerId && erpFilter === "current") {
+      return allItems
+    }
+    if (erpFilter === "current") {
+      return allItems.filter((n) => getPartnerId(n) === activePartnerId)
+    }
+    return allItems.filter((n) => getPartnerId(n) === erpFilter)
+  }, [allItems, erpFilter, activePartnerId])
+
+  const grouped = useMemo(() => groupNotificationsByDate(filteredItems), [filteredItems])
 
   const unreadMapRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     unreadMapRef.current = new Set(
-      allItems.filter((n) => !n.is_read).map((n) => n.id),
+      filteredItems.filter((n) => !n.is_read).map((n) => n.id),
     )
-  }, [allItems])
+  }, [filteredItems])
 
   const registerVisible = useCallback((id: string, visible: boolean) => {
     if (visible) {
@@ -218,7 +273,11 @@ export function useNotifications() {
     unreadCount: unreadQuery.data ?? 0,
     grouped,
     allItems,
-    isLoading: listQuery.isLoading,
+     erpOptions,
+     erpFilter,
+     setErpFilter,
+     activePartnerId,
+     isLoading: listQuery.isLoading,
     isFetchingMore: listQuery.isFetchingNextPage,
     hasMore: listQuery.hasNextPage ?? false,
     fetchMore: () => listQuery.fetchNextPage(),

@@ -348,6 +348,7 @@ export async function dispatchMaintenanceBroadcast(
             idempotencyKey,
             data: {
               audience: input.targetAudience === "partners" ? "partner" : "customer",
+              scope: "platform",
               isMaintenanceWarning: true,
               estimatedEnd: input.estimatedEnd || null,
             },

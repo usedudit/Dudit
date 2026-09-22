@@ -1375,6 +1375,7 @@ export async function processReturnRequestAction(input: unknown) {
                     entityType: "order",
                     entityId: request.order_id,
                     data: {
+                        partner_id: data.partnerId,
                         return_request_id: request.id,
                         status: data.nextStatus,
                     },

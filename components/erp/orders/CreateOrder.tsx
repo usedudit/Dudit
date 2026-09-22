@@ -1547,7 +1547,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             isPendingDelivery: paymentData.isPendingDelivery,
             paymentProvider: paymentData.paymentProvider,
             mpPaymentId: paymentData.mpPaymentId,
-            checkoutFulfillment: paymentData.checkoutFulfillment || null,
+            checkoutFulfillment: paymentData.checkoutFulfillment || undefined,
         })
     }
 
@@ -1838,14 +1838,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                                             {(() => {
                                                 const pendingSuffix = paymentStatus !== "paid" ? ` (${paymentStatus === "partially_paid" ? "Parcial" : "Pendente"})` : "";
-                                                const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
-                                                const mpSuffix = originalPaymentProvider === "Mercado Pago" && friendlyMethod && !friendlyMethod.toLowerCase().includes("mercado pago") ? " (Mercado Pago)" : "";
-                                                const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}${pendingSuffix}`;
                                                 const paymentBreakdown = Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
                                                     ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
                                                     : Number(originalPaidAmount || 0) > 0 && originalPaymentMethod
                                                         ? [{ method: originalPaymentMethod, amount: Number(originalPaidAmount || 0) }]
                                                         : [];
+                                                const methodEntries = paymentBreakdown.filter((e: any) => e?.method);
+                                                const paidMethodEntries = methodEntries.filter((e: any) => Number(e?.amountReceived ?? e?.amount ?? 0) > 0.009);
+                                                const paidLabels = Array.from(new Set(paidMethodEntries.map((e: any) => String(e?.method || "").toLowerCase().trim()).filter(Boolean)));
+                                                const friendlyMethod = paidLabels.length > 1
+                                                    ? "Múltiplos meios"
+                                                    : (() => {
+                                                        const raw = (paidMethodEntries[0] || methodEntries[0])?.method || originalPaymentMethod;
+                                                        return raw && raw !== "Não informado" ? formatPaymentMethodLabel(raw, null) : "";
+                                                    })();
+                                                const mpSuffix = originalPaymentProvider === "Mercado Pago" && friendlyMethod && friendlyMethod !== "Múltiplos meios" && !friendlyMethod.toLowerCase().includes("mercado pago") ? " (Mercado Pago)" : "";
+                                                const paymentMethodLabel = `${friendlyMethod || "Não informado"}${mpSuffix}${pendingSuffix}`;
                                                 const hasCoupon = Number(effectiveCouponDiscountAmount || 0) > 0;
 
                                                 return isPaidOrder ? (
@@ -1861,11 +1869,19 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                             <div className="flex justify-between items-start text-[14px] gap-4">
                                                                 <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
                                                                 <div className="flex flex-col gap-1 text-right">
-                                                                    {paymentBreakdown.map((entry: any, index: number) => (
-                                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                            {entry.method}: {formatCurrency(entry.amount || 0)}
-                                                                        </span>
-                                                                    ))}
+                                                                    {paymentBreakdown.map((entry: any, index: number) => {
+                                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0);
+                                                                        const baseAmount = Number(entry.amount || 0);
+                                                                        const displayAmount = received > 0.009 ? received : baseAmount;
+                                                                        return (
+                                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                                    : null}
+                                                                            </span>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -1917,12 +1933,21 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                             </div>
                                                         )}
 
-                                                        {paymentMethodExtraAmount > 0 && (
-                                                            <div className="flex justify-between items-start text-[14px] gap-4">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
-                                                                <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>
-                                                            </div>
-                                                        )}
+                                                        {(() => {
+                                                            const hasDetailedFees = paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
+                                                            const feeFieldTotal = hasDetailedFees
+                                                                ? paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
+                                                                : 0;
+                                                            const extraAmount = hasDetailedFees
+                                                                ? (feeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+                                                                : paymentMethodExtraAmount;
+                                                            return extraAmount > 0 ? (
+                                                                <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Taxa do Método</span>
+                                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(extraAmount)}</span>
+                                                                </div>
+                                                            ) : null;
+                                                        })()}
 
                                                         <div className="flex justify-between items-center pt-4 border-t border-brand-border dark:border-dark-border mt-3">
                                                             <span className="font-bold text-lg text-brand-dark dark:text-dark-heading">Total do Pedido</span>

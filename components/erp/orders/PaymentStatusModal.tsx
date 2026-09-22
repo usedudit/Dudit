@@ -30,6 +30,9 @@ import {
     getOrderTotalAmount,
     isOrderFinanciallyFrozen,
     resolveSituationFromPaid,
+    DEPOSIT_STATUS_LABELS,
+    DEPOSIT_ICON_COLORS,
+    shouldShowSinal,
 } from '@/lib/payments/order-financial-state';
 import { DepositReceiptsSection } from '@/components/erp/payments/shared/DepositReceiptsSection';
 import { BalancePaymentCollector } from '@/components/erp/payments/BalancePaymentCollector';
@@ -39,14 +42,6 @@ import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { ReceiptScallopEdge } from '../POSComponents';
 import SaleReceiptPrintModal from '@/components/erp/orders/receipt/SaleReceiptPrintModal';
 import { PixQrDisplayModal } from '@/components/erp/payments/shared/PixQrDisplayModal';
-
-const DEPOSIT_STATUS_LABELS: Record<string, string> = {
-    pending: "Sinal pendente",
-    partially_paid: "Sinal pago - saldo pendente",
-    paid: "Quitado",
-    not_required: "Sem sinal",
-    expired: "Sinal expirado",
-};
 
 const standardTransition = { type: "spring" as const, stiffness: 380, damping: 30 };
 
@@ -127,7 +122,7 @@ const TransactionReceiptContent = ({
 
         <div className="mt-auto pt-4 border-t border-dashed border-brand-border dark:border-dark-border">
             <div className="space-y-2 mb-6">
-                {depositSummary?.usesDeposit && depositSummary.initialChargeAmount > 0 && (
+                {shouldShowSinal(depositSummary) && depositSummary.initialChargeAmount > 0 && (
                     <div className="flex justify-between items-center text-sm">
                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                             Sinal{orderNumber ? ` - ${orderNumber}` : ""} ({depositSummary.depositPercent}%)
@@ -610,44 +605,39 @@ export default function PaymentStatusModal({
                                         )}
                                     </div>
 
-                                    {isMpOrder && !isFullyPaid && depositSummary?.usesDeposit && (
-                                        <div
-                                            className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors group"
+                                    {isMpOrder && !isFullyPaid && shouldShowSinal(depositSummary) && (
+                                        <ListItem
+                                            left={
+                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                    <img
+                                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                        alt="Mercado Pago"
+                                                        className="w-5 h-5 object-contain"
+                                                    />
+                                                </div>
+                                            }
+                                            title={`Sinal - ${formatCurrency((depositSummary?.initialChargeAmount || depositSummary?.depositAmount) || 0)}`}
+                                            description={mpPaymentData ? (mpPaymentData.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago") : "Carregando..."}
                                             onClick={() => {
                                                 if (mpPaymentData?.pixData || mpPaymentData?.boletoData) {
                                                     setShowMpPixModal(true);
                                                 }
                                             }}
-                                        >
-                                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                <img
-                                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                    alt="Mercado Pago"
-                                                    className="w-5 h-5 object-contain"
-                                                />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">
-                                                    Sinal{targetOrder?.order_number ? ` - ${targetOrder.order_number}` : ""}
-                                                </span>
-                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate">
-                                                    {mpPaymentData ? (mpPaymentData?.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago") : "Carregando..."}
-                                                </span>
-                                            </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSyncMpPayment();
-                                                }}
-                                                disabled={syncing}
-                                                className="h-8"
-                                            >
-                                                {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
-                                                Verificar
-                                            </Button>
-                                        </div>
+                                            right={
+                                                <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSyncMpPayment();
+                                                    }}
+                                                    disabled={syncing}
+                                                >
+                                                    {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
+                                                    Verificar
+                                                </Button>
+                                            }
+                                        />
                                     )}
 
                                     {isMpOrder && !isFullyPaid && !depositSummary?.usesDeposit && (

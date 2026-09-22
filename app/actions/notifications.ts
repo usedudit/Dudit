@@ -4,6 +4,11 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { traceServerAction } from "@/lib/observability/request-trace"
+import {
+  getAllUserStoreAccess,
+  setActivePartner,
+  setActiveStore,
+} from "@/lib/auth/partner-context"
 import type { NotificationPageCursor } from "@/lib/notifications/types"
 import {
   fetchNotificationsPage,
@@ -89,4 +94,37 @@ export async function unregisterPushSubscriptionAction(fcmToken: string) {
 
   await unregisterPushSubscription({ userId: user.id, fcmToken })
   return { success: true as const }
+}
+
+export async function switchNotificationContextAction(params: {
+  partnerId: string
+  storeId?: string | null
+  targetHref: string
+}): Promise<{ success: boolean; url: string; error?: string }> {
+  await requireRateLimit(RateLimitCategory.API_GENERAL)
+  const user = await requireUser()
+  if (!user) return { success: false, url: "/erp", error: "Não autenticado" }
+
+  try {
+    const allAccess = await getAllUserStoreAccess(user)
+    const hasPartner = allAccess.some((a) => a.partnerId === params.partnerId)
+    if (!hasPartner) {
+      return { success: false, url: "/erp", error: "Sem acesso a este negócio" }
+    }
+
+    await setActivePartner(params.partnerId)
+    if (params.storeId) {
+      const storeAccess = allAccess.find(
+        (a) => a.storeId === params.storeId && a.partnerId === params.partnerId,
+      )
+      if (storeAccess) {
+        await setActiveStore(params.storeId)
+      }
+    }
+
+    return { success: true, url: params.targetHref }
+  } catch (err) {
+    console.error("[notifications] switchNotificationContext error", err)
+    return { success: false, url: "/erp", error: "Erro ao trocar de contexto" }
+  }
 }

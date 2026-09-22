@@ -6,6 +6,7 @@ import type { NotificationRecord } from "@/lib/notifications/types"
 import { Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader } from "../reusable"
 import { usePushNotificationStatus } from "./PushNotificationManager"
 import { BellIcon } from "@/lib/icons"
+import { cn } from "@/lib/utils"
 
 interface Group {
 	label: string
@@ -22,6 +23,10 @@ export function NotificationPanel({
 	onNavigate,
 	onMarkAllAsRead,
 	unreadCount,
+	erpOptions,
+	erpFilter,
+	onErpFilter,
+	activePartnerId,
 }: {
 	grouped: Group[]
 	isLoading: boolean
@@ -32,6 +37,10 @@ export function NotificationPanel({
 	onNavigate?: () => void
 	onMarkAllAsRead?: () => void
 	unreadCount?: number
+	erpOptions: Array<{ id: string; label: string }>
+	erpFilter: string
+	onErpFilter: (filter: string) => void
+	activePartnerId: string | null
 }) {
 	const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -110,6 +119,54 @@ export function NotificationPanel({
 					</button>
 				</div>
 			)}
+			{erpOptions.length > 0 || activePartnerId ? (
+				<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface px-3 py-2 border-b border-brand-border dark:border-dark-border overflow-x-auto custom-scrollbar">
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={() => onErpFilter("all")}
+							className={cn(
+								"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
+								erpFilter === "all"
+									? "bg-brand-green text-white"
+									: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
+							)}
+						>
+							Todos
+						</button>
+						{activePartnerId && (
+							<button
+								type="button"
+								onClick={() => onErpFilter("current")}
+								className={cn(
+									"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
+									erpFilter === "current"
+										? "bg-brand-green text-white"
+										: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
+								)}
+							>
+								Este ERP
+							</button>
+						)}
+						{erpOptions.map((opt) => (
+							<button
+								key={opt.id}
+								type="button"
+								onClick={() => onErpFilter(opt.id)}
+								title={opt.label}
+								className={cn(
+									"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
+									erpFilter === opt.id
+										? "bg-brand-green text-white"
+										: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
+								)}
+							>
+								{opt.label}
+							</button>
+						))}
+					</div>
+				</div>
+			) : null}
 			{grouped.map((group) => (
 				<div key={group.label} className="px-2 py-1">
 					<p className="text-xs font-medium text-brand-dark dark:text-dark-heading px-2 py-2">

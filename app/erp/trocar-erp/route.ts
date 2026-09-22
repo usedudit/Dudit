@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { clearActivePartner, getAllUserPartnerAccess, setActivePartner } from "@/lib/auth/partner-context"
+import { getCurrentUser } from "@/lib/auth/authorization"
 
 /**
  * Route handler used to explicitly force the user out of their current ERP context.
@@ -9,7 +10,12 @@ import { clearActivePartner, getAllUserPartnerAccess, setActivePartner } from "@
  * Performance: If exactly 1 ERP is found, it auto-selects it and goes to dashboard.
  */
 export async function GET(request: Request) {
-    const allAccess = await getAllUserPartnerAccess()
+    const user = await getCurrentUser()
+    if (!user) {
+        return NextResponse.redirect(new URL("/auth/login?mode=partner", request.url))
+    }
+
+    const allAccess = await getAllUserPartnerAccess(user)
 
     // Only auto-select if the single ERP belongs to the user
     if (allAccess.length === 1 && allAccess[0].roleId === "owner") {

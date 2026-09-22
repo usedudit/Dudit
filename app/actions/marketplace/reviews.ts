@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requireRateLimit } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
 import { sendSuspiciousReview } from "@/lib/services/discord-marketplace-webhook.service"
+import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 
 async function checkFraudulentReview(
   adminSupabase: any,
@@ -257,14 +258,74 @@ export async function createReviewAction(data: {
 
   if (fraudCheck.isSuspicious) {
     // Webhook Discord: notificar tentativa de review suspeita (fail-open)
+    let productName: string | undefined
+    let serviceName: string | undefined
+    let productUrl: string | null = null
+    let serviceUrl: string | null = null
+    let partnerName: string | null = null
+    let partnerUrl: string | null = null
+
+    if (data.productId) {
+        const { data: p } = await adminSupabase
+            .from("products")
+            .select("name, slug, short_id, id, partners!inner(*)")
+            .eq("id", data.productId)
+            .maybeSingle()
+        if (p) {
+            productName = p.name
+            productUrl = getProductUrl(p)
+        }
+    } else if (data.serviceId) {
+        const { data: s } = await adminSupabase
+            .from("services")
+            .select("name, slug, short_id, id, partners!inner(*)")
+            .eq("id", data.serviceId)
+            .maybeSingle()
+        if (s) {
+            serviceName = s.name
+            serviceUrl = getServiceUrl(s)
+        }
+    }
+
+    if (data.partnerId) {
+        const { data: st } = await adminSupabase
+            .from("stores")
+            .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name)")
+            .eq("partner_id", data.partnerId)
+            .order("is_headquarters", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (st) {
+            partnerName = st.partners?.name || st.name || null
+            partnerUrl = getStoreUrl(st)
+        } else {
+            const { data: part } = await adminSupabase
+                .from("partners")
+                .select("name")
+                .eq("id", data.partnerId)
+                .maybeSingle()
+            partnerName = part?.name || null
+        }
+    }
+
+    const reporterName = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split("@")[0]
+
     sendSuspiciousReview({
       userId,
       userEmail: currentUser.email,
+      userName: reporterName,
       productId: data.productId || undefined,
+      productName,
       serviceId: data.serviceId || undefined,
+      serviceName,
       partnerId: data.partnerId,
+      partnerName,
+      partnerUrl,
       reason: fraudCheck.reason || "Padrão suspeito detectado",
       rating: data.rating,
+      comment: data.comment || null,
+      productUrl,
+      serviceUrl,
     }).catch(err => console.warn("[REVIEWS] Discord webhook failed (non-blocking):", err))
 
     return { error: fraudCheck.reason || "Não foi possível criar a avaliação" }

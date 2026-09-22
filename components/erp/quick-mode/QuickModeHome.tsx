@@ -635,7 +635,7 @@ function ModeCard({
 
                         <ListItem
                             title="Gerenciar meu negócio"
-                            description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
+                            description="Controle completo do seu negócio, financeiro, equipe e relatórios."
                             icon={<RocketIcon className="text-brand-green w-5 h-5" />}
                             onClick={() => setSelectedMode("erp")}
                             left={
@@ -666,7 +666,7 @@ function ModeCard({
     return (
         <ListItem
             title="Gestão completa"
-            description="Controle completo de estoque, frente de caixa (PDV), fluxo de caixa e relatórios."
+            description="Controle completo do seu negócio, financeiro, equipe e relatórios."
             icon={<BriefcaseIcon className="text-brand-green w-5 h-5 shrink-0" />}
             className="px-4 py-3"
             right={

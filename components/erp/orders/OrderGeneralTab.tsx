@@ -183,9 +183,6 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
     const payStatusMeta = useMemo(() => getPaymentStatusMeta(paymentStatus), [paymentStatus])
     const pendingSuffix = payStatusMeta.label !== "Pago" ? ` (${payStatusMeta.label})` : ""
-    const friendlyMethod = originalPaymentMethod && originalPaymentMethod !== "Não informado" ? formatPaymentMethodLabel(originalPaymentMethod, null) : "";
-    const paymentMethodLabel = `${friendlyMethod || "Não informado"}${pendingSuffix}`
-
     const paymentBreakdown = useMemo(() => {
         return Array.isArray(originalPaymentBreakdown) && originalPaymentBreakdown.length > 0
             ? originalPaymentBreakdown.filter((entry: any) => entry?.method)
@@ -193,6 +190,27 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                 ? [{ method: originalPaymentMethod, amount: Number(originalPaidAmount || 0) }]
                 : []
     }, [originalPaymentBreakdown, originalPaidAmount, originalPaymentMethod])
+    const hasDetailedBreakdownFees = useMemo(
+        () => paymentBreakdown.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined),
+        [paymentBreakdown]
+    )
+    const breakdownFeeFieldTotal = useMemo(() => {
+        if (!hasDetailedBreakdownFees) return 0
+        return paymentBreakdown.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0) + Number(e.feeAmount || 0) + Number(e.fixedFeeAmount || 0), 0)
+    }, [hasDetailedBreakdownFees, paymentBreakdown])
+    const effectivePaymentMethodExtraAmount = hasDetailedBreakdownFees
+        ? (breakdownFeeFieldTotal > 0.009 ? paymentMethodExtraAmount : 0)
+        : paymentMethodExtraAmount
+    const friendlyMethod = useMemo(() => {
+        const methodEntries = paymentBreakdown.filter((e: any) => e?.method)
+        const paidMethodEntries = methodEntries.filter((e: any) => Number(e?.amountReceived ?? e?.amount ?? 0) > 0.009)
+        const paidLabels = Array.from(new Set(paidMethodEntries.map((e: any) => String(e?.method || "").toLowerCase().trim()).filter(Boolean)))
+        if (paidLabels.length > 1) return "Múltiplos meios"
+        const preferred = paidMethodEntries[0] || methodEntries[0]
+        const raw = preferred?.method || originalPaymentMethod
+        return raw && raw !== "Não informado" ? formatPaymentMethodLabel(raw, null) : ""
+    }, [paymentBreakdown, originalPaymentMethod])
+    const paymentMethodLabel = `${friendlyMethod || "Não informado"}${pendingSuffix}`
     const searchRef = useRef<HTMLDivElement>(null);
     const ITEMS_PER_PAGE = 8;
     const [currentPage, setCurrentPage] = React.useState(1);
@@ -741,11 +759,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                             label="Valores por meio"
                                             value={
                                                 <div className="flex flex-col gap-1">
-                                                    {paymentBreakdown.map((entry: any, index: number) => (
-                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                        </span>
-                                                    ))}
+                                                    {paymentBreakdown.map((entry: any, index: number) => {
+                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                        const baseAmount = Number(entry.amount || 0)
+                                                        const displayAmount = received > 0.009 ? received : baseAmount
+                                                        return (
+                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                    : null}
+                                                            </span>
+                                                        )
+                                                    })}
                                                 </div>
                                             }
                                         />
@@ -810,10 +836,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     />
                                 )}
 
-                                {paymentMethodExtraAmount > 0 && (
+                                {effectivePaymentMethodExtraAmount > 0 && (
                                     <PaymentRow
                                         label="Taxa do Método"
-                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
+                                        value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>}
                                     />
                                 )}
 
@@ -1383,11 +1409,19 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                         label="Valores por meio"
                                         value={
                                             <div className="flex flex-col gap-1">
-                                                {paymentBreakdown.map((entry: any, index: number) => (
-                                                    <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                        {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(entry.amount || 0)}
-                                                    </span>
-                                                ))}
+                                                {paymentBreakdown.map((entry: any, index: number) => {
+                                                    const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                    const baseAmount = Number(entry.amount || 0)
+                                                    const displayAmount = received > 0.009 ? received : baseAmount
+                                                    return (
+                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                            {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                : null}
+                                                        </span>
+                                                    )
+                                                })}
                                             </div>
                                         }
                                     />
@@ -1452,10 +1486,10 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 />
                             )}
 
-                            {paymentMethodExtraAmount > 0 && (
+                            {effectivePaymentMethodExtraAmount > 0 && (
                                 <PaymentRow
                                     label="Taxa do Método"
-                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(paymentMethodExtraAmount)}</span>}
+                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>}
                                 />
                             )}
 

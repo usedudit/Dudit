@@ -25,7 +25,7 @@ import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityW
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
-import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state';
+import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal } from '@/lib/payments/order-financial-state';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -727,18 +727,20 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         let baseLabel = "Pix";
         const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
         const methodEntries = breakdown.filter((e: any) => e?.method);
-        const hasMultipleMethods = methodEntries.length > 1;
+        const paidMethodEntries = methodEntries.filter((e: any) => Number(e?.amountReceived ?? e?.amount ?? 0) > 0.009);
+        const paidLabels = Array.from(new Set(paidMethodEntries.map((e: any) => String(e?.method || "").toLowerCase().trim()).filter(Boolean)));
+        const hasMultiplePaidMethods = paidLabels.length > 1;
 
-        if (hasMultipleMethods) {
+        if (hasMultiplePaidMethods) {
             baseLabel = "Múltiplos meios";
-        } else if (methodEntries.length === 1) {
-            const m = methodEntries[0].method.toLowerCase();
+        } else if (paidMethodEntries.length === 1 || methodEntries.length === 1) {
+            const m = (paidMethodEntries[0] || methodEntries[0]).method.toLowerCase();
             if (m === "pix" || m === "bank_transfer") baseLabel = "Pix";
             else if (m.includes("crédito") || m.includes("credito") || m.includes("credit")) baseLabel = "Cartão de Crédito";
             else if (m.includes("débito") || m.includes("debito") || m.includes("debit")) baseLabel = "Cartão de Débito";
             else if (m.includes("dinheiro") || m.includes("cash") || m.includes("money")) baseLabel = "Dinheiro";
             else if (m.includes("boleto") || m.includes("bolbradesco") || m === "ticket") baseLabel = "Boleto";
-            else baseLabel = methodEntries[0].method;
+            else baseLabel = (paidMethodEntries[0] || methodEntries[0]).method;
         } else {
             const pm = String(order.payment_method || "").toLowerCase();
             if (pm === "pix" || pm === "bank_transfer") baseLabel = "Pix";
@@ -748,14 +750,14 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             else if (pm.includes("boleto") || pm.includes("bolbradesco") || pm === "ticket") baseLabel = "Boleto";
             else baseLabel = order.payment_method || order.payment_provider || "Pix";
         }
-        if (!hasMultipleMethods) {
-            const paymentEntry = methodEntries[0] || null;
+        if (!hasMultiplePaidMethods) {
+            const paymentEntry = paidMethodEntries[0] || methodEntries[0] || null;
             const installmentCount = paymentEntry?.installmentNumber || order.installments || 1;
             if (installmentCount > 1) {
                 baseLabel = `${baseLabel} - ${installmentCount}x`;
             }
         }
-        if (hasMultipleMethods) {
+        if (hasMultiplePaidMethods) {
             return baseLabel;
         }
         if (hasReceivedMpPayment(order) && !baseLabel.toLowerCase().includes("mercado pago")) {
@@ -827,24 +829,34 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     );
     const couponDiscountVal = Math.max(0, Number(pricingSnapshot?.couponDiscount ?? order.discount_amount ?? order.discount_total ?? 0));
     const paymentMethodDiscountVal = Math.max(0, Number(pricingSnapshot?.paymentMethodDiscount ?? order.payment_method_discount_amount ?? 0));
-    const paymentMethodInterestVal = Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
-    const paymentMethodFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFee ?? (pricingSnapshot ? 0 : order.payment_method_extra_amount) ?? 0));
-    const paymentMethodFixedFeeVal = Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
     const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
-    const depositSummary = isDepositOrder ? {
-        depositPercent: Number(order?.checkout_fulfillment?.depositCheckout?.depositPercent || 0),
-        initialChargeAmount: Number(order?.checkout_fulfillment?.depositCheckout?.initialChargeAmount || 0),
-        depositStatus: (() => {
-            const raw = order?.checkout_fulfillment?.depositCheckout?.depositStatus || "pending";
-            const paidAmount = Number(order?.paid_amount || 0);
-            const isExpired = order?.payment_expires_at && new Date(order.payment_expires_at) < new Date() && paidAmount <= 0.009;
-            return isExpired ? "expired" : raw;
-        })(),
-        paymentProvider: order?.checkout_fulfillment?.depositCheckout?.paymentProvider || null,
-    } : null;
+    const depositSummary = isDepositOrder ? getOrderDepositSummary(order) : null;
+
+    // Payment breakdown entries (one per payment leg), excluding checkoutPricing metadata
+    // Payment breakdown entries (one per payment leg), excluding checkoutPricing metadata
+    // Filter out sinal entries when expired or fully paid - those should not be shown.
+    const paymentMethodEntries = useMemo(() => {
+        const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : [];
+        const filtered = breakdown.filter((e: any) => e?.method && !e?.checkoutPricing);
+        if (!shouldShowSinal(depositSummary)) {
+            return filtered.filter((e: any) => !(isDepositOrder && Number(e?.amountReceived ?? e?.amount ?? 0) === depositSummary?.initialChargeAmount));
+        }
+        return filtered;
+    }, [order?.payment_breakdown, depositSummary]);
+
+    // Effective payment fees: prefer breakdown explicit fields over stale column
+    const hasDetailedBreakdownFees = paymentMethodEntries.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
+    const effectiveInterestTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0), [paymentMethodEntries]);
+    const effectiveFeeTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0), [paymentMethodEntries]);
+    const effectiveFixedFeeTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0), [paymentMethodEntries]);
+
+    const paymentMethodInterestVal = hasDetailedBreakdownFees ? effectiveInterestTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
+    const paymentMethodFeeVal = hasDetailedBreakdownFees ? effectiveFeeTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodFee || 0));
+    const paymentMethodFixedFeeVal = hasDetailedBreakdownFees ? effectiveFixedFeeTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
+
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => {
             const m = String(entry?.method || "").toLowerCase().trim();
@@ -1711,76 +1723,152 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 3: Pagamento */}
                                     <FormSection title="Pagamento">
-                                        <div>
-                                            <ListItem
-                                                icon={PaymentIconEl}
-                                                title={
-                                                    loadingPayment ? <Spinner size={14} className="text-brand-dark dark:text-dark-heading" /> :
+                                        <div className="space-y-3">
+                                            {paymentMethodEntries.map((entry: any, index: number) => {
+                                                const method = String(entry?.method || "").toLowerCase().trim();
+                                                const received = Number(entry?.amountReceived ?? entry?.amount ?? 0);
+                                                const amount = Number(entry?.amount || 0);
+                                                const displayAmount = received > 0.009 ? received : amount;
+                                                const isPix = method === "pix" || method === "bank_transfer";
+                                                const isCreditCard = method.includes("credit") || method.includes("crédito");
+                                                const isDebitCard = method.includes("debit") || method.includes("débito");
+                                                const isCash = method === "cash" || method === "dinheiro";
+                                                const isStoreCredit = method === "store_credit" || method === "vale-compra" || method === "vale_compra";
+                                                const isBoleto = method.includes("boleto") || method.includes("bolbradesco") || method === "ticket";
+                                                const isMercadoPago = String(entry?.provider || "").toLowerCase().includes("mercado pago") || method.includes("mercado pago");
+
+                                                const getMethodLabel = () => {
+                                                    if (isPix) return "Pix";
+                                                    if (isCreditCard) return "Cartão de Crédito";
+                                                    if (isDebitCard) return "Cartão de Débito";
+                                                    if (isCash) return "Dinheiro";
+                                                    if (isStoreCredit) return "Vale-compra";
+                                                    if (isBoleto) return "Boleto";
+                                                    return entry?.method || "Pagamento";
+                                                };
+
+                                                const getMethodIcon = () => {
+                                                    if (isStoreCredit) {
+                                                        return <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />;
+                                                    }
+                                                    if (isPix) {
+                                                        return <img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />;
+                                                    }
+                                                    if (isCreditCard || isDebitCard) {
+                                                        return <img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />;
+                                                    }
+                                                    if (isCash) {
+                                                        return <MoneyIcon key="money" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />;
+                                                    }
+                                                    if (isBoleto) {
+                                                        return <img key="boleto" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-5 h-5 object-contain shrink-0" />;
+                                                    }
+                                                    if (isMercadoPago) {
+                                                        return <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />;
+                                                    }
+                                                    return <CreditCardIcon key="default" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />;
+                                                };
+
+                                                const entryLabel = isDepositOrder && shouldShowSinal(depositSummary) && displayAmount === depositSummary?.initialChargeAmount
+                                                    ? `Sinal - ${formatCurrency(displayAmount)}`
+                                                    : getMethodLabel();
+
+                                                const entryDesc = isDepositOrder && shouldShowSinal(depositSummary) && displayAmount === depositSummary?.initialChargeAmount
+                                                    ? "pendente"
+                                                    : (isMercadoPago ? "Mercado Pago" : isExchangeOrder ? "Pix" : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"));
+
+                                                return (
+                                                    <ListItem
+                                                        key={`${entry.method}-${index}`}
+                                                        left={getMethodIcon()}
+                                                        title={
+                                                            <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                                {entryLabel}
+                                                            </span>
+                                                        }
+                                                        description={
+                                                            <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
+                                                                {entryDesc}
+                                                            </span>
+                                                        }
+                                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                        right={
+                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                                {formatCurrency(displayAmount)}
+                                                            </span>
+                                                        }
+                                                    />
+                                                );
+                                            })}
+
+                                            {paymentMethodEntries.length === 0 && !isDepositOrder && !isExchangeOrder && (
+                                                <ListItem
+                                                    icon={PaymentIconEl}
+                                                    title={
                                                         <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                            {isDepositOrder ? `Sinal${order.order_number ? ` - ${order.order_number}` : ""}` : paymentMethodName}
+                                                            {paymentMethodName}
                                                         </span>
-                                                }
-                                                description={
-                                                    <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                        {isExchangeOrder
-                                                            ? (exchangeShortfall > 0 ? "Diferença pendente de pagamento" : "Crédito da devolução anterior aplicado")
-                                                            : isDepositOrder
-                                                                ? `Sinal de ${depositSummary?.depositPercent || 0}% · ${depositSummary?.depositStatus === "paid" ? "Pago" : depositSummary?.depositStatus === "expired" ? "Expirado" : "Pendente"}`
-                                                                : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto")}
-                                                    </span>
-                                                }
-                                                className="border-none px-0 py-0 !bg-transparent shadow-none hover:border-none cursor-default"
-                                                onClick={canRetryPayment ? handlePixClick : undefined}
-                                                right={
-                                                    <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                        {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : isDepositOrder ? (depositSummary?.initialChargeAmount || 0) : totalAmount)}
-                                                    </span>
-                                                }
-                                            />
-                                            {isPendingExchangeShortfall ? (
-                                                hasMercadoPagoOnline ? (
-                                                    <InfoCard
-                                                        title="Diferença da Troca Pendente"
-                                                        message={`O valor da diferença para os novos itens é de ${formatCurrency(exchangeShortfall)}. Pague via Pix para aprovar e liberar a entrega/retirada.`}
-                                                        color="orange"
-                                                        className="mt-4"
-                                                        rightElement={
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={handlePixClick}
-                                                                disabled={loadingPayment}
-                                                                className="whitespace-nowrap"
-                                                            >
-                                                                {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
-                                                                Pagar via Pix
-                                                            </Button>
-                                                        }
-                                                    />
-                                                ) : (
-                                                    <InfoCard
-                                                        title="Diferença da Troca"
-                                                        message={`O valor da diferença é de ${formatCurrency(exchangeShortfall)}. Esta loja não utiliza pagamentos online na Dudit. O pagamento deve ser realizado diretamente no balcão da loja no momento da retirada ou combinado via WhatsApp.`}
-                                                        color="blue"
-                                                        className="mt-4"
-                                                        rightElement={
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={handleWhatsAppExchangeDifference}
-                                                                className="whitespace-nowrap flex items-center gap-1.5"
-                                                            >
-                                                                <WhatsappIcon size={14} className="text-[#25D366]" />
-                                                                Combinar no WhatsApp
-                                                            </Button>
-                                                        }
-                                                    />
-                                                )
-                                            ) : (
-                                                canRetryPayment && order.payment_expires_at && (
-                                                    <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
-                                                )
+                                                    }
+                                                    description={
+                                                        <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
+                                                            {order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"}
+                                                        </span>
+                                                    }
+                                                    className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                    right={
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(totalAmount)}
+                                                        </span>
+                                                    }
+                                                />
                                             )}
                                         </div>
+
+                                        {renderPriceSummary()}
+
+                                        {isPendingExchangeShortfall ? (
+                                            hasMercadoPagoOnline ? (
+                                                <InfoCard
+                                                    title="Diferença da Troca Pendente"
+                                                    message={`O valor da diferença para os novos itens é de ${formatCurrency(exchangeShortfall)}. Pague via Pix para aprovar e liberar a entrega/retirada.`}
+                                                    color="orange"
+                                                    className="mt-4"
+                                                    rightElement={
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={handlePixClick}
+                                                            disabled={loadingPayment}
+                                                            className="whitespace-nowrap"
+                                                        >
+                                                            {loadingPayment ? <Spinner size={14} className="mr-1" /> : null}
+                                                            Pagar via Pix
+                                                        </Button>
+                                                    }
+                                                />
+                                            ) : (
+                                                <InfoCard
+                                                    title="Diferença da Troca"
+                                                    message={`O valor da diferença é de ${formatCurrency(exchangeShortfall)}. Esta loja não utiliza pagamentos online na Dudit. O pagamento deve ser realizado diretamente no balcão da loja no momento da retirada ou combinado via WhatsApp.`}
+                                                    color="blue"
+                                                    className="mt-4"
+                                                    rightElement={
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={handleWhatsAppExchangeDifference}
+                                                            className="whitespace-nowrap flex items-center gap-1.5"
+                                                        >
+                                                            <WhatsappIcon size={14} className="text-[#25D366]" />
+                                                            Combinar no WhatsApp
+                                                        </Button>
+                                                    }
+                                                />
+                                            )
+                                        ) : (
+                                            canRetryPayment && order.payment_expires_at && (
+                                                <InfoCard message={`O pagamento expira em ${formatFullDate(order.payment_expires_at)}.`} color='orange' className="mt-4" rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>} />
+                                            )
+                                        )}
                                     </FormSection>
 
                                     {/* Section 4: Entregador */}

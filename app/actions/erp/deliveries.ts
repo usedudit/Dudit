@@ -2342,6 +2342,7 @@ export async function getERPDeliveryPlanAccessAction(partnerId: string) {
             entityId: assignment.order_id || params.deliveryId,
             idempotencyKey: `unassign-${assignment.id}-${Date.now()}`,
             data: {
+              partner_id: params.partnerId,
               deliveryId: params.deliveryId,
               reason: reasonText,
               cancelledByPartner: true,

@@ -1096,9 +1096,20 @@ async function handler(request: NextRequest) {
     
     if (existingOrderId && existingOrder) {
       const existingBreakdown = Array.isArray(existingOrder.payment_breakdown) ? existingOrder.payment_breakdown : []
-      const nonMpBreakdown = existingBreakdown.filter((b: any) => b.method === "store_credit")
+      // Keep store credit, pending legs (e.g. unpaid sinal), and any already-received
+      // non-MP payments. Only replace a prior approved MP leg for this order.
+      const keptBreakdown = existingBreakdown.filter((b: any) => {
+        if (!b?.method) return false
+        if (b.method === "store_credit") return true
+        const received = Number(b.amountReceived || 0)
+        const isMp = String(b.provider || "").toLowerCase().includes("mercado pago")
+        if (isMp && received > 0.009) return false
+        if (received > 0.009) return true
+        // pending unpaid non-MP legs without a real method stay only if they look like a sinal placeholder
+        return isMp
+      })
       const updatedBreakdown = [
-        ...nonMpBreakdown,
+        ...keptBreakdown,
         {
           method: paymentMethodDisplayName,
           amount: chargeAmount,
@@ -1106,6 +1117,10 @@ async function handler(request: NextRequest) {
           amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
           provider: "Mercado Pago",
           adjustmentType: "none",
+          interestAmount: 0,
+          feeAmount: 0,
+          fixedFeeAmount: 0,
+          feeBearer: "merchant",
           checkoutPricing: checkoutPricing || existingOrder.payment_breakdown?.[0]?.checkoutPricing || {
             subtotal: (existingOrder.order_items || []).reduce((sum: number, item: any) => sum + Number(item.subtotal || 0), 0) || (fullOrderTotal - deliveryFee),
             couponDiscount: couponDiscountAmount,
@@ -1179,6 +1194,10 @@ async function handler(request: NextRequest) {
             amountReceived: paymentStatus === "approved" ? chargeAmount : 0,
             provider: "Mercado Pago",
             adjustmentType: "none",
+            interestAmount: 0,
+            feeAmount: 0,
+            fixedFeeAmount: 0,
+            feeBearer: "merchant",
             checkoutPricing: checkoutPricing || {
               subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
               couponDiscount: couponDiscountAmount,

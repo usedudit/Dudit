@@ -18,6 +18,7 @@ import { captureError, addMonitoringBreadcrumb } from "@/lib/monitoring/sentry"
 import { logAuditEvent } from "@/lib/services/timeline.service"
 import { getTrustedClientIP } from "@/lib/security/client-ip"
 import { sendMarketplaceReport } from "@/lib/services/discord-marketplace-webhook.service"
+import { getStoreUrl } from "@/lib/utils/url-generator"
 import { REPORT_REASON_LABELS } from "@/lib/admin/report-reasons"
 
 const reportSchema = z.object({
@@ -132,6 +133,32 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
 
     // Webhook Discord: notificar denúncia criada (fail-open, não bloqueia fluxo)
     if (result?.created === true) {
+      let partnerName: string | null = null
+      let partnerId: string | null = null
+      let partnerUrl: string | null = null
+
+      const { data: rrPartner } = await admin
+        .from("return_requests")
+        .select("partner_id, stores!left(name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name))")
+        .eq("id", parsed.returnRequestId)
+        .maybeSingle()
+
+      if (rrPartner?.partner_id) {
+        partnerId = rrPartner.partner_id
+      }
+      const store = (rrPartner?.stores as any) || null
+      if (store) {
+        partnerUrl = getStoreUrl(store)
+        partnerName = store.partners?.name || store.name || null
+      } else if (partnerId) {
+        const { data: part } = await admin
+          .from("partners")
+          .select("name")
+          .eq("id", partnerId)
+          .maybeSingle()
+        partnerName = part?.name || null
+      }
+
       sendMarketplaceReport({
         returnRequestId: parsed.returnRequestId,
         reasonCode: parsed.reasonCode,
@@ -140,6 +167,9 @@ export async function reportReturnToDuditAction(input: z.infer<typeof reportSche
         userId: user.id,
         userEmail: user.email,
         userName: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0],
+        partnerId,
+        partnerName,
+        partnerUrl,
       }).catch(err => console.warn("[REPORT_RETURN] Discord webhook failed (non-blocking):", err))
     }
 

@@ -999,7 +999,7 @@ const Header: React.FC<HeaderProps> = ({
                                 { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
                                 { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
                                 { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
-                                { label: "Central do Vendedor", href: "/erp/inicio", prefetch: true },
+                                { label: "Central do Vendedor", href: "/erp/trocar-erp", prefetch: false },
                                 { label: "Enviar Feedback", action: () => { setIsMobileUserMenuOpen(false); setIsFeedbackOpen(true); } },
                             ] as any[]).map((item, idx) => {
                                 const ItemWrapper: any = item.href ? Link : "div";
@@ -1207,7 +1207,7 @@ const Header: React.FC<HeaderProps> = ({
                                             { label: "Meus Favoritos", href: "/favoritos", prefetch: false },
                                             { label: "Minhas Avaliações", href: "/perfil?tab=avaliacoes", prefetch: false },
                                             { label: "Minhas Coleções", href: "/colecoes", prefetch: false },
-                                            { label: "Central do Vendedor", href: "/erp/inicio", prefetch: true },
+                                            { label: "Central do Vendedor", href: "/erp/trocar-erp", prefetch: false },
                                             { label: "Enviar Feedback", action: () => { setIsUserMenuOpen(false); setIsFeedbackOpen(true); } },
                                         ] as any[]).map((item, idx) => {
                                             const ItemWrapper: any = item.href ? Link : "div";

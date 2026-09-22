@@ -51,6 +51,7 @@ import {
     extractCSRFTokenFromObject,
 } from "@/lib/security/csrf-action-wrapper"
 import { sendMarketplaceReport, sendContentReported } from "@/lib/services/discord-marketplace-webhook.service"
+import { getProductUrl, getServiceUrl, getStoreUrl } from "@/lib/utils/url-generator"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -323,28 +324,77 @@ export async function createReport(data: {
     // Discord webhook: notificar denúncia criada (fail-open, não bloqueia fluxo)
     try {
         let entityName = ""
+        let entityUrl: string | null = null
+        let partnerName: string | null = null
+        let partnerUrl: string | null = null
+        let partnerId: string | null = null
+
         if (data.targetType === "product") {
-            const { data: p } = await adminClient.from("products").select("name").eq("id", finalTargetId).maybeSingle()
+            const { data: p } = await adminClient
+                .from("products")
+                .select("name, slug, short_id, id, partners!inner(*)")
+                .eq("id", finalTargetId)
+                .maybeSingle()
             entityName = p?.name || ""
+            if (p) entityUrl = getProductUrl(p)
         } else if (data.targetType === "service") {
-            const { data: s } = await adminClient.from("services").select("name").eq("id", finalTargetId).maybeSingle()
+            const { data: s } = await adminClient
+                .from("services")
+                .select("name, slug, short_id, id, partners!inner(*)")
+                .eq("id", finalTargetId)
+                .maybeSingle()
             entityName = s?.name || ""
+            if (s) entityUrl = getServiceUrl(s)
         } else if (data.targetType === "partner") {
-            const { data: st } = await adminClient.from("stores").select("name").eq("partner_id", finalTargetId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle()
+            const { data: st } = await adminClient
+                .from("stores")
+                .select("name, slug, short_id, id, addresses(city, state), is_headquarters, partner_id, partners!inner(name)")
+                .eq("partner_id", finalTargetId)
+                .order("is_headquarters", { ascending: false })
+                .limit(1)
+                .maybeSingle()
             entityName = st?.name || ""
+            if (st) {
+                entityUrl = getStoreUrl(st)
+                partnerName = st.partners?.name || null
+                partnerId = st.partner_id
+                partnerUrl = getStoreUrl(st)
+            }
         } else if (data.targetType === "review") {
-            const { data: r } = await adminClient.from("reviews").select("comment").eq("id", finalTargetId).maybeSingle()
-            entityName = r?.comment ? r.comment.slice(0, 80) : ""
+            const { data: r } = await adminClient
+                .from("reviews")
+                .select("comment, rating, product_id, service_id, partner_id, products(id, name, slug, short_id, partners!inner(*)), services(id, name, slug, short_id, partners!inner(*)), partners!inner(name)")
+                .eq("id", finalTargetId)
+                .maybeSingle()
+            entityName = r?.comment ? r.comment : ""
+            // Build URL for the product or service that the review belongs to
+            if (r?.product_id && r.products) {
+                entityUrl = getProductUrl(r.products)
+            } else if (r?.service_id && r.services) {
+                entityUrl = getServiceUrl(r.services)
+            }
+            if (r?.partner_id) {
+                partnerId = r.partner_id
+                partnerName = (r.partners as any)?.name || null
+            }
         }
 
+        const reporterName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0]
+
         sendContentReported({
-            entityType: data.targetType as "product" | "service",
+            entityType: data.targetType as "product" | "service" | "partner" | "review",
             entityId: finalTargetId,
             entityName,
             reasonCode: data.reasonCode,
             reasonLabel,
             reporterUserId: user.id,
             reporterEmail: user.email,
+            reporterName,
+            description: data.description,
+            entityUrl,
+            partnerId,
+            partnerName,
+            partnerUrl,
         }).catch(err => console.warn("[REPORTS] Discord webhook failed (non-blocking):", err))
     } catch {
         // Non-critical: don't fail the report creation

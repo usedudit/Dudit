@@ -933,6 +933,7 @@ export async function broadcastAdminAnnouncement(params: {
     data: {
       url: params.url || "/",
       audience: "admin",
+      scope: params.target === "all" || params.target === "sellers" ? "platform" : "partner",
       announcement_id: params.announcementId,
     },
     idempotencyKey: `admin_announcement:${params.announcementId}:${userId}`,

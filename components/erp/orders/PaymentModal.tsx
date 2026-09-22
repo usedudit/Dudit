@@ -502,7 +502,7 @@ const PaymentModal = ({
             .then((data) => {
                 if (data && data.pixData && depositChargeAmount > 0.009) {
                     setDepositMpPixData({ qrCode: data.pixData.qrCode, qrCodeBase64: data.pixData.qrCodeBase64 });
-                    setDepositMpPaymentId(data.mpPaymentId || null);
+                    setDepositMpPaymentId(data.paymentId || data.mpPaymentId || null);
                     setExistingSinalLoaded(true);
                 }
             })
@@ -1201,14 +1201,29 @@ const PaymentModal = ({
             const paymentMethod = responseData.paymentMethod;
 
             if (status === "approved") {
-                // Payment approved - register the sale via onConfirm
+                // Payment approved - register the sale via onConfirm.
+                // Merge with existing legs (e.g. sinal already paid) so we don't drop them.
+                const mpLabel = responseData.paymentMethodDisplayName || "Mercado Pago";
+                const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
+                const mpLeg = {
+                    method: mpLabel,
+                    amount: chargeTarget,
+                    amountReceived: chargeTarget,
+                    paymentMethodId: null,
+                    installmentNumber: 1,
+                    provider: "Mercado Pago",
+                    interestAmount: 0,
+                    feeAmount: 0,
+                    fixedFeeAmount: 0,
+                    feeBearer: "merchant",
+                };
                 handleStartProcessing({
-                    paymentMethod: responseData.paymentMethodDisplayName || "Mercado Pago",
+                    paymentMethod: mpLabel,
                     paymentProvider: "Mercado Pago",
                     mpPaymentId: responseData.mpPaymentId,
                     paymentStatus: "paid",
-                    paidAmount: chargeTarget,
-                    paymentBreakdown: [{ method: responseData.paymentMethodDisplayName || "Mercado Pago", amount: chargeTarget, paymentMethodId: null, installmentNumber: 1 }],
+                    paidAmount: existingPaidAmount + chargeTarget,
+                    paymentBreakdown: [...existingLegs, mpLeg],
                     splitPayments: [],
                     isPendingDelivery,
                 });
@@ -1258,13 +1273,26 @@ const PaymentModal = ({
     };
 
     const handleMpConfirmPix = () => {
+        const existingLegs = existingPaymentBreakdown?.filter((e: any) => e?.method && (Number(e?.amount || 0) > 0.009 || Number(e?.amountReceived || 0) > 0.009)) || [];
+        const mpLeg = {
+            method: "Pix (Mercado Pago)",
+            amount: chargeTarget,
+            amountReceived: chargeTarget,
+            paymentMethodId: null,
+            installmentNumber: 1,
+            provider: "Mercado Pago",
+            interestAmount: 0,
+            feeAmount: 0,
+            fixedFeeAmount: 0,
+            feeBearer: "merchant",
+        };
         handleStartProcessing({
             paymentMethod: "Pix (Mercado Pago)",
             paymentProvider: "Mercado Pago",
             mpPaymentId: mpPaymentId,
             paymentStatus: "paid",
-            paidAmount: chargeTarget,
-            paymentBreakdown: [{ method: "Pix (Mercado Pago)", amount: chargeTarget, paymentMethodId: null, installmentNumber: 1 }],
+            paidAmount: existingPaidAmount + chargeTarget,
+            paymentBreakdown: [...existingLegs, mpLeg],
             splitPayments: [],
             isPendingDelivery,
         });
@@ -1390,10 +1418,17 @@ const PaymentModal = ({
             return;
         }
         const installmentNumber = Math.max(1, Number(installments || 1));
-        // In split mode, calculate discount/fee based on the leg's amount (calcBaseAmount), not the full total
+        // In split mode, calculate discount/fee based on the leg's amount (calcBaseAmount), not the full total.
+        // For single-leg partial payments, price only the amount being charged now — not the full remaining.
+        const singleLegPartialBase =
+            editingPaymentIndex === null &&
+            paymentBaseAmount > 0.009 &&
+            paymentBaseAmount < netChargeTarget - 0.009
+                ? paymentBaseAmount
+                : null;
         const base = editingPaymentIndex !== null
             ? Math.max(0, Number(calcBaseAmount || 0))
-            : netChargeTarget;
+            : (singleLegPartialBase ?? netChargeTarget);
 
         const currentMethod = selectedMethodId ? activeMethods.find((m: any) => m.id === selectedMethodId) : null;
         const feeBearer = (currentMethod?.fee_bearer || "merchant") as "merchant" | "customer";
@@ -2024,10 +2059,15 @@ const PaymentModal = ({
                 });
         } else {
             const isUnpaid = isUnpaidRegister || (netChargeTarget > 0 && paymentBaseAmount === 0);
-            const methodLegAmount = Number(paymentCalculation?.finalAmount ?? finalTotalWithMethodPricing ?? netChargeTarget);
+            const isPartialSingleLeg = !isUnpaid && paymentBaseAmount > 0.009 && paymentBaseAmount < netChargeTarget - 0.009;
+            const methodLegAmount = isPartialSingleLeg
+                ? paymentBaseAmount
+                : Number(paymentCalculation?.finalAmount ?? finalTotalWithMethodPricing ?? netChargeTarget);
             const actualReceived = isUnpaid ? 0 : (view === 'money'
                 ? (wantsChange ? Math.max(payWithAmount, paymentBaseAmount) : Math.max(paymentBaseAmount, paymentBaseAmount))
-                : Number(paymentCalculation?.amountReceived ?? paymentBaseAmount ?? 0));
+                : isPartialSingleLeg
+                    ? paymentBaseAmount
+                    : Number(paymentCalculation?.amountReceived ?? paymentBaseAmount ?? 0));
 
             const methodLeg = {
                 method: (() => {
@@ -2082,10 +2122,21 @@ const PaymentModal = ({
         const rawPaymentBreakdown = [...storeCreditLeg, ...selectedLegs];
         const newPaymentBreakdown = rawPaymentBreakdown;
 
-        const validExistingBreakdown = existingPaidAmount > 0.009 ? (existingPaymentBreakdown || []) : [];
+        // Keep existing legs even when nothing was received yet (e.g. pending sinal)
+        // so "Valores por meio" can show sinal + new payment side by side.
+        const validExistingBreakdown = (existingPaymentBreakdown || [])
+            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || Number(entry?.amountReceived || 0) > 0.009));
 
+        const newMethodKeys = new Set(newPaymentBreakdown.map((entry: any) => String(entry?.method || "").toLowerCase().trim()));
         const mergedPaymentBreakdown = [...validExistingBreakdown, ...newPaymentBreakdown]
-            .filter((entry: any) => entry?.method && (Number(entry?.amount || 0) > 0.009 || isUnpaidRegister || entry?.paymentMethodId));
+            .filter((entry: any, index: number, arr: any[]) => {
+                if (!entry?.method) return false;
+                if (Number(entry?.amount || 0) <= 0.009 && !isUnpaidRegister && !entry?.paymentMethodId) return false;
+                const key = `${String(entry.method).toLowerCase().trim()}::${Number(entry.amountReceived || 0).toFixed(2)}`;
+                return arr.findIndex((e: any) => `${String(e?.method || "").toLowerCase().trim()}::${Number(e?.amountReceived || 0).toFixed(2)}` === key) === index
+                    || !newMethodKeys.has(String(entry.method).toLowerCase().trim())
+                    || index >= validExistingBreakdown.length;
+            });
 
         const paymentMethod = Array.from(new Set(mergedPaymentBreakdown.map((entry: any) => formatPaymentMethodToFullLabel(entry.method)))).join(', ') || 'Método não definido';
 
@@ -2600,8 +2651,18 @@ const PaymentModal = ({
                                             ) : (
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
-                                                        <div
-                                                            className="flex items-center gap-3 p-4 rounded-xl border border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:bg-gray-50 dark:hover:bg-dark-border/20 cursor-pointer transition-colors"
+                                                        <ListItem
+                                                            left={
+                                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                                    <img
+                                                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
+                                                                        alt="Mercado Pago"
+                                                                        className="w-5 h-5 object-contain"
+                                                                    />
+                                                                </div>
+                                                            }
+                                                            title={`Sinal - ${formatCurrency(depositChargeAmount)}`}
+                                                            description={depositMpPixData ? "Pix Mercado Pago" : `Gerar cobrança de sinal${effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""}`}
                                                             onClick={() => {
                                                                 if (depositMpPixData) {
                                                                     setShowDepositPixModal(true);
@@ -2609,39 +2670,24 @@ const PaymentModal = ({
                                                                     handleGenerateDepositCharge();
                                                                 }
                                                             }}
-                                                        >
-                                                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                                <img
-                                                                    src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                                    alt="Mercado Pago"
-                                                                    className="w-5 h-5 object-contain"
-                                                                />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <span className="font-bold text-sm text-brand-dark dark:text-dark-heading block">
-                                                                    Sinal{orderId ? ` - ${orderId.slice(0, 13)}` : ""}
-                                                                </span>
-                                                                <span className="text-xs text-brand-inactive-text dark:text-dark-body block truncate">
-                                                                    {depositMpPixData ? "Pix Mercado Pago" : `Gerar cobrança de sinal${effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""} - ${formatCurrency(depositChargeAmount)}`}
-                                                                </span>
-                                                            </div>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (depositMpPixData) {
-                                                                        handleVerifyDepositPayment();
-                                                                    } else {
-                                                                        handleGenerateDepositCharge();
-                                                                    }
-                                                                }}
-                                                                isLoading={generatingDepositPix || isCheckingDepositStatus}
-                                                                className="h-8"
-                                                            >
-                                                                {depositMpPixData ? "Verificar" : (generatingDepositPix ? "Gerando..." : "Gerar Pix")}
-                                                            </Button>
-                                                        </div>
+                                                            right={
+                                                                <Button
+                                                                    variant="link"
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (depositMpPixData) {
+                                                                            handleVerifyDepositPayment();
+                                                                        } else {
+                                                                            handleGenerateDepositCharge();
+                                                                        }
+                                                                    }}
+                                                                    isLoading={generatingDepositPix || isCheckingDepositStatus}
+                                                                >
+                                                                    {depositMpPixData ? "Verificar" : (generatingDepositPix ? "Gerando..." : "Gerar Pix")}
+                                                                </Button>
+                                                            }
+                                                        />
                                                     )}
                                                     {customerCredit > 0.009 && (
                                                         <div className="p-4 rounded-2xl border border-brand-green transition-all">
@@ -3875,7 +3921,7 @@ const PaymentModal = ({
                     qrCode={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
                     payload={depositMpPixData.qrCode}
                     amount={depositChargeAmount}
-                    subtitle={orderId ? `Sinal - ${orderId.slice(0, 13)}` : "Sinal / Entrada"}
+                     subtitle="Sinal / Entrada"
                     onVerifyPayment={handleVerifyDepositPayment}
                     isVerifying={isCheckingDepositStatus}
                     onSendWhatsApp={customer?.phone ? handleSendDepositWhatsApp : undefined}
