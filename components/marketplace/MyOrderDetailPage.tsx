@@ -835,27 +835,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
     const depositSummary = isDepositOrder ? getOrderDepositSummary(order) : null;
 
-    // Payment breakdown entries (one per payment leg), excluding checkoutPricing metadata
-    // Payment breakdown entries (one per payment leg), excluding checkoutPricing metadata
-    // Filter out sinal entries when expired or fully paid - those should not be shown.
-    const paymentMethodEntries = useMemo(() => {
-        const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : [];
-        const filtered = breakdown.filter((e: any) => e?.method && !e?.checkoutPricing);
-        if (!shouldShowSinal(depositSummary)) {
-            return filtered.filter((e: any) => !(isDepositOrder && Number(e?.amountReceived ?? e?.amount ?? 0) === depositSummary?.initialChargeAmount));
-        }
-        return filtered;
-    }, [order?.payment_breakdown, depositSummary]);
-
     // Effective payment fees: prefer breakdown explicit fields over stale column
-    const hasDetailedBreakdownFees = paymentMethodEntries.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
-    const effectiveInterestTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0), [paymentMethodEntries]);
-    const effectiveFeeTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0), [paymentMethodEntries]);
-    const effectiveFixedFeeTotal = useMemo(() => paymentMethodEntries.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0), [paymentMethodEntries]);
-
-    const paymentMethodInterestVal = hasDetailedBreakdownFees ? effectiveInterestTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
-    const paymentMethodFeeVal = hasDetailedBreakdownFees ? effectiveFeeTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodFee || 0));
-    const paymentMethodFixedFeeVal = hasDetailedBreakdownFees ? effectiveFixedFeeTotal : Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
+    const breakdownEntries = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown.filter((e: any) => e?.method && !e?.checkoutPricing) : [];
+    const hasDetailedBreakdownFees = breakdownEntries.some((e: any) => e.interestAmount !== undefined || e.feeAmount !== undefined || e.fixedFeeAmount !== undefined);
+    const paymentMethodInterestVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.interestAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodInterest || 0));
+    const paymentMethodFeeVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.feeAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodFee || 0));
+    const paymentMethodFixedFeeVal = hasDetailedBreakdownFees ? breakdownEntries.reduce((sum: number, e: any) => sum + Number(e.fixedFeeAmount || 0), 0) : Math.max(0, Number(pricingSnapshot?.paymentMethodFixedFee || 0));
 
     const cashEntry = Array.isArray(order.payment_breakdown)
         ? order.payment_breakdown.find((entry: any) => {
@@ -1724,84 +1709,28 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     {/* Section 3: Pagamento */}
                                     <FormSection title="Pagamento">
                                         <div className="space-y-3">
-                                            {paymentMethodEntries.map((entry: any, index: number) => {
-                                                const method = String(entry?.method || "").toLowerCase().trim();
-                                                const received = Number(entry?.amountReceived ?? entry?.amount ?? 0);
-                                                const amount = Number(entry?.amount || 0);
-                                                const displayAmount = received > 0.009 ? received : amount;
-                                                const isPix = method === "pix" || method === "bank_transfer";
-                                                const isCreditCard = method.includes("credit") || method.includes("crédito");
-                                                const isDebitCard = method.includes("debit") || method.includes("débito");
-                                                const isCash = method === "cash" || method === "dinheiro";
-                                                const isStoreCredit = method === "store_credit" || method === "vale-compra" || method === "vale_compra";
-                                                const isBoleto = method.includes("boleto") || method.includes("bolbradesco") || method === "ticket";
-                                                const isMercadoPago = String(entry?.provider || "").toLowerCase().includes("mercado pago") || method.includes("mercado pago");
-
-                                                const getMethodLabel = () => {
-                                                    if (isPix) return "Pix";
-                                                    if (isCreditCard) return "Cartão de Crédito";
-                                                    if (isDebitCard) return "Cartão de Débito";
-                                                    if (isCash) return "Dinheiro";
-                                                    if (isStoreCredit) return "Vale-compra";
-                                                    if (isBoleto) return "Boleto";
-                                                    return entry?.method || "Pagamento";
-                                                };
-
-                                                const getMethodIcon = () => {
-                                                    if (isStoreCredit) {
-                                                        return <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />;
+                                            {shouldShowSinal(depositSummary) && (
+                                                <ListItem
+                                                    icon={PaymentIconEl}
+                                                    title={
+                                                        <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
+                                                            {`Sinal - ${formatCurrency(depositSummary!.initialChargeAmount || 0)}`}
+                                                        </span>
                                                     }
-                                                    if (isPix) {
-                                                        return <img key="pix" src="https://img.dudit.com.br/static/icons/payments/Pix.png" alt="Pix" className="w-5 h-5 object-contain shrink-0" />;
+                                                    description={
+                                                        <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
+                                                            {depositSummary!.depositStatus === "partially_paid" ? "pago" : "pendente"}
+                                                        </span>
                                                     }
-                                                    if (isCreditCard || isDebitCard) {
-                                                        return <img key="card" src="https://img.dudit.com.br/static/icons/payments/CreditCard.png" alt="Cartão" className="w-5 h-5 object-contain shrink-0" />;
+                                                    className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
+                                                    right={
+                                                        <span className="font-bold text-brand-dark dark:text-dark-heading">
+                                                            {formatCurrency(depositSummary!.initialChargeAmount || 0)}
+                                                        </span>
                                                     }
-                                                    if (isCash) {
-                                                        return <MoneyIcon key="money" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />;
-                                                    }
-                                                    if (isBoleto) {
-                                                        return <img key="boleto" src="https://img.dudit.com.br/static/icons/payments/Boleto.png" alt="Boleto" className="w-5 h-5 object-contain shrink-0" />;
-                                                    }
-                                                    if (isMercadoPago) {
-                                                        return <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />;
-                                                    }
-                                                    return <CreditCardIcon key="default" size={20} className="text-brand-dark dark:text-dark-heading shrink-0" />;
-                                                };
-
-                                                const entryLabel = isDepositOrder && shouldShowSinal(depositSummary) && displayAmount === depositSummary?.initialChargeAmount
-                                                    ? `Sinal - ${formatCurrency(displayAmount)}`
-                                                    : getMethodLabel();
-
-                                                const entryDesc = isDepositOrder && shouldShowSinal(depositSummary) && displayAmount === depositSummary?.initialChargeAmount
-                                                    ? "pendente"
-                                                    : (isMercadoPago ? "Mercado Pago" : isExchangeOrder ? "Pix" : (order.payment_provider === "Mercado Pago" ? "Mercado Pago" : "Pagamento direto"));
-
-                                                return (
-                                                    <ListItem
-                                                        key={`${entry.method}-${index}`}
-                                                        left={getMethodIcon()}
-                                                        title={
-                                                            <span className="text-sm lg:text-md font-bold text-brand-dark dark:text-dark-heading">
-                                                                {entryLabel}
-                                                            </span>
-                                                        }
-                                                        description={
-                                                            <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body font-normal">
-                                                                {entryDesc}
-                                                            </span>
-                                                        }
-                                                        className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
-                                                        right={
-                                                            <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                                {formatCurrency(displayAmount)}
-                                                            </span>
-                                                        }
-                                                    />
-                                                );
-                                            })}
-
-                                            {paymentMethodEntries.length === 0 && !isDepositOrder && !isExchangeOrder && (
+                                                />
+                                            )}
+                                            {!isDepositOrder && (
                                                 <ListItem
                                                     icon={PaymentIconEl}
                                                     title={
@@ -1817,7 +1746,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                     className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
                                                     right={
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
-                                                            {formatCurrency(totalAmount)}
+                                                            {formatCurrency(isExchangeOrder && exchangeShortfall > 0 ? exchangeShortfall : totalAmount)}
                                                         </span>
                                                     }
                                                 />

@@ -19,7 +19,8 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder, RadioButton } from '@/components/reusable';
+import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
 import { calculatePaymentMethodAmountsAction, previewSplitPaymentBreakdownAction } from '@/app/actions/erp/payment-methods';
@@ -387,6 +388,7 @@ const PaymentModal = ({
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
     const [useStoreCredit, setUseStoreCredit] = useState(false);
     const [storeCreditToUse, setStoreCreditToUse] = useState<number>(0);
+    const [sinalAction, setSinalAction] = useState<"pay" | "cancel" | "cancel_order">("pay");
 
     useEffect(() => {
         if (!isOpen || !customer?.id || !partnerId) {
@@ -2161,7 +2163,7 @@ const PaymentModal = ({
         let finalPaymentProvider: string | undefined = undefined;
         let finalCheckoutFulfillment: Record<string, unknown> | null = null;
 
-        if (depositPaid && depositMpPaymentId && depositMeta) {
+        if (depositPaid && depositMpPaymentId && depositMeta && sinalAction !== "cancel" && sinalAction !== "cancel_order") {
             const depositLeg = {
                 method: "Pix (Mercado Pago)",
                 amount: depositChargeAmount,
@@ -2664,6 +2666,7 @@ const PaymentModal = ({
                                                             title={`Sinal - ${formatCurrency(depositChargeAmount)}`}
                                                             description={depositMpPixData ? "Pix Mercado Pago" : `Gerar cobrança de sinal${effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""}`}
                                                             onClick={() => {
+                                                                if (sinalAction !== "pay") return;
                                                                 if (depositMpPixData) {
                                                                     setShowDepositPixModal(true);
                                                                 } else {
@@ -2671,22 +2674,44 @@ const PaymentModal = ({
                                                                 }
                                                             }}
                                                             right={
-                                                                <Button
-                                                                    variant="link"
-                                                                    size="sm"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        if (depositMpPixData) {
-                                                                            handleVerifyDepositPayment();
-                                                                        } else {
-                                                                            handleGenerateDepositCharge();
-                                                                        }
-                                                                    }}
-                                                                    isLoading={generatingDepositPix || isCheckingDepositStatus}
-                                                                >
-                                                                    {depositMpPixData ? "Verificar" : (generatingDepositPix ? "Gerando..." : "Gerar Pix")}
-                                                                </Button>
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <RadioButton
+                                                                        name="sinal-action"
+                                                                        value="pay"
+                                                                        label="Pagar sinal"
+                                                                        checked={sinalAction === "pay"}
+                                                                        onChange={() => setSinalAction("pay")}
+                                                                    />
+                                                                    <RadioButton
+                                                                        name="sinal-action"
+                                                                        value="cancel"
+                                                                        label="Cancelar sinal"
+                                                                        checked={sinalAction === "cancel"}
+                                                                        onChange={() => setSinalAction("cancel")}
+                                                                    />
+                                                                    <RadioButton
+                                                                        name="sinal-action"
+                                                                        value="cancel_order"
+                                                                        label="Cancelar sinal e o pedido"
+                                                                        checked={sinalAction === "cancel_order"}
+                                                                        onChange={() => setSinalAction("cancel_order")}
+                                                                    />
+                                                                </div>
                                                             }
+                                                        />
+                                                    )}
+
+                                                    {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && sinalAction === "cancel" && (
+                                                        <InfoCard
+                                                            color="orange"
+                                                            message="O sinal será cancelado. O pagamento será realizado normalmente sem o valor do sinal."
+                                                        />
+                                                    )}
+
+                                                    {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && sinalAction === "cancel_order" && (
+                                                        <InfoCard
+                                                            color="orange"
+                                                            message="O sinal e o pedido serão cancelados. Clique em Confirmar para prosseguir."
                                                         />
                                                     )}
                                                     {customerCredit > 0.009 && (

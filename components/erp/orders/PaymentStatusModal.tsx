@@ -31,7 +31,6 @@ import {
     isOrderFinanciallyFrozen,
     resolveSituationFromPaid,
     DEPOSIT_STATUS_LABELS,
-    DEPOSIT_ICON_COLORS,
     shouldShowSinal,
 } from '@/lib/payments/order-financial-state';
 import { DepositReceiptsSection } from '@/components/erp/payments/shared/DepositReceiptsSection';
@@ -130,7 +129,7 @@ const TransactionReceiptContent = ({
                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                             {formatCurrency(depositSummary.initialChargeAmount)}
                             <span className="text-xs font-normal text-brand-inactive-text ml-1">
-                                ({DEPOSIT_STATUS_LABELS[depositSummary.depositStatus] || depositSummary.depositStatus})
+                                ({depositSummary.depositStatus === "partially_paid" ? "pago" : "pendente"})
                             </span>
                         </span>
                     </div>

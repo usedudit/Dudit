@@ -49,7 +49,7 @@ import DefaultModal from "@/components/reusable/DefaultModal"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import { getOrderFinancialBreakdownAction } from "@/app/actions/erp/order-financial-breakdown"
 import type { FinancialBreakdownData } from "@/app/actions/erp/order-financial-breakdown"
-import { hasReceivedMpPayment, getOrderDepositSummary, DEPOSIT_STATUS_LABELS, DEPOSIT_ICON_COLORS, shouldShowSinal, getSinalBadgeText } from '@/lib/payments/order-financial-state'
+import { hasReceivedMpPayment, getOrderDepositSummary, DEPOSIT_STATUS_LABELS, shouldShowSinal, canPaySinal } from '@/lib/payments/order-financial-state'
 import { cleanOrderNotes, normalizeOrderSource } from "@/lib/orders/order-utils"
 
 const MERCADO_PAGO_ICON = "https://img.dudit.com.br/static/icons/payments/MercadoPago.png";
@@ -1167,24 +1167,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 label="Método de Pagamento"
                                                                 value={renderPaymentMethodValue()} />
 
-                                                            {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (() => {
-                                                                const badge = getSinalBadgeText(depositSummary);
-                                                                return (
-                                                                    <PaymentRow
-                                                                        label="Sinal"
-                                                                        value={
-                                                                            <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                                                                {formatCurrency(depositSummary.depositAmount)}
-                                                                                {badge && (
-                                                                                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${badge.colorClass}`}>
-                                                                                        {badge.text}
-                                                                                    </span>
-                                                                                )}
+                                                            {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (
+                                                                <PaymentRow
+                                                                    label="Sinal"
+                                                                    value={
+                                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                            {formatCurrency(depositSummary.depositAmount)}
+                                                                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.depositStatus === "partially_paid" ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}>
+                                                                                {depositSummary.depositStatus === "partially_paid" ? "pago" : "pendente"}
                                                                             </span>
-                                                                        }
-                                                                    />
-                                                                );
-                                                            })()}
+                                                                        </span>
+                                                                    }
+                                                                />
+                                                            )}
 
                                                             {isMercadoPago && (
                                                                 <>
@@ -1739,24 +1734,19 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                             label="Método de Pagamento"
                                                             value={renderPaymentMethodValue()} />
 
-                                                        {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (() => {
-                                                            const badge = getSinalBadgeText(depositSummary);
-                                                            return (
-                                                                <PaymentRow
-                                                                    label="Sinal"
-                                                                    value={
-                                                                        <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
-                                                                            {formatCurrency(depositSummary.depositAmount)}
-                                                                            {badge && (
-                                                                                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${badge.colorClass}`}>
-                                                                                    {badge.text}
-                                                                                </span>
-                                                                            )}
+                                                        {shouldShowSinal(depositSummary) && depositSummary.depositAmount > 0.009 && (
+                                                            <PaymentRow
+                                                                label="Sinal"
+                                                                value={
+                                                                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm flex items-center gap-1.5">
+                                                                        {formatCurrency(depositSummary.depositAmount)}
+                                                                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${depositSummary.depositStatus === "partially_paid" ? "bg-brand-green/10 text-brand-green" : "bg-brand-orange/10 text-brand-orange"}`}>
+                                                                            {depositSummary.depositStatus === "partially_paid" ? "pago" : "pendente"}
                                                                         </span>
-                                                                    }
-                                                                />
-                                                            );
-                                                        })()}
+                                                                    </span>
+                                                                }
+                                                            />
+                                                        )}
 
                                                         {isMercadoPago && (
                                                             <>

@@ -82,29 +82,17 @@ export const DEPOSIT_STATUS_LABELS: Record<string, string> = {
     expired: "Sinal expirado",
 };
 
-export const DEPOSIT_ICON_COLORS: Record<string, string> = {
-    pending: "bg-brand-orange/10 text-brand-orange",
-    partially_paid: "bg-brand-green/10 text-brand-green",
-    paid: "bg-brand-green/10 text-brand-green",
-    not_required: "bg-brand-gray/10 text-brand-gray",
-    expired: "bg-brand-red/10 text-brand-red",
-};
-
-
-export function shouldShowSinal(depositSummary: OrderDepositSummary | null): boolean {
+/** Returns true when the sinal is still actionable (can generate/pay it). */
+export function canPaySinal(depositSummary: OrderDepositSummary | null): boolean {
     if (!depositSummary?.usesDeposit) return false;
-    const status = depositSummary.depositStatus;
-    return status === "pending";
+    return depositSummary.depositStatus === "pending";
 }
 
-export function getSinalBadgeText(depositSummary: OrderDepositSummary | null): { text: string; colorClass: string } | null {
-    if (!depositSummary?.usesDeposit || depositSummary.depositAmount <= 0.009) return null;
+/** Returns true when the sinal row should be displayed (pending or paid). */
+export function shouldShowSinal(depositSummary: OrderDepositSummary | null): boolean {
+    if (!depositSummary?.usesDeposit || depositSummary.depositAmount <= 0.009) return false;
     const status = depositSummary.depositStatus;
-    if (status === "expired") return { text: "Sinal expirado", colorClass: DEPOSIT_ICON_COLORS["expired"] };
-    if (status === "paid") return { text: "Sinal quitado", colorClass: DEPOSIT_ICON_COLORS["paid"] };
-    if (status === "partially_paid") return { text: DEPOSIT_STATUS_LABELS["partially_paid"], colorClass: DEPOSIT_ICON_COLORS["partially_paid"] };
-    if (status === "pending") return { text: "pendente", colorClass: DEPOSIT_ICON_COLORS["pending"] };
-    return null;
+    return status === "pending" || status === "partially_paid";
 }
 
 export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepositSummary {
