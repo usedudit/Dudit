@@ -218,6 +218,10 @@ export default withSentryConfig(withSerwist(nextConfig), {
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
 
+  // Skip source map upload in CI (Railway build) to avoid 5-10min of upload time.
+  // Sentry error tracking still works at runtime via SENTRY_DSN.
+  authToken: process.env.CI ? undefined : process.env.SENTRY_AUTH_TOKEN,
+
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
