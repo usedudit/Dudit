@@ -15,7 +15,7 @@ describe("GET /api/mercadopago/zip-code", () => {
     expect(json.error).toBe("CEP inválido")
   })
 
-  it("returns 200 with Mercado Libre address schema when internal /api/cep succeeds", async () => {
+  it("returns 200 with Mercado Libre address schema when Edge Function cep-lookup succeeds", async () => {
     const mockCepResponse = {
       cep: "01005-900",
       logradouro: "Praça da Sé",
@@ -29,7 +29,7 @@ describe("GET /api/mercadopago/zip-code", () => {
 
     vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
       const urlStr = String(url)
-      if (urlStr.includes("/api/cep")) {
+      if (urlStr.includes("/functions/v1/cep-lookup") || urlStr.includes("/api/cep")) {
         return new Response(JSON.stringify(mockCepResponse), {
           status: 200,
           headers: { "Content-Type": "application/json" },

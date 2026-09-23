@@ -39,9 +39,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 2. Fallback to Dudit internal /api/cep endpoint
+  // 2. Fallback to Dudit Edge Function cep-lookup (or local /api/cep in dev/tests)
   try {
-    const cepUrl = new URL(`/api/cep?cep=${cleanCep}`, request.url)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+    let cepUrl: URL
+    if (supabaseUrl) {
+      cepUrl = new URL(`${supabaseUrl}/functions/v1/cep-lookup?cep=${cleanCep}`)
+    } else {
+      // Fallback to local API route (backward compatibility / local dev)
+      cepUrl = new URL(`/api/cep?cep=${cleanCep}`, request.url)
+    }
+
     const localRes = await fetch(cepUrl, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(4000),

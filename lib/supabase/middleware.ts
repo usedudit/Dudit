@@ -41,6 +41,7 @@ type SecureRuntimeStatus = {
 // Rotas da API que possuem seu próprio rate limit interno ou são probes de saúde e devem ser isentas do rate limit global no middleware
 const RATE_LIMIT_EXEMPT_PATHS = [
   "/api/health",
+  "/api/internal/jobs/process-pending-webhooks",
   "/api/assets/qr-dino",
   "/api/upload-image",
   "/api/r2/video-upload",

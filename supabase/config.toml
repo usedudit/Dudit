@@ -1,0 +1,16 @@
+# Supabase project configuration
+# https://supabase.com/docs/reference/api/configuration
+
+project_ref = "qxuqjkpzargimmbyodnx"
+
+[functions.health-check]
+verify_jwt = false
+
+[functions.cep-lookup]
+verify_jwt = false
+
+[functions.cnpj-lookup]
+verify_jwt = false
+
+[functions.mercadopago-webhook]
+verify_jwt = false
