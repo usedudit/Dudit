@@ -2,6 +2,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 import withSerwistInit from "@serwist/next"
 
 import { spawnSync } from "node:child_process"
+import path from "node:path"
 
 const gitHash = spawnSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf-8",
@@ -76,13 +77,22 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
-  // Não persistir o cache de compilação do webpack em produção. O cache
-  // filesystem padrão acumula packs de cada compilação e, nesta aplicação
-  // com muitos entrypoints, já passou de 10 GB entre server/client.
-  // O custo é um build um pouco mais lento; o ganho é não consumir disco
-  // indefinidamente nem carregar vários GB na memória durante o build.
-  webpack(config, { dev }) {
-    if (!dev) config.cache = false
+  // Reativa o cache do webpack em produção. O cache filesystem nativo
+  // da versão anterior acumulava mais de 10 GB entre server/client.
+  // Aqui configuramos com limite de tamanho (500MB) e versão baseada em
+  // hash de conteúdo para invalidação automática quando o código muda.
+  webpack(config, { dev, webpack }) {
+    if (!dev) {
+      config.cache = {
+        type: "filesystem",
+        cacheDirectory: path.resolve(__dirname, ".next/cache/webpack"),
+        buildDependencies: {
+          config: [__filename],
+        },
+        maxMemory: 500,
+        maxMilliseconds: 1000 * 60 * 60 * 24 * 7, // 7 dias
+      }
+    }
     return config
   },
   experimental: {
