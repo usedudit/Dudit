@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { DefaultModal, Badge, InfoCard, Button } from "@/components/reusable"
+import { DefaultModal, Badge, Button, ThreeDotsLoader } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
-import { PrinterIcon, XIcon, RotateCcw } from "lucide-react"
-import type { PurchaseWithRelations, BillingPayment, BillingInvoice } from "@/lib/billing/types"
+import { XIcon, PrinterIcon } from "@/lib/icons"
+import { RotateCcw } from "lucide-react"
+import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
+import type { PurchaseWithRelations, BillingInvoice } from "@/lib/billing/types"
 import { BillingRefundModal } from "./BillingRefundModal"
 
 interface BillingDetailSheetProps {
@@ -14,6 +15,10 @@ interface BillingDetailSheetProps {
     purchase: PurchaseWithRelations | null
     onInvoice?: (invoice: BillingInvoice) => void
     onCancel?: (purchase: PurchaseWithRelations) => void
+    onGenerateInvoice?: () => void
+    generateLoading?: boolean
+    onRefundSuccess?: (token: string) => void
+    isHydrating?: boolean
 }
 
 const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "purple" | "gray"> = {
@@ -77,13 +82,15 @@ function getTypeLabel(type: string): string {
     return labels[type] || type
 }
 
-export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCancel }: BillingDetailSheetProps) {
+export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCancel, onGenerateInvoice, generateLoading, onRefundSuccess, isHydrating }: BillingDetailSheetProps) {
     const [refundModalOpen, setRefundModalOpen] = useState(false)
 
     if (!purchase) return null
 
     const payments = purchase.payments || []
     const invoice = purchase.invoice
+
+    const paymentMethodFor = (payment: any) => resolvePaymentMethodDetails(payment, purchase)
 
     return (
         <>
@@ -123,15 +130,24 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                         <div>
                             <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Pagamentos</h4>
                             <div className="space-y-2">
-                                {payments.map((payment) => (
+                                 {payments.map((payment) => {
+                                    const pm = paymentMethodFor(payment)
+                                    return (
                                     <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-brand-gray dark:bg-dark-border/50">
-                                        <div className="flex items-center gap-3">
-                                            <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"}>
-                                                {getStatusLabel(payment.status)}
-                                            </Badge>
-                                            <span className="text-xs text-brand-inactive-text">
-                                                {getPaymentMethodLabel(payment.payment_method_type)}
-                                            </span>
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-3">
+                                                <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"}>
+                                                    {getStatusLabel(payment.status)}
+                                                </Badge>
+                                                <span className="text-xs text-brand-inactive-text">
+                                                    {pm.name}
+                                                </span>
+                                            </div>
+                                            {pm.detailsText && (
+                                                <span className="text-[10px] text-brand-inactive-text">
+                                                    {pm.detailsText}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="text-right">
                                             <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(payment.amount)}</span>
@@ -139,9 +155,19 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                                                 <p className="text-[11px] text-brand-inactive-text">{formatDate(payment.paid_at)}</p>
                                             )}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                        </div>
+                                    )
+                                }
+                            )
+                        }
+                        </div>
+                    </div>
+                )}
+
+                    {(isHydrating && !invoice && payments.length === 0) && (
+                        <div className="flex items-center justify-center gap-2 py-6 text-brand-inactive-text">
+                            <ThreeDotsLoader className="p-0 h-4" />
+                            Carregando detalhes…
                         </div>
                     )}
 
@@ -162,42 +188,53 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                         </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-4 border-t border-brand-border dark:border-dark-border">
-                        <Button variant="ghost" leftIcon={<XIcon />} onClick={onClose}>
-                            Fechar
+                    {!invoice && purchase.status === "completed" && onGenerateInvoice && (
+                        <Button
+                            variant="default"
+                            leftIcon={<PrinterIcon />}
+                            onClick={onGenerateInvoice}
+                            isLoading={generateLoading}
+                            disabled={isHydrating}
+                        >
+                            Gerar Fatura
                         </Button>
-                        <div className="flex items-center gap-2">
-                            {purchase.status === "completed" && (
-                                <Button
-                                    variant="outline"
-                                    leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
-                                    onClick={() => setRefundModalOpen(true)}
-                                >
-                                    Solicitar Reembolso
-                                </Button>
-                            )}
-                            {purchase.status === "pending" && onCancel && (
-                                <Button
-                                    variant="destructive"
-                                    leftIcon={<XIcon />}
-                                    onClick={() => onCancel(purchase)}
-                                >
-                                    Cancelar compra
-                                </Button>
-                            )}
+                    )}
+
+                        <div className="flex items-center justify-between pt-4 border-t border-brand-border dark:border-dark-border">
+                            <Button variant="ghost" leftIcon={<XIcon />} onClick={onClose}>
+                                Fechar
+                            </Button>
+                            <div className="flex items-center gap-2">
+                                {purchase.status === "completed" && Number(purchase.total_amount || purchase.amount || 0) > 0 && (
+                                    <Button
+                                        variant="outline"
+                                        leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
+                                        onClick={() => setRefundModalOpen(true)}
+                                    >
+                                        Solicitar Reembolso
+                                    </Button>
+                                )}
+                                {purchase.status === "pending" && onCancel && (
+                                    <Button
+                                        variant="destructive"
+                                        leftIcon={<XIcon />}
+                                        onClick={() => onCancel(purchase)}
+                                    >
+                                        Cancelar compra
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
             </DefaultModal>
 
-            {refundModalOpen && (
-                <BillingRefundModal
-                    isOpen={refundModalOpen}
-                    onClose={() => setRefundModalOpen(false)}
-                    purchase={purchase}
-                    partnerId={purchase.partner_id}
-                />
-            )}
+            <BillingRefundModal
+                isOpen={refundModalOpen}
+                onClose={() => setRefundModalOpen(false)}
+                purchase={purchase}
+                partnerId={purchase.partner_id}
+                onSuccess={onRefundSuccess}
+            />
         </>
     )
 }

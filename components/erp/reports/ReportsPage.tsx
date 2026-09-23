@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem, FormDropdown } from "@/components/reusable"
+import { Tabs, TabsList, TabsTrigger, TabsContent, Button, ListItem, FormDropdown, Badge } from "@/components/reusable"
 import { SummaryCards } from "@/components/erp/dashboard/LeftColumn"
 import { InsightsRegister } from "@/components/erp/dashboard/InsightsRegister"
 import { useDashboard } from "@/components/erp/dashboard/DashboardContext"
@@ -25,7 +25,7 @@ import {
     AlertCircleIcon, HistoryIcon, ShoppingCartIcon,
     CheckCircleIcon, StarIcon, RepeatIcon,
 } from "@/lib/icons"
-import { ReportTableCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
+import { ReportTableCard, ReportListCard, ReportRankingCard, FinancialCalendarCard } from "./widgets"
 import type { ProductsDashboardData, ServicesDashboardData, FinancialDashboardData } from "@/lib/data/dashboard"
 import type {
     SalesReportData, CustomerReportData, ReturnsReportData,
@@ -34,6 +34,8 @@ import type {
     AppointmentsReportData,
 } from "@/lib/data/reports"
 import type { Period } from "@/lib/period-types"
+import { SERVICE_ORDER_STATUS_META, type ServiceOrderStatus } from "@/lib/types/service-order"
+import { getDeliveryStatusMeta, getDeliveryStatusIcon } from "@/lib/orders/status"
 import {
     generateSalesInsights, generateProductsInsights, generateServicesInsights,
     generateFinancialInsights, generateCustomerInsights, generateMarketingInsights,
@@ -969,26 +971,60 @@ function DeliveriesSection({ deliveryData }: { deliveryData: DeliveryReportData 
             {/* Row 3: Últimas Entregas (8) + Ranking de Entregadores (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <ReportTableCard
+                    <ReportListCard
                         title="Últimas Entregas"
+                        icon={TruckIcon}
                         columns={[
-                            {
-                                key: "id", header: "Entrega", render: (v: string) => (
-                                    <div className="flex items-center gap-2">
-                                        <TruckIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                        <span className="font-bold">{v}</span>
-                                    </div>
-                                )
-                            },
-                            { key: "status", header: "Status" },
-                            { key: "deliveryPerson", header: "Entregador" },
-                            { key: "date", header: "Data" },
-                            { key: "duration", header: "Duração" },
+                            { id: "delivery", label: "Entrega", width: "220px" },
+                            { id: "deliveryPerson", label: "Entregador", width: "180px" },
+                            { id: "duration", label: "Duração", width: "110px" },
+                            { id: "status", label: "Status", align: "center", width: "160px" },
+                            { id: "actions", label: "Ações", align: "center", width: "80px" },
                         ]}
                         data={deliveryData.recentDeliveries}
                         onRowClick={(row) => router.push(`/erp/entregas?view=${row.id}`)}
-                        icon={TruckIcon}
-                        pageSize={4}
+                        renderCell={(colId, row) => {
+                            switch (colId) {
+                                case "delivery":
+                                    return (
+                                        <div className="flex items-center gap-3 text-left">
+                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                <TruckIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </div>
+                                            <div className="flex flex-col text-left min-w-0">
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[140px]">
+                                                    {row.id}
+                                                </span>
+                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                    {row.date}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )
+                                case "deliveryPerson":
+                                    return (
+                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body truncate max-w-[180px] block">
+                                            {row.deliveryPerson || "-"}
+                                        </span>
+                                    )
+                                case "duration":
+                                    return (
+                                        <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                            {row.duration || "-"}
+                                        </span>
+                                    )
+                                case "status": {
+                                    const meta = getDeliveryStatusMeta(row.statusKey)
+                                    return (
+                                        <Badge variant={meta.variant} icon={getDeliveryStatusIcon(row.statusKey)}>
+                                            {meta.label}
+                                        </Badge>
+                                    )
+                                }
+                                default:
+                                    return row[colId] ?? "-"
+                            }
+                        }}
                         className="h-full"
                     />
                 </div>
@@ -1130,26 +1166,60 @@ function ServiceOrdersSection({ serviceOrdersData }: { serviceOrdersData: Servic
             {/* Row 3: Últimas OS (8) + Ranking Responsável (4) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
                 <div className="lg:col-span-8">
-                    <ReportTableCard
+                    <ReportListCard
                         title="Últimas Ordens de Serviço"
+                        icon={FileTextIcon}
                         columns={[
-                            {
-                                key: "orderNumber", header: "Número", render: (v: string) => (
-                                    <div className="flex items-center gap-2">
-                                        <WrenchIcon size={16} className="text-brand-inactive-text dark:text-dark-body shrink-0" />
-                                        <span className="font-bold">{v}</span>
-                                    </div>
-                                )
-                            },
-                            { key: "title", header: "Título" },
-                            { key: "status", header: "Status" },
-                            { key: "total", header: "Total" },
-                            { key: "date", header: "Data" },
+                            { id: "order", label: "N° OS", width: "180px" },
+                            { id: "title", label: "Título", width: "250px" },
+                            { id: "total", label: "Total", width: "120px" },
+                            { id: "status", label: "Status", align: "center", width: "160px" },
+                            { id: "actions", label: "Ações", align: "center", width: "80px" },
                         ]}
                         data={serviceOrdersData.recentOrders}
                         onRowClick={(row) => router.push(`/erp/ordens-de-servico?view=${row.id}`)}
-                        icon={FileTextIcon}
-                        pageSize={4}
+                        renderCell={(colId, row) => {
+                            switch (colId) {
+                                case "order":
+                                    return (
+                                        <div className="flex items-center gap-3 text-left">
+                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                <WrenchIcon className="w-5 h-5 text-brand-inactive-text dark:text-dark-body" />
+                                            </div>
+                                            <div className="flex flex-col text-left min-w-0">
+                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate max-w-[120px]">
+                                                    {row.orderNumber}
+                                                </span>
+                                                <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">
+                                                    {row.date}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )
+                                case "title":
+                                    return (
+                                        <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate max-w-[220px] block">
+                                            {row.title}
+                                        </span>
+                                    )
+                                case "total":
+                                    return (
+                                        <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">
+                                            {row.total}
+                                        </span>
+                                    )
+                                case "status": {
+                                    const meta = SERVICE_ORDER_STATUS_META[row.statusKey as ServiceOrderStatus]
+                                    return (
+                                        <Badge variant={meta?.variant || "gray"}>
+                                            {meta?.label || row.status}
+                                        </Badge>
+                                    )
+                                }
+                                default:
+                                    return row[colId] ?? "-"
+                            }
+                        }}
                         className="h-full"
                     />
                 </div>

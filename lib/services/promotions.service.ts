@@ -22,7 +22,7 @@ export type PromotionRow = {
   store_id: string | null
   name: string
   description: string | null
-  promotion_type: "gift" | "buy_x_pay_y" | "discount"
+   promotion_type: "gift" | "buy_x_pay_y" | "discount" | "free_shipping"
   discount_type: "percentage" | "fixed" | null
   discount_value: number | null
   max_discount_amount: number | null

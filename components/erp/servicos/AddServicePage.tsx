@@ -231,13 +231,37 @@ export const AddServicePage: FC<AddServicePageProps> = ({
     const [isGeneratingDetails, setIsGeneratingDetails] = useState(false)
 
     const handleGenerateAiDetails = useCallback(async () => {
-        const serviceName = serviceData.name?.trim()
-        if (!serviceName) return notifyError("Atenção", "Digite o nome do serviço primeiro")
+        const serviceName = serviceData.name?.trim() || "Serviço"
         setIsGeneratingDetails(true)
         try {
+            // Coletar até 3 imagens File para análise (limite do Groq)
+            const fileImages = (serviceData.images || []).filter((img: string | File): img is File => img instanceof File).slice(0, 3)
+
+            const images: Array<{ base64: string; mimeType: string }> = []
+            for (const file of fileImages) {
+                const reader = new FileReader()
+                const base64Promise = new Promise<string>((resolve) => {
+                    reader.onloadend = () => {
+                        const result = reader.result as string
+                        const base64 = result.split(",")[1] || ""
+                        resolve(base64)
+                    }
+                    reader.readAsDataURL(file)
+                })
+                const base64 = await base64Promise
+                if (base64) {
+                    images.push({ base64, mimeType: file.type || "image/jpeg" })
+                }
+            }
+
+            const body: any = { title: serviceName, partnerId, itemType: "service" }
+            if (images.length > 0) {
+                body.images = images
+            }
+
             const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
                 method: "POST",
-                body: { title: serviceName, partnerId, itemType: "service" },
+                body,
             })
             if (data.error) {
                 notifyError("Erro", data.error)

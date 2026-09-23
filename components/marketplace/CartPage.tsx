@@ -1105,7 +1105,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     )}
 
                                                                                                     {item.item_type === "service_booking" && cartConflicts[item.id] && !(serviceAvailability[item.id]?.checked && !serviceAvailability[item.id]?.available) && (
-                                                                                                        <div className="mt-1 flex flex-col items-start gap-2 text-xs text-brand-orange dark:text-orange-400 font-medium">
+                                                                                                        <div className="mt-1 flex items-start gap-2 text-xs text-brand-orange font-medium">
                                                                                                             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange shrink-0" />
                                                                                                             <span>Conflito de horário com outro serviço na sacola</span>
                                                                                                             <span className="text-brand-inactive-text/40 dark:text-dark-body/40">•</span>

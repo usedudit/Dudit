@@ -17,6 +17,7 @@ import {
   markNotificationsReadForUser,
   registerPushSubscription,
   unregisterPushSubscription,
+  deleteAllNotificationsForUser,
 } from "@/lib/services/notification.service"
 
 export async function getNotificationsAction(params?: {
@@ -94,6 +95,15 @@ export async function unregisterPushSubscriptionAction(fcmToken: string) {
 
   await unregisterPushSubscription({ userId: user.id, fcmToken })
   return { success: true as const }
+}
+
+export async function deleteAllNotificationsAction() {
+  await requireRateLimit(RateLimitCategory.API_GENERAL)
+  const user = await requireUser()
+  if (!user) return { error: "Não autenticado" as const }
+
+  const deleted = await deleteAllNotificationsForUser(user.id)
+  return { success: true as const, deleted }
 }
 
 export async function switchNotificationContextAction(params: {

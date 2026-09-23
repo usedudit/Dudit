@@ -16,6 +16,7 @@ import {
   getGeneralAlerts,
   getGeneralActivity,
   getGeneralAbcCurve,
+  getGeneralOrdersChart,
   getDashboardGeneralData
 } from "@/lib/data/dashboard"
 import type { Period, CompareMode } from "@/lib/period-types"
@@ -25,7 +26,7 @@ import { formatCurrency as brl } from "@/lib/utils"
 import {
   TrendingUpIcon,
   CreditCardIcon,
-  TargetIcon,
+  ShoppingCartIcon,
 } from "@/lib/icons"
 
 interface DashboardProps {
@@ -140,6 +141,7 @@ export async function Dashboard({
     alertsData,
     activityData,
     abcCurveData,
+    ordersChartData,
     compareMetricsData,
     compareRevenueData,
     generalData
@@ -150,6 +152,7 @@ export async function Dashboard({
     getGeneralAlerts(partnerId, sells),
     getGeneralActivity(partnerId),
     getGeneralAbcCurve(partnerId, period),
+    getGeneralOrdersChart(partnerId, period),
     compareInfo ? getGeneralMetrics(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     compareInfo ? getGeneralRevenueChart(partnerId, compareInfo.period, compareInfo.todayOverride) : Promise.resolve(null),
     getDashboardGeneralData(partnerId),
@@ -206,11 +209,8 @@ export async function Dashboard({
   const evoData = revenueData.map(p => ({ label: p.label, value: p.value, secondary: p.secondary }))
   const originDonutData = revenueOriginData.origins.map(o => ({ label: o.label, value: Number(o.value) }))
   const totalOrigin = revenueOriginData.origins.reduce((s, o) => s + Number(o.value), 0)
-  const abcBarData = abcCategories.map(a => ({
-    label: a.label,
-    value: Number(a.value),
-    fill: a.category === "A" ? "#059669" : a.category === "B" ? "#f59e0b" : "#ef4444",
-  }))
+  const ordersBarData = ordersChartData.orders.map(p => ({ label: p.label, value: p.value }))
+  const ordersTotal = ordersChartData.total
 
   return (
     <div className="flex flex-col gap-6">
@@ -251,29 +251,22 @@ export async function Dashboard({
         )}
       </div>
 
-      {/* Row 3: Curva ABC (8) + Atividades Recentes (4) */}
-      {abcBarData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
-          <div className="lg:col-span-8">
-            <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
-              <CardHeader
-                icon={TargetIcon}
-                title="Curva ABC"
-                subtitle="Produtos classificados pela participação de receita"
-                legendItems={[
-                  { label: "Classe A (≤50%)", color: "#059669" },
-                  { label: "Classe B (50-80%)", color: "#f59e0b" },
-                  { label: "Classe C (>80%)", color: "#ef4444" },
-                ]}
-              />
-              <DashboardBarChart data={abcBarData} colors={["#059669", "#f59e0b", "#ef4444"]} format="currency" />
-            </div>
-          </div>
-          <div className="lg:col-span-4">
-            <RecentActivities activities={activityData.activity} />
+      {/* Row 3: Total de Pedidos (8) + Atividades Recentes (4) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">
+        <div className="lg:col-span-8">
+          <div className="bg-white dark:bg-dark-surface rounded-[24px] p-6 border border-brand-border dark:border-dark-border h-full flex flex-col justify-between">
+            <CardHeader
+              icon={ShoppingCartIcon}
+              title="Total de Pedidos"
+              subtitle={`${ordersTotal} pedido${ordersTotal === 1 ? "" : "s"} no período`}
+            />
+            <DashboardBarChart data={ordersBarData} colors={["#059669"]} format="number" />
           </div>
         </div>
-      )}
+        <div className="lg:col-span-4">
+          <RecentActivities activities={activityData.activity} />
+        </div>
+      </div>
 
       {/* Row 4: Precisa de Atenção (4) + Últimos Pedidos (4) + Próximos Agendamentos/Estoque Crítico (4) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full mx-auto">

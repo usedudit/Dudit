@@ -27,6 +27,17 @@ export interface GenerateInput {
   images?: string[]
 }
 
+export interface ImageInput {
+  base64: string
+  mimeType: string
+}
+
+export interface GenerateImageInput {
+  title: string
+  itemType: "product" | "service"
+  images: ImageInput[]
+}
+
 export interface GeneratedDetails {
   name?: string
   brand: string
@@ -374,26 +385,28 @@ export class AiGeneratorService {
   }
 
   /**
-   * Gera detalhes do produto analisando uma imagem via Groq + Llama 4 Scout.
+   * Gera detalhes do produto analisando uma imagem via Groq + Qwen.
    * Retorna nome sugerido, preço, descrição, marca, tags, specs e categoria.
+   * Suporta até 3 imagens por request (limite do Groq).
    */
   static async generateProductDetailsFromImage(
     partnerId: string,
     userId: string,
-    input: GenerateInput & { imageBase64: string; imageMimeType: string }
+    input: GenerateImageInput
   ): Promise<GenerationResult> {
     const startTime = Date.now()
-    const { title, itemType = "product", imageBase64, imageMimeType } = input
+    const { title, itemType = "product", images } = input
 
     if (!title || !title.trim()) {
       return { success: false, error: "invalid_input", message: "O título não pode ser vazio." }
     }
 
-    if (!imageBase64) {
+    if (!images || images.length === 0) {
       return { success: false, error: "invalid_input", message: "A imagem é obrigatória para geração por IA." }
     }
 
-    const hashed = crypto.createHash("sha256").update(`${title.trim().toLowerCase()}:${itemType}:img`).digest("hex")
+    const imageHash = crypto.createHash("sha256").update(images.map((img) => img.base64).join(":")).digest("hex")
+    const hashed = crypto.createHash("sha256").update(`${title.trim().toLowerCase()}:${itemType}:img:${imageHash}`).digest("hex")
     const cacheKey = `ai:cache:prod_details_img:${partnerId}:${hashed}`
     const todayStr = await getPartnerDateStr(partnerId)
     const rateLimitKey = `ai:rate_limit_img:${partnerId}:${todayStr}`
@@ -516,11 +529,14 @@ export class AiGeneratorService {
       let apiResponseText = ""
 
       try {
-        SecureLogger.info("[AI IMAGE GENERATOR] Analisando imagem com Groq + Llama 4 Scout")
+        SecureLogger.info("[AI IMAGE GENERATOR] Analisando imagem com Groq + Qwen")
+        const imageBase64Arr = images.map((img) => img.base64)
+        const imageMimeTypeArr = images.map((img) => img.mimeType)
+
         const apiResult = await groqProvider.generateWithImage(
           prompt,
-          imageBase64,
-          imageMimeType,
+          imageBase64Arr.length === 1 ? imageBase64Arr[0] : imageBase64Arr,
+          imageMimeTypeArr.length === 1 ? imageMimeTypeArr[0] : imageMimeTypeArr,
           undefined,
           { timeout: getAiTimeoutMs() }
         )

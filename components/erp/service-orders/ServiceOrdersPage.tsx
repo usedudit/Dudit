@@ -47,17 +47,6 @@ const SERVICE_STATUS_ORDER: string[] = [
   "aguardando_peca", "concluida", "entregue"
 ]
 
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  aberta: ["aguardando_aprovacao", "cancelada"],
-  aguardando_aprovacao: ["aprovada", "cancelada"],
-  aprovada: ["em_andamento", "cancelada"],
-  em_andamento: ["aguardando_peca", "concluida", "cancelada"],
-  aguardando_peca: ["em_andamento", "cancelada"],
-  concluida: ["entregue"],
-  entregue: [],
-  cancelada: [],
-}
-
 function doesServiceTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
   if (currentStatus === "cancelada" || nextStatus === "cancelada") return false
   const currentIdx = SERVICE_STATUS_ORDER.indexOf(currentStatus)
@@ -331,7 +320,7 @@ export default function ServiceOrdersPage({
     setIsUpdatingStatus(true)
     try {
       const { updateServiceOrderStatusAction } = await import("@/app/actions/erp/service-orders")
-      const res = await updateServiceOrderStatusAction(partnerId, id, newStatus)
+      const res = await updateServiceOrderStatusAction(partnerId, id, newStatus, reason)
       if (res.success) {
         toast({ description: "Status alterado" })
         handleMutation()
@@ -1045,27 +1034,18 @@ export default function ServiceOrdersPage({
       >
         <div className="space-y-4 py-2">
           <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-            Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[statusModal?.currentStatus as ServiceOrderStatus]?.label || statusModal?.currentStatus}</strong>
+            Selecione o novo status para esta OS:
           </p>
-          {(() => {
-            const currentStatus = statusModal?.currentStatus || "aberta"
-            const transitions = STATUS_TRANSITIONS[currentStatus] || []
-            if (transitions.length === 0) {
-              return <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
-            }
-            return (
-              <FormDropdown
-                label="Novo Status"
-                value={statusModal?.nextStatus || ""}
-                setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
-                options={transitions.map((s) => ({
-                  value: s,
-                  label: SERVICE_ORDER_STATUS_META[s as ServiceOrderStatus]?.label || s
-                }))}
-                placeholder="Selecione o novo status"
-              />
-            )
-          })()}
+          <FormDropdown
+            label="Novo Status"
+            value={statusModal?.nextStatus || ""}
+            setValue={(val) => setStatusModal(prev => prev ? { ...prev, nextStatus: val } : null)}
+            options={(Object.keys(SERVICE_ORDER_STATUS_META) as ServiceOrderStatus[]).map((s) => ({
+              value: s,
+              label: SERVICE_ORDER_STATUS_META[s].label
+            }))}
+            placeholder="Selecione o novo status"
+          />
         </div>
       </DefaultModal>
 

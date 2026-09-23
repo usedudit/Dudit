@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
 import { Search, StarIcon, MapPinIcon, ChevronRightIcon, ChevronLeftIcon, ShareIcon, WhatsappIcon, FlagIcon, Check, InfoIcon, TagIcon, PackageIcon, ServiceIcon, XIcon, ClockIcon, GridIcon, ListIcon } from "@/lib/icons"
@@ -15,7 +15,8 @@ import { getDefaultBannerSeeded } from "@/lib/utils/banner"
 import { useSupabase } from "@/providers/supabase-provider"
 import { trackEvent } from "@/lib/analytics"
 import { formatCurrency, formatDate, formatMonth, formatYear, formatNumber } from "@/lib/utils"
-import { normalizeOpeningHours, isStoreOpen } from "@/lib/utils/opening-hours"
+import { normalizeOpeningHours, getOpenNowStatus } from "@/lib/utils/opening-hours"
+import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabel, formatAverageDeliveryTimeFromRange } from "@/lib/services/location.service"
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
@@ -161,6 +162,25 @@ const RatingInline = ({ rating, reviewsCount, short }: { rating: number; reviews
         ) : (
             <span className="text-brand-inactive-text dark:text-dark-body">{short ? "(0)" : "Sem avaliações"}</span>
         )}
+    </div>
+)
+
+const openStatusToneClass = (status?: string) =>
+    status === "open" ? "text-brand-green"
+        : status === "closing_soon" ? "text-brand-yellow"
+            : "text-brand-red"
+
+const StoreStatusLine = ({ openStatus, delivery }: { openStatus: { label: string; status: string } | null; delivery: ReactNode | null }) => (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] lg:text-[14px] leading-snug">
+        {openStatus && (
+            <span className={`font-medium ${openStatusToneClass(openStatus.status)}`}>
+                {openStatus.label}
+            </span>
+        )}
+        {openStatus && delivery && (
+            <span className="text-brand-inactive-text dark:text-dark-body font-normal">|</span>
+        )}
+        {delivery}
     </div>
 )
 
@@ -424,7 +444,7 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
 
             {
                 hasPaymentSections && (
-                    <FormSection title="Pagamento na loja" hasSeparator>
+                    <FormSection title="Pagamento na loja/entrega" hasSeparator>
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div>
@@ -710,10 +730,81 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const isShowcaseActive = propIsShowcaseActive !== undefined
         ? propIsShowcaseActive
         : (partner?.isShowcaseActive ?? partner?.is_showcase_active ?? true)
-    const isStoreOpenNow = useMemo(() => {
-        return isStoreOpen(partner?.openingHours, undefined, partner?.timezone)
+    const openStatus = useMemo(() => {
+        return getOpenNowStatus(partner?.openingHours, undefined, partner?.timezone)
     }, [partner?.openingHours, partner?.timezone])
-    const isClosedAndBlocking = partner?.acceptOrdersWhenClosed === false && !isStoreOpenNow
+
+    const userCoords = useMemo(() => {
+        return userProfile?.latitude && userProfile?.longitude
+            ? { lat: Number(userProfile.latitude), lng: Number(userProfile.longitude) }
+            : null
+    }, [userProfile?.latitude, userProfile?.longitude])
+
+    const deliveryInfo = useMemo(() => {
+        const settings = partner?.delivery_settings || null
+        const isDeliveryEnabled = settings?.is_delivery_enabled !== false && settings?.isDeliveryEnabled !== false
+        const sellsProducts = partner?.offeringType ? partner.offeringType !== "services" : (products?.length > 0)
+
+        const storeLat = partner?.lat ?? partner?.latitude ?? null
+        const storeLng = partner?.lng ?? partner?.longitude ?? null
+        let distanceKm: number | null = null
+        if (userCoords && storeLat != null && storeLng != null && !isNaN(Number(storeLat)) && !isNaN(Number(storeLng))) {
+            distanceKm = Number(calculateDistance(userCoords, { lat: Number(storeLat), lng: Number(storeLng) }).toFixed(1))
+        }
+
+        const maxDeliveryKmRaw = settings?.max_delivery_km ?? settings?.maxDeliveryKm
+        const maxDeliveryKm = maxDeliveryKmRaw != null && !isNaN(Number(maxDeliveryKmRaw)) ? Number(maxDeliveryKmRaw) : null
+        const outOfRadius = isDeliveryEnabled
+            && distanceKm != null
+            && maxDeliveryKm != null
+            && maxDeliveryKm > 0
+            && distanceKm > maxDeliveryKm
+
+        const deliveryTime = distanceKm != null
+            ? estimateAverageDeliveryTime(distanceKm)
+            : formatAverageDeliveryTimeFromRange(partner?.delivery_time_formatted)
+
+        const feeLabel = outOfRadius ? null : estimateDeliveryFeeLabel({
+            distanceKm,
+            baseFee: settings?.base_fee ?? settings?.baseFee,
+            includedKm: settings?.included_km ?? settings?.includedKm,
+            extraKmPrice: settings?.extra_km_price ?? settings?.extraKmPrice,
+            maxDeliveryKm,
+            isDeliveryEnabled,
+            deliveryPayer: settings?.delivery_payer ?? settings?.deliveryPayer,
+        })
+
+        return { isDeliveryEnabled, sellsProducts, outOfRadius, deliveryTime, feeLabel }
+    }, [partner?.delivery_settings, partner?.lat, partner?.latitude, partner?.lng, partner?.longitude, partner?.offeringType, partner?.delivery_time_formatted, products, userCoords])
+
+    const deliveryNode = useMemo<ReactNode | null>(() => {
+        if (deliveryInfo.outOfRadius) {
+            return <span className="font-medium text-brand-red">Fora da área de entrega - Verifique sua localização</span>
+        }
+        if (!deliveryInfo.isDeliveryEnabled || !deliveryInfo.sellsProducts) {
+            return <span className="font-medium text-brand-dark dark:text-dark-heading">Retirada no local</span>
+        }
+
+        const { deliveryTime, feeLabel } = deliveryInfo
+        if (!deliveryTime && !feeLabel) return null
+
+        const isFreeDelivery = feeLabel ? /gr[áa]tis/i.test(feeLabel) : false
+        const mainLabel = ["Entrega", deliveryTime].filter(Boolean).join(" • ")
+
+        if (!feeLabel) {
+            return <span className="font-medium text-brand-dark dark:text-dark-heading">{mainLabel}</span>
+        }
+
+        return (
+            <span className="flex flex-wrap items-center gap-x-1.5">
+                <span className="font-medium text-brand-dark dark:text-dark-heading">{mainLabel}</span>
+                <span aria-hidden className="text-brand-inactive-text dark:text-dark-body">•</span>
+                <span className={`font-semibold ${isFreeDelivery ? "text-brand-green dark:text-emerald-400" : "text-brand-dark dark:text-dark-heading"}`}>{feeLabel}</span>
+            </span>
+        )
+    }, [deliveryInfo])
+
+    const hasStatusLine = !!openStatus || !!deliveryNode
     const calculatedReviewsCount = reviews?.length || 0
     const calculatedAverageRating = useMemo(() => {
         if (calculatedReviewsCount === 0) return 0
@@ -1152,11 +1243,9 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
 
                 <div className="px-5 lg:px-0 py-5 lg:py-2 mb-2 lg:mb-8">
-                    {!isShowcaseActive ? (
+                    {!isShowcaseActive && (
                         <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" className="mb-4" />
-                    ) : isClosedAndBlocking ? (
-                        <InfoCard title="Loja Fechada" message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento." color="orange" className="mb-4" />
-                    ) : null}
+                    )}
                     {/* Desktop Layout */}
                     <div className="hidden lg:flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -1177,6 +1266,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
                         </div>
                     </div>
+
+                    {hasStatusLine && (
+                        <div className="hidden lg:block mt-3">
+                            <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
+                        </div>
+                    )}
 
                     {/* Mobile/Tablet Layout (lg:hidden) */}
                     <div className="lg:hidden flex items-center justify-between gap-4">
@@ -1212,6 +1307,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                         onOpenSort={() => setIsCategorySortOpen(true)}
                     />
                     <div className="h-[46px]" />
+                </div>
+            )}
+
+            {hasStatusLine && (
+                <div className="lg:hidden px-5 mb-3">
+                    <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
                 </div>
             )}
 
@@ -1261,7 +1362,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     )}
 
                     <div className="w-px h-5 bg-brand-border dark:bg-dark-border shrink-0" />
-                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[30px] shrink-0">
+                    <div className="flex items-center bg-white dark:bg-dark-surface border border-brand-border rounded-full p-0.5 h-[32px] shrink-0">
                         <button
                             onClick={() => setViewMode("list")}
                             className={`w-7 h-full flex items-center justify-center rounded-full transition-colors ${viewMode === "list"
@@ -1481,11 +1582,6 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             <InfoCard title="Vitrine Inativa" message="Esta vitrine está temporariamente inativa e não está aceitando novos pedidos." color="orange" />
                         </div>
                     )}
-                    {isShowcaseActive && isClosedAndBlocking && categoryView && (
-                        <div className="mb-4 lg:hidden">
-                            <InfoCard title="Loja Fechada" message="Esta loja está fechada no momento e não está aceitando novos pedidos fora do horário de funcionamento." color="orange" />
-                        </div>
-                    )}
                     {activeSection === "products" && (
                         <div className="animate-fade-in">
                             {categoryView ? (
@@ -1536,19 +1632,19 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                                 })}
                                             </div>
                                         ) : (
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
-                                            {categoryFilteredItems.map((item: any) => (
-                                                <ItemCard
-                                                    key={item.id}
-                                                    product={normalizeItemForCard(item, partner)}
-                                                    showSeller={false}
-                                                    className="w-full"
-                                                    promotions={partnerPromotions}
-                                                    hidePromoBadge={isCampaignView}
-                                                    hideSalesCount
-                                                />
-                                            ))}
-                                        </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
+                                                {categoryFilteredItems.map((item: any) => (
+                                                    <ItemCard
+                                                        key={item.id}
+                                                        product={normalizeItemForCard(item, partner)}
+                                                        showSeller={false}
+                                                        className="w-full"
+                                                        promotions={partnerPromotions}
+                                                        hidePromoBadge={isCampaignView}
+                                                        hideSalesCount
+                                                    />
+                                                ))}
+                                            </div>
                                         )
                                     ) : (
                                         <IconPlaceholder

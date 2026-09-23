@@ -1,27 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, Button, IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
+import { IconPlaceholder, ThreeDotsLoader } from "@/components/reusable"
 import Pagination from "@/components/reusable/Pagination"
 import AlertModal from "@/components/reusable/AlertModal"
 import FilterSheet from "@/components/reusable/FilterSheet"
 import type { FilterSectionConfig } from "@/components/reusable/FilterSheet"
-import Portal from "@/components/Portal"
-import BottomSheet from "@/components/BottomSheet"
 import { BillingPageControls } from "./BillingPageControls"
 import BillingGridCard from "./BillingGridCard"
 import BillingListRow from "./BillingListRow"
+import { BillingDetailSheet } from "./BillingDetailSheet"
 import { InvoicePrintModal } from "./InvoicePrintModal"
 import { listPurchasesPageAction, updatePurchaseStatusAction, getPurchaseAction } from "@/app/actions/billing/purchases"
 import { generateInvoiceAction, getInvoiceAction } from "@/app/actions/billing/invoices"
-import { getPaymentMethodLabel } from "@/lib/billing/invoice-utils"
 import { useMediaQuery } from "@/components/erp/hooks"
-import { formatCurrency, formatDate } from "@/lib/utils"
-import { ArrowUpDownIcon, PrinterIcon, XIcon, ShoppingCartIcon } from "@/lib/icons"
-import { RotateCcw } from "lucide-react"
+import { ArrowUpDownIcon, ShoppingCartIcon } from "@/lib/icons"
+import { toast } from "@/hooks/use-notification"
+import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
 import type { PurchaseWithRelations, BillingInvoice, BillingFilters, SortConfig } from "@/lib/billing/types"
-import { BillingRefundModal } from "./BillingRefundModal"
+import type { ResolvedPaymentMethod } from "@/lib/billing/payment-method-helper"
 
 const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"> = {
     pending: "orange",
@@ -30,16 +28,6 @@ const STATUS_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "cya
     refunded: "purple",
     cancelled: "gray",
     partially_refunded: "orange",
-}
-
-const PAYMENT_VARIANTS: Record<string, "green" | "red" | "orange" | "blue" | "purple" | "gray"> = {
-    pending: "orange",
-    processing: "blue",
-    approved: "green",
-    rejected: "red",
-    refunded: "purple",
-    cancelled: "gray",
-    chargeback: "red",
 }
 
 function getStatusLabel(status: string, metadata?: any): string {
@@ -71,15 +59,14 @@ function getStatusVariant(status: string, metadata?: any): "green" | "red" | "or
     return STATUS_VARIANTS[status] || "gray"
 }
 
-function getGatewayLabel(gateway: string | null): string {
-    const labels: Record<string, string> = {
-        mercado_pago: "Mercado Pago",
-        stripe: "Stripe",
-        asaas: "Asaas",
-        pagseguro: "PagSeguro",
-        manual: "Manual",
-    }
-    return labels[gateway || ""] || gateway || "-"
+function paymentMethodForPurchase(p: PurchaseWithRelations): ResolvedPaymentMethod {
+    return resolvePaymentMethodDetails(
+        {
+            payment_method_type: p.payment_method_type ?? null,
+            gateway_payment_id: p.gateway_payment_id ?? null,
+        },
+        p,
+    )
 }
 
 function getTypeLabel(type: string): string {
@@ -100,7 +87,7 @@ const COLUMNS = [
     { id: "description", label: "Descrição", align: "left" as const },
     { id: "amount", label: "Valor", align: "right" as const, width: "120px" },
     { id: "status", label: "Status", align: "left" as const, width: "120px" },
-    { id: "gateway", label: "Gateway", align: "left" as const, width: "120px" },
+    { id: "payment_method", label: "Meio de Pagamento", align: "left" as const, width: "140px" },
     { id: "date", label: "Data", align: "left" as const, width: "140px" },
     { id: "actions", label: "", align: "center" as const, width: "60px" },
 ]
@@ -125,11 +112,13 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
 
     const [selectedPurchase, setSelectedPurchase] = useState<PurchaseWithRelations | null>(null)
     const [detailOpen, setDetailOpen] = useState(false)
-    const [refundModalOpen, setRefundModalOpen] = useState(false)
+    const [detailHydrating, setDetailHydrating] = useState(false)
+    const detailRequestRef = useRef<string | null>(null)
 
     const [invoiceData, setInvoiceData] = useState<any>(null)
     const [invoiceOpen, setInvoiceOpen] = useState(false)
     const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null)
+    const [printInvoiceId, setPrintInvoiceId] = useState<string>("")
 
     const [cancelTarget, setCancelTarget] = useState<PurchaseWithRelations | null>(null)
     const [cancelOpen, setCancelOpen] = useState(false)
@@ -221,45 +210,87 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
         setFilters({})
     }, [])
 
-    const handleViewDetails = async (purchase: PurchaseWithRelations) => {
-        const full = await getPurchaseAction(purchase.id)
-        setSelectedPurchase(full || purchase)
+    const handleCloseDetails = useCallback(() => {
+        setDetailOpen(false)
+    }, [])
+
+    const handleViewDetails = useCallback(async (purchase: PurchaseWithRelations) => {
+        detailRequestRef.current = purchase.id
+        setSelectedPurchase(purchase)
         setDetailOpen(true)
-    }
-
-    const handleInvoice = async (invoice?: BillingInvoice) => {
-        if (!invoice && selectedPurchase?.invoice_id) {
-            setInvoiceLoading(selectedPurchase.invoice_id)
-            const result = await getInvoiceAction(selectedPurchase.invoice_id)
-            if (result) {
-                setInvoiceData(result.invoice_data)
-                setInvoiceOpen(true)
+        setDetailHydrating(true)
+        try {
+            const full = await getPurchaseAction(purchase.id)
+            if (full && detailRequestRef.current === purchase.id) {
+                setSelectedPurchase(full)
             }
-            setInvoiceLoading(null)
-            return
-        }
-        if (invoice) {
-            setInvoiceLoading(invoice.id)
-            const result = await getInvoiceAction(invoice.id)
-            if (result) {
-                setInvoiceData(result.invoice_data)
-                setInvoiceOpen(true)
+        } catch (err) {
+            console.error("[BillingPage] Error loading purchase details:", err)
+        } finally {
+            if (detailRequestRef.current === purchase.id) {
+                setDetailHydrating(false)
             }
+        }
+    }, [])
+
+    const handlePrintInvoice = useCallback(async (invoice: BillingInvoice) => {
+        setInvoiceLoading(invoice.id)
+        try {
+            setInvoiceData(invoice.invoice_data)
+            setPrintInvoiceId(invoice.id)
+            setInvoiceOpen(true)
+        } catch (err) {
+            console.error("[BillingPage] Error preparing invoice:", err)
+            toast.error("Erro ao carregar fatura", "Não foi possível abrir a fatura. Tente novamente.")
+        } finally {
             setInvoiceLoading(null)
         }
-    }
+    }, [])
 
-    const handleGenerateInvoice = async () => {
+    const handlePrintInvoiceById = useCallback(async (invoiceId?: string | null) => {
+        if (!invoiceId) return
+        setInvoiceLoading(invoiceId)
+        try {
+            const invoice = await getInvoiceAction(invoiceId)
+            if (invoice) {
+                setInvoiceData(invoice.invoice_data)
+                setPrintInvoiceId(invoice.id)
+                setInvoiceOpen(true)
+            } else {
+                toast.error("Fatura não encontrada", "Não foi possível carregar a fatura. Tente novamente.")
+            }
+        } catch (err) {
+            console.error("[BillingPage] Error loading invoice:", err)
+            toast.error("Erro ao carregar fatura", "Tente novamente.")
+        } finally {
+            setInvoiceLoading(null)
+        }
+    }, [])
+
+    const handleGenerateInvoice = useCallback(async () => {
         if (!selectedPurchase) return
         setInvoiceLoading("generate")
-        const result = await generateInvoiceAction(selectedPurchase.id)
-        setInvoiceLoading(null)
-        if (result.success && result.data) {
-            setInvoiceData(result.data.invoice_data)
-            setInvoiceOpen(true)
-            loadPage(page)
+        try {
+            const result = await generateInvoiceAction(selectedPurchase.id)
+            if (result.success && result.data) {
+                const newInvoice = result.data
+                setInvoiceData(newInvoice.invoice_data)
+                setPrintInvoiceId(newInvoice.id)
+                setInvoiceOpen(true)
+                setSelectedPurchase((prev) =>
+                    prev ? { ...prev, invoice: newInvoice, invoice_id: newInvoice.id } : prev,
+                )
+                loadPage(page)
+            } else if (!result.success) {
+                toast.error("Erro ao gerar fatura", result.error || "Tente novamente.")
+            }
+        } catch (err) {
+            console.error("[BillingPage] Error generating invoice:", err)
+            toast.error("Erro ao gerar fatura", "Tente novamente.")
+        } finally {
+            setInvoiceLoading(null)
         }
-    }
+    }, [selectedPurchase, page, loadPage])
 
     const handleCancel = async () => {
         if (!cancelTarget) return
@@ -277,126 +308,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
             direction: prev?.key === colId && prev.direction === "asc" ? "desc" : "asc",
         }))
     }
-
-    // ── Detail sheet content ──
-    const detailContent = selectedPurchase && (
-        <div className="flex flex-col h-full bg-white dark:bg-dark-surface">
-            <header className="border-b border-brand-border dark:border-dark-border p-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold dark:text-dark-heading">Detalhes da Compra</h2>
-                <Button variant="filled" onClick={() => setDetailOpen(false)} size="icon">
-                    <XIcon className="w-5 h-5" />
-                </Button>
-            </header>
-
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
-                <div className="flex items-center justify-between">
-                    <Badge variant={getStatusVariant(selectedPurchase.status, selectedPurchase.metadata)}>
-                        {getStatusLabel(selectedPurchase.status, selectedPurchase.metadata)}
-                    </Badge>
-                    <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                        {formatCurrency(selectedPurchase.total_amount)}
-                    </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Tipo</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getTypeLabel(selectedPurchase.purchase_type)}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-brand-inactive-text font-medium">Data</p>
-                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(selectedPurchase.created_at)}</p>
-                    </div>
-                    {selectedPurchase.description && (
-                        <div className="col-span-2">
-                            <p className="text-xs text-brand-inactive-text font-medium">Descrição</p>
-                            <p className="text-sm text-brand-dark dark:text-dark-heading">{selectedPurchase.description}</p>
-                        </div>
-                    )}
-                </div>
-
-                {(selectedPurchase.payments || []).length > 0 && (
-                    <div>
-                        <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Pagamentos</h4>
-                        <div className="space-y-2">
-                            {(selectedPurchase.payments || []).map((payment) => (
-                                <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-brand-gray dark:bg-dark-border/50">
-                                    <div className="flex items-center gap-3">
-                                        <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"}>
-                                            {getStatusLabel(payment.status)}
-                                        </Badge>
-                                        <span className="text-xs text-brand-inactive-text">
-                                            {getPaymentMethodLabel(payment.payment_method_type)}
-                                        </span>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(payment.amount)}</span>
-                                        {payment.paid_at && (
-                                            <p className="text-[11px] text-brand-inactive-text">{formatDate(payment.paid_at)}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {selectedPurchase.invoice && (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-brand-green/5 border border-brand-green/20">
-                        <div>
-                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Fatura {selectedPurchase.invoice.invoice_number}</p>
-                            <p className="text-xs text-brand-inactive-text">Clique para visualizar</p>
-                        </div>
-                        <Button variant="outline" size="sm" leftIcon={<PrinterIcon />} onClick={() => handleInvoice(selectedPurchase.invoice!)}>
-                            Imprimir
-                        </Button>
-                    </div>
-                )}
-
-                {!selectedPurchase.invoice && selectedPurchase.status === "completed" && (
-                    <Button
-                        variant="default"
-                        leftIcon={<PrinterIcon />}
-                        onClick={handleGenerateInvoice}
-                        isLoading={invoiceLoading === "generate"}
-                    >
-                        Gerar Fatura
-                    </Button>
-                )}
-            </div>
-
-            <footer className="shrink-0 border-t border-brand-border p-4 dark:border-dark-border dark:bg-dark-surface">
-                <div className="flex items-center justify-between">
-                    <Button variant="ghost" leftIcon={<XIcon />} onClick={() => setDetailOpen(false)}>
-                        Fechar
-                    </Button>
-                    <div className="flex items-center gap-2">
-                        {selectedPurchase.status === "completed" && Number(selectedPurchase.total_amount || selectedPurchase.amount || 0) > 0 && (
-                            <Button
-                                variant="outline"
-                                leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
-                                onClick={() => setRefundModalOpen(true)}
-                            >
-                                Solicitar Reembolso
-                            </Button>
-                        )}
-                        {selectedPurchase.status === "pending" && (
-                            <Button
-                                variant="destructive"
-                                leftIcon={<XIcon />}
-                                onClick={() => {
-                                    setCancelTarget(selectedPurchase)
-                                    setCancelOpen(true)
-                                }}
-                            >
-                                Cancelar compra
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </footer>
-        </div>
-    )
 
     return (
         <FadeIn className="flex flex-col h-full bg-white dark:bg-dark-background">
@@ -433,7 +344,9 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                         </div>
                     ) : effectiveViewMode === "grid" ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {data.map((p) => (
+                            {data.map((p) => {
+                                const pm = paymentMethodForPurchase(p)
+                                return (
                                 <BillingGridCard
                                     key={p.id}
                                     id={p.id}
@@ -445,14 +358,20 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                     status={p.status}
                                     statusLabel={getStatusLabel(p.status, p.metadata)}
                                     statusVariant={getStatusVariant(p.status, p.metadata)}
-                                    gatewayLabel={getGatewayLabel(p.gateway)}
+                                    paymentMethodLabel={pm.name}
+                                    paymentMethodDetails={pm.detailsText}
+                                    paymentMethodIcon={pm.iconUrl}
                                     createdAt={p.created_at}
+                                    invoiceId={p.invoice_id}
                                     onDetails={() => handleViewDetails(p)}
-                                    onInvoice={p.invoice_id ? () => handleInvoice() : undefined}
+                                    onInvoice={handlePrintInvoiceById}
                                 />
-                            ))}
-                        </div>
-                    ) : (
+                                )
+                            }
+                            )
+                        }
+                    </div>
+                ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -462,7 +381,7 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             return (
                                                 <th
                                                     key={col.id}
-                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""}`}
+                                                    className={`py-3 px-2 text-[13px] font-medium text-gray-500 dark:text-dark-body ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} cursor-pointer hover:text-gray-900 dark:hover:text-dark-heading group select-none transition-colors ${col.id === "actions" ? "rounded-r-lg" : ""} ${col.id === "type" ? "rounded-l-lg" : ""}`}
                                                     style={{ width: col.width }}
                                                     onClick={() => handleSort(col.id)}
                                                 >
@@ -483,7 +402,9 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {data.map((p) => (
+                                    {data.map((p) => {
+                                        const pm = paymentMethodForPurchase(p)
+                                        return (
                                         <BillingListRow
                                             key={p.id}
                                             id={p.id}
@@ -495,15 +416,19 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                                             status={p.status}
                                             statusLabel={getStatusLabel(p.status, p.metadata)}
                                             statusVariant={getStatusVariant(p.status, p.metadata)}
-                                            gatewayLabel={getGatewayLabel(p.gateway)}
+                                            paymentMethodLabel={pm.name}
                                             createdAt={p.created_at}
                                             columns={filteredColumns}
-                                            onDetails={() => handleViewDetails(p)}
-                                            onInvoice={p.invoice_id ? () => handleInvoice() : undefined}
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
+                                            invoiceId={p.invoice_id}
+                                        onDetails={() => handleViewDetails(p)}
+                                        onInvoice={handlePrintInvoiceById}
+                                    />
+                                    )
+                                }
+                                )
+                            }
+                        </tbody>
+                    </table>
                         </div>
                     )}
 
@@ -529,33 +454,28 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 onClear={clearFilters}
             />
 
-            {/* ── Detail Sheet (Portal on desktop, BottomSheet on mobile) ── */}
-            {isMobile ? (
-                <BottomSheet isOpen={detailOpen} onClose={() => setDetailOpen(false)}>
-                    {detailContent}
-                </BottomSheet>
-            ) : (
-                <Portal>
-                    <div
-                        className={`fixed inset-0 bg-black/50 z-50 transition-opacity ${detailOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                        onClick={() => setDetailOpen(false)}
-                    >
-                        <div
-                            className={`fixed right-4 top-4 bottom-4 w-96 bg-white dark:bg-dark-surface shadow-2xl rounded-2xl transition-transform duration-300 overflow-hidden ${detailOpen ? "translate-x-0" : "translate-x-[120%]"}`}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {detailContent}
-                        </div>
-                    </div>
-                </Portal>
-            )}
+            {/* ── Detail Sheet ── */}
+            <BillingDetailSheet
+                isOpen={detailOpen}
+                onClose={handleCloseDetails}
+                purchase={selectedPurchase}
+                onInvoice={handlePrintInvoice}
+                onCancel={(purchase) => {
+                    setCancelTarget(purchase)
+                    setCancelOpen(true)
+                }}
+                onGenerateInvoice={handleGenerateInvoice}
+                generateLoading={invoiceLoading === "generate"}
+                onRefundSuccess={() => loadPage(page)}
+                isHydrating={detailHydrating}
+            />
 
             {/* ── Invoice Print Modal ── */}
             <InvoicePrintModal
                 isOpen={invoiceOpen}
                 onClose={() => setInvoiceOpen(false)}
                 invoiceData={invoiceData}
-                invoiceId={selectedPurchase?.invoice_id || ""}
+                invoiceId={printInvoiceId}
             />
 
             {/* ── Cancel Alert ── */}
@@ -569,19 +489,6 @@ export function BillingPage({ initialPartnerId, showTitle }: BillingPageProps) {
                 confirmText="Sim, cancelar"
                 cancelText="Não, manter"
             />
-
-            {/* ── Refund Modal ── */}
-            {selectedPurchase && (
-                <BillingRefundModal
-                    isOpen={refundModalOpen}
-                    onClose={() => setRefundModalOpen(false)}
-                    purchase={selectedPurchase}
-                    partnerId={selectedPurchase.partner_id}
-                    onSuccess={() => {
-                        loadPage(page)
-                    }}
-                />
-            )}
         </FadeIn>
     )
 }

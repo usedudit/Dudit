@@ -20,7 +20,7 @@ export interface ServiceOrderReportData {
   byStatus: { label: string; value: number }[]
   evolution: { label: string; value: number; secondary: number }[]
   assigneeRanking: { id: string; name: string; count: number; revenue: number }[]
-  recentOrders: { id: string; orderNumber: string; title: string; status: string; total: string; date: string }[]
+  recentOrders: { id: string; orderNumber: string; title: string; status: string; statusKey?: string; total: string; date: string }[]
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -153,6 +153,7 @@ const getCachedServiceOrdersData = cache(async (partnerId: string, period: Perio
           orderNumber: o.order_number || "-",
           title: o.title || "Sem título",
           status: STATUS_LABELS[String(o.status || "").toLowerCase()] || o.status || "-",
+          statusKey: String(o.status || "").toLowerCase(),
           total: brl(money(o.total_amount)),
           date: new Date(o.created_at).toLocaleDateString("pt-BR"),
         })),

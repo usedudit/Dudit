@@ -21,7 +21,7 @@ export interface DeliveryReportData {
   }
   byStatus: { label: string; value: number }[]
   evolution: { label: string; value: number; secondary: number }[]
-  recentDeliveries: { id: string; status: string; date: string; duration?: string; deliveryPerson?: string }[]
+  recentDeliveries: { id: string; status: string; statusKey?: string; date: string; duration?: string; deliveryPerson?: string }[]
   deliveryPersonRanking: { id: string; name: string; deliveries: number; status: string }[]
 }
 
@@ -192,6 +192,7 @@ const getCachedDeliveryData = cache(async (partnerId: string, period: Period = "
         recentDeliveries: periodDeliveries.slice(0, 4).map((d: any) => ({
           id: d.id,
           status: statusLabels[String(d.status || "").toLowerCase()] || d.status || "-",
+          statusKey: String(d.status || "").toLowerCase(),
           date: new Date(d.created_at).toLocaleDateString("pt-BR"),
           duration: d.estimated_duration_minutes ? `${d.estimated_duration_minutes}min` : undefined,
           deliveryPerson: d.delivery_person_id ? personNameMap.get(d.delivery_person_id) || "Sem nome" : "Não atribuído",

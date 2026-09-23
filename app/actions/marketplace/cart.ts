@@ -1149,7 +1149,7 @@ export async function checkoutCartAction(
     }
   }
 
-  // ── Single engine call with payment method ──
+   // ── Single engine call with payment method ──
   const pricingResult = calculateOrderPricing({
     items: pricingItems,
     shippingCost: deliveryFee,
@@ -1157,6 +1157,15 @@ export async function checkoutCartAction(
     promotions: promotionsData,
     paymentMethod: pmtConfig,
   })
+
+  // Zero out delivery fee when free shipping comes from a campaign promotion
+  // (coupon-driven free shipping is already handled above)
+   if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
+     deliveryFee = 0
+     if (deliveryBreakdown) {
+       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+     }
+   }
 
   totalAmount = pricingResult.finalAmountWithPayment
   couponDiscountAmount = pricingResult.couponDiscountAmount

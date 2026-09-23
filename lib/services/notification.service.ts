@@ -387,6 +387,21 @@ export async function markNotificationsReadForUser(
   return data?.length ?? 0
 }
 
+export async function deleteAllNotificationsForUser(userId: string): Promise<number> {
+  const admin = getAdminClient()
+  const { data, error } = await admin
+    .from("notifications")
+    .delete()
+    .eq("user_id", userId)
+    .select("id")
+
+  if (error) {
+    console.error("[notifications] delete all error", error.message)
+    return 0
+  }
+  return data?.length ?? 0
+}
+
 export async function markAllNotificationsReadForUser(userId: string): Promise<number> {
   const admin = getAdminClient()
   const { data, error } = await admin

@@ -16,7 +16,7 @@ interface NotificationsSheetProps {
   notifications: NotificationsController
 }
 
-const OPEN_GRACE_MS = 300
+const OPEN_SETTLE_MS = 600
 
 export function NotificationsSheet({ isOpen, onClose, notifications }: NotificationsSheetProps) {
   const {
@@ -27,6 +27,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
     fetchMore,
     registerVisible,
     markAllAsRead,
+    deleteAll,
     unreadCount,
     erpOptions,
     erpFilter,
@@ -36,31 +37,32 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
 
   const isMobile = useMediaQuery("(max-width: 1023px)")
 
-  // Click-through guard: the tap that opens the sheet can be replayed onto the
-  // (just mounted) invisible overlay/backdrop on touch devices, closing it
-  // instantly. We swallow close requests for a brief grace period right after
-  // opening so the sheet actually becomes visible.
-  const graceRef = useRef(false)
-  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Enter-settle guard: a sheet aberta ainda está executando a animação de
+  // slide-in (spring ~300-400ms). Um toque/drag nesse janela vence o backdrop
+  // ou o drag-to-close e a sheet some em menos de 1s. Ignoramos qualquer
+  // tentativa de fechamento — inclusive via backdrop/overlay — até que a
+  // animação de entrada tenha finalizado, deixando o foco no conteúdo.
+  const settledRef = useRef(false)
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (isOpen) {
-      graceRef.current = true
-      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
-      graceTimerRef.current = setTimeout(() => {
-        graceRef.current = false
-      }, OPEN_GRACE_MS)
+      settledRef.current = false
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = setTimeout(() => {
+        settledRef.current = true
+      }, OPEN_SETTLE_MS)
     } else {
-      graceRef.current = false
-      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
+      settledRef.current = false
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
     }
     return () => {
-      if (graceTimerRef.current) clearTimeout(graceTimerRef.current)
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current)
     }
   }, [isOpen])
 
   const guardedClose = useCallback(() => {
-    if (graceRef.current) return
+    if (!settledRef.current) return
     onClose()
   }, [onClose])
 
@@ -89,6 +91,7 @@ export function NotificationsSheet({ isOpen, onClose, notifications }: Notificat
           onVisible={registerVisible}
           onNavigate={handleNavigate}
           onMarkAllAsRead={markAllAsRead}
+          onDeleteAll={deleteAll}
           unreadCount={unreadCount}
           erpOptions={erpOptions}
           erpFilter={erpFilter}

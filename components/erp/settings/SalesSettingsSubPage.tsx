@@ -223,7 +223,6 @@ export function SalesSettingsSubPage({
                                 <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                     <TabsTrigger value="general">Geral</TabsTrigger>
                                     <TabsTrigger value="receipts">
-                                        <PrinterIcon className="w-4 h-4 mr-1.5" />
                                         Recibos e Impressão
                                     </TabsTrigger>
                                 </TabsList>
@@ -242,7 +241,7 @@ export function SalesSettingsSubPage({
                                             {/* Descontos & Preços */}
                                             <FormSection title="Descontos e Preços">
                                                 <div className="space-y-4">
-                                                    <div className="max-w-md">
+                                                    <div className="col-span-12 sm:col-span-6">
                                                         <Input
                                                             label="Desconto máximo permitido nas vendas (%)"
                                                             type="number"
@@ -258,7 +257,7 @@ export function SalesSettingsSubPage({
                                                         />
                                                     </div>
 
-                                                    <div className="max-w-md">
+                                                    <div className="col-span-12 sm:col-span-6">
                                                         <Input
                                                             label="Margem padrão de lucro (%)"
                                                             type="number"
@@ -319,6 +318,20 @@ export function SalesSettingsSubPage({
                                                         setValue={(v) => updateField("autoCancelManualOrdersHours", Number(v))}
                                                         options={MANUAL_ORDER_EXPIRATION_OPTIONS}
                                                     />
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                                                Cancelar pedidos com sinal expirado
+                                                            </p>
+                                                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                                                Quando ativado, pedidos com sinal não pago e expirado são automaticamente cancelados.
+                                                            </p>
+                                                        </div>
+                                                        <Checkbox
+                                                            checked={settings.cancelExpiredDepositOrders ?? false}
+                                                            onChange={(checked: boolean) => updateField("cancelExpiredDepositOrders", Boolean(checked))}
+                                                        />
+                                                    </div>
                                                     <FormDropdown
                                                         label="Validade padrão de orçamentos"
                                                         value={String(settings.quoteValidityDays ?? 15)}
@@ -342,11 +355,10 @@ export function SalesSettingsSubPage({
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <div
                                                         onClick={() => updateReceiptField("defaultReceiptFormat", "thermal")}
-                                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
-                                                            receiptSettings.defaultReceiptFormat === "thermal"
-                                                                ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
-                                                                : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
-                                                        }`}
+                                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${receiptSettings.defaultReceiptFormat === "thermal"
+                                                            ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
+                                                            : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
+                                                            }`}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
@@ -366,11 +378,10 @@ export function SalesSettingsSubPage({
 
                                                     <div
                                                         onClick={() => updateReceiptField("defaultReceiptFormat", "a4")}
-                                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${
-                                                            receiptSettings.defaultReceiptFormat === "a4"
-                                                                ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
-                                                                : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
-                                                        }`}
+                                                        className={`cursor-pointer p-4 rounded-xl border transition-all duration-200 flex flex-col justify-between ${receiptSettings.defaultReceiptFormat === "a4"
+                                                            ? "border-brand-dark dark:border-white bg-brand-light-gray/30 dark:bg-dark-surface-elevated ring-1 ring-brand-dark dark:ring-white"
+                                                            : "border-brand-border dark:border-dark-border hover:border-brand-dark/40"
+                                                            }`}
                                                     >
                                                         <div className="flex items-center justify-between mb-2">
                                                             <span className="font-bold text-sm text-brand-dark dark:text-dark-heading">
@@ -461,22 +472,20 @@ export function SalesSettingsSubPage({
                                                         <button
                                                             type="button"
                                                             onClick={() => setPreviewTab("thermal")}
-                                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                                                                previewTab === "thermal"
-                                                                    ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
-                                                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
-                                                            }`}
+                                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${previewTab === "thermal"
+                                                                ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
+                                                                : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
+                                                                }`}
                                                         >
                                                             Térmica (80mm)
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setPreviewTab("a4")}
-                                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                                                                previewTab === "a4"
-                                                                    ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
-                                                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
-                                                            }`}
+                                                            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${previewTab === "a4"
+                                                                ? "bg-white dark:bg-dark-background text-brand-dark dark:text-dark-heading shadow-xs"
+                                                                : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark"
+                                                                }`}
                                                         >
                                                             Folha A4
                                                         </button>

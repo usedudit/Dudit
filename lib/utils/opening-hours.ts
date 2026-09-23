@@ -200,3 +200,80 @@ export function getOpeningStatus(
 
   return "Temporariamente fechado";
 }
+
+export type OpenNowStatus = "open" | "closing_soon" | "closed"
+
+/**
+ * Status curto de abertura para exibição inline (ex: "Aberto agora", "Abre às 14:00")
+ * Cores correspondentes: open=verde, closing_soon=amarelo, closed=vermelho
+ */
+export function getOpenNowStatus(
+  openingHours: OpeningHoursData | null | undefined,
+  nowDate: Date = new Date(),
+  tz?: string,
+): { label: string; status: OpenNowStatus } | null {
+  if (!openingHours || typeof openingHours !== "object") {
+    return null
+  }
+
+  const hasAnySchedule = Object.values(openingHours).some(
+    (daySchedule) => daySchedule?.enabled && daySchedule.from && daySchedule.to
+  )
+  if (!hasAnySchedule) {
+    return null
+  }
+
+  const resolvedTz = tz || getDefaultTimezone()
+  const { dayOfWeek: currentDayIndex, hour, minute } = getDateComponents(nowDate, resolvedTz)
+  const currentMinutes = hour * 60 + minute
+
+  // Ainda aberto pela virada de ontem (ex: 18:00 - 02:00)
+  const yesterdayDayIndex = (currentDayIndex + 6) % 7
+  const yesterdayKey = DAYS_OF_WEEK[yesterdayDayIndex]
+  const yesterdaySchedule = openingHours[yesterdayKey]
+  if (yesterdaySchedule?.enabled && yesterdaySchedule.from && yesterdaySchedule.to) {
+    const yFrom = parseTimeToMinutes(yesterdaySchedule.from)
+    const yTo = parseTimeToMinutes(yesterdaySchedule.to)
+    if (yFrom >= 0 && yTo >= 0 && yTo <= yFrom && currentMinutes < yTo) {
+      return yTo - currentMinutes <= 60
+        ? { label: `Fecha às ${yesterdaySchedule.to}`, status: "closing_soon" }
+        : { label: "Aberto agora", status: "open" }
+    }
+  }
+
+  const todayKey = DAYS_OF_WEEK[currentDayIndex]
+  const todaySchedule = openingHours[todayKey]
+  if (todaySchedule?.enabled && todaySchedule.from && todaySchedule.to) {
+    const fromMins = parseTimeToMinutes(todaySchedule.from)
+    let toMins = parseTimeToMinutes(todaySchedule.to)
+
+    if (fromMins >= 0 && toMins >= 0) {
+      if (toMins <= fromMins) toMins += 24 * 60
+
+      if (currentMinutes >= fromMins && currentMinutes < toMins) {
+        return toMins - currentMinutes <= 60
+          ? { label: `Fecha às ${todaySchedule.to}`, status: "closing_soon" }
+          : { label: "Aberto agora", status: "open" }
+      }
+
+      if (currentMinutes < fromMins) {
+        return { label: `Abre às ${todaySchedule.from}`, status: "closed" }
+      }
+    }
+  }
+
+  // Fechado agora, busca o próximo dia de funcionamento
+  for (let i = 1; i <= 7; i++) {
+    const nextDayIndex = (currentDayIndex + i) % 7
+    const nextDayKey = DAYS_OF_WEEK[nextDayIndex]
+    const nextSchedule = openingHours[nextDayKey]
+
+    if (nextSchedule?.enabled && nextSchedule.from && nextSchedule.to) {
+      return i === 1
+        ? { label: `Abre amanhã às ${nextSchedule.from}`, status: "closed" }
+        : { label: `Abre ${DAY_NAMES[nextDayKey]} às ${nextSchedule.from}`, status: "closed" }
+    }
+  }
+
+  return { label: "Temporariamente fechado", status: "closed" }
+}

@@ -1,9 +1,9 @@
 ﻿"use client"
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon } from "@/lib/icons"
+import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon, GiftIcon } from "@/lib/icons"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SidebarCard, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog } from "@/components/reusable"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SidebarCard, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog, InfoCard } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -38,6 +38,17 @@ const REQUIRED_FIELDS = [
     { field: "gift_selection", tab: "rules" },
 ]
 
+const getRequiredFieldsForType = (promoType?: string) => {
+    if (!promoType) return REQUIRED_FIELDS
+    return REQUIRED_FIELDS.filter((f) => {
+        if (promoType === "discount" && (f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "gift_selection")) return false
+        if (promoType === "buy_x_pay_y" && (f.field === "discount_value" || f.field === "gift_selection")) return false
+        if (promoType === "gift" && (f.field === "discount_value" || f.field === "buy_quantity" || f.field === "pay_quantity")) return false
+        if (promoType === "free_shipping" && (f.field === "discount_value" || f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "gift_selection")) return false
+        return true
+    })
+}
+
 function getAutoPromotionName(
     campName: string,
     type: string,
@@ -49,6 +60,7 @@ function getAutoPromotionName(
     const base = campName || "Promoção";
     if (type === "gift") return `${base} - Brinde`;
     if (type === "buy_x_pay_y") return `${base} - Leve ${buyQuantity || 0} Pague ${payQuantity || 0}`;
+    if (type === "free_shipping") return `${base} - Frete Grátis`;
     if (type === "discount") {
         const valStr = discountType === "percentage" ? `${discountValue || 0}%` : `R$ ${discountValue || 0}`;
         return `${base} - Desconto de ${valStr}`;
@@ -107,8 +119,9 @@ export default function PromotionFormPage({
     const [editingRule, setEditingRule] = useState<any | null>(null)
 
     const getTabErrorCount = useCallback((tab: string) => {
-        return REQUIRED_FIELDS.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
-    }, [fieldErrors])
+        const ruleFields = getRequiredFieldsForType(editingRule?.promotion_type)
+        return ruleFields.filter(({ field, tab: fieldTab }) => fieldTab === tab && fieldErrors.has(field)).length
+    }, [fieldErrors, editingRule?.promotion_type])
 
     const validateFields = useCallback(() => {
         const errors = new Set<string>()
@@ -134,6 +147,7 @@ export default function PromotionFormPage({
                     errors.add("gift_selection")
                 }
             }
+            // free_shipping type has no required rule fields beyond the campaign name
         }
 
         setFieldErrors(errors)
@@ -284,7 +298,7 @@ export default function PromotionFormPage({
             return
         }
 
-        if (editingRule) {
+            if (editingRule) {
             if (editingRule.promotion_type === "buy_x_pay_y") {
                 if (!editingRule.buy_quantity || !editingRule.pay_quantity || Number(editingRule.buy_quantity) <= Number(editingRule.pay_quantity)) {
                     toast({ title: "Erro", description: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga.", variant: "destructive" })
@@ -305,6 +319,7 @@ export default function PromotionFormPage({
                     return
                 }
             }
+            // free_shipping type: no additional validation needed (min_spend_amount optional)
         }
 
         setIsSaving(true)
@@ -561,7 +576,7 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="link" type="button" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" onClick={() => setIsProductsSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Produtos
                         </Button>
                     </div>
@@ -714,7 +729,7 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="link" type="button" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" onClick={() => setIsCategoriesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Categorias
                         </Button>
                     </div>
@@ -836,7 +851,7 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="link" type="button" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" onClick={() => setIsServicesSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Serviços
                         </Button>
                     </div>
@@ -989,7 +1004,7 @@ export default function PromotionFormPage({
                                 label=""
                             />
                         </div>
-                        <Button variant="link" type="button" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
+                        <Button variant="link" onClick={() => setIsCustomersSheetOpen(true)} leftIcon={<PlusIcon size={16} />}>
                             Selecionar Clientes
                         </Button>
                     </div>
@@ -1312,11 +1327,12 @@ export default function PromotionFormPage({
                                                                     markDirty()
                                                                     setEditingRule({ ...editingRule, promotion_type: val })
                                                                 }}
-                                                                options={[
-                                                                    { value: "discount", label: "Desconto Direto (Fixo ou %)" },
-                                                                    { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
-                                                                    { value: "gift", label: "Ganhar Brinde (Freebie)" }
-                                                                ]}
+                                                                    options={[
+                                                                        { value: "discount", label: "Desconto Direto (Fixo ou %)" },
+                                                                        { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
+                                                                        { value: "gift", label: "Ganhar Brinde (Freebie)" },
+                                                                        { value: "free_shipping", label: "Frete Grátis" }
+                                                                    ]}
                                                             />
 
                                                             {editingRule.promotion_type === "discount" && (
@@ -1439,10 +1455,10 @@ export default function PromotionFormPage({
                                                             )}
 
                                                             {editingRule.promotion_type === "gift" && (
-                                                                <FormSection title="Brinde">
+                                                                <FormSection title="Brinde" hasSeparator>
                                                                     <div className="flex flex-col gap-4">
                                                                         <div className="flex justify-end">
-                                                                            <Button variant="outline" type="button" onClick={() => {
+                                                                            <Button variant="link" onClick={() => {
                                                                                 setIsGiftSheetOpen(true)
                                                                                 if (fieldErrors.has("gift_selection")) {
                                                                                     setFieldErrors(prev => {
@@ -1456,7 +1472,20 @@ export default function PromotionFormPage({
                                                                             </Button>
                                                                         </div>
                                                                         {fieldErrors.has("gift_selection") && (
-                                                                            <p className="text-sm text-red-500">Selecione um brinde</p>
+                                                                            <InfoCard
+                                                                                title="Erro"
+                                                                                message="Selecione um brinde"
+                                                                                rightElement={
+                                                                                    <Button
+                                                                                        variant="link"
+                                                                                        className="text-brand-red hover:text-brand-red/70"
+                                                                                        onClick={() => setIsGiftSheetOpen(true)}
+                                                                                    >
+                                                                                        Adicionar brinde
+                                                                                    </Button>
+                                                                                }
+                                                                                color="red"
+                                                                            />
                                                                         )}
 
                                                                         {(() => {
@@ -1469,9 +1498,16 @@ export default function PromotionFormPage({
 
                                                                             if (!selectedItem) {
                                                                                 return (
-                                                                                    <div className="text-center py-8 border border-dashed border-brand-border dark:border-dark-border rounded-xl bg-gray-50/50 dark:bg-dark-surface/30">
-                                                                                        <p className="text-sm text-brand-inactive-text dark:text-dark-body">Nenhum brinde selecionado.</p>
-                                                                                    </div>
+                                                                                    <IconPlaceholder
+                                                                                        icon={GiftIcon}
+                                                                                        title="Nenhum brinde selecionado"
+                                                                                        subtitle="Selecione um brinde para a promoção."
+                                                                                        itemButton={{
+                                                                                            text: "Selecionar Brinde",
+                                                                                            action: () => setIsGiftSheetOpen(true),
+                                                                                            variant: "outline",
+                                                                                        }}
+                                                                                    />
                                                                                 )
                                                                             }
 
@@ -1513,6 +1549,18 @@ export default function PromotionFormPage({
                                                                                 </div>
                                                                             )
                                                                         })()}
+                                                                    </div>
+                                                                </FormSection>
+                                                                    )}
+
+                                                            {editingRule.promotion_type === "free_shipping" && (
+                                                                <FormSection title="Frete Grátis" hasSeparator>
+                                                                    <div className="space-y-3">
+                                                                        <InfoCard
+                                                                            title="Frete Grátis"
+                                                                            message="Esta promoção isenta o cliente do valor do frete na sacola, desde que atenda ao valor mínimo de compra configurado ao lado."
+                                                                            color="green"
+                                                                        />
                                                                     </div>
                                                                 </FormSection>
                                                             )}

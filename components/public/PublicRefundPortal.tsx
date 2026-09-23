@@ -293,10 +293,7 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                         <TabsTrigger value="details">Detalhes da Solicitação</TabsTrigger>
                         {totalAttachments > 0 && (
                             <TabsTrigger value="attachments" className="flex items-center gap-2">
-                                <span>Anexos</span>
-                                <Badge variant="green" className="px-1.5 py-0.2 text-[10px]">
-                                    {totalAttachments}
-                                </Badge>
+                                <span>Anexos ({totalAttachments})</span>
                             </TabsTrigger>
                         )}
                         <TabsTrigger value="history">Histórico do Reembolso</TabsTrigger>
@@ -390,20 +387,20 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                                         />
 
                                         <div className="space-y-2 pt-2 text-left">
-                                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">
+                                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                                 Justificativa do Lojista
                                             </span>
-                                            <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
+                                            <div className="text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed">
                                                 {refund.reason_description || "Nenhuma justificativa detalhada foi fornecida."}
                                             </div>
                                         </div>
 
                                         {refund.admin_response && (
                                             <div className="space-y-2 pt-2 text-left">
-                                                <span className="text-xs font-bold text-brand-green uppercase tracking-wider block">
+                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                                     Parecer Oficial da Equipe Dudit
                                                 </span>
-                                                <div className="p-4 bg-brand-gray dark:bg-dark-border/20 rounded-2xl text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed border border-brand-border dark:border-dark-border">
+                                                <div className="text-xs sm:text-sm text-brand-dark dark:text-dark-body whitespace-pre-wrap leading-relaxed">
                                                     {refund.admin_response}
                                                 </div>
                                             </div>
@@ -449,7 +446,7 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                                 {/* Section 4: Estabelecimento / Lojista */}
                                 <FormSection title="Estabelecimento / Lojista">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border/40 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 shadow-xs">
+                                        <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/50 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0">
                                             {partnerLogo ? (
                                                 <img src={partnerLogo} alt={refund.partnerName} className="w-full h-full object-cover" />
                                             ) : (
@@ -581,15 +578,12 @@ export function PublicRefundPortal({ refund }: PublicRefundPortalProps) {
                                 <div className="space-y-3 pt-2">
                                     <Button
                                         variant="outline"
-                                        className="w-full h-12 font-bold flex items-center justify-center gap-2"
+                                        className="w-full h-12"
                                         onClick={handleCopyLink}
                                     >
                                         <ShareIcon size={16} />
                                         <span>{copiedLink ? "Link Copiado!" : "Copiar Link de Acompanhamento"}</span>
                                     </Button>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body text-center font-mono">
-                                        Protocolo: {refund.token?.slice(0, 16)}...
-                                    </p>
                                 </div>
                             </div>
                         </div>

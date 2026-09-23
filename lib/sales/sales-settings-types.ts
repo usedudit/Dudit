@@ -7,6 +7,7 @@ export interface SalesSettings {
   quoteValidityDays: number
   autoCancelManualOrdersHours: number // 0 = never, 24, 48, 72, 168
   defaultReceiptFormat: "thermal" | "a4"
+  cancelExpiredDepositOrders: boolean // when true, orders with expired sinal are auto-cancelled
 }
 
 export const DEFAULT_SALES_SETTINGS: SalesSettings = {
@@ -18,6 +19,7 @@ export const DEFAULT_SALES_SETTINGS: SalesSettings = {
   quoteValidityDays: 15,
   autoCancelManualOrdersHours: 0, // 0 = never cancel manual orders
   defaultReceiptFormat: "thermal",
+  cancelExpiredDepositOrders: false,
 }
 
 export interface ReceiptSettings {

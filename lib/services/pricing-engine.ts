@@ -552,6 +552,13 @@ export function calculateOrderPricing(input: PricingInput): PricingResult {
           appliedPromotionIds.push(promo.id)
         }
       }
+    } else if (promo.promotionType === PromotionType.FREE_SHIPPING) {
+      if (promo.minSpendAmount != null && promo.minSpendAmount > 0) {
+        const eligibleOrigSum = eligibleIdx.reduce((sum, idx) => sum + units[idx].originalPrice, 0)
+        if (eligibleOrigSum < promo.minSpendAmount) continue
+      }
+      freeShippingAppliedCampaign = true
+      appliedPromotionIds.push(promo.id)
     }
   }
 

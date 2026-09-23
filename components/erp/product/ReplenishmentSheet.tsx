@@ -215,7 +215,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                             {suggestions.map((s) => (
                                 <div
                                     key={s.id}
-                                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-orange/40 hover:shadow-sm transition-all cursor-pointer"
+                                    className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-green transition-all cursor-pointer"
                                     onClick={() => {
                                         onClose()
                                         router.push(`/erp/produtos?view=${s.id}`)

@@ -122,9 +122,9 @@ export function RecentActivities({ activities }: { activities: any[] }) {
     );
   }
 
-  // Sort and slice to max 6 activities
+  // Sort and slice to max 4 activities
   const sortedActivities = [...activities].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  const limitedActivities = sortedActivities.slice(0, 6);
+  const limitedActivities = sortedActivities.slice(0, 4);
 
   const groups: Record<string, any[]> = {};
   for (const item of limitedActivities) {
@@ -164,16 +164,11 @@ export function RecentActivities({ activities }: { activities: any[] }) {
         title,
         items: groups[ymd].map(item => {
           const Icon = activityIconMap[item.icon] || AlertCircleIcon
-          const entityRef = item.entityId && item.entityLabel
-            ? `${item.entityLabel} #${item.entityId.slice(0, 8)}`
-            : item.entityId
-              ? `#${item.entityId.slice(0, 8)}`
-              : ""
           return {
             id: item.id,
             time: item.time + (item.user ? ` · ${item.user}` : ""),
             text: `${item.title}${item.description ? `: ${item.description}` : ""}`,
-            entityRef,
+            entityRef: item.entityRef || "",
             icon: Icon
           };
         })

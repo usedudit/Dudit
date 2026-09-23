@@ -509,7 +509,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
             <div className="col-span-12 lg:col-span-8 pr-0 lg:pr-12">
                 <FormSection title="Informações Básicas" className="mb-8">
                     <div className="mb-10">
-                        <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
+                         <ProductImagesSection images={images} onImageUpload={onImageUpload} onRemoveImage={onRemoveImage} onSetPrimaryImage={onSetPrimaryImage} isEditing={isEditing} uploadingImages={uploadingImages} blockedImages={blockedImages} isSaving={isSaving} moderationStatus={productData.moderation_status} />
                     </div>
 
                     <div className="space-y-6">
@@ -553,7 +553,7 @@ export const ProductGeneralTab: React.FC<ProductGeneralTabProps> = ({
 
                             {!isDesapego ? (
                                 <>
-                                    <div className={`col-span-12 sm:col-span-6`}>
+                                    <div className="col-span-12 sm:col-span-6">
                                         <FormDropdown
                                             label="Status"
                                             options={[{ value: "true", label: "Ativo" }, { value: "false", label: "Inativo" }]}

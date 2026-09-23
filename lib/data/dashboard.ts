@@ -110,6 +110,7 @@ const generalRevenueChartCacheMap = new Map<string, any>()
 const generalRevenueOriginCacheMap = new Map<string, any>()
 const generalActivityCacheMap = new Map<string, any>()
 const generalAbcCurveCacheMap = new Map<string, any>()
+const generalOrdersChartCacheMap = new Map<string, any>()
 const generalTopCategoriesCacheMap = new Map<string, any>()
 const productsDashboardCacheMap = new Map<string, any>()
 
@@ -147,6 +148,7 @@ export const DASHBOARD_TAGS = {
   activity: (partnerId: string) => `dashboard-activity:${partnerId}`,
   categories: (partnerId: string, period = "monthly") => `dashboard-categories:${partnerId}:${period}`,
   abcCurve: (partnerId: string, period = "monthly") => `dashboard-abc-curve:${partnerId}:${period}`,
+  ordersChart: (partnerId: string, period = "monthly") => `dashboard-orders-chart:${partnerId}:${period}`,
   products: (partnerId: string) => `dashboard-products:${partnerId}`,
   services: (partnerId: string) => `dashboard-services:${partnerId}`,
   financial: (partnerId: string) => `dashboard-financial:${partnerId}`,
@@ -208,9 +210,11 @@ export type ActivityItem = {
   icon: string
   tone: "green" | "blue" | "orange" | "red" | "default"
   user?: string
+  date?: string
   entityId?: string
   entityType?: string
   entityLabel?: string
+  entityRef?: string
 }
 
 export type ProductsDashboardData = {
@@ -272,6 +276,11 @@ export const brl = (value: unknown) =>
 
 const compact = (value: unknown) =>
   new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(money(value))
+
+const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+
+const stripUuids = (text: string) =>
+  text.replace(UUID_PATTERN, " ").replace(/\s{2,}/g, " ").trim()
 
 const dateLabel = (value?: string | null) => {
   if (!value) return "-"
@@ -1026,6 +1035,48 @@ async function getCachedGeneralRevenueOrigin(partnerId: string, storeId = "", pe
   return cachedFn()
 }
 
+const bucketCountByDate = (rows: any[], dateKey: string, days = 30) => {
+  const today = getTodayYmdInTz()
+  const map = new Map<string, number>()
+  for (let i = 0; i < days; i++) {
+    map.set(dateLabel(addDays(today, -i)), 0)
+  }
+  for (const row of rows) {
+    const label = dateLabel(row[dateKey])
+    if (map.has(label)) {
+      map.set(label, map.get(label)! + 1)
+    }
+  }
+  return Array.from(map.entries())
+    .reverse()
+    .map(([label, value]) => ({ label, value }))
+}
+
+async function getCachedGeneralOrdersChart(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ orders: ChartPoint[]; total: number }> {
+  const mapKey = `${partnerId}:${period}`
+  let cachedFn = generalOrdersChartCacheMap.get(mapKey)
+  if (!cachedFn) {
+    cachedFn = unstable_cache(
+      async () => {
+        const { today, from } = getDateRangeForPeriod(period)
+        const daysInPeriod = period === "daily" ? 1 : period === "weekly" ? 7 : 30
+        const allOrders = await loadRawOrdersGeneralTab(partnerId, today, _requestTimezone)
+        const current = (allOrders || []).filter((order: any) => String(order.created_at).slice(0, 10) >= from)
+
+        return {
+          orders: bucketCountByDate(current, "created_at", daysInPeriod),
+          total: current.length,
+        }
+      },
+      ["dashboard-orders-chart", partnerId, storeId, period],
+      { tags: [DASHBOARD_TAGS.ordersChart(partnerId, period), DASHBOARD_TAGS.general(partnerId, period)], revalidate: 120 },
+    )
+    generalOrdersChartCacheMap.set(mapKey, cachedFn)
+  }
+  return cachedFn()
+}
+
+
 async function getCachedGeneralAbcCurve(partnerId: string, storeId = "", period: Period = "monthly"): Promise<{ abcCurve: AbcCurvePoint[] }> {
   const mapKey = `${partnerId}:${period}`
   let cachedFn = generalAbcCurveCacheMap.get(mapKey)
@@ -1118,6 +1169,7 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
           quote: { label: "Orçamento", gender: "m", icon: "file" },
           cash_session: { label: "Sessão de Caixa", gender: "f", icon: "money" },
           coupon: { label: "Cupom", gender: "m", icon: "tag" },
+          return_request: { label: "Devolução", gender: "f", icon: "file" },
         }
 
         const actionLabels: Record<string, { m: string; f: string }> = {
@@ -1135,6 +1187,60 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
           cancelled: "red", deleted: "red", refunded: "orange",
           updated: "blue", cash_opened: "blue", cash_closed: "blue",
         }
+
+        // Resolve human-readable references (order_number, description, name, ...)
+        // so UUIDs are never exposed in the UI.
+        const idsByType = new Map<string, string[]>()
+        for (const row of data) {
+          const type = String(row.entity_type || "").toLowerCase()
+          const id = row.entity_id ? String(row.entity_id) : ""
+          if (!id) continue
+          const list = idsByType.get(type)
+          if (list) list.push(id)
+          else idsByType.set(type, [id])
+        }
+
+        const refByEntityId = new Map<string, string>()
+        const collectRefs = (rows: any[] | null, makeRef: (row: any) => string) => {
+          for (const row of rows || []) {
+            const ref = makeRef(row)
+            if (ref) refByEntityId.set(String(row.id), ref)
+          }
+        }
+
+        const refJobs: Promise<void>[] = []
+        const queueRefJob = (type: string, run: (ids: string[]) => PromiseLike<{ data: any }>, makeRef: (row: any) => string) => {
+          const ids = idsByType.get(type)
+          if (!ids || ids.length === 0) return
+          refJobs.push(
+            Promise.resolve(run(ids))
+              .then(({ data: rows }) => collectRefs(rows, makeRef))
+              .catch(() => undefined),
+          )
+        }
+
+        queueRefJob("order", ids => supabase.from("orders").select("id, order_number").eq("partner_id", partnerId).in("id", ids), row =>
+          row.order_number ? `Pedido #${row.order_number}` : "",
+        )
+        queueRefJob("transaction", ids => supabase.from("transactions").select("id, description").eq("partner_id", partnerId).in("id", ids), row =>
+          row.description ? String(row.description) : "",
+        )
+        queueRefJob("return_request", ids => supabase.from("return_requests").select("id, order_number_snapshot, orders!order_id(order_number)").eq("partner_id", partnerId).in("id", ids), row => {
+          const orderNumber = row.order_number_snapshot || row.orders?.order_number
+          return orderNumber ? `Pedido #${orderNumber}` : ""
+        })
+        queueRefJob("product", ids => supabase.from("products").select("id, name").eq("partner_id", partnerId).in("id", ids), row => row.name || "")
+        queueRefJob("service", ids => supabase.from("services").select("id, name").eq("partner_id", partnerId).in("id", ids), row => row.name || "")
+        queueRefJob("customer", ids => supabase.from("customers").select("id, name").eq("partner_id", partnerId).in("id", ids), row => row.name || "")
+        queueRefJob("appointment", ids => supabase.from("appointments").select("id, customer_name, service_name").eq("partner_id", partnerId).in("id", ids), row =>
+          [row.customer_name, row.service_name].filter(Boolean).join(" · "),
+        )
+        queueRefJob("quote", ids => supabase.from("quotes").select("id, quote_number").eq("partner_id", partnerId).in("id", ids), row =>
+          row.quote_number ? `Orçamento #${row.quote_number}` : "",
+        )
+        queueRefJob("coupon", ids => supabase.from("coupons").select("id, code").eq("partner_id", partnerId).in("id", ids), row => row.code || "")
+
+        await Promise.all(refJobs)
 
         const activity: ActivityItem[] = data.map((row: any) => {
           const action = String(row.action_type || "").toLowerCase()
@@ -1161,7 +1267,7 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
             }
           }
 
-          const desc = lines.length > 0 ? String(lines[0]).slice(0, 80) : ""
+          const desc = lines.length > 0 ? stripUuids(String(lines[0])).slice(0, 80) : ""
           const timeStr = (() => {
             try { return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(row.created_at)) } catch { return "" }
           })()
@@ -1181,6 +1287,7 @@ async function getCachedGeneralActivity(partnerId: string, storeId = ""): Promis
             entityId: row.entity_id ? String(row.entity_id) : undefined,
             entityType: entity,
             entityLabel: entityMeta[entity]?.label || entity,
+            entityRef: refByEntityId.get(String(row.entity_id || "")) || undefined,
           }
         })
 
@@ -1282,6 +1389,13 @@ export async function getGeneralAbcCurve(partnerId: string, period: Period = "mo
   const tz = await getPartnerTimezone(partnerId)
   _requestTimezone = tz
   return getCachedGeneralAbcCurve(partnerId, storeId, period)
+}
+
+export async function getGeneralOrdersChart(partnerId: string, period: Period = "monthly", storeId = "") {
+  await requirePermission(partnerId, "dashboard", "view")
+  const tz = await getPartnerTimezone(partnerId)
+  _requestTimezone = tz
+  return getCachedGeneralOrdersChart(partnerId, storeId, period)
 }
 
 export async function getGeneralActivity(partnerId: string, storeId = "") {

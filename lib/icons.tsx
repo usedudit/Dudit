@@ -103,6 +103,7 @@ import {
     ZoomInAreaIcon,
     ZoomOutAreaIcon,
     RotateCropIcon,
+    GiftIcon as GiftIcon01,
     QrCodeIcon as QrCodeIcon01,
     CreditCardIcon as CreditCard,
     ShippingTruck01Icon,
@@ -332,7 +333,7 @@ export const DeliveryPickupIcon = CreateIcon(DeliveryTracking01Icon)
 export const DeliveryFailedIcon = CreateIcon(RouteBlockIcon01)
 export const AwardIcon = CreateIcon(StarAward01Icon)
 export const RankingIcon = CreateIcon(RankingIcon01)
-
+export const GiftIcon = CreateIcon(GiftIcon01)
 
 // ============================
 // UI / LAYOUT

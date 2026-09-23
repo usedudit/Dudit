@@ -109,15 +109,19 @@ export async function getPurchaseAction(purchaseId: string): Promise<PurchaseWit
     if (!user) return null
 
     const admin = getAdminClient()
-    const { data, error } = await admin
-        .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name)), billing_payments(*), billing_invoices(*)")
-        .eq("id", purchaseId)
-        .maybeSingle()
+    const [rowResult, adminUser] = await Promise.all([
+        admin
+            .from("billing_purchases")
+            .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name)), billing_payments(*), billing_invoices(*)")
+            .eq("id", purchaseId)
+            .maybeSingle(),
+        getAdminRole(),
+    ])
+
+    const { data, error } = rowResult
 
     if (error || !data) return null
 
-    const adminUser = await getAdminRole()
     if (adminUser) {
         try {
             requireScope(adminUser, "billing_control")
@@ -216,7 +220,7 @@ export async function listPurchasesPageAction(
     const admin = getAdminClient()
     let dataQuery = admin
         .from("billing_purchases")
-        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name))", { count: "exact" })
+        .select("*, partners!billing_purchases_partner_id_fkey(id, stores(name)), billing_payments(payment_method_type)", { count: "exact" })
 
     if (scope.partnerIds) {
         if (scope.partnerIds.length === 1) {
@@ -238,10 +242,14 @@ export async function listPurchasesPageAction(
     }
 
     return {
-        data: (data || []).map((item: any) => ({
-            ...item,
-            partner_name: item.partners?.stores?.[0]?.name || null,
-        })),
+        data: (data || []).map((item: any) => {
+            const firstPayment = (item.billing_payments && item.billing_payments[0]) || null
+            return {
+                ...item,
+                partner_name: item.partners?.stores?.[0]?.name || null,
+                payment_method_type: firstPayment?.payment_method_type || null,
+            }
+        }),
         total: count ?? 0,
         page,
         pageSize,

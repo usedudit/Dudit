@@ -59,6 +59,10 @@ function sanitizeSalesSettings(input: Partial<SalesSettings>): Partial<SalesSett
     sanitized.autoCancelManualOrdersHours = validHours.includes(hours) ? hours : 0
   }
 
+  if (input.cancelExpiredDepositOrders !== undefined) {
+    sanitized.cancelExpiredDepositOrders = Boolean(input.cancelExpiredDepositOrders)
+  }
+
   if (input.defaultReceiptFormat !== undefined) {
     sanitized.defaultReceiptFormat = input.defaultReceiptFormat === "a4" ? "a4" : "thermal"
   }
@@ -119,6 +123,9 @@ export async function getSalesSettingsAction(partnerId: string) {
         ? rawSettings.autoCancelManualOrdersHours
         : DEFAULT_SALES_SETTINGS.autoCancelManualOrdersHours,
       defaultReceiptFormat: rawSettings?.defaultReceiptFormat === "a4" ? "a4" : "thermal",
+      cancelExpiredDepositOrders: typeof rawSettings?.cancelExpiredDepositOrders === "boolean"
+        ? rawSettings.cancelExpiredDepositOrders
+        : DEFAULT_SALES_SETTINGS.cancelExpiredDepositOrders,
     }
 
     return { success: true as const, data: settings }

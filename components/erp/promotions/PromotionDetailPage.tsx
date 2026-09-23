@@ -63,11 +63,12 @@ export default function PromotionDetailPage({
                     <Div className="border border-brand-border dark:border-dark-border p-4 rounded-xl space-y-3">
                         <Div className="flex justify-between text-sm">
                             <Span className="text-brand-inactive-text">Tipo de Promoção:</Span>
-                            <Span className="font-semibold capitalize">
-                                {promotion.promotion_type === "gift" && "Brinde"}
-                                {promotion.promotion_type === "buy_x_pay_y" && "Leve X Pague Y"}
-                                {promotion.promotion_type === "discount" && "Desconto Direto"}
-                            </Span>
+                                <Span className="font-semibold capitalize">
+                                                                     {promotion.promotion_type === "gift" && "Brinde"}
+                                                                     {promotion.promotion_type === "buy_x_pay_y" && "Leve X Pague Y"}
+                                                                     {promotion.promotion_type === "discount" && "Desconto Direto"}
+                                                                     {promotion.promotion_type === "free_shipping" && "Frete Grátis"}
+                                                                     </Span>
                         </Div>
 
                         {promotion.promotion_type === "discount" && (

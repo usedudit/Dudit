@@ -33,7 +33,7 @@ const PromotionSchema = z.object({
   campaignId: z.string().uuid(),
   name: z.string().min(1, "O nome da promoção é obrigatório.").max(150, "O nome da promoção deve ter no máximo 150 caracteres."),
   description: z.string().nullable().optional(),
-  promotionType: z.enum(["gift", "buy_x_pay_y", "discount"]),
+   promotionType: z.enum(["gift", "buy_x_pay_y", "discount", "free_shipping"]),
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
   discountValue: z.number().min(0.01).nullable().optional(),
   maxDiscountAmount: z.number().min(0).nullable().optional(),
@@ -216,7 +216,8 @@ async function checkPromotionOverlap(
     if (hasOverlap) {
       const typeLabel =
         data.promotionType === "discount" ? "desconto" :
-        data.promotionType === "gift" ? "brinde" : "Leve X Pague Y"
+        data.promotionType === "gift" ? "brinde" :
+        data.promotionType === "free_shipping" ? "frete grátis" : "Leve X Pague Y"
 
       return `O item/escopo selecionado já possui uma promoção de ${typeLabel} ativa no mesmo período (Campanha: "${promo.name || "Existente"}").`
     }

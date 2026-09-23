@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, type FC } fro
 import { useScrollToFirstError } from "@/hooks/use-scroll-to-first-error"
 import { AnimatePresence } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, Button, Badge, Tooltip, Input, Combobox, ActionsDropdown } from "@/components/reusable"
-import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ThreeDotsIcon, EditIcon, SaveIcon, SparklesIcon } from "@/lib/icons"
 import type { Product } from "@/lib/types/product"
 import { useNotification } from "@/hooks/use-notification"
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes"
@@ -32,6 +32,7 @@ import AlertModal from "@/components/reusable/AlertModal"
 import SavingStatusModal from "@/components/reusable/SavingStatusModal"
 import ImageCropperModal from "@/components/ImageCropperModal"
 import NcmSelectionModal from "./NcmSelectionModal"
+import ImageAnalysisModal from "./ImageAnalysisModal"
 import { ProductGeneralTab } from "./ProductGeneralTab"
 import { ProductVariationsTab } from "./ProductVariationsTab"
 import { ProductSuppliersTab } from "./ProductSuppliersTab"
@@ -207,6 +208,9 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
     const [showAlertModal, setShowAlertModal] = useState(false)
     const [nextAction, setNextAction] = useState<(() => void) | null>(null)
+
+    const [isImageAnalysisModalOpen, setIsImageAnalysisModalOpen] = useState(false)
+    const [isAnalyzingImage, setIsAnalyzingImage] = useState(false)
 
     const handleAttemptNav = useCallback((action: () => void) => {
         if (isEditing && isDirty) { setNextAction(() => action); setShowAlertModal(true) }
@@ -403,33 +407,32 @@ const AddProductPage: FC<AddProductPageProps> = ({
     const [isGeneratingDetails, setIsGeneratingDetails] = useState(false)
 
     const handleGenerateAiDetails = useCallback(async () => {
-        const productName = productData.name?.trim()
-        if (!productName) return notifyWarning("Atenção", "Digite o nome do produto primeiro")
+        const productName = productData.name?.trim() || "Produto"
         setIsGeneratingDetails(true)
         try {
-            // Verificar se há imagem para enviar (primeira imagem File)
-            let imageBase64: string | undefined
-            let imageMimeType: string | undefined
-            const firstImage = productData.images?.[0]
-            if (firstImage instanceof File) {
+            // Coletar até 3 imagens File para análise (limite do Groq)
+            const fileImages = (productData.images || []).filter((img: string | File): img is File => img instanceof File).slice(0, 3)
+
+            const images: Array<{ base64: string; mimeType: string }> = []
+            for (const file of fileImages) {
                 const reader = new FileReader()
                 const base64Promise = new Promise<string>((resolve) => {
                     reader.onloadend = () => {
                         const result = reader.result as string
-                        // Extrair apenas o base64 (remover prefixo data:image/...;base64,)
                         const base64 = result.split(",")[1] || ""
                         resolve(base64)
                     }
-                    reader.readAsDataURL(firstImage)
+                    reader.readAsDataURL(file)
                 })
-                imageBase64 = await base64Promise
-                imageMimeType = firstImage.type || "image/jpeg"
+                const base64 = await base64Promise
+                if (base64) {
+                    images.push({ base64, mimeType: file.type || "image/jpeg" })
+                }
             }
 
             const body: any = { title: productName, partnerId, itemType: "product" }
-            if (imageBase64) {
-                body.imageBase64 = imageBase64
-                body.imageMimeType = imageMimeType
+            if (images.length > 0) {
+                body.images = images
             }
 
             const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
@@ -491,6 +494,78 @@ const AddProductPage: FC<AddProductPageProps> = ({
             setIsGeneratingDetails(false)
         }
     }, [productData.name, productData.images, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning, openPlanUpgrade])
+
+    const handleAnalyzeImages = useCallback(async (images: Array<{ base64: string; mimeType: string; file: File }>) => {
+        const productName = productData.name?.trim() || "Produto"
+        setIsAnalyzingImage(true)
+        try {
+            const body: any = {
+                title: productName,
+                partnerId,
+                itemType: "product",
+                images: images.map((img) => ({ base64: img.base64, mimeType: img.mimeType })),
+            }
+
+            const data = await fetchJSONWithCSRF<{ data: any; error?: string }>("/api/ai/generate-product-details", {
+                method: "POST",
+                body,
+            })
+
+            if (data.error) {
+                notifyError("Erro", data.error)
+                return
+            }
+
+            const aiData = data.data
+            setProductData((prev: any) => {
+                let brandId = prev.brand_id
+                let brandName = prev.brand
+                if (aiData.brand && typeof aiData.brand === "string" && aiData.brand.trim()) {
+                    const detected = aiData.brand.trim()
+                    const matchedBrand = brandOptions.find(
+                        (b: any) => b && (b.label || "").toLowerCase() === detected.toLowerCase()
+                    )
+                    if (matchedBrand) {
+                        brandId = matchedBrand.value
+                        brandName = matchedBrand.label
+                    } else {
+                        brandId = ""
+                        brandName = detected
+                    }
+                }
+
+                const newAttrs = Object.entries(aiData.specs || {}).map(([name, value], idx) => ({
+                    id: Date.now() + idx,
+                    name,
+                    value: String(value)
+                }))
+
+                return {
+                    ...prev,
+                    name: aiData.name || prev.name,
+                    description: aiData.description || prev.description,
+                    brand: brandName,
+                    brand_id: brandId,
+                    tags: aiData.tags || prev.tags,
+                    attributes: newAttrs,
+                    marketplace_category_id: aiData.category?.id || prev.marketplace_category_id,
+                }
+            })
+
+            notifySuccess("Sucesso", "Dados gerados com IA a partir das imagens!")
+            setIsImageAnalysisModalOpen(false)
+        } catch (e: any) {
+            const msg = e?.error || e?.message || "Falha ao conectar com o servidor."
+            if (e?.code === "plan_blocked") {
+                notifyError("Plano atual não inclui geração por IA", msg)
+                openPlanUpgrade("crescer")
+            } else {
+                notifyError("Erro", msg)
+            }
+        } finally {
+            setIsAnalyzingImage(false)
+        }
+    }, [productData.name, partnerId, brandOptions, notifyError, notifySuccess, notifyWarning, openPlanUpgrade])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [showImageCropper, setShowImageCropper] = useState(false)
@@ -923,6 +998,13 @@ const AddProductPage: FC<AddProductPageProps> = ({
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         {isEditing ? (
                                             <>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setIsImageAnalysisModalOpen(true)}
+                                                    disabled={isAnalyzingImage || isSavingProduct || isLoadingDetails}
+                                                    className="w-10 h-10 p-0 flex items-center justify-center"
+                                                    leftIcon={<SparklesIcon className="w-4 h-4 text-brand-purple" />}
+                                                />
                                                 <Button variant="outline" onClick={handleCancelEdit} disabled={isSavingProduct || isLoadingDetails}>
                                                     Cancelar
                                                 </Button>
@@ -1105,6 +1187,14 @@ const AddProductPage: FC<AddProductPageProps> = ({
                             <>
                                 <Button
                                     variant="outline"
+                                    onClick={() => setIsImageAnalysisModalOpen(true)}
+                                    disabled={isAnalyzingImage || isSavingProduct || isLoadingDetails}
+                                    className="h-12"
+                                    leftIcon={<SparklesIcon size={18} className="text-brand-purple" />}
+                                >
+                                </Button>
+                                <Button
+                                    variant="outline"
                                     onClick={handleCancelEdit}
                                     disabled={isSavingProduct || isLoadingDetails}
                                     className="flex-1 h-12"
@@ -1212,6 +1302,12 @@ const AddProductPage: FC<AddProductPageProps> = ({
                     suggestions={ncmSuggestions}
                     onSelect={handleNcmSelect}
                     isLoading={isLoadingNcmSuggestion}
+                />
+                <ImageAnalysisModal
+                    isOpen={isImageAnalysisModalOpen}
+                    onClose={() => setIsImageAnalysisModalOpen(false)}
+                    onAnalyze={handleAnalyzeImages}
+                    isLoading={isAnalyzingImage}
                 />
                 <DefaultModal
                     isOpen={metadataModal.isOpen}

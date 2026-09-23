@@ -27,17 +27,6 @@ import { useRouter } from "next/navigation"
 
 const CDN_URL = r2PublicConfig.cdnUrl || "https://img.dudit.com.br"
 
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-    aberta: ["aguardando_aprovacao", "cancelada"],
-    aguardando_aprovacao: ["aprovada", "cancelada"],
-    aprovada: ["em_andamento", "cancelada"],
-    em_andamento: ["aguardando_peca", "concluida", "cancelada"],
-    aguardando_peca: ["em_andamento", "cancelada"],
-    concluida: ["entregue"],
-    entregue: [],
-    cancelada: [],
-}
-
 const SERVICE_STATUS_ORDER: string[] = [
     "aberta", "aguardando_aprovacao", "aprovada", "em_andamento",
     "aguardando_peca", "concluida", "entregue"
@@ -150,7 +139,6 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
     }, [order?.order_number, handleBack, setHeaderOverride])
 
     const statusMeta = order?.status ? SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus] : null
-    const availableTransitions = order?.status ? (STATUS_TRANSITIONS[order.status] || []) : []
 
     // Load team members to resolve technician's name
     useEffect(() => {
@@ -170,7 +158,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
 
     const handleStatusChange = async (newStatus: string, reason?: string) => {
         setLoading(true)
-        const res = await updateServiceOrderStatusAction(partnerId, order.id, newStatus)
+        const res = await updateServiceOrderStatusAction(partnerId, order.id, newStatus, reason)
         if (res.success) {
             // Reload full service order details to get correct history / updates
             const detailsRes = await getServiceOrderDetailsAction(order.id, partnerId)
@@ -403,7 +391,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                                     <div className="hidden md:flex items-center gap-3 shrink-0 ml-3">
                                         <ActionsDropdown
                                             onEdit={handleEditClick}
-                                            onStatus={() => setShowStatusModal(true)}
+                                            onStatus={() => { setSelectedStatus(order.status || ""); setShowStatusModal(true) }}
                                             onShare={async () => {
                                                 if (!hasMinimumPlan(planSlug, "crescer")) {
                                                     openPlanUpgrade("crescer");
@@ -1070,22 +1058,18 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
             >
                 <div className="space-y-4 py-2">
                     <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                        Status atual: <strong className="text-brand-dark dark:text-dark-heading">{SERVICE_ORDER_STATUS_META[order.status as ServiceOrderStatus]?.label || order.status}</strong>
+                        Selecione o novo status para esta OS:
                     </p>
-                    {availableTransitions.length === 0 ? (
-                        <p className="text-sm text-brand-inactive-text text-center py-4">Não há alterações de status disponíveis.</p>
-                    ) : (
-                        <FormDropdown
-                            label="Novo Status"
-                            options={availableTransitions.map((status) => ({
-                                value: status,
-                                label: SERVICE_ORDER_STATUS_META[status as ServiceOrderStatus]?.label || status
-                            }))}
-                            value={selectedStatus}
-                            setValue={setSelectedStatus}
-                            placeholder="Selecione o novo status"
-                        />
-                    )}
+                    <FormDropdown
+                        label="Novo Status"
+                        options={(Object.keys(SERVICE_ORDER_STATUS_META) as ServiceOrderStatus[]).map((status) => ({
+                            value: status,
+                            label: SERVICE_ORDER_STATUS_META[status].label
+                        }))}
+                        value={selectedStatus}
+                        setValue={setSelectedStatus}
+                        placeholder="Selecione o novo status"
+                    />
                 </div>
             </DefaultModal>
 

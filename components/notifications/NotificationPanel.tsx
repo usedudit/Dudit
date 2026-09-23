@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useRef, useEffect } from "react"
+import { useCallback, useRef, useEffect, useState } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader } from "../reusable"
+import { AlertModal, Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader } from "../reusable"
 import { usePushNotificationStatus } from "./PushNotificationManager"
-import { BellIcon } from "@/lib/icons"
+import { BellIcon, TrashIcon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface Group {
@@ -22,6 +22,7 @@ export function NotificationPanel({
 	onVisible,
 	onNavigate,
 	onMarkAllAsRead,
+	onDeleteAll,
 	unreadCount,
 	erpOptions,
 	erpFilter,
@@ -36,13 +37,28 @@ export function NotificationPanel({
 	onVisible: (id: string, visible: boolean) => void
 	onNavigate?: () => void
 	onMarkAllAsRead?: () => void
-	unreadCount?: number
-	erpOptions: Array<{ id: string; label: string }>
-	erpFilter: string
+ 	onDeleteAll?: () => Promise<{ success: boolean; deleted: number }>
+ 	unreadCount?: number
+ 	erpOptions: Array<{ id: string; label: string }>
+ 	erpFilter: string
 	onErpFilter: (filter: string) => void
 	activePartnerId: string | null
 }) {
+	const [showDeleteAll, setShowDeleteAll] = useState(false)
+	const [isDeleting, setIsDeleting] = useState(false)
+
 	const sentinelRef = useRef<HTMLDivElement>(null)
+
+	const handleDeleteAllConfirm = useCallback(async () => {
+		if (!onDeleteAll) return
+		setIsDeleting(true)
+		try {
+			const res = await onDeleteAll()
+			if (res?.success) setShowDeleteAll(false)
+		} finally {
+			setIsDeleting(false)
+		}
+	}, [onDeleteAll])
 
 	const handleIntersect = useCallback(
 		(entries: IntersectionObserverEntry[]) => {
@@ -108,8 +124,10 @@ export function NotificationPanel({
 	return (
 		<>
 			{pushBanner}
-			{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
-				<div className="sticky top-0 z-10 bg-white dark:bg-dark-surface px-4 py-2 border-b border-brand-border dark:border-dark-border">
+	{grouped.length > 0 && (
+		<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface px-3 py-2 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
+			<div className="flex items-center gap-4">
+				{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
 					<button
 						type="button"
 						onClick={onMarkAllAsRead}
@@ -117,8 +135,21 @@ export function NotificationPanel({
 					>
 						Marcar todas como lidas
 					</button>
-				</div>
+				)}
+			</div>
+			{onDeleteAll && (
+				<button
+					type="button"
+					onClick={() => setShowDeleteAll(true)}
+					className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
+					title="Excluir todas as notificações"
+				>
+					<TrashIcon className="h-3 w-3" />
+					Excluir todas
+				</button>
 			)}
+		</div>
+	)}
 			{erpOptions.length > 0 || activePartnerId ? (
 				<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface px-3 py-2 border-b border-brand-border dark:border-dark-border overflow-x-auto custom-scrollbar">
 					<div className="flex items-center gap-2">
@@ -187,6 +218,20 @@ export function NotificationPanel({
 			<div ref={sentinelRef} className="h-6 flex items-center justify-center">
 				{isFetchingMore && <Spinner />}
 			</div>
+			{onDeleteAll && (
+				<AlertModal
+					isOpen={showDeleteAll}
+					onClose={() => setShowDeleteAll(false)}
+					onConfirm={handleDeleteAllConfirm}
+					title="Excluir todas as notificações?"
+					message="Esta ação não pode ser desfeita. Todas as notificações ( lidas e não lidas ) serão removidas da sua conta."
+					confirmText="Excluir"
+					cancelText="Cancelar"
+					variant="danger"
+					isLoading={isDeleting}
+					disabled={isDeleting}
+				/>
+			)}
 		</>
 	)
 }

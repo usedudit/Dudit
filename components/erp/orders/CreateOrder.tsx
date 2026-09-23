@@ -481,7 +481,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         additionalCosts: parseFloat(otherCosts || "0"),
         manualDiscount: discountAmount > 0 ? { type: "fixed", value: discountAmount } : null,
         coupon: couponPricingData,
-    }), [items, shippingFee, otherCosts, discountAmount, couponPricingData])
+        promotions: orderPromotions,
+    }), [items, shippingFee, otherCosts, discountAmount, couponPricingData, orderPromotions])
 
     const effectiveCouponDiscountAmount = couponPricingData
         ? pricingPreview.couponDiscountAmount

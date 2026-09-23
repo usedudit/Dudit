@@ -2248,9 +2248,11 @@ export function ServiceDetailsPageClient({
                             )}
 
                             {/* Reviews */}
-                            <FormSection title="Avaliações do serviço" hasSeparator>
-                                <ReviewsSection reviews={reviews} />
-                            </FormSection>
+                            {reviews.length > 0 && (
+                                <FormSection title="Avaliações do serviço" hasSeparator>
+                                    <ReviewsSection reviews={reviews} />
+                                </FormSection>
+                            )}
                         </div>
 
                         {/* ── Right Column: Booking Panel (Desktop) ── */}

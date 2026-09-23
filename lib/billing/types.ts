@@ -176,6 +176,7 @@ export interface PurchaseWithRelations extends BillingPurchase {
     invoice?: BillingInvoice | null
     partner_name?: string
     plan_name?: string
+    payment_method_type?: PaymentMethodType | null
 }
 
 export interface BillingPageResult<T> {

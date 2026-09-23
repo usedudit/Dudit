@@ -1,7 +1,8 @@
 export enum PromotionType {
     GIFT = "gift",
     BUY_X_PAY_Y = "buy_x_pay_y",
-    DISCOUNT = "discount"
+    DISCOUNT = "discount",
+    FREE_SHIPPING = "free_shipping"
 }
 
 export enum CampaignCategory {
@@ -15,6 +16,7 @@ export function getCampaignCategory(type: PromotionType): CampaignCategory {
         case PromotionType.BUY_X_PAY_Y:
             return CampaignCategory.PRICE;
         case PromotionType.GIFT:
+        case PromotionType.FREE_SHIPPING:
             return CampaignCategory.BENEFIT;
         default:
             return CampaignCategory.BENEFIT;

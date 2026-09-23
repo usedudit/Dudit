@@ -2671,11 +2671,13 @@ export function ProductDetailsPageClient({
                             )}
 
                             {/* Reviews */}
-                            <div ref={reviewsRef}>
-                                <FormSection title="Avaliações do produto" hasSeparator>
-                                    <ReviewsSection reviews={reviews} />
-                                </FormSection>
-                            </div>
+                            {reviews.length > 0 && (
+                                <div ref={reviewsRef}>
+                                    <FormSection title="Avaliações do produto" hasSeparator>
+                                        <ReviewsSection reviews={reviews} />
+                                    </FormSection>
+                                </div>
+                            )}
                         </div>
 
                         {/* Desktop buy panel */}

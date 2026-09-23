@@ -1170,7 +1170,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
 
                         {/* Opções de motivo */}
                         <div className="space-y-2 text-left pt-2">
-                            <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider block">
+                            <span className="text-brand-inactive-text dark:text-dark-body font-medium">
                                 Qual o motivo do cancelamento?
                             </span>
                             <div className="space-y-0.5 bg-brand-gray/50 dark:bg-dark-border/20 p-2.5 sm:p-3 rounded-2xl border border-brand-border/60 dark:border-dark-border/60">

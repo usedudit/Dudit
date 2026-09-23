@@ -76,14 +76,13 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                 {isOpen && (
                     <div className="fixed inset-0 z-[100] flex items-end pointer-events-none">
 
-                        {/* Overlay (backdrop click-to-close) — opacity animado
-                            de forma independente do motion value `y` para não
-                            ficar invisível após a atualização de windowHeight */}
+                        {/* Overlay (backdrop click-to-close) */}
                         <motion.div
                             className="absolute inset-0 bg-black/60 pointer-events-auto"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.6 }}
                             exit={{ opacity: 0 }}
+                            onClick={onClose}
                         />
 
                         {/* Sheet */}

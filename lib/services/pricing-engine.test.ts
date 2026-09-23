@@ -357,6 +357,58 @@ describe("calculateOrderPricing", () => {
     expect(r.finalTotal).toBe(100)
   })
 
+  it("zeros shipping when a free shipping campaign promotion is active", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 100, quantity: 1 }],
+      shippingCost: 15,
+      promotions: [
+        discountPromotion({
+          promotionType: PromotionType.FREE_SHIPPING,
+          applyScope: ApplyScope.ENTIRE_CART,
+          minSpendAmount: null,
+        }),
+      ],
+    })
+    expect(r.shipping).toBe(0)
+    expect(r.freeShippingApplied).toBe(true)
+    expect(r.finalTotal).toBe(100)
+    expect(r.appliedPromotionIds).toHaveLength(1)
+  })
+
+  it("does not apply free shipping campaign promotion when min spend is not met", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 50, quantity: 1 }],
+      shippingCost: 15,
+      promotions: [
+        discountPromotion({
+          promotionType: PromotionType.FREE_SHIPPING,
+          applyScope: ApplyScope.ENTIRE_CART,
+          minSpendAmount: 100,
+        }),
+      ],
+    })
+    expect(r.shipping).toBe(15)
+    expect(r.freeShippingApplied).toBe(false)
+    expect(r.finalTotal).toBe(65)
+  })
+
+  it("applies free shipping campaign promotion when min spend is met", () => {
+    const r = calculateOrderPricing({
+      items: [{ unitPrice: 120, quantity: 1 }],
+      shippingCost: 15,
+      promotions: [
+        discountPromotion({
+          promotionType: PromotionType.FREE_SHIPPING,
+          applyScope: ApplyScope.ENTIRE_CART,
+          minSpendAmount: 100,
+        }),
+      ],
+    })
+    expect(r.shipping).toBe(0)
+    expect(r.freeShippingApplied).toBe(true)
+    expect(r.finalTotal).toBe(120)
+  })
+
   // ── Step 6: Additional costs ───────────────────────────────────────────
   it("adds additional costs", () => {
     const r = calculateOrderPricing({

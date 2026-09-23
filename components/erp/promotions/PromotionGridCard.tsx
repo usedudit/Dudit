@@ -21,6 +21,7 @@ const getPromotionTypeLabel = (rule: any) => {
         case "discount": return "Desconto Direto"
         case "buy_x_pay_y": return "Leve X Pague Y"
         case "gift": return "Ganhar Brinde"
+        case "free_shipping": return "Frete Grátis"
         default: return rule.promotion_type || "Outro"
     }
 }
@@ -56,6 +57,8 @@ const formatRuleDetails = (rule: any) => {
         below = `Leve ${rule.buy_quantity} Pague ${rule.pay_quantity}`
     } else if (rule.promotion_type === "gift") {
         below = `1 Brinde`
+    } else if (rule.promotion_type === "free_shipping") {
+        below = `Frete isento`
     }
 
     if (rule.min_spend_amount) {

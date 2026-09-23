@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { requireUser, requirePartnerAccess } from "@/lib/auth/authorization"
 import { SecureLogger } from "@/lib/secure-logger"
 import { getValidMercadoPagoAccessToken } from "@/lib/mercadopago/token-manager"
+import { getOrderDepositSummary, shouldShowSinal } from "@/lib/payments/order-financial-state"
+import { getSalesSettingsAction } from "@/app/actions/erp/sales-settings"
 import { captureError } from "@/lib/monitoring/sentry"
 import { checkRateLimitForAPI } from "@/lib/security/require-rate-limit"
 import { RateLimitCategory } from "@/lib/rate-limiter"
@@ -87,6 +89,38 @@ export async function POST(request: NextRequest) {
         { error: "Este pedido não está com pagamento pendente" },
         { status: 400 },
       )
+    }
+
+    // Check if deposit is expired and auto-cancel is enabled
+    const depositSummary = getOrderDepositSummary(order)
+    if (depositSummary.usesDeposit && depositSummary.depositStatus === "expired" && depositSummary.paidAmount <= 0.009) {
+        let shouldCancel = false
+        try {
+            const settingsResult = await getSalesSettingsAction(order.partner_id || "")
+            if (settingsResult.success && settingsResult.data?.cancelExpiredDepositOrders) {
+                shouldCancel = true
+            }
+        } catch (_) {
+            // If settings check fails, proceed normally
+        }
+
+        if (shouldCancel) {
+            await adminClient
+                .from("orders")
+            .update({
+                    situation: "cancelled",
+                    cancelled_at: new Date().toISOString(),
+                    notes: "Pedido cancelado automaticamente: sinal de entrada expirado sem pagamento.",
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", orderId)
+
+            return NextResponse.json({
+                success: false,
+                error: "Este pedido foi cancelado automaticamente porque o sinal expirou sem pagamento. Entre em contato com a loja.",
+                cancelled: true,
+            }, { status: 410 })
+        }
     }
 
     const totalAmount = Number(order.total_amount || 0)

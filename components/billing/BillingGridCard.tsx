@@ -26,11 +26,14 @@ interface BillingGridCardProps {
     status: string
     statusLabel: string
     statusVariant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
-    gatewayLabel: string
+    paymentMethodLabel: string
+    paymentMethodDetails?: string
+    paymentMethodIcon?: string
     createdAt: string
+    invoiceId?: string | null
     onDetails: () => void
     onCancel?: () => void
-    onInvoice?: () => void
+    onInvoice?: (invoiceId: string) => void
 }
 
 const BillingGridCard = React.memo(
@@ -44,8 +47,11 @@ const BillingGridCard = React.memo(
         status,
         statusLabel,
         statusVariant,
-        gatewayLabel,
+        paymentMethodLabel,
+        paymentMethodDetails,
+        paymentMethodIcon,
         createdAt,
+        invoiceId,
         onDetails,
         onCancel,
         onInvoice,
@@ -84,17 +90,35 @@ const BillingGridCard = React.memo(
                     </div>
                 </div>
 
-                <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
+                    <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Tipo</span>
+                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{typeLabel}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5 items-end">
+                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
+                                <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{dateStr}</span>
+                            </div>
                         </div>
-                        <div className="flex flex-col gap-0.5 items-end">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Data</span>
-                            <span className="text-[13px] font-bold text-brand-dark dark:text-dark-heading">{dateStr}</span>
-                        </div>
-                    </div>
+
+                        {(paymentMethodLabel || paymentMethodIcon) && (
+                            <div className="flex items-center gap-2 pt-1">
+                                {paymentMethodIcon && (
+                                    <img src={paymentMethodIcon} alt="" className="w-5 h-5 object-contain" />
+                                )}
+                                <div className="flex flex-col">
+                                    <span className="text-[13px] font-medium text-brand-dark dark:text-dark-heading truncate">
+                                        {paymentMethodLabel || "Não informado"}
+                                    </span>
+                                    {paymentMethodDetails && (
+                                        <span className="text-[10px] text-brand-inactive-text truncate">
+                                            {paymentMethodDetails}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                     <div className="flex items-end justify-between mt-1">
                         <div />
@@ -102,7 +126,7 @@ const BillingGridCard = React.memo(
                             <ActionsDropdown
                                 onView={onDetails}
                                 onCancel={onCancel}
-                                onPrint={onInvoice}
+                                onPrint={invoiceId ? () => onInvoice?.(invoiceId) : undefined}
                                 cancelLabel="Cancelar"
                             />
                         </div>
@@ -114,7 +138,8 @@ const BillingGridCard = React.memo(
     (prev, next) =>
         prev.id === next.id &&
         prev.status === next.status &&
-        prev.totalAmount === next.totalAmount
+        prev.totalAmount === next.totalAmount &&
+        prev.invoiceId === next.invoiceId
 )
 
 BillingGridCard.displayName = "BillingGridCard"

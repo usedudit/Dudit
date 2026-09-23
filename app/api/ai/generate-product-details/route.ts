@@ -17,7 +17,7 @@ async function handleGenerateProductDetails(req: NextRequest) {
       return NextResponse.json({ error: "Corpo da requisição inválido" }, { status: 400 })
     }
 
-    const { title, partnerId, itemType = "product", imageBase64, imageMimeType } = body
+    const { title, partnerId, itemType = "product", imageBase64, imageMimeType, images } = body
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: "Título é obrigatório." }, { status: 400 })
@@ -40,13 +40,26 @@ async function handleGenerateProductDetails(req: NextRequest) {
 
     let result
 
-    // Se imagem foi enviada, usar geração por imagem (Groq + Llama 4 Scout)
-    if (imageBase64 && imageMimeType) {
+    // Normaliza imagens: aceita imageBase64 único ou array de images
+    const imageList: Array<{ base64: string; mimeType: string }> = []
+
+    if (images && Array.isArray(images) && images.length > 0) {
+      for (const img of images) {
+        if (img?.base64 && img?.mimeType) {
+          imageList.push({ base64: img.base64, mimeType: img.mimeType })
+        }
+      }
+    } else if (imageBase64 && imageMimeType) {
+      imageList.push({ base64: imageBase64, mimeType: imageMimeType })
+    }
+
+    // Se imagens foram enviadas, usar geração por imagem (Groq + Qwen)
+    if (imageList.length > 0) {
+
       result = await AiGeneratorService.generateProductDetailsFromImage(partnerId, user.id, {
         title,
         itemType,
-        imageBase64,
-        imageMimeType,
+        images: imageList,
       })
     } else {
       // Geração por texto (fluxo existente)

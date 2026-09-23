@@ -7,6 +7,7 @@ import {
   getUnreadNotificationCountAction,
   markAllNotificationsReadAction,
   markNotificationsReadAction,
+  deleteAllNotificationsAction,
 } from "@/app/actions/notifications"
 import type {
   NotificationPageCursor,
@@ -266,6 +267,24 @@ export function useNotifications() {
     }
   }, [updateReadCache])
 
+  const deleteAll = useCallback(async (): Promise<{ success: boolean; deleted: number }> => {
+    try {
+      const result = await deleteAllNotificationsAction()
+      if (result.success) {
+        queryClient.setQueryData<InfiniteData<NotificationsPageResult, NotificationPageCursor | null>>(listQueryKey, {
+          pages: [],
+          pageParams: [],
+        })
+        queryClient.setQueryData(unreadQueryKey, 0)
+        return { success: true, deleted: result.deleted ?? 0 }
+      }
+      return { success: false, deleted: 0 }
+    } catch (e) {
+      console.error("[notifications] deleteAll error:", e)
+      return { success: false, deleted: 0 }
+    }
+  }, [listQueryKey, unreadQueryKey, queryClient])
+
   return {
     user,
     panelOpen,
@@ -281,9 +300,10 @@ export function useNotifications() {
     isFetchingMore: listQuery.isFetchingNextPage,
     hasMore: listQuery.hasNextPage ?? false,
     fetchMore: () => listQuery.fetchNextPage(),
-    registerVisible,
-    markAllAsRead,
-  }
-}
+     registerVisible,
+     markAllAsRead,
+     deleteAll,
+   }
+ }
 
 export type NotificationsController = ReturnType<typeof useNotifications>

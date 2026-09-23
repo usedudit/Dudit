@@ -738,6 +738,7 @@ export async function updateServiceOrderStatusAction(
   partnerId: string,
   serviceOrderId: string,
   status: string,
+  changeReason?: string,
 ): Promise<{ success: true; data: any } | { success: false; error: string }> {
   try {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
@@ -771,7 +772,10 @@ export async function updateServiceOrderStatusAction(
       partnerId, actorUserId: user.id,
       entityType: "service_order", entityId: serviceOrderId,
       actionType: "status_changed", source: "manual",
-      changeLines: [`Status alterado: ${current.status} → ${status}`],
+      changeLines: [
+        `Status alterado: ${current.status} → ${status}`,
+        ...(changeReason?.trim() ? [`Motivo: ${changeReason.trim()}`] : []),
+      ],
     })
 
     revalidatePath("/erp/ordens-de-servico")

@@ -8,7 +8,7 @@ import Input from "@/components/reusable/Input"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { motion, AnimatePresence } from "framer-motion"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, EditIcon, ThreeDotsIcon, BoxIcon, TruckIcon } from "@/lib/icons"
+import { ChevronLeftIcon, ClockArrowUpIcon, ClockCheckIcon, EstimateTimeIcon, RouteIcon, XIcon, ThreeDotsIcon, BoxIcon } from "@/lib/icons"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { getERPDeliveryDetailsAction, getDeliveryRoutePointsAction, updateERPSingleOrderDeliveryStatusAction, updateERPDeliveryStatusAction } from "@/app/actions/erp/deliveries"
 import { formatCurrency, formatDateTime, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -430,13 +430,12 @@ export default function DeliveryDetailPage({
                     <div className="border-t border-brand-border dark:border-dark-border" />
                     <div className="p-4 bg-white dark:bg-dark-surface">
                         <ListItem
-                            icon={TruckIcon}
                             title={
                                 <div>
                                     <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{driverName}</p>
                                     <div className="flex items-center gap-1 mt-0.5">
-                                        <TruckIcon className="w-3 h-3 text-brand-green" />
-                                        <span className="text-xs text-brand-green font-medium">Rede Dudit</span>
+                                        <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                        <span className="text-xs text-brand-dark dark:text-dark-heading font-medium">Rede Dudit</span>
                                     </div>
                                 </div>
                             }
@@ -508,7 +507,7 @@ export default function DeliveryDetailPage({
                         <span>Criado em {formatDateTime(delivery.created_at)} • </span>
                         {isPlatformDriver && (
                             <Tooltip text="Entregador da Rede Dudit">
-                                <TruckIcon className="w-3.5 h-3.5 text-brand-green inline-block shrink-0 cursor-help" />
+                                <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0 cursor-help" />
                             </Tooltip>
                         )}
                         <span>{driverName}</span>

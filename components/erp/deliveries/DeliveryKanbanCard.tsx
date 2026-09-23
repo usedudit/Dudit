@@ -71,7 +71,7 @@ export default function DeliveryKanbanCard({
             <ClockIcon size={12} className="shrink-0" />
             <span>Criada {elapsed}</span>
             {delivery.deliveryTimingLabel && (
-              <Badge variant={delivery.deliveryTimingState === "late" ? "red" : "green"}>{delivery.deliveryTimingLabel}</Badge>
+              <Badge className="scale-90 whitespace-nowrap" variant={delivery.deliveryTimingState === "late" ? "red" : "green"}>{delivery.deliveryTimingLabel}</Badge>
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -93,9 +93,8 @@ export default function DeliveryKanbanCard({
           ) : (
             <>
               <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                Múltiplos pedidos
+                Múltiplos pedidos ({delivery.orderCount})
               </span>
-              <Badge variant="gray">{delivery.orderCount}</Badge>
             </>
           )}
         </div>
@@ -121,6 +120,7 @@ export default function DeliveryKanbanCard({
         <div className="mt-3.5 space-y-1.5 text-[11px] font-medium text-brand-inactive-text dark:text-dark-body border-t border-brand-border/40 dark:border-dark-border/40 pt-2.5">
           {delivery.deliveryPersonName ? (
             <div className="flex items-center gap-1.5 text-brand-dark dark:text-dark-heading min-w-0">
+              <MotorbikeIcon size={12} className="shrink-0" />
               <span className="truncate">{delivery.deliveryPersonName}</span>
               {isPlatformDriver && (
                 <Tooltip text="Entregador da Rede Dudit">
@@ -130,15 +130,15 @@ export default function DeliveryKanbanCard({
             </div>
           ) : (
             <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
-              <MoneyIcon size={12} className="shrink-0" />
+              <MotorbikeIcon size={12} className="shrink-0" />
               <span>Entrega própria</span>
             </div>
           )}
 
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              <MotorbikeIcon size={12} className="shrink-0" />
-              <span>Taxa: <strong className="text-brand-dark dark:text-dark-heading">{formatCurrency(delivery.deliveryFee || 0)}</strong></span>
+            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
+              <MoneyIcon size={12} className="shrink-0" />
+              <span>Taxa: <strong>{formatCurrency(delivery.deliveryFee || 0)}</strong></span>
             </div>
 
             {delivery.estimatedDurationMinutes ? (
@@ -147,7 +147,7 @@ export default function DeliveryKanbanCard({
           </div>
 
           {delivery.completedAt ? (
-            <div className="flex items-center gap-1.5 pt-1 text-brand-inactive-text dark:text-dark-body">
+            <div className="flex items-center gap-1 text-brand-dark dark:text-dark-heading">
               <ClockIcon size={12} className="shrink-0" />
               <span>
                 {getDeliveryStatusLabel(delivery.status)} em{" "}

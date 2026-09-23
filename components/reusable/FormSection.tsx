@@ -21,7 +21,7 @@ export const FormSection: React.FC<FormSectionProps> = ({
 }) => (
     <>
         {hasSeparator && (
-            <div className="border-t border-brand-border dark:border-dark-border mb-8 w-full" />
+            <div className={`border-t border-brand-border dark:border-dark-border mb-8 w-full ${className}`} />
         )}
         <div className={`${hasSeparator ? "mt-8 mb-8" : ""} ${className}`.trim()}>
             {(title || headerRight) && (

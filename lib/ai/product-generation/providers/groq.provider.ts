@@ -12,7 +12,7 @@ export class GroqProvider implements AiProvider {
 
   constructor() {
     this.apiKey = process.env.GROQ_API_KEY || ""
-    this.defaultModel = "meta-llama/llama-4-scout-17b-16e-instruct"
+    this.defaultModel = "qwen/qwen3.8-27b"
     this.fallbackModels = []
   }
 
@@ -74,8 +74,8 @@ export class GroqProvider implements AiProvider {
 
   async generateWithImage(
     prompt: string,
-    imageBase64: string,
-    mimeType: string,
+    imageBase64: string | string[],
+    mimeType: string | string[],
     model?: string,
     options?: { timeout?: number }
   ): Promise<{
@@ -91,6 +91,26 @@ export class GroqProvider implements AiProvider {
       throw new Error("GROQ_API_KEY não configurada no servidor.")
     }
 
+    // Normalize para sempre trabalhar com arrays
+    const images = Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+    const mimes = Array.isArray(mimeType) ? mimeType : images.map(() => mimeType)
+
+    // Groq permite máximo de 3 imagens por request
+    const maxImages = 3
+    const imagesToSend = images.slice(0, maxImages)
+    const mimesToSend = mimes.slice(0, maxImages)
+
+    const content: any[] = [{ type: "text", text: prompt }]
+    imagesToSend.forEach((img, i) => {
+      const mime = mimesToSend[i] || mimesToSend[0] || "image/jpeg"
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: `data:${mime};base64,${img}`,
+        },
+      })
+    })
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -102,15 +122,7 @@ export class GroqProvider implements AiProvider {
         messages: [
           {
             role: "user",
-            content: [
-              { type: "text", text: prompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${imageBase64}`,
-                },
-              },
-            ],
+            content,
           }
         ],
         temperature: 0.1,

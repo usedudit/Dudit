@@ -10,6 +10,9 @@ ON public.orders (payment_expires_at)
 WHERE situation IN ('pending', 'in_process') AND cancelled_at IS NULL;
 
 -- 2. Idempotent SQL procedure to cancel expired orders directly in Postgres
+-- Only cancels orders WITHOUT a deposit (regular pending orders).
+-- Orders with deposit are handled via the cancelExpiredDepositOrders setting
+-- in the retry-payment API (/api/orders/retry-payment).
 CREATE OR REPLACE FUNCTION public.cron_expire_expired_orders()
 RETURNS integer
 LANGUAGE plpgsql
@@ -24,14 +27,15 @@ DECLARE
 BEGIN
   v_cancel_note := 'Pedido cancelado por: Sistema às ' || to_char(v_now AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') || ' - O tempo limite de pagamento expirou.';
 
-  -- Loop through expired orders that are still pending
+  -- Loop through expired orders that are still pending (skip orders with deposit checkout, as those are handled via API setting)
   FOR v_order IN 
-    SELECT id, notes, partner_id
+    SELECT id, notes
     FROM public.orders
     WHERE situation IN ('pending', 'in_process')
       AND cancelled_at IS NULL
       AND payment_expires_at IS NOT NULL
       AND payment_expires_at < v_now
+      AND (checkout_fulfillment IS NULL OR checkout_fulfillment ->> 'depositCheckout' IS NULL)
     FOR UPDATE SKIP LOCKED
   LOOP
     -- Update order status to cancelled

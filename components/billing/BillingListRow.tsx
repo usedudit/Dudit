@@ -33,12 +33,13 @@ interface BillingListRowProps {
     status: string
     statusLabel: string
     statusVariant: "green" | "red" | "orange" | "blue" | "cyan" | "purple" | "gray"
-    gatewayLabel: string
+    paymentMethodLabel: string
     createdAt: string
+    invoiceId?: string | null
     columns: ColumnDef[]
     onDetails: () => void
     onCancel?: () => void
-    onInvoice?: () => void
+    onInvoice?: (invoiceId: string) => void
 }
 
 const BillingListRow = React.memo(
@@ -51,8 +52,9 @@ const BillingListRow = React.memo(
         status,
         statusLabel,
         statusVariant,
-        gatewayLabel,
+        paymentMethodLabel,
         createdAt,
+        invoiceId,
         columns,
         onDetails,
         onCancel,
@@ -94,9 +96,9 @@ const BillingListRow = React.memo(
                     return (
                         <Badge variant={statusVariant}>{statusLabel}</Badge>
                     )
-                case "gateway":
+                case "payment_method":
                     return (
-                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{gatewayLabel}</span>
+                        <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">{paymentMethodLabel || "Não informado"}</span>
                     )
                 case "date":
                     return (
@@ -108,7 +110,7 @@ const BillingListRow = React.memo(
                             <ActionsDropdown
                                 onView={onDetails}
                                 onCancel={onCancel}
-                                onPrint={onInvoice}
+                                onPrint={invoiceId ? () => onInvoice?.(invoiceId) : undefined}
                                 cancelLabel="Cancelar"
                             />
                         </div>
@@ -140,7 +142,9 @@ const BillingListRow = React.memo(
     (prev, next) =>
         prev.id === next.id &&
         prev.status === next.status &&
-        prev.totalAmount === next.totalAmount
+        prev.totalAmount === next.totalAmount &&
+        prev.invoiceId === next.invoiceId &&
+        prev.paymentMethodLabel === next.paymentMethodLabel
 )
 
 BillingListRow.displayName = "BillingListRow"

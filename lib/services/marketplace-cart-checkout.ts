@@ -165,15 +165,24 @@ export async function priceMarketplaceCartCheckout(
     }
   }
 
-  const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
+   const promotionsData = await cachedListActivePromotionsForMarketplaceAction(partnerId, params.userId)
 
-  const pricingResult = calculateOrderPricing({
-    items: pricingItems,
-    shippingCost: deliveryFee,
-    coupon: couponPricingData,
-    promotions: promotionsData,
-    paymentMethod: params.paymentMethod ?? undefined,
-  })
+   const pricingResult = calculateOrderPricing({
+     items: pricingItems,
+     shippingCost: deliveryFee,
+     coupon: couponPricingData,
+     promotions: promotionsData,
+     paymentMethod: params.paymentMethod ?? undefined,
+   })
+
+   // Zero out delivery fee when free shipping comes from a campaign promotion
+   // (coupon-driven free shipping is already handled above)
+   if (pricingResult.freeShippingApplied && !isFreeShippingCoupon) {
+     deliveryFee = 0
+     if (deliveryBreakdown) {
+       deliveryBreakdown = { ...deliveryBreakdown, freeShippingApplied: true }
+     }
+   }
 
   const giftProductIds = pricingResult.appliedGiftProductIds || []
   if (giftProductIds.length > 0) {
