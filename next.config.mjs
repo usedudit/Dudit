@@ -82,8 +82,8 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   // Reativa o cache do webpack em produção. O cache filesystem nativo
   // da versão anterior acumulava mais de 10 GB entre server/client.
-  // Aqui configuramos com limite de tamanho (500MB) e versão baseada em
-  // hash de conteúdo para invalidação automática quando o código muda.
+  // Aqui configuramos com expiração (7 dias) e geração de memória limitada
+  // para invalidação automática quando o código muda.
   webpack(config, { dev, webpack }) {
     if (!dev) {
       config.cache = {
@@ -92,8 +92,9 @@ const nextConfig = {
         buildDependencies: {
           config: [path.resolve(__dirname, "next.config.mjs")],
         },
-        maxMemory: 500,
-        maxMilliseconds: 1000 * 60 * 60 * 24 * 7, // 7 dias
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias
+        maxMemoryGenerations: 5,
+        version: "1.0.0",
       }
     }
     return config
