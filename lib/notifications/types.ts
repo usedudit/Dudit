@@ -17,6 +17,7 @@ export const NOTIFICATION_TYPES = [
   "low_stock",
   "replenishment_suggested",
   "service_return_reminder",
+  "cart_abandoned",
 ] as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number]
@@ -29,6 +30,7 @@ export type NotificationEntityType =
   | "announcement"
   | "product"
   | "quote"
+  | "cart"
   | null
 
 export interface NotificationRecord {

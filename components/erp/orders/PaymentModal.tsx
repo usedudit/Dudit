@@ -507,7 +507,7 @@ const PaymentModal = ({
                     setExistingSinalLoaded(true);
                 }
             })
-            .catch(() => {})
+            .catch(() => { })
     }, [isOpen, orderId, allowDepositCharge, existingPaidAmount, existingSinalLoaded, depositChargeAmount]);
 
     const handleVerifyDepositPayment = async () => {
@@ -881,18 +881,17 @@ const PaymentModal = ({
         // Não depender de `total`: se o pai zerar o carrinho (ex.: PDV) o total cai e apagava a tela de sucesso.
     }, [isOpen]);
 
-    // Marketplace orders or orders with existing payments: auto-navigate directly to the original/existing method view (skip method selection)
+    // Marketplace orders: auto-navigate to the original method (locked).
+    // Partial/sinal remainder: stay on the methods list so the seller can choose how to receive the rest.
     useEffect(() => {
         if (!isOpen || isLoadingMethods) return;
         // Only auto-navigate if we're on the initial methods screen
         if (view !== 'methods') return;
 
-        const hasExistingPaid = existingPaidAmount > 0.009;
         const isMarketplace = isMarketplaceOrder && !!originalPaymentMethod;
+        if (!isMarketplace) return;
 
-        if (!isMarketplace && !hasExistingPaid) return;
-
-        if (hasExistingPaid && existingPaymentBreakdown && existingPaymentBreakdown.length > 1) {
+        if (existingPaymentBreakdown && existingPaymentBreakdown.length > 1) {
             // Split payment restore
             const initialSplitLegs = existingPaymentBreakdown.map((entry: any, index: number) => ({
                 id: index + 1,
@@ -907,9 +906,7 @@ const PaymentModal = ({
         }
 
         // Single method restore/lock
-        const targetMethodLabel = hasExistingPaid
-            ? (existingPaymentBreakdown?.[0]?.method || originalPaymentMethod || 'Dinheiro')
-            : (originalPaymentMethod || 'Dinheiro');
+        const targetMethodLabel = originalPaymentMethod || 'Dinheiro';
 
         const normalizedOriginal = normalizePaymentMethodLabel(targetMethodLabel);
         const methodType = (() => {
@@ -922,7 +919,7 @@ const PaymentModal = ({
         })();
 
         const matchingMethods = activeMethods.filter((m: PartnerPaymentMethod) => normalizeMethodType(m.type) === methodType);
-        const restoredMethodId = hasExistingPaid ? (existingPaymentBreakdown?.[0]?.paymentMethodId || null) : null;
+        const restoredMethodId = existingPaymentBreakdown?.[0]?.paymentMethodId || null;
 
         if (restoredMethodId) {
             setSelectedMethodId(restoredMethodId);
@@ -941,7 +938,7 @@ const PaymentModal = ({
 
         setSelectedMethodType(methodType);
         setView(getTargetViewForMethodType(methodType));
-    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, existingPaidAmount, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
+    }, [isOpen, isMarketplaceOrder, originalPaymentMethod, existingPaymentBreakdown, isLoadingMethods, activeMethods, view]);
 
     // Fetch MP connection status
     useEffect(() => {
@@ -1425,8 +1422,8 @@ const PaymentModal = ({
         // For single-leg partial payments, price only the amount being charged now — not the full remaining.
         const singleLegPartialBase =
             editingPaymentIndex === null &&
-            paymentBaseAmount > 0.009 &&
-            paymentBaseAmount < netChargeTarget - 0.009
+                paymentBaseAmount > 0.009 &&
+                paymentBaseAmount < netChargeTarget - 0.009
                 ? paymentBaseAmount
                 : null;
         const base = editingPaymentIndex !== null
@@ -2589,7 +2586,7 @@ const PaymentModal = ({
                     {paymentStatus === 'input' && (
                         <div className="px-6 py-6 md:px-10 md:pt-10 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                {view !== 'methods' && !isMarketplaceOrder && !(existingPaidAmount > 0.009) && (
+                                {view !== 'methods' && !isMarketplaceOrder && (
                                     <motion.button
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -2664,15 +2661,7 @@ const PaymentModal = ({
                                                 <div className="grid grid-cols-1 gap-4">
                                                     {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && (
                                                         <ListItem
-                                                            left={
-                                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                                    <img
-                                                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                                        alt="Mercado Pago"
-                                                                        className="w-5 h-5 object-contain"
-                                                                    />
-                                                                </div>
-                                                            }
+                                                            icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />}
                                                             title={`Sinal - ${formatCurrency(depositChargeAmount)}`}
                                                             description="Mercado Pago"
                                                             onClick={() => {
@@ -3934,7 +3923,7 @@ const PaymentModal = ({
                     qrCode={`data:image/png;base64,${depositMpPixData.qrCodeBase64}`}
                     payload={depositMpPixData.qrCode}
                     amount={depositChargeAmount}
-                     subtitle="Sinal / Entrada"
+                    subtitle="Sinal / Entrada"
                     onVerifyPayment={handleVerifyDepositPayment}
                     isVerifying={isCheckingDepositStatus}
                     onSendWhatsApp={customer?.phone ? handleSendDepositWhatsApp : undefined}

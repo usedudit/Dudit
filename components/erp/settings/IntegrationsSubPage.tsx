@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -1242,6 +1242,8 @@ export const IntegrationsSubPage = ({
                     </Button>
                 </div>
             </div>
+
+            <SavingStatusModal isOpen={isSavingMethods !== null || isLoading} text="Salvando configurações..." />
         </FadeIn>
     )
 }

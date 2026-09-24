@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
+import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder, SavingStatusModal } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon, CrownIcon, ShieldIcon, ManagerIcon, UserIcon, MotorbikeIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
@@ -453,6 +453,8 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                     </div>
                 </div>
             </div>
+
+            <SavingStatusModal isOpen={savingAll} text="Salvando comissões..." />
         </FadeIn>
     )
 }

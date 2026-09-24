@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Zombie protection: check if order is expired
-    if (order.situation === "pending" && order.payment_expires_at) {
+    if ((order.situation === "pending" || order.situation === "payment_failed") && order.payment_expires_at) {
       if (new Date() > new Date(order.payment_expires_at)) {
         const { checkAndExpireOrder } = await import("@/lib/services/order-expiration")
         await checkAndExpireOrder(supabaseAdmin, orderId)
@@ -242,13 +242,17 @@ export async function POST(request: NextRequest) {
     } else if (paymentData.status === "in_process") {
       newOrderStatus = "in_process"
     } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentData.status)) {
-      newOrderStatus = "cancelled"
+      if (paymentData.status === "rejected" && order.situation === "payment_failed") {
+        newOrderStatus = "payment_failed"
+      } else {
+        newOrderStatus = "cancelled"
+      }
     }
 
     const finalStatuses = ["paid", "shipped", "delivered"]
 
     if (finalStatuses.includes(order.situation) && !finalStatuses.includes(newOrderStatus)) {
-      if (newOrderStatus !== "cancelled") {
+      if (newOrderStatus !== "cancelled" && newOrderStatus !== "payment_failed") {
         return NextResponse.json({
           success: true,
           orderId: order.id,

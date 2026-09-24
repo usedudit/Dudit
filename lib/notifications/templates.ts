@@ -13,6 +13,8 @@ interface TemplateContext {
     reminderLabel?: string
     mixType?: "service" | "both"
     productName?: string
+    productName2?: string
+    productName3?: string
     stock?: string
     minStock?: string
     unit?: string
@@ -23,6 +25,8 @@ interface TemplateContext {
     batchCount?: number
     orderNumbers?: string[]
     returnInterval?: string
+    itemCount?: number
+    productNames?: string[]
 }
 
 // ─── WhatsApp Message Builder ─────────────────────────────────────────────────
@@ -446,6 +450,16 @@ export function buildWhatsappMessage(
                 `- ${store}`,
             ].join("\n")
 
+        case "cart_abandoned":
+            return [
+                `🛒 *Carrinho abandonado*`,
+                ``,
+                ``,
+                `Olá, ${customer}! Seu carrinho na ${store} está te esperando.`,
+                ``,
+                `Volte e finalize sua compra enquanto os itens ainda estão disponíveis! ✨`,
+            ].filter(Boolean).join("\n")
+
         default:
             return `🔔 Você tem uma nova atualização de ${store}. Confira no app ou no site!`
     }
@@ -703,11 +717,32 @@ export function buildNotificationContent(
                     ? `Temos sugestões! ${ctx.count} produto(s) precisam de reposição de estoque. Clique para conferir. 📦`
                     : "Há produtos que precisam de reposição.",
             }
-        case "admin_announcement":
+         case "admin_announcement":
             return {
                 title: ctx.storeName || "📢 Comunicado Importante",
                 message: ctx.customerName || "Confira o novo comunicado da plataforma.",
             }
+        case "cart_abandoned": {
+            const store = ctx.storeName || "nossa loja"
+            const itemCount = ctx.itemCount || 0
+            const names = ctx.productNames?.filter(Boolean) || []
+
+            if (itemCount <= 3 && names.length > 0) {
+                const namesStr = names.length === 1
+                    ? names[0]
+                    : names.slice(0, -1).join(", ") + " e " + names[names.length - 1]
+
+                return {
+                    title: "🛒 Carrinho te esperando!",
+                    message: `Seu carrinho na ${store} com ${namesStr} está te esperando. Volte e finalize sua compra!`,
+                }
+            }
+
+            return {
+                title: "🛒 Carrinho te esperando!",
+                message: `Seu carrinho na ${store} está te esperando. Volte e finalize sua compra!`,
+            }
+        }
         default:
             return { title: "🔔 Notificação", message: "Você tem uma nova notificação." }
     }

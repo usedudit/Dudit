@@ -363,12 +363,7 @@ export function buildSaleReceiptFromOrder(
         orderSource.includes("presencial") ||
         orderSource.includes("balcão") ||
         orderSource.includes("balcao")
-    const isOnlineOrder =
-        (orderSource.includes("vitrine") ||
-            orderSource.includes("marketplace") ||
-            orderSource.includes("online") ||
-            (Boolean(order.buyer_id && order.buyer_id !== order.partner_id) &&
-                !isPresencialOrBalcao))
+    const isOnlineOrder = orderSource.includes("vitrine")
 
     const rawDeliveryType = String(order.delivery_type || "").toLowerCase()
     const deliveryType =

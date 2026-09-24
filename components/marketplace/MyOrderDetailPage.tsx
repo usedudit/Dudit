@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon, MotorbikeIcon } from '@/lib/icons';
+import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon, MotorbikeIcon, ReturnIcon } from '@/lib/icons';
 import { motion } from 'framer-motion';
 import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
@@ -58,8 +58,20 @@ const getStatusConfig = (status: string) => {
     switch (status) {
         case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Aprovado' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento' };
+        case 'payment_failed': return { label: 'Pagamento Recusado', color: 'text-brand-red', icon: XIcon, statusText: 'Tente outro método de pagamento' };
+        case 'partially_paid': return { label: 'Parcialmente Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Sinal pago - saldo pendente' };
+        case 'in_process': return { label: 'Em Processamento', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Pagamento em análise' };
+        case 'shipped': return { label: 'Enviado', color: 'text-brand-blue', icon: TruckIcon, statusText: 'Em trânsito' };
+        case 'delivered': return { label: 'Entregue', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Pedido entregue' };
         case 'cancelled': return { label: 'Cancelado', color: 'text-brand-red', icon: XIcon, statusText: 'Cancelado' };
-        default: return { label: status, color: 'text-gray-500 dark:text-dark-body', icon: AlertCircleIcon, statusText: status };
+        case 'refunded': return { label: 'Reembolsado', color: 'text-purple-700', icon: MoneyIcon, statusText: 'Reembolsado' };
+        case 'charged_back': return { label: 'Estornado', color: 'text-purple-700', icon: MoneyIcon, statusText: 'Estornado' };
+        case 'returned': return { label: 'Devolvido', color: 'text-purple-700', icon: ReturnIcon, statusText: 'Devolvido' };
+        case 'awaiting_pickup_payment': return { label: 'Pagamento na Retirada', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento na loja' };
+        case 'awaiting_payment': return { label: 'Aguardando Pagamento', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento' };
+        case 'unpaid': return { label: 'Não Pago', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Sem pagamento' };
+        case 'completed': return { label: 'Concluído', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Concluído' };
+        default: return { label: status || 'Desconhecido', color: 'text-gray-500 dark:text-dark-body', icon: AlertCircleIcon, statusText: status || 'Desconhecido' };
     }
 };
 
@@ -780,7 +792,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const isPixPayment = isExchangeOrder || paymentMethodName.toLowerCase().includes("pix");
     const isBoletoPayment = paymentMethodName.toLowerCase().includes("boleto") || paymentMethodName.toLowerCase().includes("bolbradesco");
     const isPaymentExpired = Boolean(order.payment_expires_at && new Date(order.payment_expires_at) < new Date());
-    const canRetryPayment = order.situation === "pending" && isMercadoPago && (isPixPayment || isBoletoPayment) && !isPaymentExpired;
+    const canRetryPayment = (order.situation === "pending" || order.situation === "payment_failed") && isMercadoPago && (isPixPayment || isBoletoPayment) && !isPaymentExpired;
     const PaymentIconEl = (() => {
         const icons: React.ReactNode[] = [];
         const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
@@ -1788,6 +1800,15 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                                 Combinar no WhatsApp
                                                             </Button>
                                                         }
+                                                    />
+                                                )
+                                            ) : order.situation === "payment_failed" ? (
+                                                canRetryPayment && order.payment_expires_at && (
+                                                    <InfoCard
+                                                        message={`Pagamento recusado. Pague novamente com Pix ou Boleto antes de ${formatFullDate(order.payment_expires_at)}.`}
+                                                        color='red'
+                                                        className="mt-4"
+                                                        rightElement={<Button variant='link' className="!p-0" onClick={handlePixClick}>Pagar agora</Button>}
                                                     />
                                                 )
                                             ) : (

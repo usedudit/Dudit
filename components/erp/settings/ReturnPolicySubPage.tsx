@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormSection, Checkbox, FormDropdown, FormTextarea, ThreeDotsLoader, SidebarCard } from "@/components/reusable"
+import { Button, Input, FormSection, Checkbox, FormDropdown, FormTextarea, ThreeDotsLoader, SidebarCard, SavingStatusModal } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
@@ -219,11 +219,11 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
 
                                     <FormSection
                                         title="Política completa"
-                                        description="Texto livre exibido ao cliente. Use o template e edite conforme necessário."
+                                        description="Texto livre exibido ao cliente. Use o modelo e edite conforme necessário."
                                         hasSeparator
                                     >
                                         <div className="flex justify-end mb-2">
-                                            <Button variant="outline" size="sm" onClick={fillTemplate}>Usar template padrão</Button>
+                                            <Button variant="outline" size="sm" onClick={fillTemplate}>Usar modelo padrão</Button>
                                         </div>
                                         <FormTextarea
                                             name="fullPolicyText"
@@ -234,12 +234,12 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                                         />
                                     </FormSection>
 
-                                    <FormSection
-                                        title="Referência legal (informativo)"
-                                        description="Não bloqueia regras comerciais - apenas orientação para o cliente (CDC)."
-                                        hasSeparator
-                                    >
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                </div>
+
+                                {/* Right Column / Sidebar */}
+                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
+                                    <SidebarCard hasTopStrip hasSeparator title="Referência legal (informativo)">
+                                        <div className="grid grid-cols-1 gap-4">
                                             <Input
                                                 label="Arrependimento online (dias)"
                                                 type="number"
@@ -259,26 +259,6 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                                                 onChange={(e) => update("legalNonDurableProductDays", Number(e.target.value) || 0)}
                                             />
                                         </div>
-                                    </FormSection>
-                                </div>
-
-                                {/* Right Column / Sidebar */}
-                                <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                    <SidebarCard hasTopStrip hasSeparator title="Sobre Trocas e Devoluções">
-                                        <div className="space-y-4 text-sm text-brand-inactive-text dark:text-dark-body">
-                                            <p>
-                                                <strong className="text-brand-dark dark:text-dark-heading">Validade do Vale-Compra:</strong>{" "}
-                                                Define por quanto tempo os vales-compra ou créditos de troca concedidos aos clientes permanecem ativos para novos pedidos.
-                                            </p>
-                                            <p>
-                                                <strong className="text-brand-dark dark:text-dark-heading">Prazos Comerciais:</strong>{" "}
-                                                Regras personalizadas pela sua empresa para aceitar trocas de tamanho, cor ou devoluções de produtos.
-                                            </p>
-                                            <p>
-                                                <strong className="text-brand-dark dark:text-dark-heading">Referência Legal:</strong>{" "}
-                                                Prazos baseados no Código de Defesa do Consumidor (CDC) para compras online e físicas.
-                                            </p>
-                                        </div>
                                     </SidebarCard>
                                 </div>
                             </div>
@@ -296,6 +276,8 @@ export function ReturnPolicySubPage({ partnerId, onBack }: { partnerId: string; 
                     Salvar
                 </Button>
             </div>
+
+            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
         </FadeIn>
     )
 }

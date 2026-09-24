@@ -10,7 +10,7 @@ import { BatchOrderStatusSyncOnLoad } from "@/components/order-status-sync-on-lo
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url";
 import { Button, IconPlaceholder, Tooltip, Badge, Tabs, TabsList, TabsTrigger } from "@/components/reusable";
 import Pagination from "@/components/reusable/Pagination";
-import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon } from '@/lib/icons';
+import { CheckCircleIcon, AlertCircleIcon, XIcon, ClockIcon, ReturnIcon, TruckIcon, MoneyIcon } from '@/lib/icons';
 import { MyOrderDetailPage } from './MyOrderDetailPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator";
@@ -21,10 +21,20 @@ const ORDERS_PER_PAGE = 10
 
 const getStatusConfig = (status: string) => {
     switch (status) {
-        case 'paid': return { label: 'Pago', color: 'text-green-700', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
+        case 'paid': return { label: 'Pago', color: 'text-brand-green', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
+        case 'payment_failed': return { label: 'Pagamento Recusado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200', dotBg: 'bg-red-500' };
+        case 'partially_paid': return { label: 'Parcialmente Pago', color: 'text-brand-green', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
+        case 'in_process': return { label: 'Em Processamento', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
+        case 'shipped': return { label: 'Enviado', color: 'text-brand-blue', bg: 'bg-blue-100', icon: TruckIcon, border: 'border-blue-200', dotBg: 'bg-blue-500' };
+        case 'delivered': return { label: 'Entregue', color: 'text-brand-green', bg: 'bg-green-100', icon: CheckCircleIcon, border: 'border-green-200', dotBg: 'bg-green-500' };
         case 'cancelled': return { label: 'Cancelado', color: 'text-red-700', bg: 'bg-red-100', icon: XIcon, border: 'border-red-200', dotBg: 'bg-red-500' };
-        default: return { label: status, color: 'text-gray-700 dark:text-dark-body', bg: 'bg-gray-100 dark:bg-dark-border/50', icon: AlertCircleIcon, border: 'border-gray-200 dark:border-dark-border', dotBg: 'bg-gray-500' };
+        case 'refunded': return { label: 'Reembolsado', color: 'text-purple-700', bg: 'bg-purple-100', icon: MoneyIcon, border: 'border-purple-200', dotBg: 'bg-purple-500' };
+        case 'charged_back': return { label: 'Estornado', color: 'text-purple-700', bg: 'bg-purple-100', icon: MoneyIcon, border: 'border-purple-200', dotBg: 'bg-purple-500' };
+        case 'returned': return { label: 'Devolvido', color: 'text-purple-700', bg: 'bg-purple-100', icon: ReturnIcon, border: 'border-purple-200', dotBg: 'bg-purple-500' };
+        case 'awaiting_pickup_payment': return { label: 'Pagamento na Retirada', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
+        case 'awaiting_payment': return { label: 'Aguardando Pagamento', color: 'text-brand-orange', bg: 'bg-orange-100', icon: ClockIcon, border: 'border-orange-200', dotBg: 'bg-brand-orange' };
+        default: return { label: status || 'Desconhecido', color: 'text-gray-700 dark:text-dark-body', bg: 'bg-gray-100 dark:bg-dark-border/50', icon: AlertCircleIcon, border: 'border-gray-200 dark:border-dark-border', dotBg: 'bg-gray-500' };
     }
 };
 
@@ -93,7 +103,7 @@ export function MyOrdersListClient({
     const activeOrderIdRef = useRef<string | null>(initialOrderId);
     activeOrderIdRef.current = activeOrderId;
 
-    const initialStatusTab = (initialTab && ["todos", "pending", "preparing", "sent", "delivered"].includes(initialTab)) ? initialTab : "todos";
+    const initialStatusTab = (initialTab && ["todos", "pending", "preparing", "sent", "delivered", "cancelled"].includes(initialTab)) ? initialTab : "todos";
     const [activeTab, setActiveTab] = useState<string>(initialStatusTab);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -209,10 +219,10 @@ export function MyOrdersListClient({
 
     // Calculate tab counts
     const tabCounts = useMemo(() => {
-        if (!orders) return { todos: 0, pending: 0, preparing: 0, sent: 0, delivered: 0 };
-        const counts = { todos: orders.length, pending: 0, preparing: 0, sent: 0, delivered: 0 };
+        if (!orders) return { todos: 0, pending: 0, preparing: 0, sent: 0, delivered: 0, cancelled: 0 };
+        const counts = { todos: orders.length, pending: 0, preparing: 0, sent: 0, delivered: 0, cancelled: 0 };
         orders.forEach((order: any) => {
-            if (order.situation === "pending") {
+            if (order.situation === "pending" || order.situation === "payment_failed") {
                 counts.pending++;
             } else if (order.situation === "paid") {
                 if (order.delivery_status === "pending" || order.delivery_status === "preparing") {
@@ -222,6 +232,9 @@ export function MyOrdersListClient({
                 } else if (order.delivery_status === "delivered" || order.delivery_status === "pickup_available") {
                     counts.delivered++;
                 }
+                // paid but no delivery_status match → falls into "todos" only
+            } else if (["cancelled", "refunded", "charged_back", "returned"].includes(order.situation)) {
+                counts.cancelled++;
             }
         });
         return counts;
@@ -233,7 +246,7 @@ export function MyOrdersListClient({
         return orders.filter((order: any) => {
             if (activeTab === "todos") return true;
             if (activeTab === "pending") {
-                return order.situation === "pending";
+                return order.situation === "pending" || order.situation === "payment_failed";
             }
             if (activeTab === "preparing") {
                 return order.situation === "paid" && (order.delivery_status === "pending" || order.delivery_status === "preparing");
@@ -244,7 +257,10 @@ export function MyOrdersListClient({
             if (activeTab === "delivered") {
                 return order.situation === "paid" && (order.delivery_status === "delivered" || order.delivery_status === "pickup_available");
             }
-            return true;
+            if (activeTab === "cancelled") {
+                return ["cancelled", "refunded", "charged_back", "returned"].includes(order.situation);
+            }
+            return false;
         });
     }, [orders, activeTab]);
 
@@ -300,8 +316,11 @@ export function MyOrdersListClient({
                                         <TabsTrigger value="sent">
                                             Enviado <span className="ml-1.5 text-xs font-normal">({tabCounts.sent})</span>
                                         </TabsTrigger>
-                                        <TabsTrigger value="delivered">
+                                         <TabsTrigger value="delivered">
                                             Entregue <span className="ml-1.5 text-xs font-normal">({tabCounts.delivered})</span>
+                                        </TabsTrigger>
+                                        <TabsTrigger value="cancelled">
+                                            Cancelados <span className="ml-1.5 text-xs font-normal">({tabCounts.cancelled})</span>
                                         </TabsTrigger>
                                     </TabsList>
                                 </Tabs>
@@ -542,7 +561,7 @@ export function MyOrdersListClient({
                                                                     Ver detalhes
                                                                 </Button>
 
-                                                                {order.situation === 'pending' && (
+                                                                {(order.situation === 'pending' || order.situation === 'payment_failed') && (
                                                                     <div className="w-auto">
                                                                         <OrderRetryPayment
                                                                             orderId={order.id}

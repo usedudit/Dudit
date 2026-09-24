@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button, FormSection, FormDropdown, FormTextarea, Checkbox, SidebarCard } from "@/components/reusable"
+import { Button, FormSection, FormDropdown, FormTextarea, Checkbox, SidebarCard, SavingStatusModal } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
@@ -223,6 +223,8 @@ export function SystemSettingsSubPage({
                     Salvar
                 </Button>
             </div>
+
+            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
         </FadeIn>
     )
 }

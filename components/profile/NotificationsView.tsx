@@ -162,7 +162,7 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
                 description={category.description}
                 hasSeparator={idx > 0}
               >
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex items-center mt-6 gap-3">
                   <Checkbox
                     checked={pushOn}
                     onChange={() => toggleSection(category.types, "push_enabled")}

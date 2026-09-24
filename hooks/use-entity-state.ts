@@ -171,12 +171,11 @@ export function useEntityState() {
     // ── Close: instant local state + instant URL sync ────────────────────
 
     const close = useCallback(() => {
-        // Guard: if it's already closed, do nothing (prevents duplicate history operations)
-        if (!localStateRef.current.isOpen) return
-
-        // 1. INSTANT: Clear local state synchronously
+        // Clear local state (even if already closed, still clean the URL below —
+        // local state and URL can drift when router.replace races with replaceState).
+        const wasOpen = localStateRef.current.isOpen
         localStateRef.current = CLOSED_STATE
-        setLocalState(CLOSED_STATE)
+        if (wasOpen) setLocalState(CLOSED_STATE)
 
         if (typeof window === "undefined") return
 
@@ -185,17 +184,28 @@ export function useEntityState() {
             return
         }
 
-        // 2. INSTANT: Clean the action params in-place.
+        // Clean the action params in-place.
         // Do not call history.back() here: the current entry may have been
         // replaced by a router navigation, a direct URL load, bfcache restore,
         // or a concurrent RSC transition. In those cases back() exits the
         // current route and looks like an unsolicited redirect.
         const url = new URL(window.location.href)
+        let needsClean = false
         for (const a of ACTION_PARAMS) {
-            url.searchParams.delete(a)
+            if (url.searchParams.has(a)) {
+                url.searchParams.delete(a)
+                needsClean = true
+            }
         }
-        url.searchParams.delete("type")
-        url.searchParams.delete("payment")
+        if (url.searchParams.has("type")) {
+            url.searchParams.delete("type")
+            needsClean = true
+        }
+        if (url.searchParams.has("payment")) {
+            url.searchParams.delete("payment")
+            needsClean = true
+        }
+        if (!needsClean) return
         const newRelative = `${url.pathname}${url.search}${url.hash}`
         window.history.replaceState(window.history.state, "", newRelative)
         // Keep the ref in sync so the sync-effect doesn't react to this change

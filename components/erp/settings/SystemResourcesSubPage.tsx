@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useCallback } from "react"
-import { Button, FormSection, AlertModal } from "@/components/reusable"
+import { Button, FormSection, AlertModal, SavingStatusModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { ChevronLeftIcon, SaveIcon } from "@/lib/icons"
@@ -230,6 +230,8 @@ export function SystemResourcesSubPage({ businessInfo, planSlug, onBack }: Syste
                     variant="warning"
                 />
             )}
+
+            <SavingStatusModal isOpen={saving} text="Salvando recursos..." />
         </FadeIn>
     )
 }

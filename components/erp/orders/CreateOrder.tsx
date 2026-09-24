@@ -22,6 +22,7 @@ import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
 import PaymentModal, { PAYMENT_MODAL_HEADER_SUBTITLE } from "./PaymentModal"
+import { usePaymentMethods } from "@/hooks/use-payment-methods"
 import { useCSRFToken } from "@/hooks/use-csrf-token"
 import {
     getFinanceAccountsAction,
@@ -711,6 +712,10 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         }
     }, [isLoadingData, editOrderId, searchParams, isAlreadyPaid, notifyWarning, clearPaymentParam])
 
+    // Warm payment-methods cache while the order loads (same React Query key as PaymentModal),
+    // so opening via payment=1 doesn't wait a second sequential fetch.
+    usePaymentMethods(partnerId, selectedStore?.id)
+
     useEffect(() => {
         async function loadAccounts() {
             const res = await getFinanceAccountsAction(partnerId)
@@ -1301,13 +1306,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const handleClosePaymentModal = () => {
         setIsPaymentModalOpen(false)
-        clearPaymentParam()
         if (wasSaleSuccessful) {
+            // Full cleanup (edit + payment) is done by onBack/closeEntity —
+            // avoid racing clearPaymentParam's router.replace with it.
             resetForm()
             debouncedRefresh()
             setWasSaleSuccessful(false)
             onBack()
+            return
         }
+        clearPaymentParam()
     }
 
     const buildOrderPayload = (paymentOverrides?: {
@@ -1829,7 +1837,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                 setNewAccountIsActive(true)
                                                 setIsAccountModalOpen(true)
                                             }}
-                                            handleSaveOrder={editOrderId ? handleSaveOrder : handleOpenPaymentModal}
+                                            handleSaveOrder={handleOpenPaymentModal}
                                             isQuickMode={isQuick}
                                             salesChannelOptions={salesChannelOptions}
                                             deliveryMethodOptions={deliveryMethodOptions}

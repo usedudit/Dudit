@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 import confetti from "canvas-confetti"
-import { CopyIcon, BoxIcon, CheckCircleIcon, PrinterIcon, CalendarIcon } from "@/lib/icons"
+import { CopyIcon, BoxIcon, CheckCircleIcon, PrinterIcon, CalendarIcon, CreditCardIcon } from "@/lib/icons"
 import { Button, InfoCard, IconPlaceholder, Input, Spinner, Separator, Barcode } from "@/components/reusable"
 import { useNotification } from "@/hooks/use-notification"
 import { useRealtimeRecord } from "@/hooks/use-realtime-record"
@@ -176,7 +176,7 @@ export function PaymentWrapper({
     const [isClosing, setIsClosing] = useState(false)
     const notification = useNotification()
 
-    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect" | "manual_pix">(
+    const [step, setStep] = useState<"brick" | "pix" | "boleto" | "success" | "error" | "mp_redirect" | "manual_pix" | "payment_failed">(
         !useMercadoPago && payDepositOnly && pixKey
             ? "manual_pix"
             : useMercadoPago && !initialPixData && !initialBoletoData
@@ -196,6 +196,7 @@ export function PaymentWrapper({
     const [sdkLoaded, setSdkLoaded] = useState(false)
     const [brickError, setBrickError] = useState<string | null>(null)
     const [isProcessingBrick, setIsProcessingBrick] = useState(false)
+    const [paymentFailedStatusDetail, setPaymentFailedStatusDetail] = useState<string | null>(null)
     const mpInstanceRef = useRef<any>(null)
     const bricksBuilderRef = useRef<any>(null)
     const brickIdRef = useRef<any>(null)
@@ -247,7 +248,7 @@ export function PaymentWrapper({
             setIsClosing(false)
             // If we have an actual orderId (not temp), or we are in a success/pending payment state, redirect to orders
             const isOrderCreated = Boolean((actualOrderId && !actualOrderId.startsWith("temp-")) || (orderId && !orderId.startsWith("temp-")))
-            const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect"].includes(step)
+            const isPaymentStarted = ["pix", "boleto", "success", "mp_redirect", "payment_failed"].includes(step)
 
             if (isOrderCreated || isPaymentStarted || paymentConfirmed) {
                 onClose()
@@ -591,6 +592,9 @@ export function PaymentWrapper({
                     setStep("success")
                 }
                 notification.info("Pagamento em Análise", "Seu pagamento está sendo processado.")
+            } else if (status === "rejected" || status === "payment_failed") {
+                setPaymentFailedStatusDetail(responseData.statusDetail ?? null)
+                setStep("payment_failed")
             } else {
                 handleFatalError(`Pagamento não aprovado. Status: ${status || "desconhecido"}`)
             }
@@ -600,6 +604,78 @@ export function PaymentWrapper({
         } finally {
             setIsProcessingBrick(false)
         }
+    }
+
+    const getRejectionMessage = (statusDetail: string | null): string => {
+        if (!statusDetail) return "Seu pagamento foi recusado. Tente outro método de pagamento."
+        const detailMap: Record<string, string> = {
+            cc_rejected_insufficient_funds: "Saldo insuficiente no cartão. Tente outro cartão ou pague com Pix.",
+            cc_rejected_other_reason: "Cartão recusado pela emissora. Verifique os dados ou tente outro cartão.",
+            cc_rejected_high_risk: "Transação bloqueada por segurança. Tente outro cartão.",
+            cc_rejected_blacklist: "Cartão bloqueado. Use outro método de pagamento.",
+            cc_rejected_bad_verifier: "Falha na validação do cartão. Tente novamente ou use outro cartão.",
+            cc_rejected_cannot_payment: "Não foi possível processar o pagamento. Tente outro cartão ou Pix.",
+            cc_rejected_invalid_installments: "Parcelamento não suportado para este cartão.",
+        }
+        return detailMap[statusDetail] || "Pagamento recusado. Escolha outro método de pagamento."
+    }
+
+    const handleRecoveryPayment = async (method: "pix" | "boleto") => {
+        const targetOrderId = actualOrderId || orderId
+        if (!targetOrderId || targetOrderId.startsWith("temp-")) return
+
+        try {
+            setIsProcessingBrick(true)
+            const responseData = await fetchJSONWithCSRF<any>("/api/checkout/recover-payment", {
+                method: "POST",
+                body: {
+                    orderId: targetOrderId,
+                    method,
+                },
+            })
+
+            if (responseData.pixData?.qrCodeBase64 || responseData.pixData?.qrCode) {
+                setPixData(responseData.pixData)
+                setBoletoData(undefined)
+                setStep("pix")
+                notification.info("Aguardando Pagamento", "Realize o pagamento via Pix para confirmar o pedido.")
+            } else if (responseData.boletoData?.barcode || responseData.boletoData?.ticketUrl) {
+                setPixData(undefined)
+                setBoletoData(responseData.boletoData)
+                setStep("boleto")
+                notification.info("Aguardando Pagamento", "Realize o pagamento do boleto para confirmar o pedido.")
+            } else {
+                setPaymentFailedStatusDetail(responseData.statusDetail ?? null)
+                notification.error("Erro na recuperação", "Não foi possível gerar o pagamento alternativo. Tente novamente.")
+            }
+        } catch (error: any) {
+            console.error("Erro na recuperação de pagamento:", error)
+            if (error?.recoveryBlocked) {
+                notification.error("Item indisponível", error.message || "Alguns itens não estão mais disponíveis.")
+                router.replace("/checkout")
+            } else {
+                notification.error("Erro na recuperação", error.message || "Falha ao recuperar pagamento.")
+            }
+        } finally {
+            setIsProcessingBrick(false)
+        }
+    }
+
+    const handleRetryCard = () => {
+        // Re-inicializa o Brick para tentar outro cartão
+        setPaymentFailedStatusDetail(null)
+        setBrickReady(false)
+        brickInitializedRef.current = false
+        if (brickIdRef.current) {
+            try { brickIdRef.current.unmount() } catch { }
+            brickIdRef.current = null
+        }
+        setStep("brick")
+    }
+
+    const handleCancelRecovery = () => {
+        onClose()
+        router.replace("/")
     }
 
     useEffect(() => {
@@ -1293,6 +1369,75 @@ export function PaymentWrapper({
                                 >
                                     Voltar
                                 </button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {step === "payment_failed" && (
+                        <motion.div
+                            key="payment-failed"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="bg-transparent overflow-hidden px-4 sm:px-0 flex flex-col items-center"
+                        >
+                            <IconPlaceholder
+                                placeholderType="image"
+                                imageSrc="https://img.dudit.com.br/static/mascots/Ops.png"
+                                imageAlt="Pagamento recusado"
+                                title="Pagamento recusado"
+                                subtitle={getRejectionMessage(paymentFailedStatusDetail)}
+                            />
+
+                            <div className="w-full max-w-md flex flex-col gap-3 mt-4">
+                                <Button
+                                    onClick={() => handleRecoveryPayment("pix")}
+                                    disabled={isProcessingBrick}
+                                    className="w-full h-12 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessingBrick ? (
+                                        <Spinner className="mr-2" size={16} />
+                                    ) : (
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/payments/Pix.png"
+                                            alt="Pix"
+                                            className="w-5 h-5 object-contain shrink-0"
+                                        />
+                                    )}
+                                    Pagar com Pix
+                                </Button>
+                                <Button
+                                    onClick={() => handleRecoveryPayment("boleto")}
+                                    disabled={isProcessingBrick}
+                                    className="w-full h-12 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessingBrick ? (
+                                        <Spinner className="mr-2" size={16} />
+                                    ) : (
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/payments/Boleto.png"
+                                            alt="Boleto"
+                                            className="w-5 h-5 object-contain shrink-0"
+                                        />
+                                    )}
+                                    Pagar com Boleto
+                                </Button>
+                                <Button
+                                    onClick={handleRetryCard}
+                                    className="w-full h-12 flex items-center justify-center gap-2"
+                                >
+                                    <CreditCardIcon className="w-5 h-5 shrink-0" />
+                                    Tentar outro cartão
+                                </Button>
+                                <Separator />
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCancelRecovery}
+                                    className="w-full h-12"
+                                >
+                                    Ir para a loja
+                                </Button>
                             </div>
                         </motion.div>
                     )}

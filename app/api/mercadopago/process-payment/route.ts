@@ -925,8 +925,11 @@ async function handler(request: NextRequest) {
     })
 
     // SEGURANÇA: Idempotency key determinística (protege contra double-click)
+    // Para retries de ordem já existente (payment_failed/cancelled), inclui timestamp
+    // de alta precisão para evitar cache do MP retornando a recusa original.
+    const isRetry = existingOrder && ["payment_failed", "cancelled"].includes(existingOrder.situation)
     const idempotencyKey = existingOrderId
-      ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData.payment_method_id}_${Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
+      ? createHash("sha256").update(`${buyerId}_${existingOrderId}_${paymentFormData.payment_method_id}_${isRetry ? Date.now() : Math.floor(Date.now() / 30000)}`).digest("hex").substring(0, 48)
       : useUnifiedCart
         ? generateIdempotencyKey(buyerId, partnerId, cartItemIds!.map((id) => ({ id, quantity: 1 })))
         : generateIdempotencyKey(buyerId, partnerId, validatedItems.map(i => ({ id: i.product_id, quantity: i.quantity })))
@@ -1055,7 +1058,7 @@ async function handler(request: NextRequest) {
         : paymentStatus === "in_process"
           ? "in_process"
           : paymentStatus === "rejected"
-            ? "cancelled"
+            ? "payment_failed"
             : "pending"
 
     // Fetch delivery_payer setting for snapshot (store-aware)
@@ -1146,7 +1149,7 @@ async function handler(request: NextRequest) {
 
       const updatedSituation = paymentStatus === "approved"
         ? resolveSituationFromPaid(totalPaidAmount, fullOrderTotal)
-        : (paymentStatus === "in_process" ? "in_process" : (paymentStatus === "rejected" ? "cancelled" : existingOrder.situation))
+        : (paymentStatus === "in_process" ? "in_process" : (paymentStatus === "rejected" ? "payment_failed" : existingOrder.situation))
 
       // Atualizar pedido existente com dados do pagamento
       const { data: updatedOrder, error: updateError } = await adminClient
@@ -1205,6 +1208,8 @@ async function handler(request: NextRequest) {
             feeAmount: 0,
             fixedFeeAmount: 0,
             feeBearer: "merchant",
+            mpPaymentStatus: paymentStatus,
+            mpPaymentStatusDetail: mpPaymentResponse.status_detail ?? null,
             checkoutPricing: checkoutPricing || {
               subtotal: orderItemsForInsert.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
               couponDiscount: couponDiscountAmount,
@@ -1334,6 +1339,7 @@ async function handler(request: NextRequest) {
       orderNumber: newOrder.order_number,
       paymentStatus: paymentStatus === "approved" ? "approved" : paymentStatus,
       paymentMethod: paymentFormData.payment_method_id,
+      statusDetail: mpPaymentResponse.status_detail ?? null,
       pixData: pixData,
       boletoData: boletoData,
       mpPaymentId: mpPaymentId,

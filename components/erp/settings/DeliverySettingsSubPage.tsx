@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination, ThreeDotsLoader, SidebarCard } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, MoneyInput, IconPlaceholder, TimePicker, FormSection, Accordion, Checkbox, ActionsDropdown, AlertModal, Pagination, ThreeDotsLoader, SidebarCard, SavingStatusModal } from "@/components/reusable"
 import { Switch } from "@/components/reusable/Switch"
 import { ChevronLeftIcon, ClockIcon, PlusIcon, SaveIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -659,6 +659,8 @@ export function DeliverySettingsSubPage({ partnerId, storeId, onBack, planGate }
                 cancelText="Cancelar"
                 isDestructive={true}
             />
-        </FadeIn >
+
+            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
+        </FadeIn>
     )
 }

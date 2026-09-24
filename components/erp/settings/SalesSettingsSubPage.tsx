@@ -16,6 +16,7 @@ import {
     TabsTrigger,
     TabsContent,
     SidebarCard,
+    SavingStatusModal,
 } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon, PrinterIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
@@ -665,6 +666,8 @@ export function SalesSettingsSubPage({
                     {saving ? "Salvando..." : "Salvar"}
                 </Button>
             </div>
+
+            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
         </FadeIn>
     )
 }

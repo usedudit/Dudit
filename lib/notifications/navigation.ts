@@ -48,6 +48,10 @@ export function getNotificationHref(params: {
     return "/erp/produtos"
   }
 
+  if (entityType === "cart") {
+    return "/sacola"
+  }
+
   if (entityType === "quote") {
     if (audience === "seller" || audience === "admin") {
       return entityId ? `/erp/orcamentos?view=${encodeURIComponent(entityId)}` : `/erp/orcamentos`

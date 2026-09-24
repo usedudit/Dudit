@@ -264,7 +264,15 @@ export default function OrdersPage({
         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
-    }, [entityState.entityId, cache, afterMutation, closeEntity])
+        // Force Next.js URL state clean — replaceState alone can be overwritten
+        // by an in-flight router.replace (e.g. clearPaymentParam) and leave ?edit=*id*.
+        if (typeof window !== "undefined") {
+            const hasStaleParams = /[?&](edit|view|create|duplicate|payment|type)=/.test(window.location.search)
+            if (hasStaleParams) {
+                router.replace("/erp/pedidos", { scroll: false })
+            }
+        }
+    }, [entityState.entityId, cache, afterMutation, closeEntity, router])
 
     useEffect(() => {
         const handleReset = () => closeEntity()
@@ -601,18 +609,21 @@ export default function OrdersPage({
 
     const handlePaymentStatusClick = useCallback((order: Order) => {
         if (!order.canEdit) return
-        const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
-        const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
-        const isPaid = order.situation === "paid" || (Number(order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
         const depositSummary = getOrderDepositSummary(order)
         if (canPaySinal(depositSummary)) {
             setSinalAction("keep")
             setSinalActionModal({ open: true, order })
-        } else if (isMarketplace || hasMethod || isPaid) {
-            openPaymentStatusModal(order)
-        } else {
-            router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
+            return
         }
+        // Nothing received yet (no sinal, no payments) → always open PaymentModal via payment=1
+        const paidAmount = Number(order.paidAmount || 0)
+        const totalAmount = Number(order.total_amount || 0)
+        const isFullyPaid = order.situation === "paid" || (totalAmount > 0 && paidAmount >= totalAmount - 0.009)
+        if (paidAmount <= 0.009 && !isFullyPaid) {
+            router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
+            return
+        }
+        openPaymentStatusModal(order)
     }, [router, openPaymentStatusModal])
 
     const handleSinalActionConfirm = useCallback(async () => {
@@ -921,51 +932,54 @@ export default function OrdersPage({
                                 })
                             }}
                             onUpdatePaymentStatus={(order: any) => {
-                                const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
-                                const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
-                                const isPaid = order.situation === "paid" || (Number(order.paid_amount || order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
                                 const depositSummary = getOrderDepositSummary(order)
                                 if (canPaySinal(depositSummary)) {
                                     setSinalAction("keep")
                                     setSinalActionModal({ open: true, order: { originalId: order.id, checkout_fulfillment: order.checkout_fulfillment, paidAmount: Number(order.paid_amount || 0), total_amount: Number(order.total_amount || 0), payment_expires_at: order.payment_expires_at } as any })
-                                } else if (isMarketplace || hasMethod || isPaid) {
-                                    const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
-                                    const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
-                                        ? order.customer_name
-                                        : (cust?.name || cust?.email || order.buyer_email || order.customer_name || "Consumidor final")
-                                    openPaymentStatusModal({
-                                        originalId: order.id,
-                                        displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
-                                        customer_name: resolvedCustName,
-                                        customer_id: order.buyer_id || "-",
-                                        total_amount: Number(order.total_amount || 0),
-                                        statusLabel: "",
-                                        statusColor: "gray",
-                                        deliveryStatusLabel: "",
-                                        deliveryStatusColor: "gray",
-                                        isUnfulfilled: false,
-                                        formattedDate: "",
-                                        formattedTime: "",
-                                        store_name: "",
-                                        order_source: order.order_source || "Manual",
-                                        items_count: Number(order.order_items?.length || 0),
-                                        created_at_time: new Date(order.created_at || Date.now()).getTime(),
-                                        situation: order.situation || "pending",
-                                        delivery_status: order.delivery_status || "not_sent",
-                                        delivery_type: order.delivery_type || "delivery",
-                                        notes: order.notes || "",
-                                        previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
-                                        returnCount: Number(order.return_count || order.return_requests?.length || 0),
-                                        canEdit: order.situation !== "cancelled",
-                                        paidAmount: Number(order.paid_amount || 0),
-                                        payment_method: order.payment_method || "",
-                                        payment_breakdown: order.payment_breakdown || [],
-                                        payment_provider: order.payment_provider || "",
-                                        checkout_fulfillment: order.checkout_fulfillment || null,
-                                    })
-                                } else {
-                                    router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
+                                    return
                                 }
+                                // Nothing received yet (no sinal, no payments) → always open PaymentModal via payment=1
+                                const paidAmount = Number(order.paid_amount || order.paidAmount || 0)
+                                const totalAmount = Number(order.total_amount || 0)
+                                const isFullyPaid = order.situation === "paid" || (totalAmount > 0 && paidAmount >= totalAmount - 0.009)
+                                if (paidAmount <= 0.009 && !isFullyPaid) {
+                                    router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
+                                    return
+                                }
+                                const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
+                                const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
+                                    ? order.customer_name
+                                    : (cust?.name || cust?.email || order.buyer_email || order.customer_name || "Consumidor final")
+                                openPaymentStatusModal({
+                                    originalId: order.id,
+                                    displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                    customer_name: resolvedCustName,
+                                    customer_id: order.buyer_id || "-",
+                                    total_amount: Number(order.total_amount || 0),
+                                    statusLabel: "",
+                                    statusColor: "gray",
+                                    deliveryStatusLabel: "",
+                                    deliveryStatusColor: "gray",
+                                    isUnfulfilled: false,
+                                    formattedDate: "",
+                                    formattedTime: "",
+                                    store_name: "",
+                                    order_source: order.order_source || "Manual",
+                                    items_count: Number(order.order_items?.length || 0),
+                                    created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                    situation: order.situation || "pending",
+                                    delivery_status: order.delivery_status || "not_sent",
+                                    delivery_type: order.delivery_type || "delivery",
+                                    notes: order.notes || "",
+                                    previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                    returnCount: Number(order.return_count || order.order_requests?.length || 0),
+                                    canEdit: order.situation !== "cancelled",
+                                    paidAmount: Number(order.paid_amount || 0),
+                                    payment_method: order.payment_method || "",
+                                    payment_breakdown: order.payment_breakdown || [],
+                                    payment_provider: order.payment_provider || "",
+                                    checkout_fulfillment: order.checkout_fulfillment || null,
+                                })
                             }}
                             onCancelOrder={(order: any) => openCancelModal(order.id)}
                             onOpenNotes={(order: any) => openNotesSheet(order)}
@@ -1392,19 +1406,15 @@ export default function OrdersPage({
             >
                 <div className="space-y-4">
                     <ListItem
-                        left={
-                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />
-                            </div>
-                        }
+                        icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />}
                         title={`Sinal - ${formatCurrency(Number((sinalActionModal.order?.checkout_fulfillment as any)?.depositCheckout?.initialChargeAmount || 0))}`}
                         description="Mercado Pago"
-                        className="cursor-default"
+                        className="px-4 py-3"
                     />
                     <ListItem
                         title="Manter sinal"
                         description="Manter o sinal ativo e continuar para o pagamento do pedido."
-                        className="cursor-pointer"
+                        className="px-4 py-3"
                         right={
                             <RadioButton name="sinal-action" value="keep" checked={sinalAction === "keep"} onChange={() => setSinalAction("keep")} />
                         }
@@ -1413,7 +1423,7 @@ export default function OrdersPage({
                     <ListItem
                         title="Cancelar sinal"
                         description="Cancelar apenas o sinal. O pedido pode ser pago normalmente sem o sinal."
-                        className="cursor-pointer"
+                        className="px-4 py-3"
                         right={
                             <RadioButton name="sinal-action" value="cancel" checked={sinalAction === "cancel"} onChange={() => setSinalAction("cancel")} />
                         }
@@ -1422,7 +1432,7 @@ export default function OrdersPage({
                     <ListItem
                         title="Cancelar sinal e o pedido"
                         description="Cancelar o sinal e o pedido. Esta ação não pode ser desfeita."
-                        className="cursor-pointer"
+                        className="px-4 py-3"
                         right={
                             <RadioButton name="sinal-action" value="cancel_order" checked={sinalAction === "cancel_order"} onChange={() => setSinalAction("cancel_order")} />
                         }

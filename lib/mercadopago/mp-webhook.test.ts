@@ -8,12 +8,16 @@ import { describe, expect, it } from "vitest"
  * Supabase or HTTP calls.
  */
 
-// ─── Replicate the exact status mapping logic from webhook/route.ts L297-305 ──
+// ─── Replicate the exact status mapping logic from webhook/route.ts ──
 
-function mapMpStatusToOrderSituation(mpStatus: string): string {
+function mapMpStatusToOrderSituation(mpStatus: string, currentSituation?: string): string {
   if (mpStatus === "approved") return "paid"
   if (mpStatus === "in_process") return "in_process"
-  if (["rejected", "cancelled", "refunded", "charged_back"].includes(mpStatus)) return "cancelled"
+  if (["rejected", "cancelled", "refunded", "charged_back"].includes(mpStatus)) {
+    // rejected + payment_failed → stay in payment_failed for recovery
+    if (mpStatus === "rejected" && currentSituation === "payment_failed") return "payment_failed"
+    return "cancelled"
+  }
   return "pending"
 }
 
@@ -32,12 +36,12 @@ function mapPaymentMethodLabel(paymentMethodId: string, paymentTypeId: string): 
   return "Desconhecido"
 }
 
-// ─── Replicate the status regression guard from webhook/route.ts L310-316 ──
+// ─── Replicate the status regression guard from webhook/route.ts ──
 
 function shouldSkipStatusUpdate(currentSituation: string, newStatus: string): boolean {
   const finalStatuses = ["paid", "shipped", "delivered"]
   if (finalStatuses.includes(currentSituation) && !finalStatuses.includes(newStatus)) {
-    if (newStatus !== "cancelled") return true
+    if (newStatus !== "cancelled" && newStatus !== "payment_failed") return true
   }
   return false
 }
@@ -48,12 +52,12 @@ function shouldSkipIdempotent(currentSituation: string): boolean {
   return currentSituation === "paid"
 }
 
-// ─── Replicate the process-payment situation mapping from process-payment/route.ts L734 ──
+// ─── Replicate the process-payment situation mapping from process-payment/route.ts ──
 
 function mapCreationSituation(mpStatus: string): string {
   if (mpStatus === "approved") return "paid"
   if (mpStatus === "in_process") return "in_process"
-  if (mpStatus === "rejected") return "cancelled"
+  if (mpStatus === "rejected") return "payment_failed"
   return "pending"
 }
 
@@ -72,8 +76,16 @@ describe("MP Status → Order Situation Mapping", () => {
     expect(mapMpStatusToOrderSituation("in_process")).toBe("in_process")
   })
 
-  it("Credit card rejected → cancelled", () => {
+   it("Credit card rejected → cancelled", () => {
     expect(mapMpStatusToOrderSituation("rejected")).toBe("cancelled")
+  })
+
+  it("Credit card rejected when already payment_failed → stays payment_failed (recovery)", () => {
+    expect(mapMpStatusToOrderSituation("rejected", "payment_failed")).toBe("payment_failed")
+  })
+
+  it("Refunded when already payment_failed → cancelled", () => {
+    expect(mapMpStatusToOrderSituation("refunded", "payment_failed")).toBe("cancelled")
   })
 
   it("Debit card approved → paid", () => {
@@ -174,6 +186,10 @@ describe("Status Regression Guard", () => {
     expect(shouldSkipStatusUpdate("paid", "cancelled")).toBe(false)
   })
 
+  it("paid → payment_failed: allow (card recovery)", () => {
+    expect(shouldSkipStatusUpdate("paid", "payment_failed")).toBe(false)
+  })
+
   it("shipped → pending: skip", () => {
     expect(shouldSkipStatusUpdate("shipped", "pending")).toBe(true)
   })
@@ -196,8 +212,8 @@ describe("Process-Payment Creation Situation", () => {
     expect(mapCreationSituation("in_process")).toBe("in_process")
   })
 
-  it("rejected → cancelled (not pending)", () => {
-    expect(mapCreationSituation("rejected")).toBe("cancelled")
+  it("rejected → payment_failed (not cancelled)", () => {
+    expect(mapCreationSituation("rejected")).toBe("payment_failed")
   })
 
   it("pending → pending", () => {

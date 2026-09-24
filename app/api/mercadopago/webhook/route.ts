@@ -810,7 +810,14 @@ async function processWebhookWithRetry(
     } else if (paymentInfo.status === "in_process") {
       orderStatus = "in_process"
     } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(paymentInfo.status)) {
-      orderStatus = "cancelled"
+      // If order is already in payment_failed (card rejection during checkout),
+      // keep it in payment_failed to allow recovery — only move to cancelled
+      // for refunded/charged_back or when the rejection comes from a different context.
+      if (paymentInfo.status === "rejected" && orderData.situation === "payment_failed") {
+        orderStatus = "payment_failed"
+      } else {
+        orderStatus = "cancelled"
+      }
     }
 
     console.log(`[WEBHOOK] Status mapping: MP "${paymentInfo.status}" → order "${orderStatus}"`)
@@ -818,7 +825,7 @@ async function processWebhookWithRetry(
     // ── Status regression guard ──
     const finalStatuses = ["paid", "shipped", "delivered"]
     if (finalStatuses.includes(orderData.situation) && !finalStatuses.includes(orderStatus)) {
-      if (orderStatus !== "cancelled") {
+      if (orderStatus !== "cancelled" && orderStatus !== "payment_failed") {
         console.log(`[WEBHOOK] Skipping: order already in final status "${orderData.situation}"`)
         return
       }
@@ -841,6 +848,16 @@ async function processWebhookWithRetry(
         ...updateData,
         situation: orderStatus,
         cancelled_at: new Date().toISOString(),
+        payment_method: paymentMethodName,
+        payment_provider: "Mercado Pago",
+        mp_payment_id: paymentId.toString(),
+        payment_breakdown,
+      }
+    } else if (orderStatus === "payment_failed") {
+      updateData = {
+        ...updateData,
+        situation: orderStatus,
+        cancelled_at: null,
         payment_method: paymentMethodName,
         payment_provider: "Mercado Pago",
         mp_payment_id: paymentId.toString(),
@@ -933,6 +950,34 @@ async function processWebhookWithRetry(
           })
         } catch (auditErr: any) {
           console.error("[WEBHOOK] Error logging cancellation audit event:", auditErr.message)
+        }
+      }
+
+      // Log audit event for payment_failed (card rejection) via webhook
+      if (orderStatus === "payment_failed" && previousSituation !== "payment_failed") {
+        try {
+          const { logAuditEvent } = await import("@/lib/services/timeline.service")
+          const statusDetail = paymentInfo.status_detail || paymentInfo.status || "recusado"
+          await logAuditEvent({
+            partnerId,
+            actorUserId: null,
+            entityType: "order",
+            entityId: orderId,
+            actionType: "payment_failed",
+            changeLines: [
+              `Pagamento recusado via Mercado Pago.`,
+              `Motivo: ${statusDetail}.`,
+            ],
+            source: "system",
+            metadata: {
+              oldStatus: previousSituation,
+              newStatus: "Recuperável",
+              mpPaymentStatus: paymentInfo.status,
+              mpPaymentStatusDetail: paymentInfo.status_detail,
+            },
+          })
+        } catch (auditErr: any) {
+          console.error("[WEBHOOK] Error logging payment_failed audit event:", auditErr.message)
         }
       }
 

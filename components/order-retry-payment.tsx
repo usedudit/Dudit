@@ -79,7 +79,7 @@ export function OrderRetryPayment({ orderId, amount, status, paymentProvider, or
     }
   }
 
-  if (status !== "pending" || paymentProvider !== "Mercado Pago") {
+  if (!["pending", "payment_failed"].includes(status) || paymentProvider !== "Mercado Pago") {
     return null
   }
 

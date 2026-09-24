@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useTransition, useRef, useCallback } from "react"
-import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown, FormDropdown } from "@/components/reusable"
+import { Button, IconPlaceholder, InfoCard, Input, ThreeDotsLoader, Tabs, TabsList, TabsTrigger, TabsContent, Separator, ActionsDropdown, Badge, AlertModal, DropdownItem, ListItem, RadioButton, Checkbox, Dropdown, FormDropdown, SavingStatusModal } from "@/components/reusable"
 import { MailIcon, CheckCircleIcon, ChevronLeftIcon, PlusIcon, CalendarIcon, UserIcon, MotorbikeIcon, ShieldIcon, CrownIcon, ManagerIcon, CopyIcon, ThreeDotsIcon, TrashIcon, StoreIcon, ChartIcon } from "@/lib/icons"
 import DefaultModal from "@/components/reusable/DefaultModal"
 import { getTeamMembers, getTeamMemberStatsAction, removeTeamMember, updateTeamMemberRole } from "@/app/actions/erp/team"
@@ -862,11 +862,10 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                             {allStores.map((store) => {
                                                 const isSelected = inviteSelectedStores.includes(store.id)
                                                 const locationParts = [store.city, store.state].filter(Boolean)
-                                                const locationText = locationParts.length > 0 ? locationParts.join(" - ") : ""
+                                                const locationText = locationParts.length > 0 ? locationParts.join("/") : ""
                                                 const addressParts = [
                                                     store.street,
                                                     store.number && store.number !== "S/N" ? store.number : store.number === "S/N" ? "S/N" : null,
-                                                    store.neighborhood,
                                                 ].filter(Boolean)
                                                 const addressText = addressParts.length > 0 ? addressParts.join(", ") : ""
 
@@ -1014,12 +1013,12 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                                                                 description={ROLE_LABELS[state.role] || state.role}
                                                                 right={
                                                                     <Button
-                                                                        variant="outline"
+                                                                        variant="outlinered"
                                                                         onClick={() => setStoreAccessState(prev => ({
                                                                             ...prev,
                                                                             [store.id]: { ...prev[store.id], enabled: false }
                                                                         }))}
-                                                                        className="h-8 text-xs text-red-500 hover:text-red-600 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/20 shrink-0"
+                                                                        className="h-8 text-xs"
                                                                     >
                                                                         Remover acesso
                                                                     </Button>
@@ -1173,6 +1172,8 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                     </DefaultModal>
                 </Tabs>
             </div>
+
+            <SavingStatusModal isOpen={isCreating || isPending || isSavingStoreAccess} text="Salvando configurações..." />
         </FadeIn>
     )
 }

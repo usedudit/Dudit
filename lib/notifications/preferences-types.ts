@@ -25,20 +25,21 @@ export interface NotificationCategory {
 }
 
 export const NOTIFICATION_CATEGORIES: Record<string, NotificationCategory> = {
-  customer: {
-    label: "Atualizações dos Pedidos",
-    description: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado e lembretes de agendamento",
-    types: [
-      "order_created",
-      "order_delivered",
-      "order_paid",
-      "order_refunded",
-      "appointment_created",
-      "appointment_reminder",
-      "appointment_rescheduled",
-      "service_return_reminder",
-    ],
-  },
+    customer: {
+        label: "Atualizações dos Pedidos",
+        description: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado, carrinho abandonado e lembretes de agendamento",
+        types: [
+            "order_created",
+            "order_delivered",
+            "order_paid",
+            "order_refunded",
+            "cart_abandoned",
+            "appointment_created",
+            "appointment_reminder",
+            "appointment_rescheduled",
+            "service_return_reminder",
+        ],
+    },
   seller: {
     label: "Vendedor",
     description: "Notificações sobre vendas, agendamentos, estoque baixo e sugestões de reposição",
@@ -76,7 +77,7 @@ export const CATEGORY_LABELS: Record<NotificationCategoryKey, string> = {
 }
 
 export const CATEGORY_DESCRIPTIONS: Record<NotificationCategoryKey, string> = {
-  customer: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado e lembretes de agendamento",
+  customer: "Novo pedido, pagamento aprovado, pedido entregue, reembolso realizado, carrinho abandonado e lembretes de agendamento",
   seller: "Notificações sobre vendas, agendamentos, estoque baixo e sugestões de reposição",
   system: "Comunicados da plataforma, mensagens e outras notificações",
 }
@@ -92,7 +93,7 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   appointment_confirmed: "Agendamento confirmado",
   appointment_reminder: "Lembrete de agendamento",
   appointment_cancelled: "Agendamento cancelado",
-  appointment_rescheduled: "Agendamento reagendado",
+  appointment_rescheduled: "Agendamento remarcado",
   subscription_created: "Nova assinatura",
   subscription_renewed: "Assinatura renovada",
   message_received: "Nova mensagem",
@@ -100,4 +101,5 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   low_stock: "Estoque baixo",
   replenishment_suggested: "Sugestões de reposição",
   service_return_reminder: "Lembrete de retorno",
+  cart_abandoned: "Carrinho abandonado",
 }

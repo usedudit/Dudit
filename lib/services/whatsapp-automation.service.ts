@@ -38,6 +38,7 @@ const TEMPLATE_BY_TRIGGER: Partial<Record<WhatsappAutomationTrigger, string>> = 
   quote_shared: "quote_shared",
   quote_reminder: "quote_reminder",
   payment_reminder: "payment_reminder",
+  cart_abandoned: "cart_abandoned",
   test_message: "hello_world",
 }
 

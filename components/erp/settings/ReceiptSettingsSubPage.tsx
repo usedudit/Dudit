@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Button, FormSection, FormTextarea, Checkbox, RadioButton, ThreeDotsLoader } from "@/components/reusable"
+import { Button, FormSection, FormTextarea, Checkbox, RadioButton, ThreeDotsLoader, SavingStatusModal } from "@/components/reusable"
 import { ChevronLeftIcon, SaveIcon, PrinterIcon, CheckIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useNotification } from "@/hooks/use-notification"
@@ -489,6 +489,8 @@ export function ReceiptSettingsSubPage({
                     {saving ? "Salvando..." : "Salvar"}
                 </Button>
             </div>
+
+            <SavingStatusModal isOpen={saving} text="Salvando configurações..." />
         </FadeIn>
     )
 }

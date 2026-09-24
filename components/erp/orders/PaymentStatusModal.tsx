@@ -607,15 +607,7 @@ export default function PaymentStatusModal({
 
                                     {isMpOrder && !isFullyPaid && canPaySinal(depositSummary) && (
                                         <ListItem
-                                            left={
-                                                <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
-                                                    <img
-                                                        src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                                                        alt="Mercado Pago"
-                                                        className="w-5 h-5 object-contain"
-                                                    />
-                                                </div>
-                                            }
+                                            icon={<img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />}
                                             title={`Sinal - ${formatCurrency((depositSummary?.initialChargeAmount || depositSummary?.depositAmount) || 0)}`}
                                             description="Mercado Pago"
                                             onClick={() => {
@@ -647,7 +639,7 @@ export default function PaymentStatusModal({
                                             {/* Header do card MP */}
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                                    <div className="w-12 h-12 rounded-full bg-brand-slate dark:bg-dark-border/50 flex border border-brand-border dark:border-dark-border items-center justify-center shrink-0 group-hover:bg-gray-200 dark:group-hover:bg-dark-border/90 transition-colors">
                                                         <img
                                                             src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
                                                             alt="Mercado Pago"

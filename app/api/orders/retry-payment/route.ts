@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
 
     // Allow both "pending" and "partially_paid" (deposit-only flow): a partially_paid
     // order still has a remaining balance that can be charged via retry-payment.
-    if (order.situation !== "pending" && order.situation !== "partially_paid") {
+    // Also allow "payment_failed" (card rejection recovery — can only recover via PIX).
+    if (order.situation !== "pending" && order.situation !== "partially_paid" && order.situation !== "payment_failed") {
       return NextResponse.json(
         { error: "Este pedido não está com pagamento pendente" },
         { status: 400 },
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
         .update({
           payment_provider: "Mercado Pago",
           mp_payment_id: paymentData.id.toString(),
-          situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "cancelled" : "pending")),
+           situation: paymentData.status === "approved" ? "paid" : (paymentData.status === "in_process" ? "in_process" : (paymentData.status === "rejected" ? "payment_failed" : "pending")),
           payment_expires_at: paymentData.date_of_expiration,
           updated_at: new Date().toISOString(),
         })

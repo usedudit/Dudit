@@ -35,6 +35,7 @@ export const NOTIFICATION_TYPE_URGENCY_MAP: Record<NotificationType, Notificatio
   appointment_created: "medium",
   appointment_confirmed: "medium",
   appointment_rescheduled: "medium",
+  service_return_reminder: "medium",
 
   // Low / Informational Urgency
   subscription_created: "low",
@@ -43,7 +44,7 @@ export const NOTIFICATION_TYPE_URGENCY_MAP: Record<NotificationType, Notificatio
   admin_announcement: "low",
   low_stock: "low",
   replenishment_suggested: "low",
-  service_return_reminder: "medium",
+  cart_abandoned: "low",
 }
 
 export function getNotificationUrgency(type: NotificationType): NotificationUrgency {

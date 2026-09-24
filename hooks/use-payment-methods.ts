@@ -24,9 +24,10 @@ export function usePaymentMethods(partnerId: string, storeId?: string | null) {
             const res = await getPaymentMethodsAction(partnerId, effectiveStoreId)
             return res
         },
-        staleTime: 60_000,
+        staleTime: 5 * 60_000,
         refetchOnWindowFocus: false,
         enabled: Boolean(partnerId && partnerId.trim().length > 0),
+        retry: 1,
     })
 
     const methods = data?.methods || []
