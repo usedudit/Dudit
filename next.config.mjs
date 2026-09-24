@@ -90,7 +90,7 @@ const nextConfig = {
         type: "filesystem",
         cacheDirectory: path.resolve(__dirname, ".next/cache/webpack"),
         buildDependencies: {
-          config: [__filename],
+          config: [path.resolve(__dirname, "next.config.mjs")],
         },
         maxMemory: 500,
         maxMilliseconds: 1000 * 60 * 60 * 24 * 7, // 7 dias
