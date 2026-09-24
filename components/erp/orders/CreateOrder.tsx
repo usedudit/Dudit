@@ -689,20 +689,27 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
 
     const searchParams = useSearchParams()
+    const clearPaymentParam = useCallback(() => {
+        if (typeof window === "undefined") return
+        const params = new URLSearchParams(window.location.search)
+        if (params.get("payment") !== "1") return
+        params.delete("payment")
+        const newQuery = params.toString() ? `?${params.toString()}` : ""
+        router.replace(`${window.location.pathname}${newQuery}`)
+    }, [router])
     useEffect(() => {
         if (!isLoadingData && editOrderId && searchParams?.get("payment") === "1") {
             if (isAlreadyPaid) {
                 notifyWarning("Pedido já quitado", "Este pedido já foi totalmente pago e não permite novos pagamentos.")
-                const params = new URLSearchParams(searchParams?.toString())
-                params.delete("payment")
-                const newQuery = params.toString() ? `?${params.toString()}` : ""
-                router.replace(`/erp/pedidos${newQuery}`)
+                clearPaymentParam()
                 setIsPaymentModalOpen(false)
                 return
             }
             setIsPaymentModalOpen(true)
+            // Consume the one-shot flag so later re-renders / modal closes cannot reopen it.
+            clearPaymentParam()
         }
-    }, [isLoadingData, editOrderId, searchParams, isAlreadyPaid, notifyWarning, router])
+    }, [isLoadingData, editOrderId, searchParams, isAlreadyPaid, notifyWarning, clearPaymentParam])
 
     useEffect(() => {
         async function loadAccounts() {
@@ -1294,6 +1301,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const handleClosePaymentModal = () => {
         setIsPaymentModalOpen(false)
+        clearPaymentParam()
         if (wasSaleSuccessful) {
             resetForm()
             debouncedRefresh()
@@ -1540,7 +1548,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             notifyError("Ação bloqueada", "Este pedido já está totalmente pago e não aceita novos pagamentos.")
             return { error: "Pedido já está totalmente pago." }
         }
-        return submitOrder({
+        const result = await submitOrder({
             paymentStatus: paymentData.paymentStatus,
             paymentMethod: paymentData.paymentMethod,
             paymentBreakdown: paymentData.paymentBreakdown,
@@ -1550,6 +1558,18 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             mpPaymentId: paymentData.mpPaymentId,
             checkoutFulfillment: paymentData.checkoutFulfillment || undefined,
         })
+        if (result?.success && editOrderId) {
+            const nextPaid = Number(paymentData.paidAmount ?? originalPaidAmount)
+            const nextStatus = paymentData.paymentStatus
+                || (nextPaid >= totalAmount - 0.009 ? "paid" : nextPaid > 0.009 ? "partially_paid" : "unpaid")
+            setOriginalPaidAmount(nextPaid)
+            setOriginalPaymentStatus(nextStatus)
+            setPaymentStatus(nextStatus)
+            if (Array.isArray(paymentData.paymentBreakdown)) {
+                setOriginalPaymentBreakdown(paymentData.paymentBreakdown)
+            }
+        }
+        return result
     }
 
     const handleDirectSaveOrder = async () => {
@@ -1866,26 +1886,30 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                                                             </span>
                                                         </div>
 
-                                                        {paymentBreakdown.length > 1 && (
-                                                            <div className="flex justify-between items-start text-[14px] gap-4">
-                                                                <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
-                                                                <div className="flex flex-col gap-1 text-right">
-                                                                    {paymentBreakdown.map((entry: any, index: number) => {
-                                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0);
-                                                                        const baseAmount = Number(entry.amount || 0);
-                                                                        const displayAmount = received > 0.009 ? received : baseAmount;
-                                                                        return (
-                                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
-                                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
-                                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
-                                                                                    : null}
-                                                                            </span>
-                                                                        );
-                                                                    })}
+                                                        {(() => {
+                                                            const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009);
+                                                            if (paidBreakdown.length <= 1) return null;
+                                                            return (
+                                                                <div className="flex justify-between items-start text-[14px] gap-4">
+                                                                    <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>
+                                                                    <div className="flex flex-col gap-1 text-right">
+                                                                        {paidBreakdown.map((entry: any, index: number) => {
+                                                                            const received = Number(entry.amountReceived ?? entry.amount ?? 0);
+                                                                            const baseAmount = Number(entry.amount || 0);
+                                                                            const displayAmount = received > 0.009 ? received : baseAmount;
+                                                                            return (
+                                                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                                    {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                                    {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                                        ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                                        : null}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            );
+                                                        })()}
 
                                                         <div className="flex justify-between items-start text-[14px] gap-4">
                                                             <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valor Original</span>

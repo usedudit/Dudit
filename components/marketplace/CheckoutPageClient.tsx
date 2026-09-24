@@ -2764,7 +2764,7 @@ export function CheckoutPageClient() {
                                                         const enabled = []
                                                         if (mp?.pix === true) enabled.push("Pix")
                                                         if (mp?.credit_card === true) enabled.push("Cartão")
-                                                        if (mp?.boleto === true) enabled.push("Boleto")
+                                                        if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
                                                         if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                                         return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
                                                     })()}
@@ -3240,7 +3240,7 @@ export function CheckoutPageClient() {
                                                     const enabled = []
                                                     if (mp?.pix === true) enabled.push("Pix")
                                                     if (mp?.credit_card === true) enabled.push("Cartão")
-                                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                                    if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
                                                     if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                                     return (enabled.length > 0 ? enabled.join(", ") : "Pagamento online") + "."
                                                 })()}
@@ -3708,7 +3708,7 @@ export function CheckoutPageClient() {
                                     const enabled = []
                                     if (mp?.pix === true) enabled.push("Pix")
                                     if (mp?.credit_card === true) enabled.push("Cartão")
-                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                    if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
                                     if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                     return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
                                 })() :
@@ -4117,7 +4117,7 @@ export function CheckoutPageClient() {
                                                     const enabled = []
                                                     if (mp?.pix === true) enabled.push("Pix")
                                                     if (mp?.credit_card === true) enabled.push("Cartão")
-                                                    if (mp?.boleto === true) enabled.push("Boleto")
+                                                    if (mp?.boleto === true && !payDepositOnly) enabled.push("Boleto")
                                                     if (mp?.mercado_pago_wallet === true) enabled.push("Saldo MP")
                                                     return enabled.length > 0 ? enabled.join(", ") : "Pagamento online"
                                                 })()}</p>

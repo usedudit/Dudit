@@ -447,7 +447,7 @@ export default function DeliveryDetailPage({
                                 />
                             }
                             onClick={() => setIsDriverModalOpen(true)}
-                            className="border-0 bg-transparent hover:bg-brand-gray/50 dark:hover:bg-dark-border/30 px-0"
+                            className="border-0"
                         />
                     </div>
                 </>

@@ -187,14 +187,6 @@ export const ImageAnalysisModal: React.FC<Props> = ({
                     </div>
                 )}
 
-                {/* Estado vazio */}
-                {selectedFiles.length === 0 && (
-                    <div className="flex items-center justify-center py-8 text-brand-inactive-text dark:text-dark-body">
-                        <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
-                        <p>Nenhuma imagem selecionada</p>
-                    </div>
-                )}
-
                 {/* Footer */}
                 <div className="flex justify-end gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
                     <Button variant="outline" onClick={handleClose} disabled={isLoading}>
@@ -203,7 +195,7 @@ export const ImageAnalysisModal: React.FC<Props> = ({
                     <Button
                         onClick={handleAnalyze}
                         disabled={isLoading || selectedFiles.length === 0}
-                        leftIcon={isLoading ? <Spinner size={18} /> : <SparklesIcon className="w-4 h-4" />}
+                        leftIcon={isLoading ? <Spinner size={18} /> : <SparklesIcon size={18} />}
                     >
                         {isLoading ? "Analisando..." : `Analisar com IA`}
                     </Button>

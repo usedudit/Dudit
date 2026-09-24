@@ -113,6 +113,29 @@ const normalizeItemForCard = (item: any, partner: any) => {
 const normalizeCategory = (category?: string | null) => (category || "Outros").trim()
 const categoryId = (category: string) => category.toLowerCase()
 
+const vendorBadgeSeed = (userId?: string | null) => `dudit-${userId ?? "anon"}-${new Date().toDateString()}`
+
+const vendorBadgeHash = (seed: string, id: string) => {
+    let h = 0
+    const s = `${seed}-${id}`
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i)
+    return Math.abs(h)
+}
+
+const applyVendorUrgencyBadge = (item: any, userId?: string | null) => {
+    if (!item || item._badgeLabel) return item
+    if (item.itemType === "plano" || item.itemType === "servico" || item.duration_minutes !== undefined) return item
+    const stock = Number(item.stock_quantity ?? item.stock_available ?? 0)
+    const h = vendorBadgeHash(vendorBadgeSeed(userId), `${item.id}-launch-badge`) % 100
+    if (stock > 0 && stock <= 5 && h < 45) {
+        return { ...item, _badgeLabel: `Últimos ${stock}`, _badgeVariant: "red" }
+    }
+    if (h >= 75 && h < 90) {
+        return { ...item, _badgeLabel: "Destaque", _badgeVariant: "purple" }
+    }
+    return item
+}
+
 const formatCouponValue = (coupon: any) => {
     if (coupon.discount_type === "free_shipping") return "Entrega grátis"
     if (coupon.discount_type === "percentage") return `${Number(coupon.discount_value || 0)}% OFF`
@@ -876,6 +899,11 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     const { user } = useSupabase()
     const isStoreOwner = Boolean(user?.id && ((partner?.userId && user.id === partner.userId) || (partner?.user_id && user.id === partner.user_id)))
 
+    const displayProducts = useMemo(() => {
+        if (!isMounted) return products || []
+        return (products || []).map(item => applyVendorUrgencyBadge(item, user?.id ?? null))
+    }, [products, user?.id, isMounted])
+
     const [partnerPromotions, setPartnerPromotions] = useState<any[]>([])
 
     useEffect(() => {
@@ -929,7 +957,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
     }, [partner.banner_url, partnerRawImage, partner.storeName])
 
     const hasPlans = plans && plans.length > 0
-    const currentItems = activeContext === "Produtos" ? products : (activeContext === "Servicos" ? services : plans)
+    const currentItems = activeContext === "Produtos" ? displayProducts : (activeContext === "Servicos" ? services : plans)
     const filteredItems = useMemo(() => {
         const search = searchValue.trim().toLowerCase()
         return currentItems.filter(item => !search || item.name?.toLowerCase().includes(search))
@@ -1016,7 +1044,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
         onScroll()
         window.addEventListener("scroll", onScroll, { passive: true })
         return () => window.removeEventListener("scroll", onScroll)
-    }, [])
+    }, [categoryView])
 
     useEffect(() => {
         const observer = new IntersectionObserver((entries) => {
@@ -1262,16 +1290,15 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                             </div>
                         </div>
 
-                        <div className="w-[360px]">
+                        <div className="w-[360px] shrink-0">
                             <Input variant="full-rounded" value={categoryView ? categorySearchValue : searchValue} onChange={e => categoryView ? setCategorySearchValue(e.target.value) : setSearchValue(e.target.value)} placeholder={categoryView && categoryName ? `Buscar em ${categoryName}` : `Buscar em ${partner.storeName}`} prefix={<Search size={17} />} />
+                            {hasStatusLine && (
+                                <div className="mt-1.5">
+                                    <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
+                                </div>
+                            )}
                         </div>
                     </div>
-
-                    {hasStatusLine && (
-                        <div className="hidden lg:block mt-3">
-                            <StoreStatusLine openStatus={openStatus} delivery={deliveryNode} />
-                        </div>
-                    )}
 
                     {/* Mobile/Tablet Layout (lg:hidden) */}
                     <div className="lg:hidden flex items-center justify-between gap-4">
@@ -1316,7 +1343,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                 </div>
             )}
 
-            <div ref={mobileTabsRef} className={`lg:hidden`}>
+            <div ref={mobileTabsRef} className={categoryView ? "hidden" : "lg:hidden"}>
                 <div className="flex items-center gap-4 px-3 mb-6 border-b border-brand-border dark:border-dark-border h-[46px]">
                     <button
                         onClick={() => setIsContextModalOpen(true)}

@@ -591,7 +591,7 @@ async function handler(request: NextRequest) {
     if (acceptedMethods.pix === false) excludedPaymentTypes.push({ id: "pix" })
     if (acceptedMethods.credit_card === false) excludedPaymentTypes.push({ id: "credit_card" })
     if (acceptedMethods.debit_card === false) excludedPaymentTypes.push({ id: "debit_card" })
-    if (acceptedMethods.boleto === false) excludedPaymentTypes.push({ id: "ticket" })
+    if (acceptedMethods.boleto === false || body.payDepositOnly) excludedPaymentTypes.push({ id: "ticket" })
     if (acceptedMethods.mercado_pago_wallet === false) excludedPaymentTypes.push({ id: "account_money" })
     if (excludedPaymentTypes.length > 0) {
       preferencePayload.payment_methods = {

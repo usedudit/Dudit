@@ -195,6 +195,7 @@ export function useEntityState() {
             url.searchParams.delete(a)
         }
         url.searchParams.delete("type")
+        url.searchParams.delete("payment")
         const newRelative = `${url.pathname}${url.search}${url.hash}`
         window.history.replaceState(window.history.state, "", newRelative)
         // Keep the ref in sync so the sync-effect doesn't react to this change

@@ -497,12 +497,12 @@ export function PaymentWrapper({
                         hideFormTitle: false,
                     },
                     paymentMethods: {
-                        ticket: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        ticket: payDepositOnly ? [] : mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                         bankTransfer: mpAcceptedPaymentMethods?.pix === false ? [] : "all",
                         creditCard: mpAcceptedPaymentMethods?.credit_card === false ? [] : "all",
                         debitCard: mpAcceptedPaymentMethods?.debit_card === false ? [] : "all",
                         mercadoPago: mpAcceptedPaymentMethods?.mercado_pago_wallet === false ? [] : "all",
-                        atm: mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
+                        atm: payDepositOnly ? [] : mpAcceptedPaymentMethods?.boleto === false ? [] : "all",
                     },
                 },
                 callbacks: {

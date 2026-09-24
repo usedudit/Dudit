@@ -542,7 +542,8 @@ const AddProductPage: FC<AddProductPageProps> = ({
 
                 return {
                     ...prev,
-                    name: aiData.name || prev.name,
+                    images: [...(prev.images || []), ...images.map((img) => img.file)],
+                name: aiData.name || prev.name,
                     description: aiData.description || prev.description,
                     brand: brandName,
                     brand_id: brandId,

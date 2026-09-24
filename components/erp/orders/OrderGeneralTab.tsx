@@ -753,30 +753,34 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                     }
                                 />
 
-                                {paymentBreakdown.length > 1 && (
-                                    <div className="md:col-span-2">
-                                        <PaymentRow
-                                            label="Valores por meio"
-                                            value={
-                                                <div className="flex flex-col gap-1">
-                                                    {paymentBreakdown.map((entry: any, index: number) => {
-                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
-                                                        const baseAmount = Number(entry.amount || 0)
-                                                        const displayAmount = received > 0.009 ? received : baseAmount
-                                                        return (
-                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
-                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
-                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
-                                                                    : null}
-                                                            </span>
-                                                        )
-                                                    })}
-                                                </div>
-                                            }
-                                        />
-                                    </div>
-                                )}
+                                {(() => {
+                                    const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
+                                    if (paidBreakdown.length <= 1) return null
+                                    return (
+                                        <div className="md:col-span-2">
+                                            <PaymentRow
+                                                label="Valores por meio"
+                                                value={
+                                                    <div className="flex flex-col gap-1">
+                                                        {paidBreakdown.map((entry: any, index: number) => {
+                                                            const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                            const baseAmount = Number(entry.amount || 0)
+                                                            const displayAmount = received > 0.009 ? received : baseAmount
+                                                            return (
+                                                                <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                    {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                    {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                        ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                        : null}
+                                                                </span>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                }
+                                            />
+                                        </div>
+                                    )
+                                })()}
 
                                 <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
 
@@ -1403,30 +1407,34 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                 }
                             />
 
-                            {paymentBreakdown.length > 1 && (
-                                <div className="md:col-span-2">
-                                    <PaymentRow
-                                        label="Valores por meio"
-                                        value={
-                                            <div className="flex flex-col gap-1">
-                                                {paymentBreakdown.map((entry: any, index: number) => {
-                                                    const received = Number(entry.amountReceived ?? entry.amount ?? 0)
-                                                    const baseAmount = Number(entry.amount || 0)
-                                                    const displayAmount = received > 0.009 ? received : baseAmount
-                                                    return (
-                                                        <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                                                            {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
-                                                            {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
-                                                                ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
-                                                                : null}
-                                                        </span>
-                                                    )
-                                                })}
-                                            </div>
-                                        }
-                                    />
-                                </div>
-                            )}
+                            {(() => {
+                                const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
+                                if (paidBreakdown.length <= 1) return null
+                                return (
+                                    <div className="md:col-span-2">
+                                        <PaymentRow
+                                            label="Valores por meio"
+                                            value={
+                                                <div className="flex flex-col gap-1">
+                                                    {paidBreakdown.map((entry: any, index: number) => {
+                                                        const received = Number(entry.amountReceived ?? entry.amount ?? 0)
+                                                        const baseAmount = Number(entry.amount || 0)
+                                                        const displayAmount = received > 0.009 ? received : baseAmount
+                                                        return (
+                                                            <span key={`${entry.method}-${index}`} className="text-brand-dark dark:text-dark-heading font-bold text-sm">
+                                                                {formatPaymentMethodLabel(entry.method, null)}: {formatCurrency(displayAmount)}
+                                                                {baseAmount > 0.009 && received > 0.009 && Math.abs(baseAmount - received) > 0.009
+                                                                    ? <span className="text-brand-muted font-normal"> (de {formatCurrency(baseAmount)})</span>
+                                                                    : null}
+                                                            </span>
+                                                        )
+                                                    })}
+                                                </div>
+                                            }
+                                        />
+                                    </div>
+                                )
+                            })()}
 
                             <PaymentRow label="Valor Original" value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(subtotal)}</span>} />
 

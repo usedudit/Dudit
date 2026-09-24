@@ -2,15 +2,32 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button, FormDropdown, Input, Separator, ThreeDotsLoader, IconPlaceholder } from "@/components/reusable"
-import { ChevronLeftIcon, TruckIcon, Users, SaveIcon } from "@/lib/icons"
+import { ChevronLeftIcon, SaveIcon, CrownIcon, ShieldIcon, ManagerIcon, UserIcon, MotorbikeIcon } from "@/lib/icons"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { usePlanUpgrade } from "@/components/erp/subscription/PlanUpgradeModal"
 import { listEmployeeCommissionsAction, upsertEmployeeCommissionAction, type CommissionSettingsRow } from "@/app/actions/erp/commissions"
 import { UserProfileImage } from "@/lib/utils/UserProfileImage"
 import { useToast } from "@/hooks/use-toast"
-import { Badge } from "@/components/reusable/Badge"
+import { Badge, BadgeVariant } from "@/components/reusable/Badge"
 import { getTeamMembers } from "@/app/actions/erp/team"
+import type { PartnerRole } from "@/lib/permissions/types"
 import React from "react"
+
+const ROLE_ICONS: Record<PartnerRole, React.ReactNode> = {
+    OWNER: <CrownIcon />,
+    ADMIN: <ShieldIcon />,
+    MANAGER: <ManagerIcon />,
+    OPERATOR: <UserIcon />,
+    DELIVERY: <MotorbikeIcon />,
+}
+
+const ROLE_COLORS: Record<PartnerRole, BadgeVariant> = {
+    OWNER: "orange",
+    ADMIN: "red",
+    MANAGER: "blue",
+    OPERATOR: "orange",
+    DELIVERY: "cyan",
+}
 
 const sellerOptions = [
     { value: "none", label: "Sem comissão" },
@@ -41,6 +58,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
     }, [])
 
     const handleSaveRow = async (row: CommissionSettingsRow) => {
+        if (row.role === "OWNER") return
         setSavingId(row.partnerUserId)
         try {
             const result = await upsertEmployeeCommissionAction({
@@ -64,9 +82,10 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
     }
 
     const handleSaveAll = async () => {
+        const editableRows = rows.filter((row) => row.role !== "OWNER")
         setSavingAll(true)
         try {
-            const promises = rows.map(row => upsertEmployeeCommissionAction({
+            const promises = editableRows.map(row => upsertEmployeeCommissionAction({
                 partnerId,
                 partnerUserId: row.partnerUserId,
                 role: row.commissionRole,
@@ -106,7 +125,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
     }, [rows])
 
     const hasOnlyOwner = useMemo(() => {
-        return rows.length > 0 && rows.every((r) => r.roleLabel === "Owner")
+        return rows.length > 0 && rows.every((r) => r.role === "OWNER")
     }, [rows])
 
     if (planGate) {
@@ -245,6 +264,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                         <tbody className="divide-y divide-brand-border dark:divide-dark-border">
                                             {sortedRows.map((row) => {
                                                 const isSeller = row.commissionRole === "seller"
+                                                const isOwner = row.role === "OWNER"
                                                 const options = isSeller ? sellerOptions : deliveryOptions
                                                 const valueLabel = row.commissionType.includes("percentage") ? "Percentual (%)" : "Fixo (R$)"
 
@@ -266,8 +286,10 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                         )}
                                                                     </div>
                                                                     <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body flex items-center gap-1">
-                                                                        {isSeller ? <Users size={12} /> : <TruckIcon size={12} />}
-                                                                        {row.roleLabel}
+                                                                        {React.cloneElement(ROLE_ICONS[row.role] as React.ReactElement<any>, { size: 12 })}
+                                                                        <Badge variant={ROLE_COLORS[row.role]} icon={null} className="whitespace-nowrap scale-90">
+                                                                            {row.roleLabel}
+                                                                        </Badge>
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -277,6 +299,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                 <FormDropdown
                                                                     value={row.commissionType}
                                                                     setValue={(value) => {
+                                                                        if (isOwner) return
                                                                         setRows((prev) =>
                                                                             prev.map((item) =>
                                                                                 item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
@@ -287,7 +310,13 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                     }}
                                                                     options={options}
                                                                     className="h-9 text-xs"
+                                                                    disabled={isOwner}
                                                                 />
+                                                                {isOwner && (
+                                                                    <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-1 block">
+                                                                        Proprietário não recebe comissão
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="py-4 px-4">
@@ -295,6 +324,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                 <Input
                                                                     value={String(row.value)}
                                                                     onChange={(e) => {
+                                                                        if (isOwner) return
                                                                         const next = e.target.value
                                                                         setRows((prev) =>
                                                                             prev.map((item) =>
@@ -304,7 +334,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                             ),
                                                                         )
                                                                     }}
-                                                                    disabled={row.commissionType === "none"}
+                                                                    disabled={isOwner || row.commissionType === "none"}
                                                                     className="h-9 text-center font-bold text-sm"
                                                                     placeholder="0.00"
                                                                 />
@@ -321,6 +351,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                 <div className="md:hidden flex flex-col">
                                     {sortedRows.map((row, idx) => {
                                         const isSeller = row.commissionRole === "seller"
+                                        const isOwner = row.role === "OWNER"
                                         const options = isSeller ? sellerOptions : deliveryOptions
                                         const valueLabel = row.commissionType.includes("percentage") ? "Percentual (%)" : "Fixo (R$)"
 
@@ -342,18 +373,21 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                 )}
                                                             </div>
                                                             <span className="text-sm text-brand-inactive-text dark:text-dark-body font-medium flex items-center gap-1">
-                                                                {isSeller ? <Users size={14} /> : <TruckIcon size={14} />}
-                                                                {row.roleLabel}
+                                                                {React.cloneElement(ROLE_ICONS[row.role] as React.ReactElement<any>, { size: 14 })}
+                                                                <Badge variant={ROLE_COLORS[row.role]} icon={null} className="whitespace-nowrap scale-90">
+                                                                    {row.roleLabel}
+                                                                </Badge>
                                                             </span>
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex gap-3">
                                                         <div className="flex-1">
                                                             <FormDropdown
                                                                 label="Tipo de comissão"
                                                                 value={row.commissionType}
                                                                 setValue={(value) => {
+                                                                    if (isOwner) return
                                                                     setRows((prev) =>
                                                                         prev.map((item) =>
                                                                             item.partnerUserId === row.partnerUserId && item.commissionRole === row.commissionRole
@@ -363,13 +397,20 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                     )
                                                                 }}
                                                                 options={options}
+                                                                disabled={isOwner}
                                                             />
+                                                            {isOwner && (
+                                                                <span className="text-[10px] text-brand-inactive-text dark:text-dark-body mt-1 block">
+                                                                    Proprietário não recebe comissão
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="w-[120px]">
                                                             <Input
                                                                 label={valueLabel}
                                                                 value={String(row.value)}
                                                                 onChange={(e) => {
+                                                                    if (isOwner) return
                                                                     const next = e.target.value
                                                                     setRows((prev) =>
                                                                         prev.map((item) =>
@@ -379,8 +420,7 @@ export function CommissionsSubPage({ partnerId, onBack, planGate }: { partnerId:
                                                                         ),
                                                                     )
                                                                 }}
-                                                                disabled={row.commissionType === "none"}
-                                                                className="font-bold text-center"
+                                                                disabled={isOwner || row.commissionType === "none"}
                                                             />
                                                         </div>
                                                     </div>

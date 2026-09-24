@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { ChevronRightIcon, CreditCardIcon, XIcon, CheckCircleIcon, ClockIcon, AlertCircleIcon, MoneyIcon, WhatsappIcon, TruckIcon, MotorbikeIcon } from '@/lib/icons';
 import { motion } from 'framer-motion';
-import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal, RadioButton } from '@/components/reusable';
+import { Button, Spinner, FormSection, ListItem, Tabs, TabsList, TabsTrigger, TabsContent, Input, FormDropdown, Checkbox, Badge, DefaultModal, QuantitySelector, ThreeDotsLoader, IconPlaceholder, Tooltip, InfoCard, AlertModal } from '@/components/reusable';
 import ProductImagesSection from '@/components/erp/product/ProductImagesSection';
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
@@ -434,8 +434,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const [chargedAmount, setChargedAmount] = useState<number>(Number(order?.total_amount || 0));
     const [isCanceling, setIsCanceling] = useState(false);
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-    const [showSinalModal, setShowSinalModal] = useState(false);
-    const [sinalAction, setSinalAction] = useState<"pay" | "cancel" | "cancel_order">("pay");
     const [cancelReason, setCancelReason] = useState("changed_mind");
     const [cancelDetails, setCancelDetails] = useState("");
     const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -1061,47 +1059,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             });
         } finally {
             setIsCanceling(false);
-        }
-    };
-
-    const handleSinalActionConfirm = async () => {
-        if (sinalAction === "pay") {
-            setShowSinalModal(false);
-            await handlePixClick();
-        } else if (sinalAction === "cancel") {
-            setShowSinalModal(false);
-            await handleCancelSinal();
-        } else if (sinalAction === "cancel_order") {
-            setShowSinalModal(false);
-            handleCancelOrder();
-        }
-    };
-
-    const handleCancelSinal = async () => {
-        try {
-            setLoadingPayment(true);
-            const response = await fetch("/api/orders/cancel-deposit", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: order.id }),
-            });
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || "Erro ao cancelar sinal");
-            }
-            toast({
-                title: "Sinal cancelado",
-                description: "O sinal foi cancelado. O pagamento pode ser realizado normalmente.",
-            });
-            router.refresh();
-        } catch (err: any) {
-            toast({
-                title: "Erro",
-                description: err?.message || "Não foi possível cancelar o sinal.",
-                variant: "destructive",
-            });
-        } finally {
-            setLoadingPayment(false);
         }
     };
 
@@ -1765,13 +1722,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                             {depositSummary!.depositStatus === "partially_paid" ? "pago" : "pendente"}
                                                         </span>
                                                     }
-                                                    className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-pointer"
+                                                    className="border-none px-0 py-2 !bg-transparent shadow-none hover:border-none cursor-default"
                                                     right={
                                                         <span className="font-bold text-brand-dark dark:text-dark-heading">
                                                             {formatCurrency(depositSummary!.initialChargeAmount || 0)}
                                                         </span>
                                                     }
-                                                    onClick={() => setShowSinalModal(true)}
                                                 />
                                             )}
                                             {!isDepositOrder && (
@@ -1841,69 +1797,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )}
                                         </div>
                                     </FormSection>
-
-                                    {/* Sinal Action Modal */}
-                                    <DefaultModal
-                                        isOpen={showSinalModal}
-                                        onClose={() => setShowSinalModal(false)}
-                                        title={`Sinal - ${formatCurrency(depositSummary?.initialChargeAmount || 0)}`}
-                                        maxWidth="sm"
-                                        footer={
-                                            <div className="flex justify-end gap-3 w-full">
-                                                <Button variant="outline" onClick={() => setShowSinalModal(false)}>
-                                                    Cancelar
-                                                </Button>
-                                                <Button onClick={handleSinalActionConfirm}>
-                                                    Confirmar
-                                                </Button>
-                                            </div>
-                                        }
-                                    >
-                                        <div className="space-y-4">
-                                            <ListItem
-                                                title="Pagar sinal"
-                                                description="Gerar cobrança Pix do sinal para pagamento antecipado."
-                                                className="cursor-pointer"
-                                                right={
-                                                    <RadioButton
-                                                        name="sinal-action"
-                                                        value="pay"
-                                                        checked={sinalAction === "pay"}
-                                                        onChange={() => setSinalAction("pay")}
-                                                    />
-                                                }
-                                                onClick={() => setSinalAction("pay")}
-                                            />
-                                            <ListItem
-                                                title="Cancelar sinal"
-                                                description="Cancelar apenas o sinal. O pagamento será realizado normalmente sem o valor do sinal."
-                                                className="cursor-pointer"
-                                                right={
-                                                    <RadioButton
-                                                        name="sinal-action"
-                                                        value="cancel"
-                                                        checked={sinalAction === "cancel"}
-                                                        onChange={() => setSinalAction("cancel")}
-                                                    />
-                                                }
-                                                onClick={() => setSinalAction("cancel")}
-                                            />
-                                            <ListItem
-                                                title="Cancelar sinal e o pedido"
-                                                description="Cancelar o sinal e solicitar o cancelamento total do pedido."
-                                                className="cursor-pointer"
-                                                right={
-                                                    <RadioButton
-                                                        name="sinal-action"
-                                                        value="cancel_order"
-                                                        checked={sinalAction === "cancel_order"}
-                                                        onChange={() => setSinalAction("cancel_order")}
-                                                    />
-                                                }
-                                                onClick={() => setSinalAction("cancel_order")}
-                                            />
-                                        </div>
-                                    </DefaultModal>
 
                                     {/* Section 4: Entregador */}
                                     {isDelivery && order.delivery_driver && (

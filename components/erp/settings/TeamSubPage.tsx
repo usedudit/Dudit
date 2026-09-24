@@ -69,6 +69,7 @@ function getAllowedInviteRoles(inviterRole: PartnerRole): PartnerRole[] {
 
 export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { partnerId: string; onBack: () => void; teamPlanBlocked?: boolean }) => {
     const [showInviteModal, setShowInviteModal] = useState(false)
+    const [inviteModalTab, setInviteModalTab] = useState<"dados_gerais" | "acesso_lojas">("dados_gerais")
     const [isScrolled, setIsScrolled] = useState(false)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -803,72 +804,115 @@ export const TeamSubPage = ({ partnerId, onBack, teamPlanBlocked = false }: { pa
                             setInviteEmail("")
                             setInviteUrl(null)
                             setInviteError(null)
+                            setInviteModalTab("dados_gerais")
                         }}
                         title="Convidar membro"
                     >
                         {!inviteUrl ? (
-                            <form onSubmit={handleInvite} className="space-y-4">
-                                <div>
-                                    <Input
-                                        label="Email do convidado"
-                                        type="email"
-                                        required
-                                        placeholder="exemplo@email.com"
-                                        value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)}
-                                    />
-                                </div>
+                            <form onSubmit={handleInvite} className="space-y-0">
+                                <Tabs value={inviteModalTab} onValueChange={(v) => setInviteModalTab(v as any)} className="w-full">
+                                    <TabsList className="w-full justify-start gap-6 bg-transparent p-0 border-b border-brand-border dark:border-dark-border">
+                                        <TabsTrigger value="dados_gerais" className="px-0 pb-3 text-sm">
+                                            Dados gerais
+                                        </TabsTrigger>
+                                        <TabsTrigger value="acesso_lojas" className="px-0 pb-3 text-sm">
+                                            Acesso às lojas
+                                        </TabsTrigger>
+                                    </TabsList>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Função</label>
-                                    <div className="space-y-2">
-                                        {allowedInviteRoles.map((role) => (
-                                            <ListItem
-                                                icon={ROLE_ICONS[role]}
-                                                title={ROLE_LABELS[role]}
-                                                description={ROLE_DESCRIPTIONS[role]}
-                                                onClick={() => setInviteRole(role)}
-                                                right={
-                                                    <RadioButton
-                                                        name="inviteRole"
-                                                        value={role}
-                                                        checked={inviteRole === role}
-                                                        onChange={() => setInviteRole(role)}
-                                                    />
-                                                }
-                                                className="px-4 py-3 gap-4"
+                                    <TabsContent value="dados_gerais" className="mt-5 space-y-5">
+                                        <div>
+                                            <Input
+                                                label="Email do convidado"
+                                                type="email"
+                                                required
+                                                placeholder="exemplo@email.com"
+                                                value={inviteEmail}
+                                                onChange={(e) => setInviteEmail(e.target.value)}
                                             />
-                                        ))}
-                                    </div>
-                                </div>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Acessos às lojas</label>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto border border-brand-border dark:border-dark-border rounded-xl p-3">
-                                        {allStores.map((store) => (
-                                            <label key={store.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-brand-gray dark:hover:bg-dark-border/30 cursor-pointer">
-                                                <Checkbox
-                                                    label={store.name}
-                                                    checked={inviteSelectedStores.includes(store.id)}
-                                                    onChange={() => {
-                                                        if (inviteSelectedStores.includes(store.id)) {
-                                                            setInviteSelectedStores(prev => prev.filter(id => id !== store.id))
-                                                        } else {
-                                                            setInviteSelectedStores(prev => [...prev, store.id])
+                                        <div>
+                                            <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading mb-2">Função</label>
+                                            <div className="space-y-2">
+                                                {allowedInviteRoles.map((role) => (
+                                                    <ListItem
+                                                        key={role}
+                                                        icon={ROLE_ICONS[role]}
+                                                        title={ROLE_LABELS[role]}
+                                                        description={ROLE_DESCRIPTIONS[role]}
+                                                        onClick={() => setInviteRole(role)}
+                                                        right={
+                                                            <RadioButton
+                                                                name="inviteRole"
+                                                                value={role}
+                                                                checked={inviteRole === role}
+                                                                onChange={() => setInviteRole(role)}
+                                                            />
                                                         }
-                                                    }}
-                                                />
-                                            </label>
-                                        ))}
-                                    </div>
-                                    <p className="text-xs text-brand-inactive-text mt-1">Se nenhuma for selecionada, será usada a loja atual.</p>
+                                                        className="px-4 py-3 gap-4"
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="acesso_lojas" className="mt-5">
+                                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                            {allStores.map((store) => {
+                                                const isSelected = inviteSelectedStores.includes(store.id)
+                                                const locationParts = [store.city, store.state].filter(Boolean)
+                                                const locationText = locationParts.length > 0 ? locationParts.join(" - ") : ""
+                                                const addressParts = [
+                                                    store.street,
+                                                    store.number && store.number !== "S/N" ? store.number : store.number === "S/N" ? "S/N" : null,
+                                                    store.neighborhood,
+                                                ].filter(Boolean)
+                                                const addressText = addressParts.length > 0 ? addressParts.join(", ") : ""
+
+                                                return (
+                                                    <ListItem
+                                                        key={store.id}
+                                                        icon={StoreIcon as any}
+                                                        title={store.name}
+                                                        description={
+                                                            <div className="flex flex-col">
+                                                                {locationText && (
+                                                                    <span className="text-xs lg:text-sm text-brand-inactive-text dark:text-dark-body">{locationText}</span>
+                                                                )}
+                                                                {addressText && (
+                                                                    <span className="text-xs text-brand-inactive-text dark:text-dark-body mt-0.5">{addressText}</span>
+                                                                )}
+                                                            </div>
+                                                        }
+                                                        right={
+                                                            <Checkbox
+                                                                checked={isSelected}
+                                                                onChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setInviteSelectedStores(prev => [...prev, store.id])
+                                                                    } else {
+                                                                        setInviteSelectedStores(prev => prev.filter(id => id !== store.id))
+                                                                    }
+                                                                }}
+                                                            />
+                                                        }
+                                                        className="px-4 py-3"
+                                                    />
+                                                )
+                                            })}
+                                        </div>
+                                        <p className="text-xs text-brand-inactive-text mt-3">Se nenhuma for selecionada, será usada a loja atual.</p>
+                                    </TabsContent>
+                                </Tabs>
+
+                                {inviteError && <p className="text-sm text-red-500 font-medium mt-4">{inviteError}</p>}
+
+                                <div className="flex justify-end gap-3 pt-5 mt-5 border-t border-brand-border dark:border-dark-border">
+                                    <Button type="submit" className="h-12 px-6" isLoading={isCreating}>
+                                        Gerar Link de Convite
+                                    </Button>
                                 </div>
-
-                                {inviteError && <p className="text-sm text-red-500 font-medium">{inviteError}</p>}
-
-                                <Button type="submit" className="w-full h-12" isLoading={isCreating}>
-                                    Gerar Link de Convite
-                                </Button>
                             </form>
                         ) : (
                             <div className="space-y-6 text-center py-4">

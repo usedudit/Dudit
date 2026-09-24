@@ -26,17 +26,23 @@ interface Store {
   whatsapp_phone?: string | null
   is_headquarters: boolean
   is_active: boolean
-  person_type: string | null
-  cnpj: string | null
-  cpf: string | null
-  crt: string | null
-  contribuinte: string | null
-  inscricao_estadual: string | null
-  ie_isento: boolean | null
-  inscricao_municipal: string | null
-  timezone?: string | null
-  created_at: string
-  updated_at: string
+    person_type: string | null
+    cnpj: string | null
+    cpf: string | null
+    crt: string | null
+    contribuinte: string | null
+    inscricao_estadual: string | null
+    ie_isento: boolean | null
+    inscricao_municipal: string | null
+    timezone?: string | null
+    created_at: string
+    updated_at: string
+    /** Address fields (enriched by listStoresAction) */
+    street?: string | null
+    number?: string | null
+    complement?: string | null
+    neighborhood?: string | null
+    zip_code?: string | null
   /** User's effective role for this specific store (from store_members or partner_users) */
   user_role?: string | null
 }

@@ -107,15 +107,16 @@ export function getOrderDepositSummary(order: OrderFinancialSnapshot): OrderDepo
     const isExpired = order.payment_expires_at && new Date(order.payment_expires_at) < new Date() && paidAmount <= 0.009
     if (isExpired) {
       depositStatus = "expired"
-    } else if (paidAmount <= 0.009) {
-      depositStatus = "pending"
-    } else if (paidAmount >= fullOrderTotal - 0.005) {
-      depositStatus = "paid"
+    } else if (meta.depositStatus === "paid" || meta.depositStatus === "partially_paid") {
+      // Sinal was actually paid/confirmed via MP webhook — trust meta.depositStatus
+      if (paidAmount >= fullOrderTotal - 0.005) {
+        depositStatus = "paid"
+      } else {
+        depositStatus = "partially_paid"
+      }
     } else {
-      depositStatus = "partially_paid"
-    }
-    if (meta.depositStatus === "paid" && paidAmount > 0.009 && remainingBalance > 0.009) {
-      depositStatus = "partially_paid"
+      // Sinal not confirmed paid via MP yet — regardless of other payments on the order
+      depositStatus = "pending"
     }
   }
 
@@ -154,13 +155,23 @@ export function patchDepositCheckoutOnPayment(
 
   const paid = Math.max(0, Number(paidAmount || 0))
   const total = Math.max(0, Number(totalAmount || 0))
+  const initialCharge = Number(meta.initialChargeAmount || 0)
   const remainingBalance = Math.max(0, total - paid)
 
   let depositStatus: DepositCheckoutMeta["depositStatus"] = "pending"
-  if (paid >= total - 0.005 && total > 0.005) {
-    depositStatus = "paid"
-  } else if (paid > 0.005) {
-    depositStatus = "partially_paid"
+  if (initialCharge > 0) {
+    // Sinal is an atomic MP charge — only "paid" when paid covers the initial charge
+    if (paid >= initialCharge - 0.005) {
+      depositStatus = "paid"
+    } else {
+      depositStatus = "pending"
+    }
+  } else {
+    if (paid >= total - 0.005 && total > 0.005) {
+      depositStatus = "paid"
+    } else if (paid > 0.005) {
+      depositStatus = "partially_paid"
+    }
   }
 
   return {

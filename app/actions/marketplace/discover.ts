@@ -564,9 +564,6 @@ function applyUrgencyBadges(sections: HomeSection[], ctx: DiscoverCtx) {
             if (stock > 0 && stock <= 5 && h < 45) {
                 it._badgeLabel = `Últimos ${stock}`
                 it._badgeVariant = "red"
-            } else if (it.originalPrice && it.originalPrice > it.price && h >= 45 && h < 75) {
-                it._badgeLabel = "Promoção"
-                it._badgeVariant = "green"
             } else if (h >= 75 && h < 90) {
                 it._badgeLabel = "Destaque"
                 it._badgeVariant = "purple"

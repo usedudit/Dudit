@@ -418,7 +418,11 @@ export const ItemCard: React.FC<ItemCardProps> = memo(({ product, userCoords, sh
     })
 
     useEffect(() => {
-        if (preloadedPromos || !partnerId || promotionsValueCache[partnerId]) {
+        if (preloadedPromos) {
+            setActivePromotions(preloadedPromos)
+            return
+        }
+        if (!partnerId || promotionsValueCache[partnerId]) {
             return
         }
         getCachedPartnerPromotions(partnerId).then((promos) => {

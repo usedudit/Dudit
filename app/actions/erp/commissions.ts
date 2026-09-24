@@ -5,11 +5,13 @@ import { requireUser } from "@/lib/auth/authorization"
 import { requirePermission } from "@/lib/permissions/access"
 import { calculateCommission, partnerRoleToCommissionRole, type CommissionRole, type CommissionType } from "@/lib/services/commission.service"
 import type { RoleId } from "@/lib/permissions/rbac-types"
+import type { PartnerRole } from "@/lib/permissions/types"
 
 export type CommissionSettingsRow = {
   partnerUserId: string
   userId: string
   name: string
+  role: PartnerRole
   roleLabel: string
   commissionRole: CommissionRole
   commissionType: CommissionType
@@ -67,11 +69,11 @@ export async function listEmployeeCommissionsAction(partnerId: string) {
   }
 
   const roleLabelMap: Record<string, string> = {
-    OWNER: "Owner",
-    ADMIN: "Admin",
+    OWNER: "Proprietário",
+    ADMIN: "Administrador",
     MANAGER: "Gestor",
     OPERATOR: "Operador",
-    DELIVERY: "Entrega",
+    DELIVERY: "Entregador",
   }
 
   const items: CommissionSettingsRow[] = partnerUsers.map((row: any) => {
@@ -83,6 +85,7 @@ export async function listEmployeeCommissionsAction(partnerId: string) {
       partnerUserId: String(row.id),
       userId: String(row.user_id),
       name: nameByUserId.get(String(row.user_id)) || "Usuário",
+      role: partnerRole as PartnerRole,
       roleLabel: roleLabelMap[String(partnerRole)] || String(partnerRole),
       commissionRole,
       commissionType: (saved?.commission_type || DEFAULT_TYPE_BY_ROLE[commissionRole]) as CommissionType,

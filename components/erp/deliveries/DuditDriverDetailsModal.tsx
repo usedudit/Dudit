@@ -1,6 +1,5 @@
 "use client"
 
-import React from "react"
 import { ListItem } from "@/components/reusable"
 import {
     PhoneIcon,
@@ -32,13 +31,12 @@ export default function DuditDriverDetailsModal({
     return (
         <div className="space-y-6 pt-2">
             <ListItem
-                icon={TruckIcon}
                 title={
                     <div>
                         <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{driver.fullName || "Entregador Parceiro"}</p>
                         <div className="flex items-center gap-1 mt-0.5">
-                            <TruckIcon className="w-3 h-3 text-brand-green" />
-                            <span className="text-xs text-brand-green font-medium">Rede Dudit</span>
+                            <img src="https://img.dudit.com.br/static/Icon.png" alt="Dudit" className="w-3.5 h-3.5 object-contain shrink-0" />
+                            <span className="text-xs text-brand-dark dark:text-dark-heading font-medium">Rede Dudit</span>
                         </div>
                     </div>
                 }
@@ -49,7 +47,7 @@ export default function DuditDriverDetailsModal({
                         className="w-12 h-12"
                     />
                 }
-                className="border-0 bg-transparent px-0"
+                className="border-0"
             />
 
             {driver.phone && (

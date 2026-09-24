@@ -63,7 +63,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
     const [searchQuery, setSearchQuery] = useState("")
 
     const PERIOD_OPTIONS = [
-        { value: "7", label: "7 dias" },
+        { value: "15", label: "15 dias" },
         { value: "30", label: "30 dias" },
         { value: "60", label: "60 dias" },
         { value: "90", label: "90 dias" },
@@ -268,14 +268,6 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                         <div className="flex items-center justify-center py-16">
                             <Spinner size={28} />
                         </div>
-                    ) : stagnantProducts.length === 0 ? (
-                        <div className="py-12">
-                            <IconPlaceholder
-                                icon={ClockIcon}
-                                title="Nenhum produto estagnado!"
-                                subtitle={`Todos os seus produtos possuem movimentação ou foram cadastrados há menos de ${selectedPeriod} dias.`}
-                            />
-                        </div>
                     ) : (
                         <div className="space-y-3">
                             <div className="mb-3 flex items-center justify-between">
@@ -304,69 +296,81 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                 </div>
                             </div>
 
-                            <p className="text-xs font-semibold text-brand-inactive-text px-1">
-                                {filteredStagnantProducts.length} produto(s) sem giro há mais de {selectedPeriod} dias
-                            </p>
-                            {filteredStagnantProducts.map((p) => {
-                                const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < p.price
-                                return (
-                                    <div
-                                        key={p.id}
-                                        className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-primary/40 hover:shadow-sm transition-all cursor-pointer"
-                                        onClick={() => openDiscountSheet(p)}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                {p.image ? (
-                                                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <Package size={20} className="text-brand-inactive-text" />
-                                                )}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
-                                                        {p.name}
-                                                    </p>
-                                                </div>
-                                                <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
-                                                    {p.sku || p.gtin || "Sem SKU"} • {p.stock_quantity} em estoque
-                                                </p>
-                                            </div>
-                                            <Badge variant="blue">Parado há {p.days_stagnant}d</Badge>
-                                        </div>
-
-                                        <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
-                                            <div>
-                                                <span className="text-xs text-brand-inactive-text block">Preço de Venda</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-sm font-bold ${hasPromo ? "line-through text-brand-inactive-text text-xs" : "text-brand-dark dark:text-dark-heading"}`}>
-                                                        {formatCurrency(p.price)}
-                                                    </span>
-                                                    {hasPromo && (
-                                                        <span className="text-sm font-bold text-brand-green">
-                                                            {formatCurrency(p.promotional_price!)}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 text-xs gap-1.5"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    openDiscountSheet(p)
-                                                }}
+                            {stagnantProducts.length === 0 ? (
+                                <div className="py-12">
+                                    <IconPlaceholder
+                                        icon={ClockIcon}
+                                        title="Nenhum produto estagnado!"
+                                        subtitle={`Todos os seus produtos possuem movimentação ou foram cadastrados há menos de ${selectedPeriod} dias.`}
+                                    />
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-xs font-semibold text-brand-inactive-text px-1">
+                                        {filteredStagnantProducts.length} produto(s) sem giro há mais de {selectedPeriod} dias
+                                    </p>
+                                    {filteredStagnantProducts.map((p) => {
+                                        const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < p.price
+                                        return (
+                                            <div
+                                                key={p.id}
+                                                className="bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border rounded-2xl p-4 hover:border-brand-primary/40 hover:shadow-sm transition-all cursor-pointer"
+                                                onClick={() => openDiscountSheet(p)}
                                             >
-                                                <TagIcon size={14} className="text-brand-primary" />
-                                                Aplicar Desconto
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )
-                            })}
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
+                                                        {p.image ? (
+                                                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <Package size={20} className="text-brand-inactive-text" />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
+                                                                {p.name}
+                                                            </p>
+                                                        </div>
+                                                        <p className="text-xs text-brand-inactive-text font-mono mt-0.5">
+                                                            {p.sku || p.gtin || "Sem SKU"} • {p.stock_quantity} em estoque
+                                                        </p>
+                                                    </div>
+                                                    <Badge variant="blue">Parado há {p.days_stagnant}d</Badge>
+                                                </div>
+
+                                                <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-brand-border/60 dark:border-dark-border/60">
+                                                    <div>
+                                                        <span className="text-xs text-brand-inactive-text block">Preço de Venda</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-sm font-bold ${hasPromo ? "line-through text-brand-inactive-text text-xs" : "text-brand-dark dark:text-dark-heading"}`}>
+                                                                {formatCurrency(p.price)}
+                                                            </span>
+                                                            {hasPromo && (
+                                                                <span className="text-sm font-bold text-brand-green">
+                                                                    {formatCurrency(p.promotional_price!)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 text-xs gap-1.5"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            openDiscountSheet(p)
+                                                        }}
+                                                    >
+                                                        <TagIcon size={14} className="text-brand-primary" />
+                                                        Aplicar Desconto
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </>
+                            )}
                         </div>
                     )
                 )}

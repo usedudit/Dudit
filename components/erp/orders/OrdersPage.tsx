@@ -12,7 +12,7 @@ import { useInfiniteScrollObserver } from "@/hooks/use-infinite-scroll-observer"
 import { useUndoGracePeriod } from "@/hooks/use-undo-grace-period"
 
 // Components
-import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge, UndoGracePeriodToast } from "@/components/reusable"
+import { Button, Checkbox, IconPlaceholder, ThreeDotsLoader, Input, InfoCard, SelectionBanner, MoneyInput, FormDropdown, Badge, UndoGracePeriodToast, ListItem, RadioButton } from "@/components/reusable"
 import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSheet"
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
@@ -40,6 +40,7 @@ import {
 } from "@/lib/icons"
 
 import { formatDate, formatTime, formatCurrency } from "@/lib/utils"
+import { getOrderDepositSummary, canPaySinal } from "@/lib/payments/order-financial-state"
 import SaleReceiptPrintModal from "@/components/erp/orders/receipt/SaleReceiptPrintModal"
 import {
     EMPTY_DATE_PERIOD,
@@ -232,6 +233,8 @@ export default function OrdersPage({
     const [deliveryStatusValue, setDeliveryStatusValue] = useState("not_sent")
     const [paymentStatusModal, setPaymentStatusModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
     const [paymentStatusValue, setPaymentStatusValue] = useState("pending")
+    const [sinalActionModal, setSinalActionModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null })
+    const [sinalAction, setSinalAction] = useState<"keep" | "cancel" | "cancel_order">("keep")
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
     const [printOrderId, setPrintOrderId] = useState<string | null>(null)
@@ -601,17 +604,67 @@ export default function OrdersPage({
         const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
         const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
         const isPaid = order.situation === "paid" || (Number(order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
-        const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
-        const hasAlreadyPaid = Number(order.paidAmount || 0) > 0.009
-        const isExpired = Boolean((order as any).payment_expires_at && new Date((order as any).payment_expires_at) < new Date() && !hasAlreadyPaid)
-        if (hasDeposit && !hasAlreadyPaid && !isExpired) {
-            router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
+        const depositSummary = getOrderDepositSummary(order)
+        if (canPaySinal(depositSummary)) {
+            setSinalAction("keep")
+            setSinalActionModal({ open: true, order })
         } else if (isMarketplace || hasMethod || isPaid) {
             openPaymentStatusModal(order)
         } else {
             router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
         }
     }, [router, openPaymentStatusModal])
+
+    const handleSinalActionConfirm = useCallback(async () => {
+        const order = sinalActionModal.order
+        if (!order) return
+        setSinalActionModal({ open: false, order: null })
+        if (sinalAction === "keep") {
+            router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
+        } else if (sinalAction === "cancel") {
+            try {
+                const res = await fetch("/api/orders/cancel-deposit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ orderId: order.originalId }),
+                })
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    throw new Error(err.error || "Erro ao cancelar sinal")
+                }
+                toast({ title: "Sinal cancelado", description: "O pedido agora pode ser pago normalmente." })
+                afterMutation(order.originalId)
+            } catch (err: any) {
+                toast({ title: "Erro", description: err?.message || "Não foi possível cancelar o sinal.", variant: "destructive" })
+            }
+        } else if (sinalAction === "cancel_order") {
+            try {
+                const res = await fetch("/api/orders/cancel-deposit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ orderId: order.originalId }),
+                })
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}))
+                    throw new Error(err.error || "Erro ao cancelar sinal")
+                }
+                const cancelResult = await updateOrdersStatusInBatchAction({
+                    orderIds: [order.originalId],
+                    partnerId,
+                    actionType: 'cancel',
+                    cancelReason: 'Sinal cancelado pelo vendedor',
+                    userName: currentUserName,
+                })
+                if (!cancelResult.success) {
+                    throw new Error(cancelResult.error || "Erro ao cancelar pedido")
+                }
+                toast({ title: "Sinal e pedido cancelados", description: "O sinal e o pedido foram cancelados com sucesso." })
+                afterMutation()
+            } catch (err: any) {
+                toast({ title: "Erro", description: err?.message || "Não foi possível cancelar o sinal e o pedido.", variant: "destructive" })
+            }
+        }
+    }, [sinalActionModal.order, sinalAction, router, afterMutation, toast, partnerId, currentUserName])
 
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -871,11 +924,10 @@ export default function OrdersPage({
                                 const isMarketplace = order.order_source === "Marketplace" || order.order_source === "Online Store"
                                 const hasMethod = Boolean(order.payment_method) && order.payment_method !== "Método não definido"
                                 const isPaid = order.situation === "paid" || (Number(order.paid_amount || order.paidAmount || 0) >= Number(order.total_amount || 0) - 0.009 && Number(order.total_amount || 0) > 0)
-                                const hasDeposit = Boolean((order?.checkout_fulfillment as any)?.depositCheckout?.payDepositOnly)
-                                const hasAlreadyPaid = Number(order.paid_amount || order.paidAmount || 0) > 0.009
-                                const isExpired = Boolean((order as any).payment_expires_at && new Date((order as any).payment_expires_at) < new Date() && !hasAlreadyPaid)
-                                if (hasDeposit && !hasAlreadyPaid && !isExpired) {
-                                    router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
+                                const depositSummary = getOrderDepositSummary(order)
+                                if (canPaySinal(depositSummary)) {
+                                    setSinalAction("keep")
+                                    setSinalActionModal({ open: true, order: { originalId: order.id, checkout_fulfillment: order.checkout_fulfillment, paidAmount: Number(order.paid_amount || 0), total_amount: Number(order.total_amount || 0), payment_expires_at: order.payment_expires_at } as any })
                                 } else if (isMarketplace || hasMethod || isPaid) {
                                     const cust = Array.isArray(order.customers) ? order.customers[0] : order.customers
                                     const resolvedCustName = (order.customer_name && order.customer_name !== "Consumidor final")
@@ -1318,6 +1370,63 @@ export default function OrdersPage({
                         value={deliveryStatusValue}
                         setValue={setDeliveryStatusValue}
                         placeholder="Selecione o status"
+                    />
+                </div>
+            </DefaultModal>
+
+            <DefaultModal
+                isOpen={sinalActionModal.open}
+                onClose={() => setSinalActionModal({ open: false, order: null })}
+                title={`Sinal - ${formatCurrency(Number((sinalActionModal.order?.checkout_fulfillment as any)?.depositCheckout?.initialChargeAmount || 0))}`}
+                maxWidth="sm"
+                footer={
+                    <div className="flex justify-end gap-3 w-full">
+                        <Button variant="outline" onClick={() => setSinalActionModal({ open: false, order: null })}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSinalActionConfirm}>
+                            Confirmar
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="space-y-4">
+                    <ListItem
+                        left={
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
+                                <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain" />
+                            </div>
+                        }
+                        title={`Sinal - ${formatCurrency(Number((sinalActionModal.order?.checkout_fulfillment as any)?.depositCheckout?.initialChargeAmount || 0))}`}
+                        description="Mercado Pago"
+                        className="cursor-default"
+                    />
+                    <ListItem
+                        title="Manter sinal"
+                        description="Manter o sinal ativo e continuar para o pagamento do pedido."
+                        className="cursor-pointer"
+                        right={
+                            <RadioButton name="sinal-action" value="keep" checked={sinalAction === "keep"} onChange={() => setSinalAction("keep")} />
+                        }
+                        onClick={() => setSinalAction("keep")}
+                    />
+                    <ListItem
+                        title="Cancelar sinal"
+                        description="Cancelar apenas o sinal. O pedido pode ser pago normalmente sem o sinal."
+                        className="cursor-pointer"
+                        right={
+                            <RadioButton name="sinal-action" value="cancel" checked={sinalAction === "cancel"} onChange={() => setSinalAction("cancel")} />
+                        }
+                        onClick={() => setSinalAction("cancel")}
+                    />
+                    <ListItem
+                        title="Cancelar sinal e o pedido"
+                        description="Cancelar o sinal e o pedido. Esta ação não pode ser desfeita."
+                        className="cursor-pointer"
+                        right={
+                            <RadioButton name="sinal-action" value="cancel_order" checked={sinalAction === "cancel_order"} onChange={() => setSinalAction("cancel_order")} />
+                        }
+                        onClick={() => setSinalAction("cancel_order")}
                     />
                 </div>
             </DefaultModal>

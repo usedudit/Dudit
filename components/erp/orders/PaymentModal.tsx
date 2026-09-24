@@ -19,7 +19,7 @@ import {
     InfoIcon,
 } from '@/lib/icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder, RadioButton } from '@/components/reusable';
+import { Button, Checkbox, MoneyInput, Badge, Tooltip, Spinner, FormDropdown, InfoCard, DefaultModal, ListItem, IconPlaceholder } from '@/components/reusable';
 import { hasReceivedMpPayment } from '@/lib/payments/order-financial-state';
 import { ReceiptContent, PaymentMethodCard, SplitPaymentCard, Numpad } from '../POSComponents';
 import { UserProfileImage } from '@/lib/utils/UserProfileImage';
@@ -388,7 +388,6 @@ const PaymentModal = ({
     const [fetchedCustomerCredit, setFetchedCustomerCredit] = useState<number | null>(null);
     const [useStoreCredit, setUseStoreCredit] = useState(false);
     const [storeCreditToUse, setStoreCreditToUse] = useState<number>(0);
-    const [sinalAction, setSinalAction] = useState<"pay" | "cancel" | "cancel_order">("pay");
 
     useEffect(() => {
         if (!isOpen || !customer?.id || !partnerId) {
@@ -726,6 +725,8 @@ const PaymentModal = ({
     const subTotal = cart.reduce((acc: number, item: any) => acc + (item.unitPrice * item.quantity), 0);
     const total = subTotal + shippingFee + otherCosts - discountAmount;
     const chargeTarget = Math.max(0, Number(amountDue ?? total));
+    // Full order value (not just the remaining charge): amountDue is the outstanding balance.
+    const fullOrderTotal = amountDue !== undefined ? existingPaidAmount + amountDue : total;
     const isAlreadyFullyPaid = (amountDue !== undefined && amountDue <= 0.009) || (existingPaidAmount > 0.009 && chargeTarget <= 0.009);
 
     const customerCredit = getCustomerCredit(customer, fetchedCustomerCredit);
@@ -1756,7 +1757,9 @@ const PaymentModal = ({
     };
 
     const handlePaymentApproved = useCallback((orderNumber?: string) => {
-        const remainingPartial = 0;
+        const paidNow = existingPaidAmount + chargeTarget;
+        const isUnder = paidNow < fullOrderTotal - 0.005;
+        const remainingPartial = Math.max(0, fullOrderTotal - paidNow);
         const snapshotBreakdown = [
             { method: mpStep === "pix" ? "Pix (Mercado Pago)" : "Boleto (Mercado Pago)", amount: chargeTarget }
         ];
@@ -1768,10 +1771,10 @@ const PaymentModal = ({
             otherCosts: Number(otherCosts || 0),
             discountAmount: Number(discountAmount || 0),
             total,
-            displayOrderTotal: displayTransactionTotal,
-            totalPaid: chargeTarget,
+            displayOrderTotal: fullOrderTotal,
+            totalPaid: paidNow,
             change: 0,
-            isUnderpaid: false,
+            isUnderpaid: isUnder,
             remainingPartial,
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
@@ -1788,7 +1791,7 @@ const PaymentModal = ({
         setSaleId(orderNumber || "DDT000000");
         setPaymentStatus('success');
         setPreCreatedOrderId(null);
-    }, [mpStep, chargeTarget, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total, displayTransactionTotal, currentPricingTotals, cart]);
+    }, [mpStep, chargeTarget, existingPaidAmount, fullOrderTotal, subTotal, itemCount, shippingFee, otherCosts, discountAmount, total, currentPricingTotals, cart]);
 
     // Realtime: updates POS in < 80ms as soon as Mercado Pago webhook updates the order
     useRealtimeRecord<{ situation?: string; payment_status?: string; order_number?: string }>({
@@ -2153,7 +2156,8 @@ const PaymentModal = ({
         const paidToRegister =
             existingPaidAmount + singleRegisterAmount;
 
-        const isUnderpaid = paidToRegister < chargeTarget - 0.005;
+        // Compare against the full order value — chargeTarget may be only the remaining balance.
+        const isUnderpaid = paidToRegister < fullOrderTotal - 0.005;
 
         // Incorporate deposit payment into the payload when it was generated and confirmed
         let finalPaidAmount = paidToRegister;
@@ -2163,7 +2167,7 @@ const PaymentModal = ({
         let finalPaymentProvider: string | undefined = undefined;
         let finalCheckoutFulfillment: Record<string, unknown> | null = null;
 
-        if (depositPaid && depositMpPaymentId && depositMeta && sinalAction !== "cancel" && sinalAction !== "cancel_order") {
+        if (depositPaid && depositMpPaymentId && depositMeta) {
             const depositLeg = {
                 method: "Pix (Mercado Pago)",
                 amount: depositChargeAmount,
@@ -2192,7 +2196,7 @@ const PaymentModal = ({
 
             finalPaidAmount = existingPaidAmount + depositChargeAmount + singleRegisterAmount;
 
-            const remainingAfterAll = finalPaidAmount - total;
+            const remainingAfterAll = finalPaidAmount - fullOrderTotal;
             if (remainingAfterAll >= -0.005) {
                 finalPaymentStatus = 'paid';
             } else if (finalPaidAmount > 0.005) {
@@ -2296,7 +2300,6 @@ const PaymentModal = ({
             return;
         }
 
-        const remainingPartial = Math.max(0, displayTransactionTotal - totalPaidCalculated)
         let payload = forcedPayload || buildConfirmPayload(isUnpaidRegister);
 
         // If a deposit was generated and paid (new-order flow), merge deposit
@@ -2347,7 +2350,7 @@ const PaymentModal = ({
                 } as Record<string, unknown>,
                 paymentStatus: (() => {
                     const totalPaid = Number(payload.paidAmount || 0) + depositChargeAmount;
-                    if (totalPaid >= total - 0.005) return 'paid';
+                    if (totalPaid >= fullOrderTotal - 0.005) return 'paid';
                     if (totalPaid > 0.005) return 'partially_paid';
                     return 'unpaid';
                 })(),
@@ -2389,9 +2392,16 @@ const PaymentModal = ({
         }
 
         const isPendingPayment = isUnpaidRegister || paymentPendingType !== 'none';
-        const snapshotTotalPaid = isPendingPayment ? existingPaidAmount : (view === 'money' && wantsChange ? Math.max(payWithAmount, totalPaidCalculated) : totalPaidCalculated);
-        const snapshotIsUnderpaid = isPendingPayment ? (displayTransactionTotal > existingPaidAmount + 0.005) : isUnderpaid;
-        const snapshotRemainingPartial = isPendingPayment ? Math.max(0, displayTransactionTotal - existingPaidAmount) : remainingPartial;
+        const payloadPaidAmount = Number(payload?.paidAmount ?? 0);
+        const snapshotTotalPaid = isPendingPayment
+            ? existingPaidAmount
+            : (view === 'money' && wantsChange
+                ? Math.max(payWithAmount, totalPaidCalculated)
+                : (payloadPaidAmount > 0.009 ? payloadPaidAmount : totalPaidCalculated));
+        const snapshotIsUnderpaid = isPendingPayment
+            ? (fullOrderTotal > existingPaidAmount + 0.005)
+            : (Math.min(snapshotTotalPaid, fullOrderTotal) < fullOrderTotal - 0.005);
+        const snapshotRemainingPartial = Math.max(0, fullOrderTotal - Math.min(snapshotTotalPaid, fullOrderTotal));
         const snapshotChange = isPendingPayment ? 0 : (view === 'money' && wantsChange ? Math.max(0, payWithAmount - paymentBaseAmount) : changeAmount);
 
         setSuccessSnapshot({
@@ -2401,7 +2411,7 @@ const PaymentModal = ({
             otherCosts: Number(otherCosts || 0),
             discountAmount: Number(discountAmount || 0),
             total,
-            displayOrderTotal: displayTransactionTotal,
+            displayOrderTotal: fullOrderTotal,
             totalPaid: snapshotTotalPaid,
             change: snapshotChange,
             isUnderpaid: snapshotIsUnderpaid,
@@ -2664,9 +2674,8 @@ const PaymentModal = ({
                                                                 </div>
                                                             }
                                                             title={`Sinal - ${formatCurrency(depositChargeAmount)}`}
-                                                            description={depositMpPixData ? "Pix Mercado Pago" : `Gerar cobrança de sinal${effectiveDepositPercent ? ` (${effectiveDepositPercent}%)` : ""}`}
+                                                            description="Mercado Pago"
                                                             onClick={() => {
-                                                                if (sinalAction !== "pay") return;
                                                                 if (depositMpPixData) {
                                                                     setShowDepositPixModal(true);
                                                                 } else {
@@ -2674,44 +2683,23 @@ const PaymentModal = ({
                                                                 }
                                                             }}
                                                             right={
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <RadioButton
-                                                                        name="sinal-action"
-                                                                        value="pay"
-                                                                        label="Pagar sinal"
-                                                                        checked={sinalAction === "pay"}
-                                                                        onChange={() => setSinalAction("pay")}
-                                                                    />
-                                                                    <RadioButton
-                                                                        name="sinal-action"
-                                                                        value="cancel"
-                                                                        label="Cancelar sinal"
-                                                                        checked={sinalAction === "cancel"}
-                                                                        onChange={() => setSinalAction("cancel")}
-                                                                    />
-                                                                    <RadioButton
-                                                                        name="sinal-action"
-                                                                        value="cancel_order"
-                                                                        label="Cancelar sinal e o pedido"
-                                                                        checked={sinalAction === "cancel_order"}
-                                                                        onChange={() => setSinalAction("cancel_order")}
-                                                                    />
-                                                                </div>
+                                                                <Button
+                                                                    variant="link"
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (depositMpPixData) {
+                                                                            setShowDepositPixModal(true);
+                                                                        } else {
+                                                                            handleGenerateDepositCharge();
+                                                                        }
+                                                                    }}
+                                                                    disabled={generatingDepositPix}
+                                                                >
+                                                                    {generatingDepositPix ? <Spinner size={12} className="mr-1.5" /> : null}
+                                                                    Pagar agora
+                                                                </Button>
                                                             }
-                                                        />
-                                                    )}
-
-                                                    {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && sinalAction === "cancel" && (
-                                                        <InfoCard
-                                                            color="orange"
-                                                            message="O sinal será cancelado. O pagamento será realizado normalmente sem o valor do sinal."
-                                                        />
-                                                    )}
-
-                                                    {allowDepositCharge && mpConnected && existingPaidAmount <= 0.009 && depositChargeAmount > 0.009 && sinalAction === "cancel_order" && (
-                                                        <InfoCard
-                                                            color="orange"
-                                                            message="O sinal e o pedido serão cancelados. Clique em Confirmar para prosseguir."
                                                         />
                                                     )}
                                                     {customerCredit > 0.009 && (
@@ -3699,7 +3687,7 @@ const PaymentModal = ({
                                     <div className="flex flex-col sm:flex-row gap-8 sm:gap-12 mb-10 mt-4 border-l-4 border-brand-dark dark:border-dark-heading pl-6">
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total da venda</span>
-                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.displayOrderTotal : !isUnderpaid ? totalPaidCalculated : chargeTarget)}</div>
+                                            <div className="text-3xl font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(successSnapshot ? successSnapshot.displayOrderTotal : fullOrderTotal)}</div>
                                         </div>
                                         <div>
                                             <span className="block text-md font-medium text-brand-inactive-text dark:text-dark-body mb-1">Total recebido</span>

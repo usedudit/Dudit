@@ -49,6 +49,13 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: "Método de pagamento não informado" }, { status: 400 })
     }
 
+    if (body.isDepositCharge) {
+      const depositMethodId = String(paymentFormData.payment_method_id || "").toLowerCase()
+      if (depositMethodId === "bolbradesco" || depositMethodId === "boleto" || depositMethodId === "ticket") {
+        return NextResponse.json({ error: "Boleto não está disponível para pagamento de sinal." }, { status: 400 })
+      }
+    }
+
     if (!partnerId) {
       return NextResponse.json({ error: "Parceiro não informado" }, { status: 400 })
     }

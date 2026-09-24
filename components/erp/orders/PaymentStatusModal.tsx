@@ -32,6 +32,7 @@ import {
     resolveSituationFromPaid,
     DEPOSIT_STATUS_LABELS,
     shouldShowSinal,
+    canPaySinal,
 } from '@/lib/payments/order-financial-state';
 import { DepositReceiptsSection } from '@/components/erp/payments/shared/DepositReceiptsSection';
 import { BalancePaymentCollector } from '@/components/erp/payments/BalancePaymentCollector';
@@ -604,7 +605,7 @@ export default function PaymentStatusModal({
                                         )}
                                     </div>
 
-                                    {isMpOrder && !isFullyPaid && shouldShowSinal(depositSummary) && (
+                                    {isMpOrder && !isFullyPaid && canPaySinal(depositSummary) && (
                                         <ListItem
                                             left={
                                                 <div className="w-10 h-10 rounded-full bg-white dark:bg-dark-surface border border-brand-border dark:border-dark-border flex items-center justify-center shrink-0">
@@ -616,7 +617,7 @@ export default function PaymentStatusModal({
                                                 </div>
                                             }
                                             title={`Sinal - ${formatCurrency((depositSummary?.initialChargeAmount || depositSummary?.depositAmount) || 0)}`}
-                                            description={mpPaymentData ? (mpPaymentData.boletoData ? "Boleto Mercado Pago" : "Pix Mercado Pago") : "Carregando..."}
+                                            description="Mercado Pago"
                                             onClick={() => {
                                                 if (mpPaymentData?.pixData || mpPaymentData?.boletoData) {
                                                     setShowMpPixModal(true);
@@ -628,12 +629,14 @@ export default function PaymentStatusModal({
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleSyncMpPayment();
+                                                        if (mpPaymentData?.pixData || mpPaymentData?.boletoData) {
+                                                            setShowMpPixModal(true);
+                                                        }
                                                     }}
-                                                    disabled={syncing}
+                                                    disabled={!mpPaymentData?.pixData && !mpPaymentData?.boletoData}
                                                 >
-                                                    {syncing ? <Spinner size={12} className="mr-1.5" /> : null}
-                                                    Verificar
+                                                    {mpLoading ? <Spinner size={12} className="mr-1.5" /> : null}
+                                                    Pagar agora
                                                 </Button>
                                             }
                                         />
