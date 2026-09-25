@@ -32,6 +32,19 @@ type ShippingCustomerDetails = {
     } | null
 } | null
 
+export type ShippingAddress = {
+    zipCode?: string
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    city?: string
+    state?: string
+    country?: string
+    latitude?: number | null
+    longitude?: number | null
+} | null
+
 interface POSShippingSheetProps {
     isOpen: boolean
     onClose: () => void
@@ -40,6 +53,8 @@ interface POSShippingSheetProps {
     currentShippingFee: number
     partnerId: string
     storeId?: string | null
+    deliveryAddress?: ShippingAddress
+    orderSubtotal?: number
     onCreateAddress: (payload: {
         customerId: string
         address: {
@@ -54,7 +69,12 @@ interface POSShippingSheetProps {
             longitude?: number | null
         }
     }) => Promise<void> | void
-    onApply: (payload: { shippingFee: number; distanceKm?: number | null; breakdown?: Record<string, unknown> | null }) => void
+    onApply: (payload: {
+        shippingFee: number
+        distanceKm?: number | null
+        breakdown?: Record<string, unknown> | null
+        deliveryAddress?: ShippingAddress
+    }) => void
 }
 
 export default function POSShippingSheet({
@@ -65,6 +85,8 @@ export default function POSShippingSheet({
     currentShippingFee,
     partnerId,
     storeId,
+    deliveryAddress,
+    orderSubtotal,
     onCreateAddress,
     onApply,
 }: POSShippingSheetProps) {
@@ -93,6 +115,12 @@ export default function POSShippingSheet({
     const [latitude, setLatitude] = useState<number | null>(null)
     const [longitude, setLongitude] = useState<number | null>(null)
 
+    const [useOrderAddress, setUseOrderAddress] = useState(false)
+
+    const hasOrderAddress = !!(deliveryAddress && (deliveryAddress.street || deliveryAddress.zipCode))
+    const activeAddress = (useOrderAddress && hasOrderAddress) ? deliveryAddress : customerDetails?.address
+    const activeHasStreet = !!activeAddress?.street?.trim()
+
     useEffect(() => {
         if (!isOpen) return
         setShippingInput(Number(currentShippingFee || 0))
@@ -101,7 +129,8 @@ export default function POSShippingSheet({
         setCalculatedFee(0)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
-    }, [isOpen, currentShippingFee])
+        if (hasOrderAddress) setUseOrderAddress(true)
+    }, [isOpen, currentShippingFee, hasOrderAddress])
 
     useEffect(() => {
         if (!customerDetails?.address) return
@@ -167,8 +196,8 @@ export default function POSShippingSheet({
 
     useEffect(() => {
         let active = true
-        if (!isOpen || !hasSelectedCustomer || !hasStreet) return
-        const destinationAddress = `${customerDetails?.address?.street || ""}, ${customerDetails?.address?.number || ""} - ${customerDetails?.address?.neighborhood || ""}, ${customerDetails?.address?.city || ""} - ${customerDetails?.address?.state || ""}, ${customerDetails?.address?.zipCode || ""}`
+        if (!isOpen || !hasSelectedCustomer || !activeHasStreet) return
+        const destinationAddress = `${activeAddress?.street || ""}, ${activeAddress?.number || ""} - ${activeAddress?.neighborhood || ""}, ${activeAddress?.city || ""} - ${activeAddress?.state || ""}, ${activeAddress?.zipCode || ""}`
         setIsQuoteLoading(true)
         setDeliveryError(null)
         setOutsideRadiusWarning(null)
@@ -177,6 +206,7 @@ export default function POSShippingSheet({
                     partnerId,
                     storeId,
                     destinationAddress,
+                    orderSubtotal,
                     allowOutsideRadius: true,
                 })
                 if (!active) return
@@ -207,14 +237,18 @@ export default function POSShippingSheet({
     }, [
         isOpen,
         hasSelectedCustomer,
-        hasStreet,
+        activeHasStreet,
         partnerId,
         storeId,
         shippingFree,
         activeTab,
+        useOrderAddress,
         customerDetails?.id,
         customerDetails?.address?.street,
         customerDetails?.address?.zipCode,
+        deliveryAddress?.street,
+        deliveryAddress?.zipCode,
+        orderSubtotal,
     ])
 
     const content = (
@@ -246,17 +280,31 @@ export default function POSShippingSheet({
                             </p>
                         )}
 
+                        {hasSelectedCustomer && hasOrderAddress && (
+                            <div className="flex flex-col gap-1">
+                                <Checkbox
+                                    label="Usar endereço de entrega do pedido"
+                                    checked={useOrderAddress}
+                                    onChange={setUseOrderAddress}
+                                    name="useOrderAddress"
+                                />
+                                <p className="text-xs text-brand-inactive-text">
+                                    Quando ativado, o frete é calculado pelo endereço definido na aba de Entrega, que pode ser diferente do endereço do cliente.
+                                </p>
+                            </div>
+                        )}
+
                         {hasSelectedCustomer && customerDetails && (
                             <CustomerCard
                                 customer={{ name: customerDetails.name || "", email: customerDetails.email || "", phone: customerDetails.phone || "", image_url: customerDetails.image_url || null }}
-                                address={customerDetails.address || null}
-                                showMap={hasStreet}
+                                address={activeAddress || null}
+                                showMap={activeHasStreet}
                                 chrome="minimal"
                                 className="shadow-none"
                             />
                         )}
 
-                        {hasSelectedCustomer && !hasStreet && (
+                        {hasSelectedCustomer && !useOrderAddress && !hasStreet && (
                             <Button className="w-full" onClick={() => setIsAddressSheetOpen(true)}>
                                 Adicionar endereço
                             </Button>
@@ -300,7 +348,7 @@ export default function POSShippingSheet({
                             </div>
                         )}
 
-                        {hasSelectedCustomer && hasStreet && (
+                        {hasSelectedCustomer && activeHasStreet && (
                             <div className="mt-4 pt-4 border-t border-brand-border dark:border-dark-border space-y-4">
                                 <label className="flex items-center gap-2 text-sm font-medium text-brand-dark dark:text-dark-heading cursor-pointer">
                                     <Checkbox checked={isCustomShipping} onChange={() => setIsCustomShipping((prev) => !prev)} name="isCustomShipping" />
@@ -334,7 +382,7 @@ export default function POSShippingSheet({
                     </Button>
                     <Button
                         className="h-12 flex-1"
-                        disabled={!hasSelectedCustomer || !hasStreet}
+                        disabled={!hasSelectedCustomer || !activeHasStreet}
                         onClick={() => {
                             const effectiveDeliveryPayer = isSubsidized ? "seller" : "customer"
                             const effectiveOriginalFee = feeToDisplay
@@ -349,6 +397,7 @@ export default function POSShippingSheet({
                                     originalFee: effectiveOriginalFee,
                                     deliverySubsidy: effectiveDeliveryPayer === "seller" ? effectiveOriginalFee : 0,
                                 },
+                                deliveryAddress: activeAddress || null,
                             })
                         }}
                     >

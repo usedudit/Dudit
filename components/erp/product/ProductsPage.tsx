@@ -1423,6 +1423,7 @@ export default function ProductsPage({
                 isOpen={showReplenishment}
                 onClose={() => setShowReplenishment(false)}
                 partnerId={partnerId}
+                storeId={storeId || undefined}
             />
 
             {showLabelModal && (

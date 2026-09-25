@@ -3,10 +3,9 @@
 import { useCallback, useRef, useEffect, useState } from "react"
 import { NotificationItem } from "./NotificationItem"
 import type { NotificationRecord } from "@/lib/notifications/types"
-import { AlertModal, Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader } from "../reusable"
+import { AlertModal, Button, IconPlaceholder, ListItem, Spinner, ThreeDotsLoader, Tabs, TabsList, TabsTrigger } from "../reusable"
 import { usePushNotificationStatus } from "./PushNotificationManager"
 import { BellIcon, TrashIcon } from "@/lib/icons"
-import { cn } from "@/lib/utils"
 
 interface Group {
 	label: string
@@ -125,79 +124,46 @@ export function NotificationPanel({
 		<>
 			{pushBanner}
 	{grouped.length > 0 && (
-		<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface px-3 py-2 border-b border-brand-border dark:border-dark-border flex items-center justify-between">
-			<div className="flex items-center gap-4">
-				{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
+		<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
+			{(erpOptions.length > 0 || activePartnerId) && (
+				<Tabs value={erpFilter} onValueChange={onErpFilter}>
+					<TabsList className="border-0 border-b-0 hide-scrollbar">
+						<TabsTrigger value="all">Todos</TabsTrigger>
+						{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
+						{erpOptions.map((opt) => (
+							<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
+								{opt.label}
+							</TabsTrigger>
+						))}
+					</TabsList>
+				</Tabs>
+			)}
+			<div className="px-3 py-2 flex items-center justify-between">
+				<div className="flex items-center gap-4">
+					{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
+						<button
+							type="button"
+							onClick={onMarkAllAsRead}
+							className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
+						>
+							Marcar todas como lidas
+						</button>
+					)}
+				</div>
+				{onDeleteAll && (
 					<button
 						type="button"
-						onClick={onMarkAllAsRead}
-						className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
+						onClick={() => setShowDeleteAll(true)}
+						className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
+						title="Excluir todas as notificações"
 					>
-						Marcar todas como lidas
+						<TrashIcon className="h-3 w-3" />
+						Excluir todas
 					</button>
 				)}
 			</div>
-			{onDeleteAll && (
-				<button
-					type="button"
-					onClick={() => setShowDeleteAll(true)}
-					className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
-					title="Excluir todas as notificações"
-				>
-					<TrashIcon className="h-3 w-3" />
-					Excluir todas
-				</button>
-			)}
 		</div>
 	)}
-			{erpOptions.length > 0 || activePartnerId ? (
-				<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface px-3 py-2 border-b border-brand-border dark:border-dark-border overflow-x-auto custom-scrollbar">
-					<div className="flex items-center gap-2">
-						<button
-							type="button"
-							onClick={() => onErpFilter("all")}
-							className={cn(
-								"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
-								erpFilter === "all"
-									? "bg-brand-green text-white"
-									: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
-							)}
-						>
-							Todos
-						</button>
-						{activePartnerId && (
-							<button
-								type="button"
-								onClick={() => onErpFilter("current")}
-								className={cn(
-									"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
-									erpFilter === "current"
-										? "bg-brand-green text-white"
-										: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
-								)}
-							>
-								Este ERP
-							</button>
-						)}
-						{erpOptions.map((opt) => (
-							<button
-								key={opt.id}
-								type="button"
-								onClick={() => onErpFilter(opt.id)}
-								title={opt.label}
-								className={cn(
-									"shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
-									erpFilter === opt.id
-										? "bg-brand-green text-white"
-										: "bg-brand-gray/10 text-brand-dark dark:text-dark-body hover:bg-brand-gray/20",
-								)}
-							>
-								{opt.label}
-							</button>
-						))}
-					</div>
-				</div>
-			) : null}
 			{grouped.map((group) => (
 				<div key={group.label} className="px-2 py-1">
 					<p className="text-xs font-medium text-brand-dark dark:text-dark-heading px-2 py-2">

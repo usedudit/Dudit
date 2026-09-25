@@ -314,7 +314,7 @@ export default function DeliveryDetailPage({
         if (!orderStatusModal || !orderNewStatus) return
         const { orderId } = orderStatusModal
         setOrderStatusModal(null)
-        await handleOrderDeliveryStatusChange(orderId, orderNewStatus, undefined, true)
+        await handleOrderDeliveryStatusChange(orderId, orderNewStatus, undefined, false)
         setOrderNewStatus("")
     }
 

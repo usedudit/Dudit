@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { DefaultModal, Badge, Button, ThreeDotsLoader } from "@/components/reusable"
+import { DefaultModal, Badge, Button, ThreeDotsLoader, FormSection, ListItem } from "@/components/reusable"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { XIcon, PrinterIcon } from "@/lib/icons"
+import { XIcon, PrinterIcon, FileIcon } from "@/lib/icons"
 import { RotateCcw } from "lucide-react"
 import { resolvePaymentMethodDetails } from "@/lib/billing/payment-method-helper"
 import type { PurchaseWithRelations, BillingInvoice } from "@/lib/billing/types"
@@ -96,15 +96,6 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
         <>
             <DefaultModal isOpen={isOpen} onClose={onClose} title="Detalhes da Compra" maxWidth="2xl">
                 <div className="space-y-6 pt-2 pb-4">
-                    <div className="flex items-center justify-between">
-                        <Badge variant={getStatusVariant(purchase.status, purchase.metadata)}>
-                            {getStatusLabel(purchase.status, purchase.metadata)}
-                        </Badge>
-                        <span className="text-lg font-bold text-brand-dark dark:text-dark-heading">
-                            {formatCurrency(purchase.total_amount)}
-                        </span>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-xs text-brand-inactive-text font-medium">Tipo</p>
@@ -127,42 +118,41 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                     </div>
 
                     {payments.length > 0 && (
-                        <div>
-                            <h4 className="text-sm font-bold text-brand-dark dark:text-dark-heading mb-3">Pagamentos</h4>
+                        <FormSection title="Pagamentos" hasSeparator>
                             <div className="space-y-2">
-                                 {payments.map((payment) => {
+                                {payments.map((payment) => {
                                     const pm = paymentMethodFor(payment)
                                     return (
-                                    <div key={payment.id} className="flex items-center justify-between p-3 rounded-xl bg-brand-gray dark:bg-dark-border/50">
-                                        <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-3">
-                                                <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"}>
-                                                    {getStatusLabel(payment.status)}
-                                                </Badge>
-                                                <span className="text-xs text-brand-inactive-text">
-                                                    {pm.name}
-                                                </span>
+                                        <div key={payment.id} className="flex items-center justify-between">
+                                            <div className="flex flex-col gap-0.5">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs text-brand-inactive-text">
+                                                        {pm.name}
+                                                    </span>
+                                                    <Badge variant={PAYMENT_VARIANTS[payment.status] || "gray"} className="scale-90 whitespace-nowrap">
+                                                        {getStatusLabel(payment.status)}
+                                                    </Badge>
+                                                </div>
+                                                {pm.detailsText && (
+                                                    <span className="text-xs text-brand-inactive-text">
+                                                        {pm.detailsText}
+                                                    </span>
+                                                )}
                                             </div>
-                                            {pm.detailsText && (
-                                                <span className="text-[10px] text-brand-inactive-text">
-                                                    {pm.detailsText}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(payment.amount)}</span>
-                                            {payment.paid_at && (
-                                                <p className="text-[11px] text-brand-inactive-text">{formatDate(payment.paid_at)}</p>
-                                            )}
-                                        </div>
+                                            <div className="text-right">
+                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(payment.amount)}</span>
+                                                {payment.paid_at && (
+                                                    <p className="text-[11px] text-brand-inactive-text">{formatDate(payment.paid_at)}</p>
+                                                )}
+                                            </div>
                                         </div>
                                     )
                                 }
-                            )
-                        }
-                        </div>
-                    </div>
-                )}
+                                )
+                                }
+                            </div>
+                        </FormSection>
+                    )}
 
                     {(isHydrating && !invoice && payments.length === 0) && (
                         <div className="flex items-center justify-center gap-2 py-6 text-brand-inactive-text">
@@ -172,20 +162,16 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                     )}
 
                     {invoice && (
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-brand-green/5 border border-brand-green/20">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-brand-green/10 flex items-center justify-center">
-                                    <PrinterIcon className="w-4 h-4 text-brand-green" />
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">Fatura {invoice.invoice_number}</p>
-                                    <p className="text-xs text-brand-inactive-text">Clique para visualizar</p>
-                                </div>
-                            </div>
-                            <Button variant="outline" size="sm" leftIcon={<PrinterIcon />} onClick={() => onInvoice?.(invoice)}>
-                                Visualizar
-                            </Button>
-                        </div>
+                        <ListItem
+                            icon={FileIcon}
+                            title={`Fatura ${invoice.invoice_number}`}
+                            description="Clique para visualizar"
+                            right={
+                                <Button variant="link" leftIcon={<PrinterIcon />} onClick={() => onInvoice?.(invoice)}>
+                                    Imprimir
+                                </Button>
+                            }
+                        />
                     )}
 
                     {!invoice && purchase.status === "completed" && onGenerateInvoice && (
@@ -200,32 +186,29 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                         </Button>
                     )}
 
-                        <div className="flex items-center justify-between pt-4 border-t border-brand-border dark:border-dark-border">
-                            <Button variant="ghost" leftIcon={<XIcon />} onClick={onClose}>
-                                Fechar
-                            </Button>
-                            <div className="flex items-center gap-2">
-                                {purchase.status === "completed" && Number(purchase.total_amount || purchase.amount || 0) > 0 && (
-                                    <Button
-                                        variant="outline"
-                                        leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
-                                        onClick={() => setRefundModalOpen(true)}
-                                    >
-                                        Solicitar Reembolso
-                                    </Button>
-                                )}
-                                {purchase.status === "pending" && onCancel && (
-                                    <Button
-                                        variant="destructive"
-                                        leftIcon={<XIcon />}
-                                        onClick={() => onCancel(purchase)}
-                                    >
-                                        Cancelar compra
-                                    </Button>
-                                )}
-                            </div>
+                    <div className="flex items-center justify-between pt-4 border-t border-brand-border dark:border-dark-border">
+                        <div className="flex items-center gap-2">
+                            {purchase.status === "completed" && Number(purchase.total_amount || purchase.amount || 0) > 0 && (
+                                <Button
+                                    variant="outline"
+                                    leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
+                                    onClick={() => setRefundModalOpen(true)}
+                                >
+                                    Solicitar Reembolso
+                                </Button>
+                            )}
+                            {purchase.status === "pending" && onCancel && (
+                                <Button
+                                    variant="destructive"
+                                    leftIcon={<XIcon />}
+                                    onClick={() => onCancel(purchase)}
+                                >
+                                    Cancelar compra
+                                </Button>
+                            )}
                         </div>
                     </div>
+                </div>
             </DefaultModal>
 
             <BillingRefundModal

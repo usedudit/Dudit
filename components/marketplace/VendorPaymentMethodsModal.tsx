@@ -158,7 +158,7 @@ export function VendorPaymentMethodsModal({
                 )}
 
                 {hasPaymentSections ? (
-                    <FormSection title="Pagamento na loja">
+                    <FormSection title="Pagamento na retirada/entrega">
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div>

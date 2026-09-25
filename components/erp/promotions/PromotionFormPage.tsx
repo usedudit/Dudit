@@ -36,14 +36,15 @@ const REQUIRED_FIELDS = [
     { field: "buy_quantity", tab: "rules" },
     { field: "pay_quantity", tab: "rules" },
     { field: "gift_selection", tab: "rules" },
+    { field: "min_spend_amount", tab: "rules" },
 ]
 
 const getRequiredFieldsForType = (promoType?: string) => {
     if (!promoType) return REQUIRED_FIELDS
     return REQUIRED_FIELDS.filter((f) => {
-        if (promoType === "discount" && (f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "gift_selection")) return false
-        if (promoType === "buy_x_pay_y" && (f.field === "discount_value" || f.field === "gift_selection")) return false
-        if (promoType === "gift" && (f.field === "discount_value" || f.field === "buy_quantity" || f.field === "pay_quantity")) return false
+        if (promoType === "discount" && (f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "gift_selection" || f.field === "min_spend_amount")) return false
+        if (promoType === "buy_x_pay_y" && (f.field === "discount_value" || f.field === "gift_selection" || f.field === "min_spend_amount")) return false
+        if (promoType === "gift" && (f.field === "discount_value" || f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "min_spend_amount")) return false
         if (promoType === "free_shipping" && (f.field === "discount_value" || f.field === "buy_quantity" || f.field === "pay_quantity" || f.field === "gift_selection")) return false
         return true
     })
@@ -146,8 +147,11 @@ export default function PromotionFormPage({
                 if (!editingRule.gift_product_id && !editingRule.gift_service_id) {
                     errors.add("gift_selection")
                 }
+            } else if (editingRule.promotion_type === "free_shipping") {
+                if (!editingRule.min_spend_amount || Number(editingRule.min_spend_amount) <= 0) {
+                    errors.add("min_spend_amount")
+                }
             }
-            // free_shipping type has no required rule fields beyond the campaign name
         }
 
         setFieldErrors(errors)
@@ -1583,8 +1587,10 @@ export default function PromotionFormPage({
                                                                         />
                                                                     </div>
                                                                 </FormSection>
-                                                            )}
+                                                                )}
 
+                                                             {editingRule.promotion_type !== "free_shipping" && (
+                                                                 <>
                                                             <FormDropdown
                                                                 label="Escopo de Aplicação"
                                                                 value={editingRule.apply_scope || "entire_cart"}
@@ -1605,7 +1611,10 @@ export default function PromotionFormPage({
                                                             {editingRule.apply_scope === "specific_products" && renderSelectedProductsList()}
                                                             {editingRule.apply_scope === "category" && renderSelectedCategoriesList()}
                                                             {editingRule.apply_scope === "specific_services" && renderSelectedServicesList()}
-                                                        </FormSection>
+                                                            </>
+                                                        )}
+
+                                                    </FormSection>
                                                     </div>
 
                                                     {/* Right Column: Rule limits and status */}
@@ -1632,6 +1641,8 @@ export default function PromotionFormPage({
                                                                         markDirty()
                                                                         setEditingRule({ ...editingRule, min_spend_amount: val })
                                                                     }}
+                                                                    error={fieldErrors.has("min_spend_amount")}
+                                                                    errorMessage={fieldErrors.has("min_spend_amount") ? "Valor mínimo de compra é obrigatório" : undefined}
                                                                 />
                                                                 <Input
                                                                     label="Limite Global de Usos"

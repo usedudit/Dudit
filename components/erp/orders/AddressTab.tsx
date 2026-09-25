@@ -2,7 +2,7 @@
 
 import React from "react"
 import { FadeIn } from "@/components/animations/FadeIn"
-import { Badge, DatePicker, FormDropdown, FormSection, Input, TimePicker } from "@/components/reusable"
+import { Badge, DatePicker, FormDropdown, FormSection, Input, SidebarCard, TimePicker } from "@/components/reusable"
 import { usePermissions } from "@/lib/permission-context"
 import { CepInput } from "@/components/reusable/Inputs/CepInput"
 import { StateComboBox } from "@/components/reusable/Inputs/StateComboBox"
@@ -173,8 +173,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                 </div>
 
                 <div className="lg:col-span-4 flex flex-col gap-8 lg:border-l lg:border-brand-border lg:pl-12 dark:lg:border-dark-border">
-                    <section>
-                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4">Informações da Entrega</h3>
+                    <SidebarCard hasSeparator hasTopStrip title="Informações da Entrega">
                         {isPaidOrder ? (
                             <div className="space-y-4 rounded-2xl border border-brand-border p-6 dark:border-dark-border bg-white dark:bg-dark-surface">
                                 <InfoRow label="Entregador" value={deliveryPeopleOptions.find(opt => opt.value === selectedDeliveryPersonId)?.label || "Sem entregador (não atribuído)"} />
@@ -221,7 +220,7 @@ export const AddressTab: React.FC<AddressTabProps> = ({
                                 />
                             </div>
                         )}
-                    </section>
+                    </SidebarCard>
                 </div>
             </div>
         </FadeIn>

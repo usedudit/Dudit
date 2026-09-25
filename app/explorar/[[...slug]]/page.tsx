@@ -378,7 +378,7 @@ export default async function ExplorarPage({
 
                         return (
                             <>
-                                <FormSection title="Categorias de Produtos">
+                                <FormSection title="Categorias de Produtos" className="mb-8">
                                     {productCategories.map((cat) => {
                                         const href = `/explorar/${landingCitySlug}/${cat.slug}`
                                         return (

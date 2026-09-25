@@ -1514,7 +1514,7 @@ export default function CreateReturnPage({
                                                 </FormSection>
                                             )}
                                             {/* Refund/Exchange status details */}
-                                            {returnRequest && (
+                                            {(returnRequest || selectedOrder) && (
                                                 <FormSection hasSeparator title="Resolução da devolução">
                                                     {isViewOnly ? (
                                                         <div className="space-y-1">

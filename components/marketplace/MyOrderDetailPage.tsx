@@ -1541,7 +1541,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                     <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="w-full">
                         <TabsList className="mb-8">
                             <TabsTrigger value="details">Detalhes do Pedido</TabsTrigger>
-                            {isDelivery && order.delivery_driver && (
+                            {isDelivery && (
                                 <TabsTrigger value="delivery">Entrega</TabsTrigger>
                             )}
                             <TabsTrigger value="history">Histórico do Pedido</TabsTrigger>
@@ -1709,7 +1709,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
 
                                     {/* Section 2: Endereço de entrega / retirada */}
                                     {hasProducts && (
-                                        <FormSection title={isDelivery ? "Endereço de Entrega" : "Retirada no estabelecimento"}>
+                                        <FormSection title={isDelivery ? "Endereço de Entrega" : "Retirada no estabelecimento"} hasSeparator>
                                             {isDelivery ? (
                                                 <div
                                                     onClick={() => setIsShippingModalOpen(true)}
@@ -1747,7 +1747,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     )}
 
                                     {(order.order_items || []).some((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription") && (
-                                        <FormSection title="Locais de atendimento">
+                                        <FormSection title="Locais de atendimento" hasSeparator>
                                             <div className="space-y-6">
                                                 {(order.order_items || [])
                                                     .filter((item: any) => item.service_id || item.recurring_plan_id || item.line_type === "service_booking" || item.line_type === "subscription")
@@ -1793,7 +1793,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     )}
 
                                     {/* Section 3: Pagamento */}
-                                    <FormSection title="Pagamento">
+                                    <FormSection title="Pagamento" hasSeparator>
                                         <div className="space-y-3">
                                             {shouldShowSinal(depositSummary) && (
                                                 <ListItem
@@ -2204,7 +2204,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             </FormSection>
                         </TabsContent>
 
-                        {isDelivery && order.delivery_driver && (
+                        {isDelivery && (
                             <TabsContent value="delivery" className="mt-0 focus-visible:ring-0">
                                 <div className="space-y-6">
                                     {/* Status da Entrega */}
@@ -2237,7 +2237,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     </FormSection>
 
                                     {/* Card do Entregador */}
-                                    {order.delivery_driver && (
+                                    {order.delivery_driver ? (
                                         <FormSection title="Entregador">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
@@ -2295,6 +2295,22 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                                         <WhatsappIcon size={16} className="text-[#25D366]" />
                                                     </a>
                                                 )}
+                                            </div>
+                                        </FormSection>
+                                    ) : (
+                                        <FormSection title="Entregador">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-inactive-text dark:text-dark-body">
+                                                    <TruckIcon size={22} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                        Entrega própria
+                                                    </span>
+                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                        Ainda não há um entregador atribuído a este pedido.
+                                                    </span>
+                                                </div>
                                             </div>
                                         </FormSection>
                                     )}
@@ -2469,7 +2485,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             fallback_variant_image: item.product_variants?.variant_options?.image || null,
                                         });
                                         return (
-                                            <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3 rounded-xl border border-brand-border dark:border-dark-border p-3">
+                                            <div key={item.id} className="flex flex-col md:flex-row md:items-center gap-3">
                                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                                     <Checkbox
                                                         checked={Number(returnItems[item.id] || 0) > 0}
@@ -2621,7 +2637,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                             />
                         ) : (
                             <div className="space-y-3">
-                                <h4 className="font-bold text-sm text-brand-dark dark:text-dark-heading">Evidências</h4>
+                                <h4 className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-1.5 truncate">Evidências</h4>
                                 <div className="max-w-full overflow-x-auto">
                                     <ProductImagesSection
                                         images={returnEvidence}

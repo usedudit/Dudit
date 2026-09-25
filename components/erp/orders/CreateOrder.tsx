@@ -2593,6 +2593,16 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     onClose={() => setIsShippingSheetOpen(false)}
                     selectedCustomerId={selectedCustomer?.id || null}
                     customerDetails={shippingCustomerDetails}
+                    deliveryAddress={{
+                        zipCode: cep,
+                        street,
+                        number: noNumber ? "S/N" : number,
+                        complement,
+                        neighborhood,
+                        city,
+                        state: uf,
+                    }}
+                    orderSubtotal={subtotal}
                     currentShippingFee={parseFloat(shippingFee || "0")}
                     onCreateAddress={async (payload: any) => {
                         const result = await createPOSCustomerAddressAction({
@@ -2626,22 +2636,22 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                         notifySuccess("Endereço cadastrado com sucesso.")
                     }}
-                    onApply={({ shippingFee: fee, isCustom, breakdown }: any) => {
+                    onApply={({ shippingFee: fee, isCustom, breakdown, deliveryAddress: addr }: any) => {
                         setShippingFee(String(Math.max(0, Number(fee || 0))))
                         setIsCustomShipping(!!isCustom)
                         setDeliveryBreakdown(breakdown || null)
                         setDeliveryMethod("delivery")
-                        if (shippingCustomerDetails?.address) {
-                            const addr = shippingCustomerDetails.address
-                            setCep(String(addr.zipCode || ""))
-                            setStreet(String(addr.street || ""))
-                            const isNoNum = addr.number === "S/N" || !String(addr.number || "").trim()
-                            setNumber(isNoNum ? "" : String(addr.number || ""))
+                        const source = addr || shippingCustomerDetails?.address
+                        if (source) {
+                            setCep(String(source.zipCode || ""))
+                            setStreet(String(source.street || ""))
+                            const isNoNum = source.number === "S/N" || !String(source.number || "").trim()
+                            setNumber(isNoNum ? "" : String(source.number || ""))
                             setNoNumber(isNoNum)
-                            setComplement(String(addr.complement || ""))
-                            setNeighborhood(String(addr.neighborhood || ""))
-                            setCity(String(addr.city || ""))
-                            setUf(String(addr.state || "SP"))
+                            setComplement(String(source.complement || ""))
+                            setNeighborhood(String(source.neighborhood || ""))
+                            setCity(String(source.city || ""))
+                            setUf(String(source.state || "SP"))
                         }
                         setIsShippingSheetOpen(false)
                     }}

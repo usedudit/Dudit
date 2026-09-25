@@ -1927,16 +1927,20 @@ export async function getProductCostHistoryAction(productId: string, limit = 10)
 // REPOSIÇÃO
 // ============================================================================
 
-export async function getReplenishmentSuggestionsAction(partnerId: string) {
+export async function getReplenishmentSuggestionsAction(partnerId: string, storeId?: string) {
     try {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "products", "view")
+        }
         const admin = getAdminClient()
 
-        const { data, error } = await admin
+        let query = admin
             .from("products")
             .select(`
                 id, name, sku, gtin, stock_quantity, min_stock, cost_price, unit, images,
+                variants:product_variants(count),
                 product_suppliers(supplier_id, cost_price)
             `)
             .eq("partner_id", partnerId)
@@ -1944,6 +1948,10 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
             .gt("min_stock", 0)
             .order("name")
             .limit(200)
+
+        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+
+        const { data, error } = await query
 
         if (error) return { error: error.message }
 
@@ -1962,11 +1970,21 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
             if (suppliers) for (const s of suppliers) supplierNameMap[s.id] = s.name
         }
 
+        // Batch resolve variant aggregates for products that have variants
+        const variantProductIds = lowStockProducts
+            .filter((p: any) => {
+                const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+                return count > 0
+            })
+            .map((p: any) => p.id)
+        const variantAggregates = await fetchVariantAggregates(variantProductIds)
+
         const suggestions = lowStockProducts.map((p: any) => {
             const stock = Number(p.stock_quantity) || 0
             const min = Number(p.min_stock) || 0
             const suggestion = Math.max(0, min - stock)
             const primarySupplier = p.product_suppliers?.[0]
+            const agg = variantAggregates[p.id]
             return {
                 id: p.id,
                 name: p.name,
@@ -1977,9 +1995,11 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
                 suggestion,
                 unit: p.unit || "un",
                 cost_price: p.cost_price,
-                image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+                images: Array.isArray(p.images) ? p.images : null,
                 supplier_name: primarySupplier ? (supplierNameMap[primarySupplier.supplier_id] || null) : null,
                 supplier_cost: primarySupplier?.cost_price || null,
+                variant_min_price: agg?.variant_min_price ?? null,
+                variant_max_price: agg?.variant_max_price ?? null,
             }
         })
 
@@ -1989,17 +2009,20 @@ export async function getReplenishmentSuggestionsAction(partnerId: string) {
     }
 }
 
-export async function getStagnantProductsAction(partnerId: string, days: number = 90) {
+export async function getStagnantProductsAction(partnerId: string, days: number = 90, storeId?: string) {
     try {
         const user = await requireUser()
         await requirePermission(partnerId, "products", "view")
+        if (storeId) {
+            await requireStorePermission(storeId, partnerId, "products", "view")
+        }
         const admin = getAdminClient()
 
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-        const { data, error } = await admin
+        let query = admin
             .from("products")
-            .select("id, name, sku, gtin, stock_quantity, price, cost_price, promotional_price, unit, images, created_at, updated_at")
+            .select("id, name, sku, gtin, stock_quantity, price, cost_price, promotional_price, unit, images, variants:product_variants(count), created_at, updated_at")
             .eq("partner_id", partnerId)
             .eq("is_active", true)
             .gt("stock_quantity", 0)
@@ -2007,12 +2030,24 @@ export async function getStagnantProductsAction(partnerId: string, days: number 
             .order("created_at", { ascending: true })
             .limit(200)
 
+        if (storeId) query = query.or(`store_id.eq.${storeId},store_id.is.null`)
+
+        const { data, error } = await query
+
         if (error) return { error: error.message }
+
+        // Batch resolve variant aggregates for products that have variants
+        const variantProductIds = (data || []).filter((p: any) => {
+            const count = Array.isArray(p.variants) ? p.variants[0]?.count ?? p.variants.length : 0
+            return count > 0
+        }).map((p: any) => p.id)
+        const variantAggregates = await fetchVariantAggregates(variantProductIds)
 
         const now = Date.now()
         const products = (data || []).map((p: any) => {
             const createdAtTime = new Date(p.created_at).getTime()
             const daysStagnant = Math.max(days, Math.floor((now - createdAtTime) / (1000 * 60 * 60 * 24)))
+            const agg = variantAggregates[p.id]
             return {
                 id: p.id,
                 name: p.name,
@@ -2023,9 +2058,11 @@ export async function getStagnantProductsAction(partnerId: string, days: number 
                 cost_price: p.cost_price != null ? Number(p.cost_price) : null,
                 promotional_price: p.promotional_price != null ? Number(p.promotional_price) : null,
                 unit: p.unit || "un",
-                image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+                images: Array.isArray(p.images) ? p.images : null,
                 days_stagnant: daysStagnant,
                 created_at: p.created_at,
+                variant_min_price: agg?.variant_min_price ?? null,
+                variant_max_price: agg?.variant_max_price ?? null,
             }
         })
 

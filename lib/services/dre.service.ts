@@ -44,6 +44,7 @@ export interface DreCompanyInfo {
   partnerName: string
   tradeName?: string
   documentNumber?: string
+  documentType?: "cpf" | "cnpj"
   storeName?: string
   taxRegimeLabel?: string
   partnerAvatar?: string
@@ -606,6 +607,27 @@ async function computeDrePeriod(
   const ebitdaMarginPercent = netRevenueTotal > 0 ? (ebitdaTotal / netRevenueTotal) * 100 : 0
   const netMarginPercent = netRevenueTotal > 0 ? (netProfitTotal / netRevenueTotal) * 100 : 0
 
+  // Resolve and decrypt the document (CPF/CNPJ) for display on the DRE.
+  // CPF is stored encrypted (AES-256-GCM) and must be decrypted before display.
+  // CNPJ is stored in plain text and can be used as-is.
+  async function resolveDocument(store: any): Promise<{ documentNumber: string; documentType: "cpf" | "cnpj" | undefined }> {
+    if (!store) return { documentNumber: "", documentType: undefined }
+    if (store.cnpj) return { documentNumber: store.cnpj, documentType: "cnpj" }
+    if (store.cpf) {
+      try {
+        const { decryptCPF } = await import("@/lib/crypto")
+        const decrypted = await decryptCPF(store.cpf)
+        return { documentNumber: decrypted, documentType: "cpf" }
+      } catch (e) {
+        console.error("[DRE] Failed to decrypt CPF:", e)
+        return { documentNumber: "", documentType: undefined }
+      }
+    }
+    return { documentNumber: "", documentType: undefined }
+  }
+
+  const resolvedDoc = await resolveDocument(selectedStore || hqStore)
+
   return {
     raw: {
       grossRevenue: grossRevenueTotal,
@@ -648,7 +670,8 @@ async function computeDrePeriod(
     companyInfo: {
       partnerName: hqStore?.name || "Empresa Matriz",
       tradeName: hqStore?.name,
-      documentNumber: selectedStore?.cnpj || selectedStore?.cpf || hqStore?.cnpj || hqStore?.cpf || "",
+      documentNumber: resolvedDoc.documentNumber || undefined,
+      documentType: resolvedDoc.documentType,
       partnerAvatar: (selectedStore?.logo_url || hqStore?.logo_url) ? getR2ImageUrl(selectedStore?.logo_url || hqStore?.logo_url) : undefined,
       storeName: storeId
         ? (selectedStore?.name || "Loja Selecionada")

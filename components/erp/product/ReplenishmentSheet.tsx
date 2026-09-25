@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/erp/products"
 import { notifyReplenishmentSuggestedAction } from "@/app/actions/erp/notifications"
 import { formatCurrency, formatQuantityWithUnit, formatUnit } from "@/lib/utils"
+import { getPrimaryProductDisplayImage } from "@/lib/utils/product-display-images"
 import { useRouter } from "next/navigation"
 import { useNotification } from "@/hooks/use-notification"
 
@@ -26,9 +27,11 @@ interface Suggestion {
     suggestion: number
     unit: string
     cost_price: number | null
-    image: string | null
+    images: string[] | null
     supplier_name: string | null
     supplier_cost: number | null
+    variant_min_price: number | null
+    variant_max_price: number | null
 }
 
 interface StagnantProduct {
@@ -41,18 +44,21 @@ interface StagnantProduct {
     cost_price: number | null
     promotional_price: number | null
     unit: string
-    image: string | null
+    images: string[] | null
     days_stagnant: number
     created_at: string
+    variant_min_price: number | null
+    variant_max_price: number | null
 }
 
 interface ReplenishmentSheetProps {
     isOpen: boolean
     onClose: () => void
     partnerId: string
+    storeId?: string
 }
 
-export function ReplenishmentSheet({ isOpen, onClose, partnerId }: ReplenishmentSheetProps) {
+export function ReplenishmentSheet({ isOpen, onClose, partnerId, storeId }: ReplenishmentSheetProps) {
     const isMobile = useMediaQuery("(max-width: 1023px)")
     const router = useRouter()
     const { success: notifySuccess, error: notifyError } = useNotification()
@@ -85,7 +91,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
 
     const fetchSuggestions = useCallback(() => {
         setLoadingSuggestions(true)
-        getReplenishmentSuggestionsAction(partnerId).then((res) => {
+        getReplenishmentSuggestionsAction(partnerId, storeId).then((res) => {
             if (res.suggestions) {
                 setSuggestions(res.suggestions)
                 if (res.suggestions.length > 0) {
@@ -94,17 +100,17 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
             }
             setLoadingSuggestions(false)
         })
-    }, [partnerId])
+    }, [partnerId, storeId])
 
     const fetchStagnant = useCallback(() => {
         setLoadingStagnant(true)
-        getStagnantProductsAction(partnerId, selectedPeriod).then((res) => {
+        getStagnantProductsAction(partnerId, selectedPeriod, storeId).then((res) => {
             if (res.products) {
                 setStagnantProducts(res.products)
             }
             setLoadingStagnant(false)
         })
-    }, [partnerId, selectedPeriod])
+    }, [partnerId, selectedPeriod, storeId])
 
     const refetchStagnant = useCallback(() => {
         fetchStagnant()
@@ -131,7 +137,9 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
 
     const openDiscountSheet = (product: StagnantProduct) => {
         setSelectedStagnant(product)
-        const initialPromo = product.promotional_price || Math.round(product.price * 0.85 * 100) / 100
+        const hasVariantData = product.variant_min_price !== null && product.variant_max_price !== null
+        const basePrice = hasVariantData ? product.variant_min_price! : product.price
+        const initialPromo = product.promotional_price || Math.round(basePrice * 0.85 * 100) / 100
         setPromoPriceInput(initialPromo)
         setIsDiscountSheetOpen(true)
     }
@@ -223,11 +231,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                 >
                                     <div className="flex items-start gap-3">
                                         <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                            {s.image ? (
-                                                <img src={s.image} alt={s.name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <Package size={20} className="text-brand-inactive-text" />
-                                            )}
+                                            <img src={getPrimaryProductDisplayImage(s)} alt={s.name} className="w-full h-full object-cover" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
@@ -310,7 +314,9 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                         {filteredStagnantProducts.length} produto(s) sem giro há mais de {selectedPeriod} dias
                                     </p>
                                     {filteredStagnantProducts.map((p) => {
-                                        const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < p.price
+                                        const hasVariantData = p.variant_min_price !== null && p.variant_max_price !== null
+                                        const effectivePrice = hasVariantData ? p.variant_min_price! : p.price
+                                        const hasPromo = p.promotional_price && p.promotional_price > 0 && p.promotional_price < effectivePrice
                                         return (
                                             <div
                                                 key={p.id}
@@ -319,11 +325,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="w-12 h-12 rounded-xl bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                                                        {p.image ? (
-                                                            <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <Package size={20} className="text-brand-inactive-text" />
-                                                        )}
+                                                        <img src={getPrimaryProductDisplayImage(p)} alt={p.name} className="w-full h-full object-cover" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2">
@@ -342,12 +344,28 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                                                     <div>
                                                         <span className="text-xs text-brand-inactive-text block">Preço de Venda</span>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-sm font-bold ${hasPromo ? "line-through text-brand-inactive-text text-xs" : "text-brand-dark dark:text-dark-heading"}`}>
-                                                                {formatCurrency(p.price)}
-                                                            </span>
-                                                            {hasPromo && (
-                                                                <span className="text-sm font-bold text-brand-green">
-                                                                    {formatCurrency(p.promotional_price!)}
+                                                            {hasVariantData ? (
+                                                                p.variant_min_price === p.variant_max_price ? (
+                                                                    <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                        {formatCurrency(p.variant_min_price!)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-xs text-brand-inactive-text">
+                                                                        De: {formatCurrency(p.variant_min_price!)} até <span className="font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(p.variant_max_price!)}</span>
+                                                                    </span>
+                                                                )
+                                                            ) : hasPromo ? (
+                                                                <>
+                                                                    <span className="text-sm font-bold line-through text-brand-inactive-text">
+                                                                        {formatCurrency(p.price)}
+                                                                    </span>
+                                                                    <span className="text-sm font-bold text-brand-green">
+                                                                        {formatCurrency(p.promotional_price!)}
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">
+                                                                    {formatCurrency(p.price)}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -386,7 +404,10 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
     )
 
     // --- CONTEÚDO DA SEGUNDA SHEET (PREÇO PROMOCIONAL) ---
-    const discountContent = selectedStagnant ? (
+    const discountContent = selectedStagnant ? (() => {
+        const hasVariantData = selectedStagnant.variant_min_price !== null && selectedStagnant.variant_max_price !== null
+        const effectiveBasePrice = hasVariantData ? selectedStagnant.variant_min_price! : selectedStagnant.price
+        return (
         <div className="flex h-full flex-col bg-white dark:bg-dark-surface">
             {/* Header */}
             <header className="z-10 flex shrink-0 items-center justify-between border-b border-brand-border bg-white p-6 dark:border-dark-border dark:bg-dark-surface">
@@ -414,11 +435,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                 {/* Resumo do Produto */}
                 <div className="bg-brand-gray/40 dark:bg-dark-border/40 border border-brand-border dark:border-dark-border rounded-2xl p-4 flex items-center gap-4">
                     <div className="w-14 h-14 rounded-xl bg-white dark:bg-dark-surface shrink-0 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border">
-                        {selectedStagnant.image ? (
-                            <img src={selectedStagnant.image} alt={selectedStagnant.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <Package size={24} className="text-brand-inactive-text" />
-                        )}
+                        <img src={getPrimaryProductDisplayImage(selectedStagnant)} alt={selectedStagnant.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading truncate">
@@ -428,7 +445,15 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                             Estoque: <strong className="text-brand-dark dark:text-dark-heading">{formatQuantityWithUnit(selectedStagnant.stock_quantity, selectedStagnant.unit, "full")}</strong> • Parado há {selectedStagnant.days_stagnant} dias
                         </p>
                         <div className="mt-1.5 flex items-center gap-3 text-xs">
-                            <span>Preço normal: <strong>{formatCurrency(selectedStagnant.price)}</strong></span>
+                            {selectedStagnant.variant_min_price !== null && selectedStagnant.variant_max_price !== null ? (
+                                selectedStagnant.variant_min_price === selectedStagnant.variant_max_price ? (
+                                    <span>Preço normal: <strong>{formatCurrency(selectedStagnant.variant_min_price)}</strong></span>
+                                ) : (
+                                    <span>Preço de venda: <strong>De {formatCurrency(selectedStagnant.variant_min_price)} até {formatCurrency(selectedStagnant.variant_max_price)}</strong></span>
+                                )
+                            ) : (
+                                <span>Preço normal: <strong>{formatCurrency(selectedStagnant.price)}</strong></span>
+                            )}
                             {selectedStagnant.cost_price != null && selectedStagnant.cost_price > 0 && (
                                 <span className="text-brand-inactive-text">Custo: {formatCurrency(selectedStagnant.cost_price)}</span>
                             )}
@@ -440,7 +465,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                 <InfoCard
                     title="Sugestão de Giro de Estoque"
                     color="blue"
-                    message={`Este produto possui ${formatQuantityWithUnit(selectedStagnant.stock_quantity, selectedStagnant.unit, "short")} empacadas há ${selectedStagnant.days_stagnant} dias. Aplicar um desconto promocional atrai clientes e libera ${formatCurrency(selectedStagnant.price * selectedStagnant.stock_quantity)} em capital de giro.`}
+                    message={`Este produto possui ${formatQuantityWithUnit(selectedStagnant.stock_quantity, selectedStagnant.unit, "short")} empacadas há ${selectedStagnant.days_stagnant} dias. Aplicar um desconto promocional atrai clientes e libera ${formatCurrency(effectiveBasePrice * selectedStagnant.stock_quantity)} em capital de giro.`}
                 />
 
                 {/* Atalhos Rápidos de Desconto */}
@@ -450,7 +475,7 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                     </label>
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                         {[15, 20, 30, 50].map((pct) => {
-                            const calculatedPrice = Math.round(selectedStagnant.price * (1 - pct / 100) * 100) / 100
+                            const calculatedPrice = Math.round(effectiveBasePrice * (1 - pct / 100) * 100) / 100
                             const isSelected = Math.abs(promoPriceInput - calculatedPrice) < 0.05
                             return (
                                 <button
@@ -493,12 +518,12 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                         onChange={(val) => setPromoPriceInput(typeof val === "number" ? val : parseFloat(val) || 0)}
                         placeholder="0,00"
                     />
-                    {promoPriceInput > 0 && selectedStagnant.price > 0 && (
+                    {promoPriceInput > 0 && effectiveBasePrice > 0 && (
                         <div className="flex items-center justify-between text-xs pt-1 px-1">
-                            {promoPriceInput < selectedStagnant.price ? (
+                            {promoPriceInput < effectiveBasePrice ? (
                                 <span className="font-bold text-brand-green">
-                                    Desconto de {Math.round(((selectedStagnant.price - promoPriceInput) / selectedStagnant.price) * 100)}%
-                                    ({formatCurrency(selectedStagnant.price - promoPriceInput)} de redução)
+                                    Desconto de {Math.round(((effectiveBasePrice - promoPriceInput) / effectiveBasePrice) * 100)}%
+                                    ({formatCurrency(effectiveBasePrice - promoPriceInput)} de redução)
                                 </span>
                             ) : (
                                 <span className="text-brand-inactive-text">Preço promocional igual ou superior ao original</span>
@@ -529,7 +554,8 @@ export function ReplenishmentSheet({ isOpen, onClose, partnerId }: Replenishment
                 </div>
             </footer>
         </div>
-    ) : null
+        )
+    })() : null
 
     // --- RENDERIZADOR RESPONSIVO (DESKTOP SHEET VS BOTTOM SHEET) ---
     if (isMobile) {

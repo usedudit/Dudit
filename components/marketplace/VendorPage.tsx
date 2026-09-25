@@ -20,7 +20,7 @@ import { calculateDistance, estimateAverageDeliveryTime, estimateDeliveryFeeLabe
 import { Tabs, TabsList, TabsTrigger } from "@/components/reusable/Tabs"
 import { ListItem } from "@/components/reusable/ListItem"
 import BottomSheet from "@/components/BottomSheet"
-import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard } from "@/components/reusable"
+import { Button, DefaultModal, Input, MoneyInput, Separator, Checkbox, FormSection, InfoCard, RadioButton } from "@/components/reusable"
 import { ItemCard, HorizontalCarousel } from "./shared-components"
 import { getStoreUrl, getProductUrl, getServiceUrl } from "@/lib/utils/url-generator"
 import { ExplorarMobileControls } from "./ExplorarMobileControls"
@@ -467,7 +467,7 @@ const InfoTab = ({ partner, stats, isActive, onReport }: any) => {
 
             {
                 hasPaymentSections && (
-                    <FormSection title="Pagamento na loja/entrega" hasSeparator>
+                    <FormSection title="Pagamento na retirada/entrega" hasSeparator>
                         <div className="space-y-5">
                             {hasSimplePayments && (
                                 <div>
@@ -747,6 +747,38 @@ function pickBestSection(sections: any[], seed: string | number): any | null {
     }
 
     return bestDiscount || bestBenefit
+}
+
+function VendorListItem({ item, partner }: { item: any; partner: any }) {
+    const normalized = normalizeItemForCard(item, partner)
+    const imageUrl = normalized.images?.[0] || null
+    const itemUrl = item.duration_minutes !== undefined
+        ? getServiceUrl(normalized, normalized.partners)
+        : getProductUrl(normalized, normalized.partners)
+    return (
+        <a
+            href={itemUrl}
+            className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30 transition-colors"
+        >
+            <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
+                {imageUrl && <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />}
+            </div>
+            <div className="min-w-0 py-1">
+                <h3 className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-green transition-colors">{item.name}</h3>
+                {item.category && <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{normalizeCategory(item.category)}</p>}
+                <div className="flex items-center gap-2 mt-1.5">
+                    {item.promotional_price ? (
+                        <>
+                            <span className="text-[14px] font-bold text-brand-green">{formatCurrency(Number(item.promotional_price))}</span>
+                            <span className="text-[12px] text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(Number(item.price))}</span>
+                        </>
+                    ) : item.price ? (
+                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(item.price))}</span>
+                    ) : null}
+                </div>
+            </div>
+        </a>
+    )
 }
 
 export function VendorPageClient({ partner, products, services, plans = [], reviews, stats, ratingDistribution, productCategories, serviceCategories, coupons = [], userProfile, cartCount, isShowcaseActive: propIsShowcaseActive, initialCategory }: VendorPageClientProps) {
@@ -1623,41 +1655,12 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                         </div>
                                     </div>
                                     {categoryFilteredItems.length > 0 ? (
-                                        viewMode === "list" ? (
-                                            <div className="flex flex-col mt-4">
-                                                {categoryFilteredItems.map((item: any) => {
-                                                    const normalized = normalizeItemForCard(item, partner)
-                                                    const imageUrl = normalized.images?.[0] || null
-                                                    const itemUrl = item.duration_minutes !== undefined
-                                                        ? getServiceUrl(normalized, normalized.partners)
-                                                        : getProductUrl(normalized, normalized.partners)
-                                                    return (
-                                                        <a
-                                                            key={item.id}
-                                                            href={itemUrl}
-                                                            className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30 transition-colors"
-                                                        >
-                                                            <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
-                                                                {imageUrl && <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />}
-                                                            </div>
-                                                            <div className="min-w-0 py-1">
-                                                                <h3 className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-green transition-colors">{item.name}</h3>
-                                                                {item.category && <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{normalizeCategory(item.category)}</p>}
-                                                                <div className="flex items-center gap-2 mt-1.5">
-                                                                    {item.promotional_price ? (
-                                                                        <>
-                                                                            <span className="text-[14px] font-bold text-brand-green">{formatCurrency(Number(item.promotional_price))}</span>
-                                                                            <span className="text-[12px] text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(Number(item.price))}</span>
-                                                                        </>
-                                                                    ) : item.price ? (
-                                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(item.price))}</span>
-                                                                    ) : null}
-                                                                </div>
-                                                            </div>
-                                                        </a>
-                                                    )
-                                                })}
-                                            </div>
+                            viewMode === "list" ? (
+                                <div className="flex flex-col mt-4">
+                                    {categoryFilteredItems.map((item: any) => (
+                                        <VendorListItem key={item.id} item={item} partner={partner} />
+                                    ))}
+                                </div>
                                         ) : (
                                             <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6 mt-4 lg:mt-4">
                                                 {categoryFilteredItems.map((item: any) => (
@@ -1729,44 +1732,22 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                                     })()}
 
                                     {viewMode === "list" ? (
-                                        <div className="flex flex-col">
-                                            {filteredItems.length > 0 ? (
-                                                filteredItems.map((item: any) => {
-                                                    const normalized = normalizeItemForCard(item, partner)
-                                                    const imageUrl = normalized.images?.[0] || null
-                                                    const itemUrl = item.duration_minutes !== undefined
-                                                        ? getServiceUrl(normalized, normalized.partners)
-                                                        : getProductUrl(normalized, normalized.partners)
-                                                    return (
-                                                        <a
-                                                            key={item.id}
-                                                            href={itemUrl}
-                                                            className="group grid grid-cols-[80px_1fr] gap-3 border-t border-gray-100 dark:border-dark-border py-3 hover:bg-gray-50/60 dark:hover:bg-dark-border/30 transition-colors"
-                                                        >
-                                                            <div className="relative aspect-square overflow-hidden rounded-lg bg-brand-gray dark:bg-dark-border/30">
-                                                                {imageUrl && <img src={imageUrl} alt={item.name} className="h-full w-full object-cover" loading="lazy" />}
-                                                            </div>
-                                                            <div className="min-w-0 py-1">
-                                                                <h3 className="text-[14px] font-medium text-brand-dark dark:text-dark-heading truncate group-hover:text-brand-green transition-colors">{item.name}</h3>
-                                                                {item.category && <p className="text-[12px] text-brand-inactive-text dark:text-dark-body mt-0.5">{normalizeCategory(item.category)}</p>}
-                                                                <div className="flex items-center gap-2 mt-1.5">
-                                                                    {item.promotional_price ? (
-                                                                        <>
-                                                                            <span className="text-[14px] font-bold text-brand-green">{formatCurrency(Number(item.promotional_price))}</span>
-                                                                            <span className="text-[12px] text-brand-inactive-text dark:text-dark-body line-through">{formatCurrency(Number(item.price))}</span>
-                                                                        </>
-                                                                    ) : item.price ? (
-                                                                        <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">{formatCurrency(Number(item.price))}</span>
-                                                                    ) : null}
-                                                                </div>
-                                                            </div>
-                                                        </a>
-                                                    )
-                                                })
-                                            ) : (
-                                                <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascots/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
-                                            )}
-                                        </div>
+                                        groupedItems.length > 0 ? (
+                                            <div className="flex flex-col">
+                                                {groupedItems.map(group => (
+                                                    <section key={group.id} id={group.id} data-category-section={group.id} className="scroll-mt-[150px] mb-8 last:mb-0">
+                                                        <h2 className="text-base font-semibold text-brand-dark dark:text-dark-heading mb-3 px-4 lg:px-0 capitalize">{group.name}</h2>
+                                                        <div className="flex flex-col">
+                                                            {group.items.map((item: any) => (
+                                                                <VendorListItem key={item.id} item={item} partner={partner} />
+                                                            ))}
+                                                        </div>
+                                                    </section>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <IconPlaceholder placeholderType="image" imageSrc="https://img.dudit.com.br/static/mascotes/NaoEncontrado.png" imageAlt="Sem itens" title="Nenhum item por aqui!" subtitle="Este vendedor ainda não adicionou nenhum item." />
+                                        )
                                     ) : (
                                         <>
                                             {groupedItems.map(group => (
@@ -1851,9 +1832,7 @@ export function VendorPageClient({ partner, products, services, plans = [], revi
                     ].map((opt, i, arr) => (
                         <div key={opt.value} onClick={() => { setActiveContext(opt.value as any); setCategoryView(null); setActiveTag("todos"); setIsContextModalOpen(false) }} className={`flex items-center justify-between py-5 cursor-pointer ${i < arr.length - 1 ? "border-b border-brand-border" : ""}`}>
                             <span className={`text-[16px] ${activeContext === opt.value ? "font-medium text-brand-green" : "font-normal text-brand-dark dark:text-dark-heading"}`}>{opt.label}</span>
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${activeContext === opt.value ? "border-brand-green" : "border-brand-border"}`}>
-                                {activeContext === opt.value && <div className="w-3 h-3 bg-brand-green rounded-full animate-scale-in" />}
-                            </div>
+                            <RadioButton name="activeContext" value={opt.value} checked={activeContext === opt.value} onChange={() => {}} />
                         </div>
                     ))}
                 </div>

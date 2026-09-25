@@ -42,6 +42,7 @@ import { formatCurrency, formatDateTime, formatTime, formatDayMonth, formatQuant
 import { getPaymentStatusMeta } from "@/lib/orders/status"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatPaymentMethodLabel } from "@/lib/utils/payment-method-label"
+import { PaymentMethodIndicator } from "@/components/erp/transactions/PaymentMethodIndicator"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { useStore } from "@/lib/store-context"
 import { parseAddressString } from "./CreateOrder"
@@ -440,89 +441,26 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
         return schedule
     }
 
-    const getPaymentTypeLabel = () => {
-        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const methodEntries = breakdown.filter((e: any) => e?.method);
-        const paidMethodEntries = methodEntries.filter((e: any) => Number(e?.amountReceived ?? e?.amount ?? 0) > 0.009);
-        const paidLabels = Array.from(new Set(
-            paidMethodEntries
-                .map((e: any) => formatPaymentMethodLabel(e.method, null))
-                .filter(Boolean)
-        ));
-        const hasMultiplePaidMethods = paidLabels.length > 1;
-
-        if (hasMultiplePaidMethods) {
-            let label = "Múltiplos meios";
-            if (installmentCount && installmentCount > 1) {
-                label = `${label} - ${installmentCount}x`;
-            }
-            return label;
-        }
-
-        const preferredEntry = paidMethodEntries[0] || methodEntries[0];
-        const rawMethod = preferredEntry?.method || order.payment_method;
-
-        let label = formatPaymentMethodLabel(rawMethod, null);
-        if (!label) label = "Não informado";
-
-        if (installmentCount && installmentCount > 1) {
-            label = `${label} - ${installmentCount}x`;
-        }
-        if (hasReceivedMpPayment(order) && !label.toLowerCase().includes("mercado pago") && !label.toLowerCase().includes("mercadopago")) {
-            label = `${label} (Mercado Pago)`;
-        }
-        return label;
-    };
-    const paymentMethodLabel = `${getPaymentTypeLabel()}${pendingSuffix}`
     const isMercadoPago = hasReceivedMpPayment(order);
-    const getPaymentIcon = () => {
-        const breakdown = Array.isArray(order.payment_breakdown) ? order.payment_breakdown : [];
-        const methodEntries = breakdown.filter((e: any) => e?.method);
-        const hasMultipleMethods = methodEntries.length > 1;
+    const paymentMethodIndicatorLabel: string | null = (() => {
+        const methodEntries = breakdown.filter((b: any) => b?.method && !b?.checkoutPricing);
+        const paidMethodEntries = methodEntries.filter((b: any) => Number(b?.amountReceived ?? b?.amount ?? 0) > 0.009);
+        const paidLabels = Array.from(new Set(paidMethodEntries.map((b: any) => String(b?.method || "").toLowerCase().trim()).filter(Boolean)));
+        let pmLabel: string | null = null;
 
-        const icons: React.ReactNode[] = [];
-        const isStoreCredit = order.payment_method === "store_credit" || order.payment_method === "vale-compra" || order.payment_method === "vale_compra";
-        if (isStoreCredit) {
-            icons.push(
-                <img key="vc" src="https://img.dudit.com.br/static/icons/payments/Voucher.png" alt="Vale-compra" className="w-5 h-5 object-contain shrink-0" />
-            );
-        } else if (isMercadoPago) {
-            icons.push(
-                <img key="mp" src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-5 h-5 object-contain shrink-0" />
-            );
-        }
-
-        if (hasMultipleMethods) {
-            icons.push(
-                <span key="multi" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
-            );
+        if (paidLabels.length > 1) {
+            pmLabel = "Múltiplos meios";
+        } else if (paidMethodEntries.length === 1) {
+            pmLabel = paidMethodEntries[0]?.method || order.payment_method || null;
         } else {
-            const subMethod = String(methodEntries[0]?.method || order.payment_method || "").toLowerCase();
-
-            let iconName = null;
-            if (subMethod.includes("pix") || subMethod.includes("bank_transfer")) {
-                iconName = "Pix.png";
-            } else if (subMethod.includes("crédito") || subMethod.includes("credito") || subMethod.includes("credit")) {
-                iconName = "CreditCard.png";
-            } else if (subMethod.includes("débito") || subMethod.includes("debito") || subMethod.includes("debit")) {
-                iconName = "DebitCard.png";
-            } else if (subMethod.includes("boleto")) {
-                iconName = "Boleto.png";
-            }
-
-            if (iconName) {
-                icons.push(
-                    <img key="sub" src={`https://img.dudit.com.br/static/icons/payments/${iconName}`} alt="Sub method" className="w-5 h-5 object-contain shrink-0" />
-                );
-            } else if (!isMercadoPago) {
-                icons.push(
-                    <span key="default" className="text-brand-dark dark:text-dark-heading shrink-0 text-sm">💳</span>
-                );
-            }
+            pmLabel = methodEntries[0]?.method || order.payment_method || null;
         }
 
-        return <div className="flex items-center gap-1">{icons}</div>;
-    }
+        if (pmLabel && methodEntries.length === 1 && methodEntries[0]?.installmentNumber > 1) {
+            pmLabel = `${pmLabel} - ${methodEntries[0].installmentNumber}x`;
+        }
+        return pmLabel;
+    })();
 
     const getPaymentStatusDisplay = (situation: string) => {
         switch (situation) {
@@ -570,18 +508,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     const renderPaymentMethodValue = () => {
         const statusDisplay = getPaymentStatusDisplay(order.situation);
         const StatusIcon = statusDisplay.Icon;
-        const formattedLabel = getPaymentTypeLabel();
 
         return (
             <div className="flex items-center gap-2 flex-wrap text-sm">
-                <div className="flex items-center gap-2">
-                    <div className={`${isMercadoPago ? "w-auto px-1.5" : "w-4"} h-4 flex items-center justify-center overflow-hidden shrink-0`}>
-                        {getPaymentIcon()}
-                    </div>
-                    <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
-                        {formattedLabel}
-                    </span>
-                </div>
+                <PaymentMethodIndicator label={paymentMethodIndicatorLabel} provider={order.payment_provider} simplify />
                 <span className="text-brand-border dark:text-dark-border">|</span>
                 <span className={`inline-flex items-center gap-1 font-bold ${statusDisplay.color}`}>
                     <StatusIcon size={14} className="shrink-0" />
@@ -897,7 +827,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="summary">Dados gerais</TabsTrigger>
-                                            {deliverySummary && deliverySummary.id && (
+                                            {!isPickupOrder && (
                                                 <TabsTrigger value="delivery">Entrega</TabsTrigger>
                                             )}
                                             <TabsTrigger value="attachments">Anexos</TabsTrigger>
@@ -1947,15 +1877,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                             {(() => {
                                                 const ds = deliverySummary
                                                 const isPickup = order.delivery_type === "pickup"
+                                                const hasDeliveryRecord = ds && ds.id
                                                 const statusLabel = (() => {
-                                                    const s = String(ds?.status || "").trim().toLowerCase()
+                                                    const s = String(ds?.status || order?.delivery_status || "").trim().toLowerCase()
                                                     if (s === "preparing") return "Em preparo"
                                                     if (s === "sent") return "Saiu para entrega"
                                                     if (s === "delivered") return "Entregue"
                                                     if (s === "delivery_failed") return "Falha na entrega"
                                                     if (s === "cancelled") return "Cancelada"
                                                     if (s === "pickup_available") return "Pronto para retirada"
-                                                    return "Pendente"
+                                                    if (s === "pending" || s === "not_sent") return "Pendente"
+                                                    return "Aguardando preparação para entrega"
                                                 })()
                                                 return (
                                                     <div className="space-y-6">
@@ -2006,12 +1938,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                             <span className="font-semibold text-brand-dark dark:text-dark-heading">#{ds.deliveryNumber}</span>
                                                                         </div>
                                                                     )}
-                                                                    {ds?.status && (
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.status}</span>
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds?.status || order?.delivery_status || "Não informado"}</span>
+                                                                    </div>
                                                                     {ds?.driverName && (
                                                                         <div className="flex justify-between">
                                                                             <span className="text-brand-inactive-text dark:text-dark-body">Entregador</span>
@@ -2046,6 +1976,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         <div className="flex justify-between">
                                                                             <span className="text-brand-inactive-text dark:text-dark-body">Rota</span>
                                                                             <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.routeStep}/{ds.orderCount}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {!hasDeliveryRecord && ds?.error && (
+                                                                        <div className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                            {ds.error}
                                                                         </div>
                                                                     )}
                                                                 </div>

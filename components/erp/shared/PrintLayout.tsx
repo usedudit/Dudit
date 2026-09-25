@@ -78,6 +78,21 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                             opacity: 1 !important;
                         }
 
+                        /* DRE: prevent table rows and sections from splitting across pages (applies during Puppeteer screen-media PDF rendering) */
+                        .dre-a4-print .dre-content {
+                            overflow: visible !important;
+                        }
+                        .dre-a4-print tr,
+                        .dre-a4-print .break-inside-avoid,
+                        .dre-a4-print thead tr,
+                        .dre-a4-print tbody tr {
+                            break-inside: avoid !important;
+                            page-break-inside: avoid !important;
+                        }
+                        .dre-a4-print .dre-table {
+                            break-inside: auto !important;
+                        }
+
                         @media print {
                             html, body {
                                 background-color: #ffffff !important;
@@ -90,7 +105,7 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                                     ? "min-height: auto !important; height: auto !important; max-width: 80mm !important;"
                                     : `height: ${paperHeight} !important;`}
                             }
-                            
+
                             /* Hide browser-added headers and footers with valid page size */
                             @page {
                                 size: ${pageSize};
@@ -106,17 +121,7 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                             .no-print {
                                 display: none !important;
                             }
-                        }
 
-                        /* Container styling for PDF preview & print */
-                        .pdf-print-container {
-                            width: 100%;
-                            ${isThermal || isThermal58 ? "display: block;" : "display: flex; flex-direction: column; align-items: center;"}
-                            background-color: #ffffff;
-                            margin: 0 auto;
-                        }
-
-                        @media print {
                             .pdf-print-container {
                                 ${isThermal
                                     ? "display: block !important; width: 80mm !important; max-width: 80mm !important; margin: 0 auto !important;"
@@ -133,6 +138,14 @@ export default function PrintLayout({ children, paperSize = "a4" }: PrintLayoutP
                                 background-color: #ffffff !important;
                                 color: #000000 !important;
                             }
+                        }
+
+                        /* Container styling for PDF preview & print */
+                        .pdf-print-container {
+                            width: 100%;
+                            ${isThermal || isThermal58 ? "display: block;" : "display: flex; flex-direction: column; align-items: center;"}
+                            background-color: #ffffff;
+                            margin: 0 auto;
                         }
 
                         /* Force each page iteration to split into a new page in the PDF */

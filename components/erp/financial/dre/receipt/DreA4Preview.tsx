@@ -58,8 +58,8 @@ export function DreA4Preview({
   const kpis = report.kpis
 
   return (
-    <div
-      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative overflow-hidden ${printMode ? "dre-a4-print" : "md:border-l border-brand-border dark:border-dark-border"
+     <div
+      className={`flex flex-col w-full h-full bg-white dark:bg-dark-surface relative ${printMode ? "dre-a4-print overflow-visible" : "overflow-hidden md:border-l border-brand-border dark:border-dark-border"
         }`}
     >
       <div
@@ -78,13 +78,12 @@ export function DreA4Preview({
         >
           {/* Folha A4 Padronizada */}
           <div
-            className={`w-[210mm] min-w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] shrink-0 bg-white text-[#113833] overflow-hidden relative font-sans flex flex-col justify-between ${printMode ? "pdf-print-page" : "shadow-md rounded-sm min-h-[297mm]"
-              }`}
+            className={`w-[210mm] min-w-[210mm] max-w-[210mm] bg-white text-[#113833] relative font-sans ${printMode ? "pdf-print-page min-h-[297mm]" : "h-[297mm] max-h-[297mm] shrink-0 shadow-md rounded-sm min-h-[297mm] flex flex-col justify-between overflow-hidden"}`}
           >
-            <div>
+            <div className="dre-content">
               {/* ── 1. Top Banner Estilo Canônico da Dudit ─────────────────── */}
               <div
-                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0"
+                className="px-8 py-8 relative overflow-hidden flex flex-col justify-between h-[160px] shrink-0 break-inside-avoid"
                 style={{ backgroundColor: primaryColor }}
               >
                 {/* Elementos geométricos decorativos oficiais Dudit */}
@@ -142,13 +141,15 @@ export function DreA4Preview({
               </div>
 
               {/* ── 2. Metadados e Informações Institucionais ────────────────────── */}
-              <div className="px-8 py-6">
+              <div className="px-8 py-6 break-inside-avoid">
                 <div className="grid grid-cols-3 gap-4 border-b border-gray-100 pb-6 w-full">
                   <div className="flex flex-col">
                     <span className="text-xs text-brand-inactive-text font-medium tracking-wide mb-0.5">Empresa</span>
                     <span className="font-bold text-sm text-brand-dark">{partnerName}</span>
-                    {report.companyInfo?.documentNumber && (
-                      <span className="text-[10px] text-gray-500">CNPJ: {report.companyInfo.documentNumber}</span>
+                     {report.companyInfo?.documentNumber && (
+                      <span className="text-[10px] text-gray-500">
+                        {report.companyInfo.documentType === "cpf" ? "CPF" : "CNPJ"}: {report.companyInfo.documentNumber}
+                      </span>
                     )}
                   </div>
                   <div className="flex flex-col">
@@ -166,9 +167,9 @@ export function DreA4Preview({
 
               {/* ── 3. Tabela Principal da DRE ─────────────────────────────────── */}
               <div className="px-8 pb-4">
-                <table className="w-full text-left border-separate border-spacing-0">
+                <table className="w-full text-left border-separate border-spacing-0 dre-table">
                   <thead>
-                    <tr className="bg-brand-gray/40">
+                    <tr className="bg-brand-gray/40 break-inside-avoid">
                       <th className="py-2.5 pl-6 pr-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider rounded-tl-xl border-b border-gray-100">
                         Estrutura / Conta Contábil
                       </th>
@@ -208,7 +209,7 @@ export function DreA4Preview({
 
               {/* ── 4. Resumo de Indicadores e Margens Contábeis ────────────────── */}
               {showKpiSummary && kpis && (
-                <div className="px-8 pb-4">
+                <div className="px-8 pb-4 break-inside-avoid">
                   <div className="bg-brand-gray/40 p-6 rounded-2xl text-black">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-2">
                       Resumo de Margens e Indicadores Operacionais
@@ -237,7 +238,7 @@ export function DreA4Preview({
 
               {/* ── 5. Bloco de Assinaturas Formais Contábeis ─────────────────────── */}
               {showSignatures && (
-                <div className="px-8 pt-8 pb-16">
+                <div className="px-8 pt-8 pb-16 break-inside-avoid">
                   <div className="grid grid-cols-2 gap-12 text-center text-xs text-gray-800">
                     <div className="border-t border-gray-400 pt-2">
                       <p className="font-bold text-brand-dark text-xs">{partnerName}</p>
@@ -252,9 +253,9 @@ export function DreA4Preview({
               )}
             </div>
 
-            {/* ── 6. Rodapé Oficial Dudit ───────────────────────────────────────── */}
+            {/* ── Rodapé Oficial Dudit ───────────────────────────────────────── */}
             <div
-              className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center absolute bottom-0 w-full h-[40px]"
+              className="text-white/80 px-8 py-2 text-[10px] flex justify-end items-center w-full shrink-0"
               style={{ backgroundColor: primaryColor }}
             >
               <span>Criado via Dudit - dudit.com.br</span>
@@ -294,7 +295,7 @@ function DreA4TableRow({
 
   return (
     <>
-      <tr className={getRowBg()}>
+      <tr className={`break-inside-avoid ${getRowBg()}`}>
         <td className="py-2 pl-6 pr-4 text-[13px]">
           <span className={isResult || isSubtotal ? "font-bold text-brand-dark" : "font-medium text-brand-dark"}>
             {node.title}
@@ -329,7 +330,7 @@ function DreA4TableRow({
       {showSubItems &&
         hasItems &&
         node.items.map((item) => (
-          <tr key={item.id} className="bg-gray-50/40 text-[11px] border-b border-gray-50">
+          <tr key={item.id} className="break-inside-avoid bg-gray-50/40 text-[11px] border-b border-gray-50">
             <td className="py-1.5 pl-10 pr-4 text-gray-700">
               <span className="mr-1 text-brand-green">•</span>
               {item.name}

@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
-import { Button, Input, FormDropdown, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
+import { Button, Input, FormDropdown, DefaultModal, Separator, FormSection, CepInput, Spinner, StateComboBox, RadioButton, Checkbox, NumberInputWithCheckbox, Badge, ListItem } from "@/components/reusable"
 import { formatCurrency, formatQuantityWithUnit } from "@/lib/utils"
 import { isStoreOpen } from "@/lib/utils/opening-hours"
 import { ShareModal } from "./ShareModal"
@@ -363,6 +363,7 @@ export function ProductDetailsPageClient({
     }, [product])
 
     const [expandedAddonGroups, setExpandedAddonGroups] = useState<Record<string, boolean>>({})
+    const [addonsModalOpen, setAddonsModalOpen] = useState(false)
 
     // Initialize required groups open by default, optional closed by default
     useEffect(() => {
@@ -381,7 +382,17 @@ export function ProductDetailsPageClient({
 
     const toggleAddonGroup = useCallback((groupId: string) => {
         setExpandedAddonGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
+        setTimeout(() => setAddonsModalOpen(true), 0)
     }, [])
+
+    const openAddonsModal = useCallback(() => {
+        productAddons.forEach((grp) => {
+            setExpandedAddonGroups((prev) => ({ ...prev, [grp.id]: true }))
+        })
+        setAddonsModalOpen(true)
+    }, [productAddons])
+
+    const closeAddonsModal = useCallback(() => setAddonsModalOpen(false), [])
 
     const desapegoInfo = useMemo(() => {
         const rawSpecs = typeof product.technical_specs === 'object' && product.technical_specs !== null ? product.technical_specs : {}
@@ -449,13 +460,13 @@ export function ProductDetailsPageClient({
                 const minReq = grp.min_quantity || 1
                 if (selected.length < minReq) {
                     setExpandedAddonGroups((prev) => ({ ...prev, [grp.id]: true }))
-                    notifyError("Complemento obrigatório", `Por favor, selecione as opções obrigatórias no grupo: "${grp.name || "Adicionais"}".`)
+                    setAddonsModalOpen(true)
                     return false
                 }
             }
         }
         return true
-    }, [productAddons, selectedAddonOptionIds, notifyError])
+    }, [productAddons, selectedAddonOptionIds])
 
     useEffect(() => {
         if (!activeGiftPromo) {
@@ -1453,19 +1464,73 @@ export function ProductDetailsPageClient({
 
             {VariantsSection}
 
-            {/* Addons / Complementos - Design Inteligente e Compacto */}
+            {/* Addons / Complementos - ListItem que abre modal */}
             {productAddons.length > 0 && (
-                <div className="mb-6 space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-bold text-brand-inactive-text dark:text-dark-body uppercase tracking-wider">
-                            Complementos
-                        </span>
-                        {addonsUnitPrice > 0 && (
-                            <span className="text-xs font-bold text-brand-green">
-                                + {formatMoney(addonsUnitPrice)}
-                            </span>
-                        )}
+                <div className="mb-6">
+                    {(() => {
+                        const requiredUnsatisfied = productAddons.some((grp: any) => {
+                            const selectedIds = selectedAddonOptionIds[grp.id] || []
+                            return grp.required && selectedIds.length < (grp.min_quantity || 1)
+                        })
+                        const hasSelections = selectedAddonsList.length > 0
+                        const selectedSummary = selectedAddonsList.length > 0
+                            ? selectedAddonsList.map((a: any) => a.optionName).join(", ")
+                            : (requiredUnsatisfied ? "Obrigatório" : "Clique para selecionar")
+
+                        return (
+                            <ListItem
+                                title={
+                                    <div className="flex items-center gap-2">
+                                        <span>Complementos</span>
+                                        {requiredUnsatisfied && (
+                                            <Badge variant="red" className="scale-90">
+                                                Obrigatório
+                                            </Badge>
+                                        )}
+                                        {hasSelections && !requiredUnsatisfied && (
+                                            <Badge variant="green" className="scale-90">
+                                                {selectedAddonsList.length} selecionado{selectedAddonsList.length > 1 ? "s" : ""}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                }
+                                description={addonsUnitPrice > 0 ? `+ ${formatMoney(addonsUnitPrice)}` : selectedSummary}
+                                right={
+                                    <div className="flex items-center gap-2">
+                                        {addonsUnitPrice > 0 && (
+                                            <span className="text-xs font-bold text-brand-green">
+                                                + {formatMoney(addonsUnitPrice)}
+                                            </span>
+                                        )}
+                                        <ChevronRightIcon className="text-brand-inactive-text dark:text-dark-body shrink-0" />
+                                    </div>
+                                }
+                                onClick={openAddonsModal}
+                                className="!cursor-pointer"
+                            />
+                        )
+                    })()}
+                </div>
+            )}
+
+            {/* Modal de Complementos */}
+            <DefaultModal
+                isOpen={addonsModalOpen}
+                onClose={closeAddonsModal}
+                title="Complementos"
+                maxWidth="lg"
+                footer={
+                    <div className="flex gap-3">
+                        <Button variant="outline" onClick={closeAddonsModal}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={closeAddonsModal}>
+                            Confirmar
+                        </Button>
                     </div>
+                }
+            >
+                <div className="space-y-3">
                     {productAddons.map((grp: any) => {
                         const selectedIds = selectedAddonOptionIds[grp.id] || []
                         const maxQty = grp.max_quantity || grp.options?.length || 1
@@ -1493,26 +1558,21 @@ export function ProductDetailsPageClient({
                                                 {grp.name || "Adicionais"}
                                             </h4>
                                             {grp.required ? (
-                                                <span
-                                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSatisfied
-                                                        ? "bg-brand-green/10 text-brand-green border border-brand-green/20"
-                                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-300 dark:border-amber-700/40"
-                                                        }`}
-                                                >
-                                                    {isSatisfied ? "✓ Selecionado" : "Obrigatório"}
-                                                </span>
+                                                <Badge variant={isSatisfied ? "green" : "red"} className="scale-90">
+                                                    {isSatisfied ? "Selecionado" : "Obrigatório"}
+                                                </Badge>
                                             ) : selectedIds.length > 0 ? (
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-green/10 text-brand-green border border-brand-green/20">
-                                                    {selectedIds.length} selecionado{selectedIds.length > 1 ? "s" : ""}
-                                                </span>
+                                                <Badge variant="green" className="scale-90">
+                                                    {selectedIds.length}
+                                                </Badge>
                                             ) : (
-                                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-dark-border text-brand-inactive-text dark:text-dark-body">
+                                                <Badge variant="gray" className="scale-90">
                                                     Opcional
-                                                </span>
+                                                </Badge>
                                             )}
                                         </div>
                                         <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-0.5">
-                                            {grp.required ? `Escolha no mínimo ${grp.min_quantity || 1}` : "Opcional"} · {isRadio ? "1 opção" : `até ${maxQty} opções`}
+                                            {grp.required ? `Mínimo ${grp.min_quantity || 1}` : "Opcional"} · {isRadio ? "1 opção" : `até ${maxQty} opções`}
                                             {!isExpanded && selectedOptions.length > 0 && (
                                                 <span className="text-brand-dark dark:text-dark-heading font-medium ml-1.5">
                                                     ({selectedOptions.map((o: any) => o.name).join(", ")})
@@ -1537,44 +1597,43 @@ export function ProductDetailsPageClient({
                                         >
                                             {(grp.options || []).filter((o: any) => o.available !== false).map((opt: any) => {
                                                 const isSelected = selectedIds.includes(opt.id)
+                                                const optionPrice = Number(opt.price) || 0
                                                 return (
-                                                    <button
+                                                    <div
                                                         key={opt.id}
-                                                        type="button"
-                                                        className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-brand-gray/30 dark:hover:bg-dark-border/20 ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""
-                                                            }`}
-                                                        onClick={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                        className={`flex items-center justify-between px-4 py-2.5 transition-colors ${isSelected ? "bg-brand-green/5 dark:bg-brand-green/10" : ""}`}
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0 pr-2">
-                                                            <div
-                                                                className={`w-4 h-4 flex items-center justify-center shrink-0 border-2 transition-colors ${isRadio ? "rounded-full" : "rounded"
-                                                                    } ${isSelected
-                                                                        ? "border-brand-green bg-brand-green text-white"
-                                                                        : "border-brand-border dark:border-dark-border"
-                                                                    }`}
-                                                            >
-                                                                {isSelected && (
-                                                                    <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
-                                                                        <path
-                                                                            d="M2.5 6L5 8.5L9.5 3.5"
-                                                                            stroke="currentColor"
-                                                                            strokeWidth="2"
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                        />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                            <span className="text-sm text-brand-dark dark:text-dark-heading truncate">
-                                                                {opt.name}
-                                                            </span>
+                                                            {isRadio ? (
+                                                                <RadioButton
+                                                                    name={`addon_${grp.id}`}
+                                                                    value={opt.id}
+                                                                    checked={isSelected}
+                                                                    onChange={() => handleToggleAddonOption(grp.id, opt.id, maxQty)}
+                                                                    label={opt.name}
+                                                                />
+                                                            ) : (
+                                                                <Checkbox
+                                                                    id={`addon_${grp.id}_${opt.id}`}
+                                                                    name={`addon_${grp.id}_${opt.id}`}
+                                                                    checked={isSelected}
+                                                                    onChange={(checked) => {
+                                                                        if (checked) {
+                                                                            handleToggleAddonOption(grp.id, opt.id, maxQty)
+                                                                        } else {
+                                                                            handleToggleAddonOption(grp.id, opt.id, maxQty)
+                                                                        }
+                                                                    }}
+                                                                    label={opt.name}
+                                                                />
+                                                            )}
                                                         </div>
-                                                        {(Number(opt.price) || 0) > 0 && (
+                                                        {optionPrice > 0 && (
                                                             <span className="text-xs font-bold text-brand-green shrink-0 ml-2">
-                                                                + {formatMoney(Number(opt.price))}
+                                                                + {formatMoney(optionPrice)}
                                                             </span>
                                                         )}
-                                                    </button>
+                                                    </div>
                                                 )
                                             })}
                                         </motion.div>
@@ -1584,7 +1643,7 @@ export function ProductDetailsPageClient({
                         )
                     })}
                 </div>
-            )}
+            </DefaultModal>
 
             {isProductOwner && (
                 <InfoCard

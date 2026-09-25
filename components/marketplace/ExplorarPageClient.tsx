@@ -887,10 +887,21 @@ export function ExplorarPageClient({
 
     const subcategoriesList = useMemo(() => {
         if (!isCategoryMode || !categoryName) return []
+        const normalize = (s: string) => s
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/&/g, "e")
+            .replace(/[-_]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+        const normCategory = normalize(categoryName)
         const subs = new Set<string>()
         dataToFilter.forEach(item => {
             if (itemMatchesCategory(item, categoryName) && item.subcategoryName) {
-                subs.add(item.subcategoryName)
+                if (normalize(item.subcategoryName) !== normCategory) {
+                    subs.add(item.subcategoryName)
+                }
             }
         })
         return [...subs].sort()
