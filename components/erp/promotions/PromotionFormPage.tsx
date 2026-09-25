@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { SaveIcon, EditIcon, PlusIcon, TrashIcon, SearchIcon, UserIcon, Package, WrenchIcon, TagIcon, GiftIcon } from "@/lib/icons"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
-import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, FormRadioGroup, DatePicker, FormSection, SidebarCard, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog, InfoCard } from "@/components/reusable"
+import { Button, Input, Checkbox, Badge, Tabs, TabsList, TabsTrigger, FormDropdown, FormTextarea, DatePicker, FormSection, SidebarCard, Pagination, Separator, MoneyInput, PercentageInput, IconPlaceholder, UnsavedChangesDialog, InfoCard, ListItem, RadioButton } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { useToast } from "@/hooks/use-toast"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -298,7 +298,7 @@ export default function PromotionFormPage({
             return
         }
 
-            if (editingRule) {
+        if (editingRule) {
             if (editingRule.promotion_type === "buy_x_pay_y") {
                 if (!editingRule.buy_quantity || !editingRule.pay_quantity || Number(editingRule.buy_quantity) <= Number(editingRule.pay_quantity)) {
                     toast({ title: "Erro", description: "Para Leve X Pague Y, a quantidade de compra deve ser maior que a quantidade paga.", variant: "destructive" })
@@ -318,8 +318,12 @@ export default function PromotionFormPage({
                     toast({ title: "Erro", description: "Para desconto de valor fixo (R$), informe o valor mínimo de compra.", variant: "destructive" })
                     return
                 }
+            } else if (editingRule.promotion_type === "free_shipping") {
+                if (!editingRule.min_spend_amount || Number(editingRule.min_spend_amount) <= 0) {
+                    toast({ title: "Erro", description: "Para frete grátis, informe o valor mínimo de compra (R$).", variant: "destructive" })
+                    return
+                }
             }
-            // free_shipping type: no additional validation needed (min_spend_amount optional)
         }
 
         setIsSaving(true)
@@ -1241,22 +1245,39 @@ export default function PromotionFormPage({
                                                         placeholder="Descrição para controle interno ou exibição pública"
                                                     />
 
-                                                    <FormRadioGroup
-                                                        label="Público da Campanha"
-                                                        name="custScope"
-                                                        value={campScope}
-                                                        onChange={(val) => {
-                                                            markDirty()
-                                                            setCampScope(val as "all" | "specific")
-                                                        }}
-                                                        disabled={isReadOnly}
-                                                        options={[
-                                                            { value: "all", label: "Todos os Clientes" },
-                                                            { value: "specific", label: "Clientes Específicos" }
-                                                        ]}
-                                                    />
+                                                     <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">Público da Campanha</p>
+                                                     <div className="flex gap-3">
+                                                         <ListItem
+                                                             title="Todos os Clientes"
+                                                             description="A campanha vale para toda a base de clientes"
+                                                             onClick={() => !isReadOnly && (markDirty(), setCampScope("all"))}
+                                                             className="flex-1 px-4 py-3"
+                                                             right={
+                                                                 <RadioButton
+                                                                     checked={campScope === "all"}
+                                                                     onChange={() => !isReadOnly && (markDirty(), setCampScope("all"))}
+                                                                     name="custScope"
+                                                                     value="all"
+                                                                 />
+                                                             }
+                                                         />
+                                                         <ListItem
+                                                             title="Clientes Específicos"
+                                                             description="A campanha vale apenas para clientes selecionados"
+                                                             onClick={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
+                                                             className="flex-1 px-4 py-3"
+                                                             right={
+                                                                 <RadioButton
+                                                                     checked={campScope === "specific"}
+                                                                     onChange={() => !isReadOnly && (markDirty(), setCampScope("specific"))}
+                                                                     name="custScope"
+                                                                     value="specific"
+                                                                 />
+                                                             }
+                                                     />
+                                                     </div>
 
-                                                    {campScope === "specific" && renderSelectedCustomersList()}
+                                                     {campScope === "specific" && renderSelectedCustomersList()}
                                                 </FormSection>
                                             </div>
 
@@ -1283,8 +1304,7 @@ export default function PromotionFormPage({
                                                     </div>
                                                 </SidebarCard>
 
-                                                <div className="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-brand-border dark:border-dark-border mb-6 transition-colors">
-                                                    <h3 className="text-[15px] font-bold text-brand-dark dark:text-dark-heading mb-4">Configuração e Status</h3>
+                                                <SidebarCard hasSeparator hasTopStrip title="Configuração e Status">
                                                     <div className="space-y-4">
                                                         <Checkbox
                                                             checked={editingRule?.allow_coupon_combination || false}
@@ -1305,7 +1325,7 @@ export default function PromotionFormPage({
                                                             label="Campanha ativa e disponível"
                                                         />
                                                     </div>
-                                                </div>
+                                                </SidebarCard>
                                             </div>
                                         </div>
                                     </FadeIn>
@@ -1327,12 +1347,12 @@ export default function PromotionFormPage({
                                                                     markDirty()
                                                                     setEditingRule({ ...editingRule, promotion_type: val })
                                                                 }}
-                                                                    options={[
-                                                                        { value: "discount", label: "Desconto Direto (Fixo ou %)" },
-                                                                        { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
-                                                                        { value: "gift", label: "Ganhar Brinde (Freebie)" },
-                                                                        { value: "free_shipping", label: "Frete Grátis" }
-                                                                    ]}
+                                                                options={[
+                                                                    { value: "discount", label: "Desconto Direto (Fixo ou %)" },
+                                                                    { value: "buy_x_pay_y", label: "Leve X Pague Y (Ex: Leve 3 Pague 2)" },
+                                                                    { value: "gift", label: "Ganhar Brinde (Freebie)" },
+                                                                    { value: "free_shipping", label: "Frete Grátis" }
+                                                                ]}
                                                             />
 
                                                             {editingRule.promotion_type === "discount" && (
@@ -1551,7 +1571,7 @@ export default function PromotionFormPage({
                                                                         })()}
                                                                     </div>
                                                                 </FormSection>
-                                                                    )}
+                                                                )}
 
                                                             {editingRule.promotion_type === "free_shipping" && (
                                                                 <FormSection title="Frete Grátis" hasSeparator>

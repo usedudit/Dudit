@@ -179,7 +179,7 @@ export async function expireAllExpiredOrders(
 
   const { data: expiredOrders } = await client
     .from("orders")
-    .select("id")
+    .select("id, payment_provider")
     .in("situation", ["pending", "in_process", "payment_failed"])
     .is("cancelled_at", null)
     .lt("payment_expires_at", now)
@@ -190,6 +190,13 @@ export async function expireAllExpiredOrders(
 
   let expiredCount = 0
   for (const order of expiredOrders) {
+    // Only auto-cancel expired orders that are paid via Mercado Pago.
+    // Manual payment orders should NOT be auto-cancelled by the cron job;
+    // they are handled separately by `autoCancelManualOrdersHours` setting
+    // which sets payment_expires_at only when explicitly configured by the partner.
+    if (order.payment_provider !== "Mercado Pago") {
+      continue
+    }
     const result = await checkAndExpireOrder(client, order.id)
     if (result.expired) expiredCount++
   }

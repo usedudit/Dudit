@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { revalidateOrderHistory } from "@/lib/utils/revalidation"
 import { TAGS } from "@/lib/utils/revalidation-tags"
+import { formatCurrency } from "@/lib/utils/formatters"
 
 const MAX_MERGED_ENTRIES = 50
 
@@ -40,7 +41,30 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     console.error("[orders_history] timeline fetch error:", timelineError)
   }
 
-  // Normalize timeline entries (from audit_logs)
+  const { data: returnRequestIds } = await supabase
+    .from("return_requests")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("order_id", orderId)
+    .is("deleted_at", null)
+
+  const returnRequestIdsList = (returnRequestIds || []).map((rr: any) => rr.id)
+  let returnTimelineResult: any[] = []
+  if (returnRequestIdsList.length > 0) {
+    const { data: rtData, error: rtError } = await supabase
+      .from("audit_logs")
+      .select("id, partner_id, actor_user_id, action_type, change_lines, created_at, entity_id, metadata")
+      .eq("partner_id", partnerId)
+      .eq("entity_type", "return_request")
+      .in("entity_id", returnRequestIdsList)
+      .order("created_at", { ascending: false })
+      .limit(cappedLimit)
+    if (rtError) {
+      console.error("[orders_history] return timeline fetch error:", rtError)
+    }
+    returnTimelineResult = rtData || []
+  }
+
   const timelineEntries: OrderHistoryEntry[] = (timelineResult || []).map((entry: any) => ({
     id: `tl-${entry.id}`,
     order_id: entry.entity_id,
@@ -52,14 +76,23 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
     created_at: entry.created_at,
   }))
 
-  // Sort by created_at DESC in memory, cap at limit
-  const merged = [...timelineEntries]
+  const returnTimelineEntries: OrderHistoryEntry[] = returnTimelineResult.map((entry: any) => ({
+    id: `ret-${entry.id}`,
+    order_id: entry.entity_id,
+    partner_id: entry.partner_id,
+    actor_user_id: entry.actor_user_id,
+    entry_type: `return_${entry.action_type}`,
+    change_lines: entry.change_lines || [],
+    metadata: entry.metadata,
+    created_at: entry.created_at,
+  }))
+
+  const merged = [...timelineEntries, ...returnTimelineEntries]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, cappedLimit)
 
   if (merged.length === 0) return []
 
-  // Resolve actor names
   const actorIds = Array.from(
     new Set(
       merged
@@ -125,6 +158,23 @@ async function fetchOrderHistoryEntries(orderId: string, partnerId: string, limi
         }
         return line
       })
+    }
+
+    // Enrich return events with financial details from metadata
+    if (entry.entry_type && entry.entry_type.startsWith("return_") && entry.metadata) {
+      const md = entry.metadata
+      if (Number(md.refund_amount || 0) > 0) {
+        changeLines.push(`Valor do reembolso: ${formatCurrency(Number(md.refund_amount))}`)
+      }
+      if (Number(md.store_credit_amount || 0) > 0) {
+        changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(md.store_credit_amount))}`)
+      }
+      if (md.refund_payment_method) {
+        changeLines.push(`Método de reembolso: ${md.refund_payment_method}`)
+      }
+      if (md.exchange_order_id) {
+        changeLines.push(`Pedido de troca criado: #${String(md.exchange_order_id).slice(0, 8).toUpperCase()}`)
+      }
     }
 
     return {

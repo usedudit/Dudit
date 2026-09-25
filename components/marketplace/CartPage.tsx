@@ -5,7 +5,7 @@ import { useSupabase } from "@/providers/supabase-provider"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getStoreUrl, getProductUrl, getServiceUrl, getPlanUrl } from "@/lib/utils/url-generator"
-import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from "@/lib/icons"
+import { TrashIcon, ChevronUpIcon, ChevronDownIcon, FireIcon } from "@/lib/icons"
 import { QuantitySelector } from "@/components/reusable/QuantitySelector"
 import { AnimatePresence, motion } from "framer-motion"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -1228,7 +1228,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                                                     )}
                                                                                                     {!isOutOfStock && !exceedsStock && !isSellWithoutStock && maxStock <= 5 && maxStock > 0 && (
                                                                                                         <p className="text-[12px] text-brand-orange dark:text-orange-400 font-medium mb-1">
-                                                                                                            Apenas {maxStock} restante(s) em estoque
+                                                                                                            <FireIcon size={12} /> Apenas {maxStock} restante(s) em estoque
                                                                                                         </p>
                                                                                                     )}
                                                                                                     {(() => {

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ActionsDropdown, Badge, Button, DefaultModal, DropdownItem, FormSection, IconPlaceholder, InfoCard, Input, MoneyInput, Tabs, TabsContent, TabsList, TabsTrigger, ThreeDotsLoader } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency } from "@/lib/utils"
+import { AlertModal } from "@/components/reusable"
 import { closeCashSessionAction, createCashMovementAction, getCashSessionCloseSummaryAction, getCashSessionDetailsAction, reverseCashMovementAction } from "@/app/actions/erp/cash-register"
 import { useNotification } from "@/hooks/use-notification"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -83,6 +84,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
     const [isSavingMovement, setIsSavingMovement] = useState(false)
     const [movementsSortConfig, setMovementsSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({ key: "date", direction: "desc" })
     const [detailMovement, setDetailMovement] = useState<any | null>(null)
+    const [reverseMovementId, setReverseMovementId] = useState<string | null>(null)
     const movementsTableRef = useRef<HTMLDivElement>(null)
     const [movementsScroll, setMovementsScroll] = useState({ left: false, right: false })
 
@@ -292,6 +294,8 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
         await refresh()
     }
 
+    const openReverseConfirm = (movementId: string) => setReverseMovementId(movementId)
+
     const movementModalTitle = movModal === "withdrawal" ? "Registrar sangria" : movModal === "deposit" ? "Registrar reforço" : "Movimentação de caixa"
 
     return (
@@ -359,7 +363,7 @@ export default function CashSessionDetailPage({ partnerId, details: initialDetai
                                 <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                     <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                         <TabsTrigger value="summary">Resumo</TabsTrigger>
-                                        <TabsTrigger value="movements" badge={<span className="text-xs text-brand-inactive-text">{String(sangriasReforcos.length).padStart(2, "0")}</span>}>Sangrias e reforços</TabsTrigger>
+                                        <TabsTrigger value="movements">Sangrias e reforços</TabsTrigger>
                                     </TabsList>
                                 </div>
                             </div>
@@ -514,7 +518,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                                                     className="h-8"
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation()
-                                                                                        handleReverse(m.originalId)
+                                                                                        openReverseConfirm(m.originalId)
                                                                                     }}
                                                                                 >
                                                                                     Estornar
@@ -580,7 +584,7 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                                                                             onCancel={
                                                                                 isOpen && !m.reversed_at
                                                                                     ? () => {
-                                                                                        handleReverse(m.originalId)
+                                                                                        openReverseConfirm(m.originalId)
                                                                                     }
                                                                                     : undefined
                                                                             }
@@ -814,6 +818,21 @@ Diferença final: ${formatCurrency(details.totals.difference)}`} color={details.
                             </div>
                         ) : null}
                     </DefaultModal>
+
+                    <AlertModal
+                        isOpen={reverseMovementId !== null}
+                        title="Confirmar estorno"
+                        description="Tem certeza que deseja estornar este movimento de caixa? O valor será devolvido ao saldo."
+                        confirmText="Estornar"
+                        cancelText="Cancelar"
+                        variant="warning"
+                        onConfirm={async () => {
+                            if (!reverseMovementId) return
+                            await handleReverse(reverseMovementId)
+                            setReverseMovementId(null)
+                        }}
+                        onClose={() => setReverseMovementId(null)}
+                    />
                 </Tabs >
             </div >
         </FadeIn >

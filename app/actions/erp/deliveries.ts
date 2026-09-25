@@ -396,6 +396,8 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
         departure_time,
         completed_at,
         delivery_person_id,
+        distance_km,
+        estimated_duration_minutes,
         delivery_orders(id)
       ),
       orders(id, order_number)
@@ -433,6 +435,15 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
 
   const orderItem: any = Array.isArray(data.orders) ? data.orders[0] : data.orders
 
+  const distanceKm = delivery.distance_km != null ? Number(delivery.distance_km) : null
+  let estimatedHours: number | null = null
+  if (delivery.estimated_duration_minutes != null) {
+    const mins = Number(delivery.estimated_duration_minutes)
+    if (!Number.isNaN(mins)) {
+      estimatedHours = Math.round((mins / 60) * 2) / 2
+    }
+  }
+
   return {
     success: true as const,
     data: {
@@ -445,6 +456,8 @@ export async function getOrderDeliverySummaryAction(params: { partnerId: string;
       orderCount: totalOrders,
       routeStep: currentStep,
       orderLabel: orderItem?.order_number || `#${String(params.orderId).slice(0, 8).toUpperCase()}`,
+      distanceKm,
+      estimatedHours,
     },
   }
 }

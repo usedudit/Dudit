@@ -139,6 +139,49 @@ const CHANGE_STATUS_REASONS = [
     { value: "other", label: "Outro" }
 ]
 
+const UNDEFINED_PAYMENT_PLACEHOLDERS = [
+    "método não definido",
+    "metodo nao definido",
+    "não informado",
+    "nao informado",
+    "",
+];
+
+const hasDefinedPaymentMethod = (order: {
+    payment_method?: string;
+    payment_breakdown?: any;
+    checkout_fulfillment?: Record<string, unknown> | null;
+}): boolean => {
+    const isPlaceholder = (value?: string | null) => {
+        const normalized = String(value ?? "")
+            .trim()
+            .toLowerCase();
+        return UNDEFINED_PAYMENT_PLACEHOLDERS.some((placeholder) => normalized === placeholder);
+    };
+
+    const breakdown = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown : [];
+    const hasRealLeg = breakdown.some((leg: any) => {
+        const method = String(leg?.method ?? "").trim();
+        if (!method || isPlaceholder(method)) return false;
+        if (Number(leg?.amountReceived ?? leg?.amount ?? 0) <= 0.009) return false;
+        return true;
+    });
+    if (hasRealLeg) return true;
+
+    if (!isPlaceholder(order?.payment_method)) return true;
+
+    const deposit = order?.checkout_fulfillment as any;
+    const checkoutMethod = deposit?.depositCheckout?.paymentMethod || deposit?.paymentMethod;
+    return !isPlaceholder(checkoutMethod);
+};
+
+const ONLINE_ORDER_SOURCES = ["marketplace", "vitrine online", "online store", "loja online"];
+
+const isOnlineMarketplaceOrder = (source?: string | null): boolean => {
+    const normalized = String(source ?? "").trim().toLowerCase();
+    return ONLINE_ORDER_SOURCES.includes(normalized);
+};
+
 function doesTransitionRequireReason(currentStatus: string, nextStatus: string): boolean {
     if (currentStatus === "delivered" && nextStatus !== "delivered") {
         return true;
@@ -615,11 +658,20 @@ export default function OrdersPage({
             setSinalActionModal({ open: true, order })
             return
         }
-        // Nothing received yet (no sinal, no payments) → always open PaymentModal via payment=1
+        // Nothing received yet (no sinal, no payments)
         const paidAmount = Number(order.paidAmount || 0)
         const totalAmount = Number(order.total_amount || 0)
         const isFullyPaid = order.situation === "paid" || (totalAmount > 0 && paidAmount >= totalAmount - 0.009)
         if (paidAmount <= 0.009 && !isFullyPaid) {
+            // Pedido online (marketplace) com método já escolhido pelo comprador → não pode mudar o método,
+            // então mostra o PaymentStatusModal em vez de abrir o PaymentModal com &payment=1.
+            // Exceção: pedidos de sinal (o método vem do MP do sinal, não do comprador).
+            const isOnlineOrder = isOnlineMarketplaceOrder(order.order_source)
+            const methodAlreadyDefined = !depositSummary?.usesDeposit && hasDefinedPaymentMethod(order)
+            if (isOnlineOrder && methodAlreadyDefined) {
+                openPaymentStatusModal(order)
+                return
+            }
             router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
             return
         }
@@ -631,6 +683,12 @@ export default function OrdersPage({
         if (!order) return
         setSinalActionModal({ open: false, order: null })
         if (sinalAction === "keep") {
+            // Pedido já com valor recebido → mostra o que já entrou (PaymentStatusModal),
+            // não abre um PaymentModal novo com &payment=1.
+            if (Number(order.paidAmount || 0) > 0.009) {
+                openPaymentStatusModal(order)
+                return
+            }
             router.push(`/erp/pedidos?edit=${order.originalId}&payment=1`)
         } else if (sinalAction === "cancel") {
             try {
@@ -675,7 +733,7 @@ export default function OrdersPage({
                 toast({ title: "Erro", description: err?.message || "Não foi possível cancelar o sinal e o pedido.", variant: "destructive" })
             }
         }
-    }, [sinalActionModal.order, sinalAction, router, afterMutation, toast, partnerId, currentUserName])
+    }, [sinalActionModal.order, sinalAction, router, afterMutation, toast, partnerId, currentUserName, openPaymentStatusModal])
 
     const handleSelectRow = (id: string) => {
         setSelection((p) => {
@@ -938,11 +996,46 @@ export default function OrdersPage({
                                     setSinalActionModal({ open: true, order: { originalId: order.id, checkout_fulfillment: order.checkout_fulfillment, paidAmount: Number(order.paid_amount || 0), total_amount: Number(order.total_amount || 0), payment_expires_at: order.payment_expires_at } as any })
                                     return
                                 }
-                                // Nothing received yet (no sinal, no payments) → always open PaymentModal via payment=1
+                                // Nothing received yet (no sinal, no payments)
                                 const paidAmount = Number(order.paid_amount || order.paidAmount || 0)
                                 const totalAmount = Number(order.total_amount || 0)
                                 const isFullyPaid = order.situation === "paid" || (totalAmount > 0 && paidAmount >= totalAmount - 0.009)
                                 if (paidAmount <= 0.009 && !isFullyPaid) {
+                                    const isOnlineOrder = isOnlineMarketplaceOrder(order.order_source)
+                                    const methodAlreadyDefined = !depositSummary?.usesDeposit && hasDefinedPaymentMethod(order)
+                                    if (isOnlineOrder && methodAlreadyDefined) {
+                                        openPaymentStatusModal({
+                                            originalId: order.id,
+                                            displayId: order.order_number || `#${String(order.id).substring(0, 8)}`,
+                                            customer_name: order.customer_name || "Consumidor final",
+                                            customer_id: order.buyer_id || "-",
+                                            total_amount: Number(order.total_amount || 0),
+                                            statusLabel: "",
+                                            statusColor: "gray",
+                                            deliveryStatusLabel: "",
+                                            deliveryStatusColor: "gray",
+                                            isUnfulfilled: false,
+                                            formattedDate: "",
+                                            formattedTime: "",
+                                            store_name: "",
+                                            order_source: order.order_source || "Manual",
+                                            items_count: Number(order.order_items?.length || 0),
+                                            created_at_time: new Date(order.created_at || Date.now()).getTime(),
+                                            situation: order.situation || "pending",
+                                            delivery_status: order.delivery_status || "not_sent",
+                                            delivery_type: order.delivery_type || "delivery",
+                                            notes: order.notes || "",
+                                            previousSituationBeforeCancel: order.previous_situation_before_cancel || null,
+                                            returnCount: Number(order.return_count || order.order_requests?.length || 0),
+                                            canEdit: order.situation !== "cancelled",
+                                            paidAmount: Number(order.paid_amount || 0),
+                                            payment_method: order.payment_method || "",
+                                            payment_breakdown: order.payment_breakdown || [],
+                                            payment_provider: order.payment_provider || "",
+                                            checkout_fulfillment: order.checkout_fulfillment || null,
+                                        })
+                                        return
+                                    }
                                     router.push(`/erp/pedidos?edit=${order.id}&payment=1`)
                                     return
                                 }

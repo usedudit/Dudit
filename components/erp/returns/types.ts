@@ -56,4 +56,6 @@ export interface ReturnEvent {
   actor_name?: string
   notes: string | null
   created_at: string
+  metadata?: Record<string, any>
+  event_type?: string
 }

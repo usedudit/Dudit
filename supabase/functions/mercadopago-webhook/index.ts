@@ -152,8 +152,7 @@ Deno.serve(async (req: Request) => {
 		// Prevents duplicate inserts when MP retries or duplicate webhooks arrive
 		const idempotencyKey = `mercadopago:${payload.type || "unknown"}:${resourceId}:${requestId}`
 
-		// Upsert (insert on conflict) into outbox table
-		// The Next.js app polls this table (or uses Realtime) to process asynchronously
+		// Insert into outbox table (primary path)
 		const { error: upsertError } = await supabase
 			.from("pending_webhook_events")
 			.upsert({
@@ -170,14 +169,29 @@ Deno.serve(async (req: Request) => {
 			})
 
 		if (upsertError) {
-			console.error("[Edge Function] Failed to upsert webhook event:", upsertError)
-			// Still ACK to MP - we don't want MP to retry on our DB errors
+			console.error("[Edge Function] Failed to insert webhook event:", upsertError)
+
+			// Fallback: forward to Next.js webhook endpoint directly
+			// This ensures webhooks are still processed if the DB/write fails
+			const appWebhookUrl = Deno.env.get("APP_WEBHOOK_URL")
+			if (appWebhookUrl) {
+				console.log("[Edge Function] Falling back to direct forward...")
+				fetch(appWebhookUrl, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"x-signature": signature,
+						"x-request-id": requestId,
+						"x-forwarded-from": "edge-function-fallback",
+					},
+					body: JSON.stringify(payload),
+				}).catch((e) => console.error("[Edge Function] Fallback forward failed:", e))
+			}
 		} else {
 			console.log(`[Edge Function] Webhook queued: type=${payload.type} resourceId=${resourceId} requestId=${requestId}`)
 		}
 
-		// Immediate ACK to Mercado Pago (even if insert failed - they'll retry,
-		// but the idempotency key protects against duplicates on re-processing)
+		// Immediate ACK to Mercado Pago (always 200 - we don't want MP to retry)
 		return new Response(JSON.stringify({ received: true, status: "accepted" }), {
 			status: 200,
 			headers: { "Content-Type": "application/json" },

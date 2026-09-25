@@ -1729,13 +1729,13 @@ export function ProductDetailsPageClient({
                                                 </div>
                                                 <div className="text-right">
                                                     {deliveryLoading ? (
-                                                        <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin ml-auto" />
+                                                        <Spinner />
                                                     ) : (deliveryBreakdown?.deliveryPayer === "seller" || deliveryConfig?.settings?.deliveryPayer === "seller") ? (
-                                                        <div className="flex flex-col items-end">
+                                                        <div className="flex items-end">
                                                             {deliveryBreakdown?.originalFee != null && Number(deliveryBreakdown.originalFee) > 0 && (
-                                                                <span className="line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(deliveryBreakdown.originalFee))} | </span>
+                                                                <span className="text-sm line-through text-brand-inactive-text dark:text-dark-body font-normal">{formatCurrency(Number(deliveryBreakdown.originalFee))} | </span>
                                                             )}
-                                                            <span className="text-sm font-bold text-brand-green">Grátis</span>
+                                                            <span className="text-sm font-bold text-brand-green"> Grátis</span>
                                                         </div>
                                                     ) : isFreeByThreshold || deliveryBreakdown?.isFreeByThreshold || (deliveryFee !== null && deliveryFee === 0 && (deliveryBreakdown?.hasRatesConfigured ?? hasDeliveryRatesConfigured(deliveryConfig?.settings, deliveryConfig?.rules))) ? (
                                                         <span className="text-sm font-bold text-brand-green">Grátis</span>
@@ -1754,7 +1754,7 @@ export function ProductDetailsPageClient({
                                                     ) : isTechnicalError ? (
                                                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     ) : (
-                                                        <p className="text-sm font-semibold text-brand-inactive-text dark:text-dark-body">-</p>
+                                                        <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">A combinar</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -2093,34 +2093,31 @@ export function ProductDetailsPageClient({
                 isOpen={showQuantityModal}
                 onClose={() => setShowQuantityModal(false)}
                 maxWidth="sm"
+                title="Informe a quantidade"
+                footer={<Button
+                    className="w-full"
+                    disabled={!customQuantity || Number(customQuantity) <= 0 || Number(customQuantity) > MAX_STOCK}
+                    onClick={() => {
+                        setQuantity(Number(customQuantity))
+                        setShowQuantityModal(false)
+                    }}
+                >Confirmar</Button>}
             >
                 <div className="flex flex-col items-center p-2">
-                    <h4 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 text-center">Informe a quantidade</h4>
                     <div className="w-full space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-brand-inactive-text dark:text-dark-body mb-1 uppercase tracking-wider">Quantidade desejada</label>
                             <Input
+                                label="Quantidade desejada"
                                 type="number"
-                                placeholder="Ex: 10"
                                 value={customQuantity}
                                 onChange={(e) => setCustomQuantity(e.target.value)}
+                                suffix={product.unit}
                                 autoFocus
-                                className="text-center text-lg font-bold"
                             />
-                            <p className="text-[11px] text-brand-inactive-text dark:text-dark-body mt-2 text-center">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-2 text-center">
                                 Limite disponível: <span className="font-bold">{getQuantityLabel(MAX_STOCK, product.unit)}</span>
                             </p>
                         </div>
-                        <Button
-                            className="w-full"
-                            disabled={!customQuantity || Number(customQuantity) <= 0 || Number(customQuantity) > MAX_STOCK}
-                            onClick={() => {
-                                setQuantity(Number(customQuantity))
-                                setShowQuantityModal(false)
-                            }}
-                        >
-                            Confirmar
-                        </Button>
                     </div>
                 </div>
             </DefaultModal>

@@ -1,5 +1,6 @@
 "use client"
 
+import { formatCurrency } from "@/lib/utils"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { HistoryTimeline, type HistoryEntry } from "@/components/erp/shared/HistoryTimeline"
 import type { ReturnEvent } from "./types"
@@ -26,8 +27,22 @@ function getReturnStatusLabel(status: string) {
     }
 }
 
+function getStatusActionLabel(actionType: string) {
+    switch (actionType) {
+        case "created": return "Solicitação criada"
+        case "approved": return "Solicitação aprovada"
+        case "rejected": return "Solicitação recusada"
+        case "resolved": return "Solicitação resolvida"
+        case "updated": return "Solicitação atualizada"
+        case "mercadopago_refund_executed": return "Reembolso via Mercado Pago executado"
+        default: return actionType || "Atualização"
+    }
+}
+
 function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
     const changeLines: string[] = []
+    const metadata = event.metadata || {}
+    const actionType = event.event_type || "updated"
 
     if (event.previous_status && event.new_status && event.previous_status !== event.new_status) {
         changeLines.push(`alterou status: ${getReturnStatusLabel(event.previous_status)} → ${getReturnStatusLabel(event.new_status)}`)
@@ -37,10 +52,45 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
         changeLines.push(event.notes)
     }
 
-    // Enrich from metadata
-    const metadata = (event as any).metadata || {}
+    if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
+        changeLines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`)
+        if (metadata.refund_status) {
+            changeLines.push(`Status do reembolso: ${metadata.refund_status}`)
+        }
+        if (metadata.refund_payment_method) {
+            changeLines.push(`Método de reembolso: ${metadata.refund_payment_method}`)
+        }
+    }
 
-    // 1. Items listed during creation or edits
+    if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
+        changeLines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`)
+    }
+
+    if (metadata.exchange_order_id) {
+        changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
+    }
+    if (Number(metadata.exchange_shortfall_amount || 0) > 0) {
+        changeLines.push(`Diferença complementar cobrada: ${formatCurrency(Number(metadata.exchange_shortfall_amount))}`)
+    }
+    if (Number(metadata.exchange_surplus_amount || 0) > 0) {
+        changeLines.push(`Crédito excedente gerado: ${formatCurrency(Number(metadata.exchange_surplus_amount))}`)
+    }
+    if (metadata.exchange_balance_resolution) {
+        const dest = metadata.exchange_balance_resolution === "store_credit" ? "vale-compra" : "reembolso"
+        changeLines.push(`Saldo da troca enviado para: ${dest}`)
+    }
+
+    if (metadata.stock_movement_id) {
+        changeLines.push("Itens restaurados ao estoque físico")
+    }
+
+    if (metadata.resolution) {
+        const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
+            metadata.resolution === "exchange" ? "Troca" :
+                metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution
+        changeLines.push(`Resolução desejada: ${resolLabel}`)
+    }
+
     if (metadata.items && Array.isArray(metadata.items) && metadata.items.length > 0) {
         changeLines.push("Itens na solicitação:")
         metadata.items.forEach((item: any) => {
@@ -48,32 +98,16 @@ function mapReturnEventToHistoryEntry(event: ReturnEvent): HistoryEntry {
             const qty = item.quantity || 1
             const conditionRaw = String(item.condition || "").toLowerCase()
             const cond = conditionRaw === "sealed" || conditionRaw === "lacrado" ? "Lacrado" : conditionRaw === "damaged" || conditionRaw === "danificado" ? "Danificado" : "Aberto"
-            changeLines.push(`• ${name} (${qty}x) - Condição: ${cond}`)
+            changeLines.push(`  ${name} (${qty}x) - Condição: ${cond}`)
         })
     }
 
-    // 2. Financial outcomes / Exchange orders / Stock movement
-    if (metadata.exchange_order_id) {
-        changeLines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`)
-    }
-    if (Number(metadata.exchange_shortfall_amount || 0) > 0) {
-        changeLines.push(`Diferença complementar cobrada: R$ ${Number(metadata.exchange_shortfall_amount).toFixed(2)}`)
-    }
-    if (Number(metadata.exchange_surplus_amount || 0) > 0) {
-        changeLines.push(`Crédito excedente gerado: R$ ${Number(metadata.exchange_surplus_amount).toFixed(2)}`)
-    }
-    if (metadata.refund_id || metadata.transaction_id) {
-        changeLines.push(`Transação de reembolso registrada`)
-    }
-    if (metadata.store_credit_id || metadata.credit_transaction_id) {
-        changeLines.push(`Vale-compra gerado com sucesso`)
-    }
-    if (metadata.return_to_inventory) {
-        changeLines.push("Itens restaurados ao estoque físico")
+    if (metadata.mpRefundId) {
+        changeLines.push(`Refund ID do Mercado Pago: ${metadata.mpRefundId}`)
     }
 
     if (changeLines.length === 0) {
-        changeLines.push("atualizou a solicitação.")
+        changeLines.push(getStatusActionLabel(actionType) + ".")
     }
 
     return {

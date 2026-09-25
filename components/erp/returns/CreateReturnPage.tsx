@@ -23,6 +23,7 @@ import {
     DefaultModal,
     InfoCard,
     SavingStatusModal,
+    AlertModal,
 } from "@/components/reusable"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { GenericAttachmentsTab } from "../shared/GenericAttachmentsTab"
@@ -34,7 +35,10 @@ import { ReturnRequest, ReturnItem, ReturnEvent } from "./types"
 import { ReturnHistoryTab } from "./ReturnHistoryTab"
 import { getReturnStatusMeta } from "./ReturnListRow"
 import { usePickerBucket, useProductBucket, type ProductBucketItem } from "@/components/erp/hooks"
-import { getDeliveryStatusMeta, getPaymentStatusMeta } from "@/lib/orders/status"
+import { getDeliveryStatusMeta, getDeliveryStatusIcon, getPaymentStatusMeta } from "@/lib/orders/status"
+import { usePermissions } from "@/lib/permission-context"
+import { normalizeBusinessInfo } from "@/lib/business-info"
+import { DEFAULT_SALES_SETTINGS, type SalesSettings } from "@/lib/sales/sales-settings-types"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { useR2Upload } from "@/hooks/use-r2-upload"
 import { calculateReturnNetTotal } from "@/lib/returns/calculations"
@@ -182,6 +186,13 @@ export default function CreateReturnPage({
     )
     const productBucket = useProductBucket<ProductBucketItem>(fetchPartnerProductsBucket)
 
+    const { businessInfo: contextBusinessInfo } = usePermissions()
+    const businessInfo = useMemo(() => normalizeBusinessInfo(contextBusinessInfo), [contextBusinessInfo])
+    const salesSettings: SalesSettings = useMemo(() => ({
+        ...DEFAULT_SALES_SETTINGS,
+        ...((businessInfo as any)?.salesSettings || {}),
+    }), [businessInfo])
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -232,6 +243,8 @@ export default function CreateReturnPage({
     const [replacementProduct, setReplacementProduct] = useState("")
     const [replacementItems, setReplacementItems] = useState<ReplacementItemState[]>([])
     const [isReplacementSearchOpen, setIsReplacementSearchOpen] = useState(false)
+    const [showZeroStockAlert, setShowZeroStockAlert] = useState(false)
+    const [pendingZeroStockItem, setPendingZeroStockItem] = useState<{ product: { name: string }; callback?: () => void } | null>(null)
     const [exchangeBalanceResolution, setExchangeBalanceResolution] = useState<"store_credit" | "refund">("store_credit")
     const [exchangeStatus, setExchangeStatus] = useState("pending")
     const [pendingSaveData, setPendingSaveData] = useState<(Partial<ReturnRequest> & Record<string, any>) | null>(null)
@@ -275,8 +288,8 @@ export default function CreateReturnPage({
                     const def = banks.find((a: any) => a.is_default) || banks[0]
                     if (def) setFinanceAccountId(def.id)
                 }
-            }).catch(() => {})
-        ).catch(() => {})
+            }).catch(() => { })
+        ).catch(() => { })
     }, [partnerId])
 
     const isConsumidorFinal = useMemo(() => {
@@ -370,7 +383,7 @@ export default function CreateReturnPage({
                 orderDate: returnRequest.createdAt,
                 status: returnRequest.orderStatus || "paid",
                 deliveryStatus: returnRequest.deliveryStatus || "delivered",
-                totalAmount: returnRequest.orderTotal || returnRequest.orderPaidAmount || returnRequest.refundValue || 0,
+                totalAmount: returnRequest.orderTotal || returnRequest.orderPaidAmount || 0,
                 payment_provider: returnRequest.paymentProvider,
                 paymentProvider: returnRequest.paymentProvider,
                 mp_payment_id: returnRequest.mpPaymentId,
@@ -626,20 +639,65 @@ export default function CreateReturnPage({
         }
     }, [calculatedRefundValue, creditType, refundType, resolutionType, exchangeBalanceResolution, exchangeSurplus])
 
+    const getReplacementStock = useCallback((product: ProductBucketItem) => {
+        if (product.has_variants) {
+            return (product.variants || []).reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0)
+        }
+        return Number(product.stock || 0)
+    }, [])
+
+    const getReplacementMaxQty = useCallback((product: ProductBucketItem) => {
+        if (product.allow_sell_without_stock) return undefined
+        if (salesSettings.allowNegativeStock !== false) return undefined
+        return Math.max(0, getReplacementStock(product))
+    }, [salesSettings.allowNegativeStock, getReplacementStock])
+
     const addReplacementProduct = useCallback((product: ProductBucketItem) => {
-        setReplacementItems(prev => {
-            if (prev.some(item => item.product.id === product.id)) return prev
-            return [...prev, { product, quantity: 1 }]
-        })
-        productBucket.setSearchQuery("")
-        setIsReplacementSearchOpen(false)
-    }, [productBucket])
+        const proceed = () => {
+            setReplacementItems(prev => {
+                if (prev.some(item => item.product.id === product.id)) return prev
+                return [...prev, { product, quantity: 1 }]
+            })
+            productBucket.setSearchQuery("")
+            setIsReplacementSearchOpen(false)
+        }
+
+        const availableStock = getReplacementStock(product)
+        if (!product.allow_sell_without_stock && 1 > availableStock) {
+            if (salesSettings.allowNegativeStock === false) {
+                notifyError(`O produto "${product.name}" está sem estoque e as configurações da empresa não permitem vendas com estoque negativo.`)
+                return
+            }
+            setPendingZeroStockItem({ product: { name: product.name }, callback: proceed })
+            setShowZeroStockAlert(true)
+            return
+        }
+
+        proceed()
+    }, [productBucket, getReplacementStock, salesSettings.allowNegativeStock, notifyError])
 
     const updateReplacementQty = useCallback((index: number, quantity: number) => {
-        setReplacementItems(prev => prev.map((item, itemIndex) => (
-            itemIndex === index ? { ...item, quantity: Math.max(1, quantity) } : item
+        const item = replacementItems[index]
+        if (!item) return
+
+        const nextQty = Math.max(1, quantity)
+        const applyQty = () => setReplacementItems(prev => prev.map((prevItem, prevIndex) => (
+            prevIndex === index ? { ...prevItem, quantity: nextQty } : prevItem
         )))
-    }, [])
+
+        const availableStock = getReplacementStock(item.product)
+        if (nextQty > item.quantity && !item.product.allow_sell_without_stock && nextQty > availableStock) {
+            if (salesSettings.allowNegativeStock === false) {
+                notifyError(`Estoque insuficiente de "${item.product.name}" (${availableStock} disponíveis). A empresa não permite vendas com estoque negativo.`)
+                return
+            }
+            setPendingZeroStockItem({ product: { name: item.product.name }, callback: applyQty })
+            setShowZeroStockAlert(true)
+            return
+        }
+
+        applyQty()
+    }, [replacementItems, getReplacementStock, salesSettings.allowNegativeStock, notifyError])
 
     const removeReplacementProduct = useCallback((index: number) => {
         setReplacementItems(prev => prev.filter((_, itemIndex) => itemIndex !== index))
@@ -710,6 +768,16 @@ export default function CreateReturnPage({
 
     const handleFormSubmit = async () => {
         if (checkedItems.length === 0) return
+
+        if (salesSettings.allowNegativeStock === false) {
+            const invalidReplacement = replacementItems.find(item =>
+                !item.product.allow_sell_without_stock && item.quantity > getReplacementStock(item.product)
+            )
+            if (invalidReplacement) {
+                notifyError(`O produto "${invalidReplacement.product.name}" não possui estoque suficiente (${getReplacementStock(invalidReplacement.product)} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`)
+                return
+            }
+        }
 
         setIsUploading(true)
 
@@ -994,31 +1062,31 @@ export default function CreateReturnPage({
                                                                                     orderPicker.setSearchQuery(order.displayId)
                                                                                     setIsOrderSearchOpen(false)
                                                                                     // Map order items to returns checklist items
-                                                                                        const mappedItems = (order.order_items || []).map((item: any) => {
-                                                                                         const isServiceItem = !!item.service_id || item.line_type === "service_booking"
-                                                                                         const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
-                                                                                             ? item.products.images[0]
-                                                                                             : (item.products?.video_thumbnail || item.products?.images
-                                                                                                 || (Array.isArray(item.services?.images) && item.services.images[0]
-                                                                                                     ? item.services.images[0]
-                                                                                                     : item.services?.video_thumbnail || item.services?.images || null))
-                                                                                         const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
-                                                                                         return {
-                                                                                             id: item.id,
-                                                                                             productId: item.product_id || item.services?.id || item.id,
-                                                                                             productName: item.product_name || item.products?.name || item.services?.name || (isServiceItem ? "Serviço" : "Produto"),
-                                                                                             sku: item.products?.sku || item.services?.sku || "",
-                                                                                             image: getR2ImageUrl(imgKey, "thumb"),
-                                                                                             price: item.product_price || 0,
-                                                                                             netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
-                                                                                             quantity: Math.min(item.quantity || 1, remainingQty),
-                                                                                             maxQuantity: remainingQty,
-                                                                                             checked: false,
-                                                                                             reason: "defeito" as const,
-                                                                                             condition: "aberto" as const,
-                                                                                             lineType: item.line_type || (isServiceItem ? "service_booking" : "product"),
-                                                                                         }
-                                                                                     })
+                                                                                    const mappedItems = (order.order_items || []).map((item: any) => {
+                                                                                        const isServiceItem = !!item.service_id || item.line_type === "service_booking"
+                                                                                        const imgKey = Array.isArray(item.products?.images) && item.products.images[0]
+                                                                                            ? item.products.images[0]
+                                                                                            : (item.products?.video_thumbnail || item.products?.images
+                                                                                                || (Array.isArray(item.services?.images) && item.services.images[0]
+                                                                                                    ? item.services.images[0]
+                                                                                                    : item.services?.video_thumbnail || item.services?.images || null))
+                                                                                        const remainingQty = typeof item.remainingQuantity === "number" ? item.remainingQuantity : item.quantity || 1
+                                                                                        return {
+                                                                                            id: item.id,
+                                                                                            productId: item.product_id || item.services?.id || item.id,
+                                                                                            productName: item.product_name || item.products?.name || item.services?.name || (isServiceItem ? "Serviço" : "Produto"),
+                                                                                            sku: item.products?.sku || item.services?.sku || "",
+                                                                                            image: getR2ImageUrl(imgKey, "thumb"),
+                                                                                            price: item.product_price || 0,
+                                                                                            netItemValue: item.net_item_value || item.subtotal || item.product_price || 0,
+                                                                                            quantity: Math.min(item.quantity || 1, remainingQty),
+                                                                                            maxQuantity: remainingQty,
+                                                                                            checked: false,
+                                                                                            reason: "defeito" as const,
+                                                                                            condition: "aberto" as const,
+                                                                                            lineType: item.line_type || (isServiceItem ? "service_booking" : "product"),
+                                                                                        }
+                                                                                    })
                                                                                     setReturnItems(mappedItems)
                                                                                 }}
                                                                             >
@@ -1047,7 +1115,7 @@ export default function CreateReturnPage({
                                                                                         <Badge variant={searchPaymentMeta.variant} className="scale-90 whitespace-nowrap">
                                                                                             {searchPaymentMeta.label}
                                                                                         </Badge>
-                                                                                        <Badge variant={searchDeliveryMeta.variant} className="scale-90 whitespace-nowrap">
+                                                                                        <Badge variant={searchDeliveryMeta.variant} icon={getDeliveryStatusIcon(order.deliveryStatus)} className="scale-90 whitespace-nowrap">
                                                                                             {searchDeliveryMeta.label}
                                                                                         </Badge>
                                                                                     </div>
@@ -1104,7 +1172,7 @@ export default function CreateReturnPage({
                                                                         <p className="text-sm font-medium text-brand-inactive-text dark:text-dark-body mb-3">
                                                                             Entrega
                                                                         </p>
-                                                                        <Badge variant={deliveryMeta.variant}>{deliveryMeta.label}</Badge>
+                                                                        <Badge variant={deliveryMeta.variant} icon={getDeliveryStatusIcon(selectedOrder?.deliveryStatus)}>{deliveryMeta.label}</Badge>
                                                                     </div>
 
                                                                     <div className="p-5">
@@ -1446,7 +1514,7 @@ export default function CreateReturnPage({
                                                 </FormSection>
                                             )}
                                             {/* Refund/Exchange status details */}
-                                            {selectedOrder && (
+                                            {returnRequest && (
                                                 <FormSection hasSeparator title="Resolução da devolução">
                                                     {isViewOnly ? (
                                                         <div className="space-y-1">
@@ -1718,6 +1786,7 @@ export default function CreateReturnPage({
                                                                             }}
                                                                             placeholder="Buscar por nome ou SKU"
                                                                             prefix={<SearchIcon size={18} className="shrink-0 text-brand-inactive-text" />}
+                                                                            variant="full-rounded"
                                                                         />
 
                                                                         <AnimatePresence>
@@ -1748,9 +1817,7 @@ export default function CreateReturnPage({
                                                                                                 promotions,
                                                                                                 { productId: product.id, categoryId: categoryId || undefined }
                                                                                             )
-                                                                                            const displayStock = product.has_variants
-                                                                                                ? (product.variants || []).reduce((sum: number, v: any) => sum + Number(v.stock || 0), 0)
-                                                                                                : product.stock
+                                                                                            const displayStock = getReplacementStock(product)
                                                                                             return (
                                                                                                 <div
                                                                                                     key={product.id}
@@ -1801,44 +1868,111 @@ export default function CreateReturnPage({
                                                                     </div>
 
                                                                     {replacementItems.length > 0 && (
-                                                                        <div className="md:col-span-2 space-y-3 rounded-xl border border-brand-border dark:border-dark-border p-4">
-                                                                            {replacementItems.map((item, index) => (
-                                                                                <div key={item.product.id} className="flex flex-col gap-3 border-b border-brand-border pb-3 last:border-0 last:pb-0 dark:border-dark-border md:flex-row md:items-center">
-                                                                                    <div className="min-w-0 flex-1">
-                                                                                        <p className="truncate text-sm font-bold text-brand-dark dark:text-dark-heading">{item.product.name}</p>
-                                                                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">{formatCurrency(item.product.price || 0)} cada</p>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-3">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            disabled={item.quantity <= 1 || isViewOnly}
-                                                                                            onClick={() => updateReplacementQty(index, item.quantity - 1)}
-                                                                                            className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
-                                                                                        >
-                                                                                            -
-                                                                                        </button>
-                                                                                        <span className="w-8 text-center text-sm font-bold text-brand-dark dark:text-dark-heading">{item.quantity}</span>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            disabled={isViewOnly}
-                                                                                            onClick={() => updateReplacementQty(index, item.quantity + 1)}
-                                                                                            className="h-9 w-9 rounded-full border border-brand-border text-brand-dark disabled:opacity-40 dark:border-dark-border dark:text-dark-heading"
-                                                                                        >
-                                                                                            +
-                                                                                        </button>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            disabled={isViewOnly}
-                                                                                            onClick={() => removeReplacementProduct(index)}
-                                                                                            className="h-9 w-9 rounded-full text-brand-red hover:bg-brand-red-light disabled:opacity-40"
-                                                                                            title="Remover produto"
-                                                                                        >
-                                                                                            <TrashIcon size={17} className="mx-auto" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
+                                                                        <>
+                                                                            {/* Items List - Desktop Table */}
+                                                                            <div className="hidden md:block md:col-span-2 w-full overflow-x-auto pb-4 custom-scrollbar">
+                                                                                <table className="w-full text-left border-separate border-spacing-0">
+                                                                                    <thead>
+                                                                                        <tr className="bg-brand-gray dark:bg-dark-border/50">
+                                                                                            <th className="py-3 pl-6 pr-4 text-[13px] font-medium text-gray-500 dark:text-dark-body rounded-l-lg">Produto</th>
+                                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-36">Qtd.</th>
+                                                                                            <th className="py-3 px-4 text-[13px] font-medium text-gray-500 dark:text-dark-body text-center w-24 rounded-r-lg">Ações</th>
+                                                                                        </tr>
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                        {replacementItems.map((item, index) => {
+                                                                                            const itemStock = getReplacementStock(item.product)
+                                                                                            return (
+                                                                                                <tr key={item.product.id} className="group hover:bg-brand-gray/20 dark:hover:bg-dark-border/10 transition-colors">
+                                                                                                    <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
+                                                                                                        <div className="flex items-center gap-3">
+                                                                                                            <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
+                                                                                                                <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full rounded-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                                                                            </div>
+                                                                                                            <div className="flex flex-col text-left flex-1 min-w-0">
+                                                                                                                <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
+                                                                                                                    {item.product.name}
+                                                                                                                </span>
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body truncate">{item.product.sku || "Sem SKU"}</span>
+                                                                                                                    <span className="w-1 h-1 rounded-full bg-brand-inactive-text opacity-40"></span>
+                                                                                                                    <span className="text-xs font-medium text-brand-inactive-text dark:text-dark-body">Estoque: <strong className="text-brand-dark dark:text-dark-heading font-bold">{itemStock}</strong></span>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                                        <div className="flex justify-center">
+                                                                                                            <QuantitySelector
+                                                                                                                value={item.quantity}
+                                                                                                                onChange={(val) => updateReplacementQty(index, val)}
+                                                                                                                min={1}
+                                                                                                                max={getReplacementMaxQty(item.product)}
+                                                                                                                size="md"
+                                                                                                                disabled={isViewOnly}
+                                                                                                            />
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                    <td className="py-4 px-4 border-b border-brand-border dark:border-dark-border">
+                                                                                                        <div className="flex justify-center">
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => removeReplacementProduct(index)}
+                                                                                                                disabled={isViewOnly}
+                                                                                                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-red-50 dark:hover:bg-red-900/10 text-brand-red transition-colors disabled:opacity-40"
+                                                                                                                title="Remover item"
+                                                                                                            >
+                                                                                                                <TrashIcon size={18} />
+                                                                                                            </button>
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            )
+                                                                                        })}
+                                                                                    </tbody>
+                                                                                </table>
+                                                                            </div>
+
+                                                                            {/* Items List - Mobile */}
+                                                                            <div className="block md:hidden md:col-span-2 space-y-2">
+                                                                                {replacementItems.map((item, index) => {
+                                                                                    const itemStock = getReplacementStock(item.product)
+                                                                                    return (
+                                                                                        <div key={item.product.id} className="flex items-center gap-4 py-4 border-b border-brand-border dark:border-dark-border last:border-0">
+                                                                                            <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 overflow-hidden flex items-center justify-center">
+                                                                                                <img src={getR2ImageUrl(item.product.image, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!item.product.image ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                                                            </div>
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="flex justify-between items-start mb-0.5">
+                                                                                                    <h4 className="font-bold text-[13px] text-brand-dark dark:text-dark-heading truncate pr-2">
+                                                                                                        {item.product.name}
+                                                                                                    </h4>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        onClick={() => removeReplacementProduct(index)}
+                                                                                                        disabled={isViewOnly}
+                                                                                                        className="w-8 h-8 flex items-center justify-center text-brand-red hover:bg-red-50 dark:hover:bg-red-900/10 rounded-full transition-colors shrink-0 disabled:opacity-40"
+                                                                                                    >
+                                                                                                        <TrashIcon size={14} />
+                                                                                                    </button>
+                                                                                                </div>
+                                                                                                <p className="text-[11px] font-medium text-brand-inactive-text truncate mb-2">
+                                                                                                    {item.product.sku || "Sem SKU"} • Estoque: {itemStock}
+                                                                                                </p>
+                                                                                                <QuantitySelector
+                                                                                                    value={item.quantity}
+                                                                                                    onChange={(val) => updateReplacementQty(index, val)}
+                                                                                                    min={1}
+                                                                                                    max={getReplacementMaxQty(item.product)}
+                                                                                                    size="md"
+                                                                                                    disabled={isViewOnly}
+                                                                                                />
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )
+                                                                                })}
+                                                                            </div>
+                                                                        </>
                                                                     )}
 
                                                                     <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -1991,7 +2125,7 @@ export default function CreateReturnPage({
                                             <FormSection title="Observações da Devolução">
                                                 {returnRequest?.customerMessage && (
                                                     <div className="space-y-2">
-                                                        <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Observações do Cliente</label>
+                                                        <label className="text-sm font-medium text-brand-dark dark:text-dark-heading truncate">Observações do Cliente</label>
                                                         <div className="p-3.5 bg-brand-gray/50 dark:bg-dark-border/30 rounded-xl text-sm text-brand-dark dark:text-dark-heading whitespace-pre-wrap border border-brand-border/40 dark:border-dark-border/40">
                                                             {returnRequest.customerMessage}
                                                         </div>
@@ -2264,6 +2398,21 @@ export default function CreateReturnPage({
                     </div>
                 </div>
             </DefaultModal>
+
+            <AlertModal
+                isOpen={showZeroStockAlert}
+                onClose={() => setShowZeroStockAlert(false)}
+                onConfirm={() => {
+                    setShowZeroStockAlert(false)
+                    pendingZeroStockItem?.callback?.()
+                    setPendingZeroStockItem(null)
+                }}
+                title="Estoque insuficiente"
+                message={`O produto "${pendingZeroStockItem?.product?.name || ''}" não possui estoque suficiente. Deseja continuar mesmo assim?`}
+                confirmText="Continuar mesmo assim"
+                cancelText="Cancelar"
+                variant="warning"
+            />
 
             <UnsavedChangesDialog
                 open={showConfirmDialog}

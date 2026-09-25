@@ -98,10 +98,9 @@ const RadioItem = ({
     <label
       className={`
         relative flex items-start p-4 border rounded-lg transition-all duration-200 cursor-pointer group
-        ${
-          checked
-            ? "border-brand-green bg-brand-green/10 ring-1 ring-brand-green" // Estado Selecionado (Igual ao RadioButton anterior)
-            : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-green/50"
+        ${checked
+          ? "border-brand-green bg-brand-green/10 ring-1 ring-brand-green" // Estado Selecionado (Igual ao RadioButton anterior)
+          : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface hover:border-brand-green/50"
         }
         ${disabled ? "opacity-50 cursor-not-allowed" : ""}
       `}
@@ -122,22 +121,20 @@ const RadioItem = ({
             w-5 h-5 rounded-full border 
             flex items-center justify-center
             transition-all duration-200 ease-out
-            ${
-              checked
-                ? "bg-brand-green border-brand-green" // Círculo cheio verde
-                : "bg-white border-brand-border dark:border-gray-600 dark:bg-dark-surface group-hover:border-brand-green/60"
+            ${checked
+              ? "bg-brand-green border-brand-green" // Círculo cheio verde
+              : "bg-white border-brand-border dark:border-gray-600 dark:bg-dark-surface group-hover:border-brand-green/60"
             }
           `}
         >
-           {/* Bolinha Interna Branca */}
+          {/* Bolinha Interna Branca */}
           <div className={`${dotClasses} w-2 h-2 rounded-full bg-white dark:bg-dark-surface`} />
         </div>
       </div>
       <div className="ml-3 flex-1">
         <span
-          className={`block text-sm font-medium transition-colors ${
-            checked ? "text-brand-dark dark:text-white" : "text-brand-dark dark:text-dark-heading"
-          }`}
+          className={`block text-sm font-medium transition-colors ${checked ? "text-brand-dark dark:text-white" : "text-brand-dark dark:text-dark-heading"
+            }`}
         >
           {option.label}
         </span>

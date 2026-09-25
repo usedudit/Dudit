@@ -96,10 +96,10 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
           .in("status", ["assigned", "accepted", "picked_up", "out_for_delivery", "delivered"])
           .order("assigned_at", { ascending: false }),
         adminClient
-          .from("delivery_orders")
-          .select("order_id, delivery_id, deliveries(id, delivery_person_id, status)")
-          .in("order_id", orderIds),
-      ])
+            .from("delivery_orders")
+            .select("order_id, delivery_id, deliveries(id, delivery_person_id, status, estimated_duration_minutes, distance_km)")
+            .in("order_id", orderIds),
+        ])
 
       const assignmentByOrderId = new Map<string, any>()
       for (const a of assignments || []) {
@@ -170,7 +170,7 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
         const assignment = assignmentByOrderId.get(String(order.id))
         const legacyDel = deliveryByOrderId.get(String(order.id))
 
-        if (assignment && assignment.driver_id) {
+                if (assignment && assignment.driver_id) {
           const driverId = String(assignment.driver_id)
           const profile = profileMap.get(driverId)
           const driverRow = driverDetailsMap.get(driverId)
@@ -193,11 +193,25 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
               out_for_delivery_at: assignment.out_for_delivery_at || null,
               completed_at: assignment.completed_at || null,
               failure_reason: assignment.failure_reason || null,
+              estimatedHours: null,
+              distanceKm: null,
             },
           }
         } else if (legacyDel && legacyDel.delivery_person_id) {
           const driverId = String(legacyDel.delivery_person_id)
           const profile = profileMap.get(driverId)
+
+          let estimatedHours: number | null = null
+          if (legacyDel?.deliveries?.estimated_duration_minutes != null) {
+            const mins = Number(legacyDel.deliveries.estimated_duration_minutes)
+            if (!Number.isNaN(mins)) {
+              estimatedHours = Math.round((mins / 60) * 2) / 2
+            }
+          }
+          const distanceKm = legacyDel?.deliveries?.distance_km != null
+            ? Number(legacyDel.deliveries.distance_km)
+            : null
+
           return {
             ...order,
             delivery_driver: {
@@ -215,6 +229,8 @@ export default async function MyOrdersPage({ searchParams }: { searchParams?: Pr
               out_for_delivery_at: null,
               completed_at: null,
               failure_reason: null,
+              estimatedHours,
+              distanceKm,
             },
           }
         }

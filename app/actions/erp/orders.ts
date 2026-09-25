@@ -700,8 +700,13 @@ async function validateERPItemsStock(params: {
         allowSellWithoutStock?: boolean | null
     }>
     salesSettings?: SalesSettings | null
+    baselineQuantities?: Map<string, number>
 }) {
     const isGlobalNegativeStockAllowed = params.salesSettings?.allowNegativeStock !== false
+
+    // Config global "permitir venda com estoque zerado/negativo" ativa: nenhuma
+    // linha do pedido é travada (mesma regra aplicada no PDV).
+    if (isGlobalNegativeStockAllowed) return null
 
     const stockItems = params.items.filter(
         (item) => !item.serviceId && item.lineType !== 'service_booking' && item.lineType !== 'service' && item.productId && (!item.allowSellWithoutStock || !isGlobalNegativeStockAllowed)
@@ -820,15 +825,80 @@ async function validateERPItemsStock(params: {
             return `Não foi possível validar o estoque de "${request.displayName}".`
         }
 
-        if (request.quantity > availableStock) {
+        // Estoque que este pedido já reserva/deduz. Somado ao disponível para que a
+        // validação não trave o próprio estoque já segurado pelo pedido.
+        const baselineKey = request.variantId
+            ? `variant:${request.variantId}`
+            : `product:${request.productId}`
+        const heldQuantity = params.baselineQuantities?.get(baselineKey) || 0
+        const availableForOrder = availableStock + heldQuantity
+
+        if (request.quantity > availableForOrder) {
             if (!isGlobalNegativeStockAllowed) {
-                return `O produto "${request.displayName}" não possui estoque suficiente (${availableStock} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
+                return `O produto "${request.displayName}" não possui estoque suficiente (${availableForOrder} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
             }
             return `A quantidade de "${request.displayName}" está maior que o estoque disponível.`
         }
     }
 
     return null
+}
+
+// Calcula quanto falta reservar para cada item. O pedido pode já ter a reserva
+// feita (feito na criação), então reservar a quantidade inteira novamente
+// duplicaria a baixa de estoque.
+async function buildStockShortfallItems(
+    supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+    partnerId: string,
+    items: Array<{
+        product_id?: string | null
+        variant_id?: string | null
+        quantity: number
+        allow_sell_without_stock?: boolean | null
+    }>
+) {
+    const variantIds = Array.from(new Set(items.map((item) => item.variant_id).filter(Boolean))) as string[]
+    const productIds = Array.from(new Set(
+        items.filter((item) => item.product_id && !item.variant_id).map((item) => item.product_id)
+    )) as string[]
+
+    const reservedByVariant = new Map<string, number>()
+    const reservedByProduct = new Map<string, number>()
+
+    if (variantIds.length > 0) {
+        const { data: variants } = await supabase
+            .from("product_variants")
+            .select("id, stock_reserved")
+            .in("id", variantIds)
+
+        for (const variant of variants || []) {
+            reservedByVariant.set(variant.id, Number(variant.stock_reserved || 0))
+        }
+    }
+
+    if (productIds.length > 0) {
+        const { data: products } = await supabase
+            .from("products")
+            .select("id, stock_reserved")
+            .eq("partner_id", partnerId)
+            .in("id", productIds)
+
+        for (const product of products || []) {
+            reservedByProduct.set(product.id, Number(product.stock_reserved || 0))
+        }
+    }
+
+    const shortfall: typeof items = []
+    for (const item of items) {
+        if (!item.product_id) continue
+        const reserved = item.variant_id
+            ? (reservedByVariant.get(item.variant_id) || 0)
+            : (reservedByProduct.get(item.product_id) || 0)
+        const missing = Number(item.quantity || 0) - reserved
+        if (missing > 0) shortfall.push({ ...item, quantity: missing })
+    }
+
+    return shortfall
 }
 
 function buildInventoryMovementDelta(previousItems: Array<{
@@ -2326,7 +2396,7 @@ export async function getOrderDetailsAction(orderId: string, partnerId: string) 
                     stores(name),
                     coupons(*),
                     appointments(*),
-                    return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, created_at, return_items!return_items_return_request_id_fkey(*))
+                    return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, created_at, return_items!return_items_return_request_id_fkey(*))
                 `)
                 .eq("partner_id", partnerId)
 
@@ -3012,19 +3082,21 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
     ]
 
     const delta = buildInventoryMovementDelta(currentOrder.order_items || [], nextItemsForDelta)
-    const stockItemsToValidate = currentOrder.inventory_deducted
-        ? delta.outgoing.map((item) => ({
-            productId: item.product_id,
-            variantId: item.variant_id || null,
-            quantity: item.quantity,
-            allowSellWithoutStock: item.allow_sell_without_stock,
-        }))
-        : nextItemsForDelta
+    // Estoque que este pedido já reserva/deduz. Validamos os itens completos
+    // somando essas quantidades ao disponível, para que um pedido com reserva
+    // ativa não bloqueie a própria edição/pagamento.
+    const baselineQuantities = new Map<string, number>()
+    for (const item of currentOrder.order_items || []) {
+        if (!item?.product_id) continue
+        const baselineKey = item.variant_id ? `variant:${item.variant_id}` : `product:${item.product_id}`
+        baselineQuantities.set(baselineKey, (baselineQuantities.get(baselineKey) || 0) + Number(item.quantity || 0))
+    }
     const stockValidationError = capabilities.hasStockMovements ? await validateERPItemsStock({
         supabase,
         partnerId: data.partnerId,
-        items: stockItemsToValidate,
+        items: nextItemsForDelta,
         salesSettings,
+        baselineQuantities,
     }) : null
     if (stockValidationError) return { error: stockValidationError }
     const sanitizedPaymentBreakdown = sanitizePaymentBreakdown(data.paymentBreakdown)
@@ -3434,15 +3506,20 @@ export async function updateERPOrderAction(orderId: string, data: ERPOrderPayloa
         }
 
         if (delta.incoming.length === 0 && delta.outgoing.length === 0 && stockItems.length > 0) {
-            const reserveResult = await reserveOrderInventory({
-                client: supabase,
-                partnerId: data.partnerId,
-                orderId,
-                items: stockItems,
-                storeId: data.storeId,
-            })
+            // Sem delta de estoque: o pedido normalmente já está com a reserva feita.
+            // Só reserva o que realmente faltar para não duplicar a baixa.
+            const shortfallItems = await buildStockShortfallItems(supabase, data.partnerId, stockItems)
+            if (shortfallItems.length > 0) {
+                const reserveResult = await reserveOrderInventory({
+                    client: supabase,
+                    partnerId: data.partnerId,
+                    orderId,
+                    items: shortfallItems,
+                    storeId: data.storeId,
+                })
 
-            if ("error" in reserveResult) return { error: reserveResult.error }
+                if ("error" in reserveResult) return { error: reserveResult.error }
+            }
         }
 
         const situationJustBecamePaid = currentOrder.situation !== "paid" && paymentState.situation === "paid"
@@ -4670,7 +4747,7 @@ export async function getERPOrdersPageAction(
                         delivery_status, delivery_type, order_source, created_at, store_id,
                         stores(name),
                         customers(id, name, email, phone),
-                        return_requests!order_id(id, status, approved_resolution, desired_resolution, refund_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
+                        return_requests!order_id(id, status, approved_resolution, desired_resolution, resolution_type, refund_amount, store_credit_amount, inventory_movement_id, return_items!return_items_return_request_id_fkey(order_item_id, quantity)),
                         order_items(id, quantity, product_id, variant_id, service_id, line_type, product_name, product_price, subtotal, is_gift, original_price, products(id, name, sku, images, unit), product_variants(id, variant_name, sku), services(id, name, images)),
                         payment_method, payment_breakdown, payment_provider,
                         checkout_fulfillment

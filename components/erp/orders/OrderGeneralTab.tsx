@@ -755,7 +755,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                                 {(() => {
                                     const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
-                                    if (paidBreakdown.length <= 1) return null
+                                    if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(originalPaidAmount || 0) > 0.009 && remainingPaymentAmount > 0.009)) return null
                                     return (
                                         <div className="md:col-span-2">
                                             <PaymentRow
@@ -1409,7 +1409,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
 
                             {(() => {
                                 const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
-                                if (paidBreakdown.length <= 1) return null
+                                if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(originalPaidAmount || 0) > 0.009 && remainingPaymentAmount > 0.009)) return null
                                 return (
                                     <div className="md:col-span-2">
                                         <PaymentRow

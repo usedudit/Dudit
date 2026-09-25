@@ -137,7 +137,7 @@ const OrderListItem = React.memo(
                         return (
                             <div className={`flex gap-2 w-full flex-wrap ${getJustifyClass(columns.find(c => c.id === 'status')?.align)}`}>
                                 {order.situation === "cancelled" ? (
-                                    <Badge variant="gray">Estornado</Badge>
+                                    <Badge variant={order.reversed_at ? "gray" : "green"} icon={order.reversed_at ? <ReturnIcon size={12} /> : undefined}>{order.reversed_at ? "Estornado" : "Cancelado"}</Badge>
                                 ) : (
                                     <Badge variant={order.statusColor}>{order.statusLabel}</Badge>
                                 )}

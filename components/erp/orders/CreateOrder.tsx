@@ -293,7 +293,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
     const [manualItemNameErrors, setManualItemNameErrors] = useState<Set<number>>(new Set())
     const [manualItemPriceErrors, setManualItemPriceErrors] = useState<Set<number>>(new Set())
-    const [inventoryAlreadyDeducted, setInventoryAlreadyDeducted] = useState(false)
+    const [originalStockHold, setOriginalStockHold] = useState<Record<string, number>>({})
     const [originalPaymentStatus, setOriginalPaymentStatus] = useState<'paid' | 'partially_paid' | 'unpaid'>("unpaid")
     const [originalPaidAmount, setOriginalPaidAmount] = useState(0)
     const [originalPaymentMethod, setOriginalPaymentMethod] = useState("Não informado")
@@ -641,7 +641,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                     setDiscountType(order.discount_type || "fixed");
                     setCouponPricingData(null);
                 }
-                setInventoryAlreadyDeducted(Boolean(order.inventory_deducted))
+                const stockHold: Record<string, number> = {}
+                for (const orderItem of (order.order_items as any[]) || []) {
+                    if (!orderItem?.product_id) continue
+                    const holdKey = orderItem.variant_id ? `variant:${orderItem.variant_id}` : `product:${orderItem.product_id}`
+                    stockHold[holdKey] = (stockHold[holdKey] || 0) + Number(orderItem.quantity || 0)
+                }
+                setOriginalStockHold(stockHold)
 
                 if (order.order_items) {
                     setItems((order.order_items as any[]).map((item: any) => ({
@@ -881,19 +887,20 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
     const getItemMaxQuantity = useCallback((item: any) => {
         if (!item || item.isManual || item.allowSellWithoutStock) return undefined
-        if (inventoryAlreadyDeducted) {
-            return Math.max(0, Number(item.stock ?? 0) + Number(item.quantity ?? 0))
-        }
-        return Math.max(0, Number(item.stock ?? 0))
-    }, [inventoryAlreadyDeducted])
+        if (salesSettings.allowNegativeStock !== false) return undefined
+        const key = item.variantId ? `variant:${item.variantId}` : `product:${item.productId}`
+        const held = Number(originalStockHold[key] || 0)
+        return Math.max(0, Number(item.stock ?? 0) + held)
+    }, [originalStockHold, salesSettings.allowNegativeStock])
 
     const validateStockAvailability = useCallback((targetItems: any[]) => {
-        if (inventoryAlreadyDeducted) return null
-        const stockMap = new Map<string, { name: string; quantity: number; stock: number; allowSellWithoutStock: boolean }>()
+        if (salesSettings.allowNegativeStock !== false) return null
+        const stockMap = new Map<string, { name: string; quantity: number; stock: number; held: number; allowSellWithoutStock: boolean }>()
 
         for (const item of targetItems) {
             if (!item?.productId || item.isManual) continue
             const key = item.variantId ? `variant:${item.variantId}` : `product:${item.productId}`
+            const held = Number(originalStockHold[key] || 0)
             const existing = stockMap.get(key)
 
             if (existing) {
@@ -908,22 +915,21 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 name: item.name || "Produto",
                 quantity: Number(item.quantity || 0),
                 stock: Number(item.stock ?? 0),
+                held,
                 allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
             })
         }
 
         for (const entry of stockMap.values()) {
-            if (entry.allowSellWithoutStock && salesSettings.allowNegativeStock !== false) continue
-            if (entry.quantity > entry.stock) {
-                if (salesSettings.allowNegativeStock === false) {
-                    return `O produto "${entry.name}" não possui estoque suficiente (${entry.stock} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
-                }
-                return `A quantidade de "${entry.name}" está maior que o estoque disponível.`
+            if (entry.allowSellWithoutStock) continue
+            const available = entry.stock + entry.held
+            if (entry.quantity > available) {
+                return `O produto "${entry.name}" não possui estoque suficiente (${available} disponíveis) e as configurações da empresa bloqueiam vendas com estoque negativo.`
             }
         }
 
         return null
-    }, [inventoryAlreadyDeducted, salesSettings.allowNegativeStock])
+    }, [originalStockHold, salesSettings.allowNegativeStock])
 
     const proceedAddProduct = (product: any, forceBypass?: boolean) => {
         const pricing = computeItemDisplayPrice(Number(product.price || 0), product.promotional_price && Number(product.promotional_price) < Number(product.price || 0) ? Number(product.promotional_price) : null, orderPromotions, { productId: product.id, categoryId: product.category_id || undefined })
@@ -1165,7 +1171,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setOriginalPaymentProvider("")
         setOriginalPaymentBreakdown([])
         setOriginalOrderSource(null)
-        setInventoryAlreadyDeducted(false)
+        setOriginalStockHold({})
         setManualItemNameErrors(new Set())
         setManualItemPriceErrors(new Set())
         setFieldErrors(new Set())
@@ -1374,7 +1380,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
                 serviceId: item.serviceId || (item.isService ? item.productId : null),
                 lineType: item.isService || item.serviceId ? 'service_booking' : (item.lineType || 'product'),
                 fulfillmentMode: item.fulfillmentMode || null,
-                allowSellWithoutStock: Boolean(item.allowSellWithoutStock),
+                allowSellWithoutStock: Boolean(item.allowSellWithoutStock) || salesSettings.allowNegativeStock !== false,
             })),
             subtotal,
             discountValue: discountAmount,
@@ -1896,7 +1902,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
 
                                                         {(() => {
                                                             const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009);
-                                                            if (paidBreakdown.length <= 1) return null;
+                                                            if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(originalPaidAmount || 0) > 0.009 && remainingAmount > 0.009)) return null;
                                                             return (
                                                                 <div className="flex justify-between items-start text-[14px] gap-4">
                                                                     <span className="text-brand-inactive-text dark:text-dark-body font-medium">Valores por meio</span>

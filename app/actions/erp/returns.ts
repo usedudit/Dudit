@@ -268,7 +268,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         ? toNumber(row.store_credit_amount)
         : (storeCreditRecord && toNumber(storeCreditRecord.amount) > 0 ? toNumber(storeCreditRecord.amount) : 0)
 
-    const orderPaid = toNumber(row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount)
+    const orderPaid = toNumber(row.order_total_snapshot || row.orders?.amount_paid || row.orders?.paid_amount || row.orders?.total_amount || row.order_total_snapshot)
     const resolvedRefundType = refundRecord?.refund_type
         ? refundRecord.refund_type
         : (resolvedRefundVal > 0 && orderPaid > 0 && Math.abs(resolvedRefundVal - orderPaid) < 0.01 ? "full" : (resolvedRefundVal > 0 ? "partial" : undefined))
@@ -311,7 +311,7 @@ function normalizeReturnRow(row: any): ReturnRequestListItem & { returnEvents?: 
         duditReportId: row.dudit_report_id || null,
         paymentProvider: row.orders?.payment_provider || undefined,
         mpPaymentId: row.orders?.mp_payment_id || undefined,
-        orderTotal: toNumber(row.orders?.total_amount),
+        orderTotal: toNumber(row.order_total_snapshot || row.orders?.total_amount),
         orderPaidAmount: orderPaid,
         refundPaymentMethod: row.refund_payment_method || (refundRecord ? refundRecord.payment_method : undefined),
         exchangeOrderId: row.exchange_order_id || undefined,
@@ -526,6 +526,36 @@ export async function getReturnRequestDetailsAction(partnerId: string, requestId
     }
 }
 
+export async function getReturnAuditLogsAction(requestId: string) {
+    try {
+        const user = await requireUser()
+        if (!user) return { success: false as const, error: "Não autenticado" }
+        const supabase = createAdminClient()
+        const { data, error } = await supabase
+            .from("audit_logs")
+            .select("*")
+            .eq("entity_type", "return_request")
+            .eq("entity_id", requestId)
+            .order("created_at", { ascending: true })
+        if (error) throw error
+        const events = (data || []).map((e: any) => ({
+            id: e.id,
+            return_request_id: e.entity_id,
+            previous_status: e.metadata?.from_status || e.old_values?.status || null,
+            new_status: e.metadata?.to_status || e.new_values?.status || null,
+            changed_by: e.actor_user_id || e.user_id || null,
+            actor_name: e.actor_name || "Sistema",
+            notes: (Array.isArray(e.change_lines) && e.change_lines[0]) ? e.change_lines[0] : (e.metadata?.notes || e.metadata?.message || null),
+            metadata: e.metadata || e.new_values || {},
+            event_type: e.action_type || e.action || "updated",
+            created_at: e.created_at,
+        }))
+        return { success: true as const, data: events }
+    } catch (e: any) {
+        return { success: false as const, error: e?.message || "Erro ao carregar histórico da devolução" }
+    }
+}
+
 export async function createReturnRequestAction(input: unknown) {
     await requireRateLimit(RateLimitCategory.ERP_GENERAL)
     let partnerId: string | undefined
@@ -620,17 +650,6 @@ export async function createReturnRequestAction(input: unknown) {
                 console.error("[createReturnRequestAction] Failed to save exchange items snapshot:", updateErr)
             }
         }
-
-        await logAuditEvent({
-            partnerId: data.partnerId,
-            actorUserId: user.id,
-            entityType: "return_request",
-            entityId: requestId,
-            actionType: "created",
-            changeLines: ["criou solicitação de troca/devolução."],
-            metadata: { orderId: data.orderId, resolution: data.resolution, exchangeItems: data.exchangeItems?.length || 0 },
-            source: "manual",
-        })
 
         // Webhook Discord: notificar nova solicitação de reembolso/troca (fail-open)
         if (data.resolution === "refund" || data.resolution === "exchange") {
@@ -788,17 +807,6 @@ export async function createMarketplaceReturnRequestAction(input: Omit<z.infer<t
                 .eq("id", requestId)
         }
 
-        await logAuditEvent({
-            partnerId: order.partner_id,
-            actorUserId: user.id,
-            entityType: "return_request",
-            entityId: requestId,
-            actionType: "created",
-            changeLines: ["criou solicitação de troca/devolução pelo marketplace."],
-            metadata: { orderId: base.orderId, resolution: base.resolution, source: "marketplace" },
-            source: "marketplace",
-        })
-
         await revalidateReturns(order.partner_id, base.orderId, requestId)
 
         // Notify partner team
@@ -891,17 +899,6 @@ export async function createMarketplaceCancellationRequestAction(input: unknown)
 
         if (error) throw error
         const requestId = String((created as any)?.id || "")
-
-        await logAuditEvent({
-            partnerId: order.partner_id,
-            actorUserId: user.id,
-            entityType: "return_request",
-            entityId: requestId,
-            actionType: "created",
-            changeLines: ["solicitou cancelamento do pedido pelo marketplace."],
-            metadata: { orderId: data.orderId, reason: data.reason, source: "marketplace" },
-            source: "marketplace",
-        })
 
         await revalidateReturns(order.partner_id, data.orderId, requestId)
 
@@ -1321,23 +1318,6 @@ export async function processReturnRequestAction(input: unknown) {
         // A aprovação da devolução cria o registro return_refund com status PENDING.
         // A execução real do reembolso MP ocorre em executeMercadoPagoRefundAction,
         // que possui todas as validações de segurança (confirmação, senha, cooldown, rate limit, etc.).
-
-        await logAuditEvent({
-            partnerId: data.partnerId,
-            actorUserId: user.id,
-            entityType: "return_request",
-            entityId: data.requestId,
-            actionType: data.action,
-            changeLines: data.nextStatus ? [`alterou status para ${data.nextStatus}.`] : ["atualizou a solicitação."],
-            metadata: {
-                refundAmount: data.refundAmount,
-                storeCreditAmount: data.storeCreditAmount,
-                returnToInventory: data.returnToInventory,
-                exchangeItems: data.exchangeItems.length,
-                exchangeBalanceResolution: data.exchangeBalanceResolution || null,
-            },
-            source: "manual",
-        })
 
         await revalidateReturns(data.partnerId, request.order_id, data.requestId)
         if (capabilities.hasStockMovements && (data.returnToInventory || returnToStockItems.length > 0)) await revalidateStockMovements(data.partnerId)

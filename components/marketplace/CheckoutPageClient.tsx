@@ -993,11 +993,11 @@ export function CheckoutPageClient() {
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                            Frete Grátis
+                            Entrega Grátis
                         </p>
                         {isFree ? (
                             <span className="text-xs font-bold text-brand-green flex items-center gap-1">
-                                <CheckCircleIcon size={14} className="fill-brand-green text-white shrink-0" /> Atingido
+                                <CheckCircleIcon size={16} className="text-brand-green" /> Atingido
                             </span>
                         ) : (
                             <span className="text-xs font-bold text-brand-green">{percentage.toFixed(0)}%</span>
@@ -1776,8 +1776,8 @@ export function CheckoutPageClient() {
                         : paymentPreviewLoading
                             ? "Calculando pagamento..."
                             : checkoutContext?.partner?.orderFlow === "whatsapp"
-                                ? `Fazer pedido via WhatsApp • ${formatCurrency(checkoutTotalToCharge)}`
-                                : `Finalizar pedido • ${formatCurrency(checkoutTotalToCharge)}`
+                                ? `Fazer pedido via WhatsApp - ${formatCurrency(checkoutTotalToCharge)}`
+                                : `Finalizar pedido - ${formatCurrency(checkoutTotalToCharge)}`
                     }
                 </Button>
             )}
@@ -2889,7 +2889,7 @@ export function CheckoutPageClient() {
                                                                                 } else {
                                                                                     setShowPaymentModal(true)
                                                                                 }
-                                                                            }}>Trocar</Button>
+                                                                            }}>Alterar</Button>
                                                                         }
                                                                     />
                                                                 )}
@@ -2974,7 +2974,7 @@ export function CheckoutPageClient() {
                                                         }
                                                         className="!border-none !bg-transparent !shadow-none !px-0 py-3 hover:!bg-transparent hover:!border-none"
                                                         right={
-                                                            <Button variant="link" onClick={() => setShowPaymentModal(true)}>Trocar</Button>
+                                                            <Button variant="link" onClick={() => setShowPaymentModal(true)}>Alterar</Button>
                                                         }
                                                     />
                                                 )}
@@ -3342,7 +3342,7 @@ export function CheckoutPageClient() {
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                 right={
                                                     <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>
-                                                        {formData.paymentMethod ? "Trocar" : "Selecionar"}
+                                                        {formData.paymentMethod ? "Alterar" : "Selecionar"}
                                                     </Button>
                                                 }
                                             />
@@ -3398,7 +3398,7 @@ export function CheckoutPageClient() {
                                                 className="!border-none !bg-transparent !shadow-none !px-0 py-2 hover:!bg-transparent hover:!border-none"
                                                 right={
                                                     <Button variant="link" size="sm" onClick={() => setShowPaymentModal(true)}>
-                                                        Trocar
+                                                        Alterar
                                                     </Button>
                                                 }
                                             />
@@ -4019,6 +4019,11 @@ export function CheckoutPageClient() {
                                 : "border-brand-border dark:border-dark-border bg-white dark:bg-dark-surface"
                                 }`}
                         >
+                            <div className="flex-1 pr-4">
+                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
+                            </div>
                             <div className="mt-2.5 shrink-0 px-4">
                                 <RadioButton
                                     name="addressSelect"
@@ -4029,11 +4034,6 @@ export function CheckoutPageClient() {
                                         setShowAddressModal(false)
                                     }}
                                 />
-                            </div>
-                            <div className="flex-1 pr-4">
-                                <p className="font-bold text-sm text-brand-dark dark:text-dark-heading">{address.street}, {address.number}</p>
-                                <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-0.5">{address.neighborhood} - {address.city}/{address.state}</p>
-                                <p className="text-xs text-brand-inactive-text dark:text-dark-body mt-1">CEP: {address.zip_code}</p>
                             </div>
                         </div>
                     ))}

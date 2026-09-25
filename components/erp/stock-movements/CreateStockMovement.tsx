@@ -446,7 +446,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
             } else {
                 const movementRecord = res.data as any;
                 const movementId = movementRecord?.id;
-                
+
                 if (movementId && (stagedFiles.length > 0 || stagedImages.length > 0)) {
                     await uploadAndSavePendingAttachments({
                         partnerId,
@@ -456,7 +456,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                         images: stagedImages,
                     });
                 }
-                
+
                 notifySuccess("Movimentação registrada com sucesso!");
                 if (onSuccess) onSuccess();
                 onBack();
@@ -654,16 +654,9 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                                                                         error={fieldErrors.has('items') && items.length === 0}
                                                                         errorMessage={fieldErrors.has('items') && items.length === 0 ? "Adicione pelo menos um produto" : undefined}
                                                                         dataField="items"
+                                                                        variant="full-rounded"
                                                                     />
                                                                 </div>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    type="button"
-                                                                    onClick={() => setIsCameraOpen(true)}
-                                                                    className="h-10 px-3 shrink-0"
-                                                                    leftIcon={<CameraIcon size={18} />}
-                                                                    title="Escanear Câmera"
-                                                                />
                                                             </div>
 
                                                             {showSearchDropdown && (
@@ -752,7 +745,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                                                                                     <td className="py-4 pl-6 pr-4 border-b border-brand-border dark:border-dark-border">
                                                                                         <div className="flex items-center gap-3">
                                                                                             <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border shrink-0 flex items-center justify-center border border-brand-border dark:border-dark-border">
-                                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full ${!itemImage ? 'object-contain' : 'object-cover'}`} alt="" />
+                                                                                                <img src={getR2ImageUrl(itemImage, "thumbnail") || "https://img.dudit.com.br/static/Placeholder.png"} className={`w-full h-full rounded-full ${!itemImage ? 'object-contain' : 'object-cover'}`} alt="" />
                                                                                             </div>
                                                                                             <div className="flex flex-col text-left flex-1 min-w-0">
                                                                                                 <span className="font-bold text-[13px] text-brand-dark dark:text-dark-heading mb-0.5 truncate max-w-[250px]">
@@ -1085,7 +1078,7 @@ const CreateStockMovement: FC<CreateStockMovementProps> = ({ partnerId, onBack, 
                         <Button
                             onClick={handleSave}
                             disabled={isSaving}
-                            className={`flex-1 h-12 ${type === 'in' ? 'bg-brand-green hover:bg-brand-green/90 text-white' : type === 'out' ? 'bg-brand-red hover:bg-brand-red/90 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                            className="flex-1 h-12"
                             leftIcon={<SaveIcon size={18} />}
                         >
                             {isSaving ? "Salvando..." : "Salvar"}

@@ -8,7 +8,7 @@ import ProductImagesSection from '@/components/erp/product/ProductImagesSection'
 import { getR2ImageUrl } from '@/lib/utils/get-r2-image-url';
 import Link from 'next/link';
 import { PaymentWrapper } from '@/components/PaymentWrapper';
-import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction } from '@/app/actions/erp/returns';
+import { createMarketplaceCancellationRequestAction, createMarketplaceReturnRequestAction, getReturnAuditLogsAction } from '@/app/actions/erp/returns';
 import { cancelBuyerOrderAction, confirmOrderFulfillmentAction } from '@/app/actions/marketplace/orders';
 import { getPartnerReturnPolicyPublicAction } from '@/app/actions/marketplace/store-policies';
 import { getOrderAttachmentsAction, getOrderAttachmentUrlAction } from '@/app/actions/erp/orders';
@@ -25,7 +25,7 @@ import { formatCurrency, formatDate, formatFullDate, formatTime, formatQuantityW
 import { ReportReturnModal } from '@/components/marketplace/ReportReturnModal';
 import { canReportReturnToDudit } from '@/lib/returns/policy';
 import { getReturnStatusLabel } from '@/lib/returns/types';
-import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal } from '@/lib/payments/order-financial-state';
+import { hasReceivedMpPayment, getOrderDepositSummary, shouldShowSinal, type OrderDepositSummary } from '@/lib/payments/order-financial-state';
 
 interface MyOrderDetailPageProps {
     order: any;
@@ -54,12 +54,21 @@ const RETURN_REASON_CATEGORY_MAP: Record<string, ReturnReasonCategory> = {
     other: "other",
 };
 
-const getStatusConfig = (status: string) => {
+const getStatusConfig = (status: string, depositSummary?: OrderDepositSummary | null) => {
     switch (status) {
         case 'paid': return { label: 'Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Aprovado' };
         case 'pending': return { label: 'Pendente', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Aguardando pagamento' };
         case 'payment_failed': return { label: 'Pagamento Recusado', color: 'text-brand-red', icon: XIcon, statusText: 'Tente outro método de pagamento' };
-        case 'partially_paid': return { label: 'Parcialmente Pago', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Sinal pago - saldo pendente' };
+        case 'partially_paid': return {
+            label: 'Parcialmente Pago',
+            color: 'text-brand-green',
+            icon: CheckCircleIcon,
+            statusText: depositSummary?.usesDeposit
+                ? ((depositSummary.depositStatus === 'paid' || depositSummary.depositStatus === 'partially_paid')
+                    ? 'Sinal pago - saldo pendente'
+                    : 'Sinal pendente - pagamento parcial')
+                : 'Pagamento parcial - saldo pendente',
+        };
         case 'in_process': return { label: 'Em Processamento', color: 'text-brand-orange', icon: ClockIcon, statusText: 'Pagamento em análise' };
         case 'shipped': return { label: 'Enviado', color: 'text-brand-blue', icon: TruckIcon, statusText: 'Em trânsito' };
         case 'delivered': return { label: 'Entregue', color: 'text-brand-green', icon: CheckCircleIcon, statusText: 'Pedido entregue' };
@@ -112,13 +121,13 @@ const getReturnRequestStatusConfig = (request: any): { title: string; descriptio
             };
         case "APPROVED":
             return {
-                title: `${typeLabel} aprovado(a)!`,
+                title: `${typeLabel} aprovada!`,
                 description: `O vendedor aceitou sua solicitação. Resolução: ${request.approved_resolution === "refund" ? "Reembolso" : request.approved_resolution === "store_credit" ? "Vale-compra" : "Troca"}.`,
                 color: "green",
             };
         case "REJECTED":
             return {
-                title: `${typeLabel} recusado(a)`,
+                title: `${typeLabel} recusada`,
                 description: `A solicitação foi recusada pelo vendedor.`,
                 color: "red",
             };
@@ -149,7 +158,7 @@ const getReturnRequestStatusConfig = (request: any): { title: string; descriptio
                 resMsg += ` Crédito em conta: ${formatCurrency(request.store_credit_amount)}.`;
             }
             return {
-                title: `${typeLabel} concluído(a)`,
+                title: `${typeLabel} concluída`,
                 description: resMsg,
                 color: "green",
             };
@@ -469,6 +478,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
         phone: null,
         loaded: false,
     });
+    const [returnAuditLogs, setReturnAuditLogs] = useState<any[]>([]);
     const evidenceUploader = useR2Upload({
         endpoint: "/api/r2/returns-evidence",
         allowedTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
@@ -629,20 +639,63 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const hasActiveReturn = !!activeReturnRequest;
     const returnStatusCfg = activeReturnRequest ? getReturnRequestStatusConfig(activeReturnRequest) : null;
 
-    const returnEvents = activeReturnRequest?.auditLogs || [];
+    useEffect(() => {
+        if (!activeReturnRequest) {
+            setReturnAuditLogs([])
+            return
+        }
+        getReturnAuditLogsAction(activeReturnRequest.id).then((res: any) => {
+            if (res.success && res.data) {
+                setReturnAuditLogs(res.data)
+            } else {
+                setReturnAuditLogs([])
+            }
+        }).catch(() => setReturnAuditLogs([]))
+    }, [activeReturnRequest])
+
+    const returnEvents = returnAuditLogs.length > 0 ? returnAuditLogs : (activeReturnRequest?.auditLogs || []);
     const mappedReturnHistoryEntries = returnEvents.map((evt: any) => {
         let title = "Solicitação de devolução";
-        let lines = [evt.message || "Evento de devolução registrado."];
+        let lines: string[] = [];
+        const metadata = evt.metadata || {}
 
         if (evt.event_type === "created" || evt.message === "Solicitação criada" || evt.message === "Solicitação de cancelamento criada") {
             title = "Solicitação de devolução";
-            lines = [evt.message === "Solicitação de cancelamento criada" ? "Solicitação de cancelamento criada" : "Solicitação de devolução criada pelo cliente"];
+            if (evt.message === "Solicitação de cancelamento criada") {
+                lines = ["Solicitação de cancelamento criada"];
+            } else if (metadata.resolution) {
+                const resolLabel = metadata.resolution === "refund" ? "Reembolso" :
+                    metadata.resolution === "exchange" ? "Troca" :
+                        metadata.resolution === "store_credit" ? "Vale-compra" : metadata.resolution;
+                lines = [`Solicitação de devolução/troca criada. Resolução desejada: ${resolLabel}`];
+            } else {
+                lines = ["Solicitação de devolução/troca criada pelo cliente"];
+            }
         } else if (evt.event_type === "status_changed" || evt.event_type === "status_updated" || evt.event_type === "updated") {
+            const fromLabel = evt.previous_status ? getReturnStatusLabel(evt.previous_status) : "Pendente";
+            const toLabel = evt.new_status ? getReturnStatusLabel(evt.new_status) : "";
             title = "Atualização da solicitação de devolução";
-            lines = [`Solicitação atualizada: ${getReturnStatusLabel(evt.from_status || "PENDING_REVIEW")} para ${getReturnStatusLabel(evt.to_status)}`];
+            lines = [`Solicitação atualizada: ${fromLabel} → ${toLabel}`];
+            if (metadata.refund_amount && Number(metadata.refund_amount) > 0) {
+                lines.push(`Valor do reembolso: ${formatCurrency(Number(metadata.refund_amount))}`);
+            }
+            if (metadata.store_credit_amount && Number(metadata.store_credit_amount) > 0) {
+                lines.push(`Vale-compra gerado: ${formatCurrency(Number(metadata.store_credit_amount))}`);
+            }
+            if (metadata.exchange_order_id) {
+                lines.push(`Pedido de troca criado: #${String(metadata.exchange_order_id).slice(0, 8).toUpperCase()}`);
+            }
         } else if (evt.event_type === "message_added") {
             title = "Mensagem na Devolução";
             lines = [evt.message];
+        } else if (evt.event_type === "mercadopago_refund_executed") {
+            title = "Reembolso via Mercado Pago executado";
+            lines = [`Reembolso de ${formatCurrency(Number(metadata.amount || 0))} executado com sucesso.`];
+            if (metadata.mpRefundId) {
+                lines.push(`Refund ID: ${metadata.mpRefundId}`);
+            }
+        } else {
+            lines = [evt.message || "Evento de devolução registrado."];
         }
 
         return {
@@ -692,7 +745,9 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const orderNumber = order.order_number || order.id.slice(0, 8).toUpperCase();
     const dateStrFull = formatFullDate(order.created_at);
     const dateStrTime = formatTime(order.created_at);
-    const statusConfig = getStatusConfig(order.situation);
+    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
+    const depositSummary = isDepositOrder ? getOrderDepositSummary(order) : null;
+    const statusConfig = getStatusConfig(order.situation, depositSummary);
     const store = Array.isArray(order.stores) ? order.stores[0] : order.stores
     const storeImage = store?.logo_url
         ? getR2ImageUrl(store.logo_url)
@@ -844,8 +899,6 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
     const shippingVal = Math.max(0, Number(pricingSnapshot?.deliveryFee ?? order.delivery_fee ?? order.shipping_total ?? 0));
     const subtotalVal = Number(pricingSnapshot?.subtotal ?? order.subtotal_original ?? itemsSubtotal);
     const totalVal = Number(order.total_amount || 0);
-    const isDepositOrder = Boolean(order?.checkout_fulfillment?.depositCheckout?.payDepositOnly);
-    const depositSummary = isDepositOrder ? getOrderDepositSummary(order) : null;
 
     // Effective payment fees: prefer breakdown explicit fields over stale column
     const breakdownEntries = Array.isArray(order?.payment_breakdown) ? order.payment_breakdown.filter((e: any) => e?.method && !e?.checkoutPricing) : [];
@@ -1402,6 +1455,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
             reportedToDuditAt: activeReturnRequest.reported_to_dudit_at,
         });
 
+        const resolutionType = activeReturnRequest.approved_resolution || activeReturnRequest.desired_resolution;
+        const resolutionLabel = resolutionType === "refund" ? "Reembolso" :
+            resolutionType === "exchange" ? "Troca" :
+                resolutionType === "store_credit" ? "Vale-compra" : "Sem resolução";
+        const isResolved = activeReturnRequest.status === "RESOLVED" || activeReturnRequest.status === "APPROVED";
+
         return (
             <InfoCard
                 title={returnStatusCfg.title}
@@ -1409,6 +1468,21 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                 message={
                     <span className="space-y-1 block">
                         <span>{returnStatusCfg.description}</span>
+                        {isResolved && resolutionType && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Tipo de resolução:</strong> {resolutionLabel}
+                            </span>
+                        )}
+                        {isResolved && Number(activeReturnRequest.refund_amount || 0) > 0 && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Valor reembolsado:</strong> {formatCurrency(Number(activeReturnRequest.refund_amount))}
+                            </span>
+                        )}
+                        {isResolved && Number(activeReturnRequest.store_credit_amount || 0) > 0 && (
+                            <span className="block mt-1">
+                                <strong className="font-medium">Vale-compra gerado:</strong> {formatCurrency(Number(activeReturnRequest.store_credit_amount))}
+                            </span>
+                        )}
                         {activeReturnRequest.seller_notes && (
                             <span className="block mt-1 font-medium">
                                 Observações do vendedor: {activeReturnRequest.seller_notes}
@@ -2264,6 +2338,12 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )}
                                             {order.delivery_fee > 0 && (
                                                 <DetailRow label="Taxa de entrega" value={formatCurrency(order.delivery_fee)} />
+                                            )}
+                                            {order.delivery_driver?.estimatedHours != null && order.delivery_driver.estimatedHours > 0 && (
+                                                <DetailRow label="Tempo estimado" value={`${order.delivery_driver.estimatedHours} h`} />
+                                            )}
+                                            {order.delivery_driver?.distanceKm != null && (
+                                                <DetailRow label="Distância" value={`${order.delivery_driver.distanceKm} km`} />
                                             )}
                                             {order.delivery_type === "pickup" && store?.addresses && (
                                                 <DetailRow label="Local de retirada" value={

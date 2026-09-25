@@ -1465,8 +1465,10 @@ export async function checkoutCartAction(
     })
   }
 
-  // Set payment expiration
-  {
+  // Set payment expiration - ONLY for Mercado Pago payments.
+  // Manual payments (Dinheiro, PIX sem integração MP, etc) should not be auto-cancelled
+  // by the cron job since they are handled by the seller at the point of sale.
+  if (useMercadoPago && !isFullyPaidWithStoreCredit) {
     const { computePaymentExpiresAt, computePickupPaymentExpiresAt } = await import("@/lib/services/order-expiration")
     const expiresAt = isPickupPayment
       ? computePickupPaymentExpiresAt()

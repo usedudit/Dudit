@@ -35,6 +35,7 @@ import {
     ViewOffSlashIcon,
     AnalyticsUpIcon,
     Mail01Icon,
+    FireIcon as FireIcon01,
     DiceFaces03Icon,
     StarAward01Icon,
     RankingIcon as RankingIcon01,
@@ -379,6 +380,7 @@ export const RocketIcon = CreateIcon(Rocket01Icon)
 export const BriefcaseIcon = CreateIcon(Briefcase01Icon)
 export const KeyIcon = CreateIcon(Key01Icon)
 export const EnergyIcon = CreateIcon(EnergyIcon01)
+export const FireIcon = CreateIcon(FireIcon01)
 
 // ============================
 // SYSTEM / MISC

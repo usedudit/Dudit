@@ -9,7 +9,8 @@ import {
     ClockIcon,
     MoneyIcon,
     ReturnIcon,
-    CalendarIcon
+    CalendarIcon,
+    TruckIcon
 } from "@/lib/icons"
 import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet"
 import {
@@ -896,6 +897,9 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <div className={`w-full transition-all duration-500 ${isScrolled ? "md:mt-2" : "md:mt-4"}`}>
                                         <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
                                             <TabsTrigger value="summary">Dados gerais</TabsTrigger>
+                                            {deliverySummary && deliverySummary.id && (
+                                                <TabsTrigger value="delivery">Entrega</TabsTrigger>
+                                            )}
                                             <TabsTrigger value="attachments">Anexos</TabsTrigger>
                                             <TabsTrigger value="history">Histórico</TabsTrigger>
                                         </TabsList>
@@ -1044,6 +1048,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                                     <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
                                                                                                                     <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
                                                                                                                     <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
+                                                                                            <p><strong>Tipo:</strong> {ret.resolution_type ? (ret.resolution_type === "refund" ? "Reembolso" : ret.resolution_type === "exchange" ? "Troca" : ret.resolution_type === "store_credit" ? "Vale-compra" : ret.resolution_type) : "—"}</p>
+                                                                                            {Number(ret.refund_amount || 0) > 0 && (
+                                                                                                <p><strong>Valor reembolsado:</strong> {formatCurrency(Number(ret.refund_amount))}</p>
+                                                                                            )}
+                                                                                            {Number(ret.store_credit_amount || 0) > 0 && (
+                                                                                                <p><strong>Vale-compra:</strong> {formatCurrency(Number(ret.store_credit_amount))}</p>
+                                                                                            )}
                                                                                                                 </div>
                                                                                                             </div>
                                                                                                         );
@@ -1241,7 +1252,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                             {(() => {
                                                                 const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
-                                                                if (paidBreakdown.length <= 1) return null
+                                                                if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(order.paid_amount || 0) > 0.009 && remainingPaymentAmount > 0.009)) return null
                                                                 return (
                                                                     <PaymentRow
                                                                         label="Valores por meio"
@@ -1799,7 +1810,7 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
 
                                                         {(() => {
                                                             const paidBreakdown = paymentBreakdown.filter((entry: any) => Number(entry.amountReceived ?? entry.amount ?? 0) > 0.009)
-                                                            if (paidBreakdown.length <= 1) return null
+                                                            if (paidBreakdown.length <= 1 && !(paidBreakdown.length === 1 && Number(order.paid_amount || 0) > 0.009 && remainingPaymentAmount > 0.009)) return null
                                                             return (
                                                                 <PaymentRow
                                                                     label="Valores por meio"
@@ -1928,6 +1939,121 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                     <TabsContent value="attachments" className="mt-0">
                                         <FadeIn key="attachments">
                                             <OrderAttachmentsTab orderId={order.id} partnerId={partnerId} isEditing={false} readOnly={true} />
+                                        </FadeIn>
+                                    </TabsContent>
+
+                                    <TabsContent value="delivery" className="mt-0">
+                                        <FadeIn key="delivery">
+                                            {(() => {
+                                                const ds = deliverySummary
+                                                const isPickup = order.delivery_type === "pickup"
+                                                const statusLabel = (() => {
+                                                    const s = String(ds?.status || "").trim().toLowerCase()
+                                                    if (s === "preparing") return "Em preparo"
+                                                    if (s === "sent") return "Saiu para entrega"
+                                                    if (s === "delivered") return "Entregue"
+                                                    if (s === "delivery_failed") return "Falha na entrega"
+                                                    if (s === "cancelled") return "Cancelada"
+                                                    if (s === "pickup_available") return "Pronto para retirada"
+                                                    return "Pendente"
+                                                })()
+                                                return (
+                                                    <div className="space-y-6">
+                                                        <FormSection title="Status da Entrega">
+                                                            <ListItem
+                                                                icon={<TruckIcon />}
+                                                                title={isPickup ? "Retirada no estabelecimento" : statusLabel}
+                                                                description={
+                                                                    isPickup
+                                                                        ? "Seu pedido está pronto para ser retirado na loja."
+                                                                        : ds?.status === "delivered"
+                                                                            ? "O pedido foi entregue com sucesso."
+                                                                            : ds?.status === "sent"
+                                                                                ? "O pedido saiu para entrega e está a caminho."
+                                                                                : ds?.status === "preparing"
+                                                                                    ? "O pedido está sendo preparado para entrega."
+                                                                                    : ds?.status === "delivery_failed"
+                                                                                        ? "Houve uma falha na entrega do pedido."
+                                                                                        : "Aguardando preparação para entrega."
+                                                                }
+                                                            />
+                                                        </FormSection>
+
+                                                        {!isPickup && ds?.driverName && (
+                                                            <FormSection title="Entregador">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-primary/10 dark:bg-brand-primary/20 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-primary">
+                                                                        <TruckIcon size={20} className="text-brand-dark dark:text-dark-heading" />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                                            {ds.driverName}
+                                                                        </span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                            Entrega própria do estabelecimento
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </FormSection>
+                                                        )}
+
+                                                        {!isPickup && (
+                                                            <FormSection title="Detalhes da Entrega">
+                                                                <div className="space-y-3 text-sm">
+                                                                    {ds?.deliveryNumber && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Nº Entrega</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">#{ds.deliveryNumber}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.status && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.status}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.driverName && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entregador</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.driverName}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.departureTime && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Saída</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(ds.departureTime)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.completedAt && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Entregue em</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(ds.completedAt)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.distanceKm != null && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Distância</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.distanceKm} km</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.estimatedHours != null && ds?.estimatedHours > 0 && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Tempo estimado</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.estimatedHours} h</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {ds?.routeStep && ds?.orderCount && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Rota</span>
+                                                                            <span className="font-semibold text-brand-dark dark:text-dark-heading">{ds.routeStep}/{ds.orderCount}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </FormSection>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
                                         </FadeIn>
                                     </TabsContent>
                                 </Tabs>
