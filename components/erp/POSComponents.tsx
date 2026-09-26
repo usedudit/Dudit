@@ -144,7 +144,7 @@ export const ReceiptContent = ({
                         <span className="text-brand-inactive-text dark:text-dark-body font-medium">Entrega</span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
                             {formatCurrency(Number(deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy || 0))}
-                            <Badge variant="orange">Subsidiado pela loja</Badge>
+                            <span className="text-brand-orange">- Subsidiado pela loja</span>
                         </span>
                     </div>
                 )}

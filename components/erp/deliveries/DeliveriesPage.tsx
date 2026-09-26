@@ -258,8 +258,9 @@ export default function DeliveriesPage({
             const estimatedArrivalAt = raw.started_at && raw.estimated_duration_minutes
                 ? new Date(new Date(raw.started_at).getTime() + Number(raw.estimated_duration_minutes) * 60000).toISOString()
                 : null
-            const isClosed = ["delivered", "cancelled", "delivery_failed"].includes(effectiveStatus)
-            const isLate = !!estimatedArrivalAt && !isClosed && nowMs > new Date(estimatedArrivalAt).getTime()
+            const isClosed = ["cancelled", "delivery_failed"].includes(effectiveStatus)
+            const showTimingBadge = ["sent", "delivered"].includes(effectiveStatus)
+            const isLate = !!estimatedArrivalAt && showTimingBadge && !isClosed && nowMs > new Date(estimatedArrivalAt).getTime()
             const remainingMs = estimatedArrivalAt ? Math.max(0, new Date(estimatedArrivalAt).getTime() - nowMs) : 0
             const remainingMinutes = Math.ceil(remainingMs / 60000)
             const remainingHoursPart = Math.floor(remainingMinutes / 60)
@@ -294,8 +295,8 @@ export default function DeliveriesPage({
                 deliveryFee: links.reduce((sum: number, l: any) => sum + Number(l.orders?.delivery_fee || 0), 0),
                 createdAtMs: new Date(raw.created_at).getTime(),
                 deliveryTimingState: isLate ? "late" : "on_time",
-                deliveryTimingLabel: estimatedArrivalAt ? (isLate ? "Atrasada" : "No prazo") : "",
-                deliveryTimingDetail: estimatedArrivalAt && !isLate && !isClosed ? remainingLabel : "",
+                deliveryTimingLabel: estimatedArrivalAt && showTimingBadge ? (isLate ? "Atrasada" : "No prazo") : "",
+                deliveryTimingDetail: estimatedArrivalAt && showTimingBadge && effectiveStatus === "sent" && !isLate ? remainingLabel : "",
             }
         }).filter(Boolean)
 
@@ -442,6 +443,7 @@ export default function DeliveriesPage({
                             onBack={() => closeEntity()}
                             onEdit={isDelivery ? undefined : (id) => openEntity("edit", id)}
                             planSlug={planSlug}
+                            userRole={initialUserRole}
                         />
                     </FadeIn>
                 ) : (
@@ -776,7 +778,7 @@ export default function DeliveriesPage({
                             await executeStatusChange(deliveryId, nextStatus);
                         }
                     }}
-                    variant="danger"
+                    variant="warning"
                 />
             </AnimatePresence>
 

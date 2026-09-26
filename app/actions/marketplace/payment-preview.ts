@@ -196,6 +196,7 @@ export async function previewMarketplacePaymentAction(input: {
         installmentValue: calc.installmentAmounts[0] || 0,
         hasInterest: calc.interestAmount > 0 && (feeConfig.feeBearer === "customer" || feeConfig.installmentFeeBearer === "customer"),
         totalInterest: calc.interestAmount,
+        installmentCostAmount: calc.installmentCostAmount,
         totalFee: calc.feeAmount,
         fixedFee: calc.fixedFeeAmount,
         feeBearer: feeConfig.feeBearer,

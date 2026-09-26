@@ -1109,7 +1109,7 @@ export default function ServiceOrdersPage({
             await handleStatusChange(orderId, nextStatus)
           }
         }}
-        variant="info"
+        variant="warning"
       />
     </>
   )

@@ -2298,20 +2298,13 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             </div>
                                         </FormSection>
                                     ) : (
-                                        <FormSection title="Entregador">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-inactive-text dark:text-dark-body">
-                                                    <TruckIcon size={22} />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
-                                                        Entrega própria
-                                                    </span>
-                                                    <span className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                                        Ainda não há um entregador atribuído a este pedido.
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        <FormSection title="Entregador" hasSeparator>
+                                            <ListItem
+                                                icon={<TruckIcon />}
+                                                title="Entrega própria"
+                                                description="Ainda não há um entregador atribuído a este pedido."
+                                                className="px-4 py-3"
+                                            />
                                         </FormSection>
                                     )}
 
@@ -2340,16 +2333,16 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                     })()}
 
                                     {/* Resumo da Entrega */}
-                                    <FormSection title="Resumo da Entrega">
+                                    <FormSection title="Resumo da Entrega" hasSeparator>
                                         <div className="space-y-3">
                                             <DetailRow label="Tipo de entrega" value={
                                                 order.delivery_type === "pickup" ? "Retirada" : (
-                                                    order.delivery_driver?.isPlatformDriver ? "Dudit Rede" : "Entregador da Loja"
+                                                    order.delivery_driver?.isPlatformDriver ? "Dudit Rede" : "Entrega própria"
                                                 )
                                             } />
                                             {order.delivery_address && order.delivery_type === "delivery" && (
                                                 <DetailRow label="Endereço" value={
-                                                    <span className="text-sm max-w-[250px] truncate inline-block">{order.delivery_address}</span>
+                                                    <span className="text-sm truncate inline-block">{order.delivery_address}</span>
                                                 } />
                                             )}
                                             {order.delivery_fee > 0 && (
@@ -2363,7 +2356,7 @@ export const MyOrderDetailPage = ({ order, onBack }: MyOrderDetailPageProps) => 
                                             )}
                                             {order.delivery_type === "pickup" && store?.addresses && (
                                                 <DetailRow label="Local de retirada" value={
-                                                    <span className="text-sm max-w-[250px] truncate inline-block">{formatPartnerAddress(store.addresses)}</span>
+                                                    <span className="text-sm truncate inline-block">{formatPartnerAddress(store.addresses)}</span>
                                                 } />
                                             )}
                                         </div>

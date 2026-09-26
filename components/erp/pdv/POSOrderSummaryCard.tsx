@@ -182,7 +182,7 @@ export const POSOrderSummaryContent = memo(function POSOrderSummaryContent({
                         </span>
                         <span className="font-bold text-brand-dark dark:text-dark-heading flex items-center gap-1.5">
                             {(deliveryBreakdown?.deliveryPayer === "seller" || (shippingFee === 0 && (deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy)))
-                                ? <><span>{formatCurrency(Number(deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy || shippingFee || 0))}</span><Badge variant="orange">Subsidiado pela loja</Badge></>
+                                ? <><span>{formatCurrency(Number(deliveryBreakdown?.originalFee || deliveryBreakdown?.deliverySubsidy || shippingFee || 0))}</span><span className="text-brand-orange"> - Subsidiado pela loja</span></>
                                 : shippingFee > 0 ? formatCurrency(shippingFee) : "Grátis"
                             }
                         </span>

@@ -36,10 +36,10 @@ export function NotificationPanel({
 	onVisible: (id: string, visible: boolean) => void
 	onNavigate?: () => void
 	onMarkAllAsRead?: () => void
- 	onDeleteAll?: () => Promise<{ success: boolean; deleted: number }>
- 	unreadCount?: number
- 	erpOptions: Array<{ id: string; label: string }>
- 	erpFilter: string
+	onDeleteAll?: () => Promise<{ success: boolean; deleted: number }>
+	unreadCount?: number
+	erpOptions: Array<{ id: string; label: string }>
+	erpFilter: string
 	onErpFilter: (filter: string) => void
 	activePartnerId: string | null
 }) {
@@ -123,47 +123,47 @@ export function NotificationPanel({
 	return (
 		<>
 			{pushBanner}
-	{grouped.length > 0 && (
-		<div className="sticky top-0 z-20 bg-white dark:bg-dark-surface border-b border-brand-border dark:border-dark-border">
-			{(erpOptions.length > 0 || activePartnerId) && (
-				<Tabs value={erpFilter} onValueChange={onErpFilter}>
-					<TabsList className="border-0 border-b-0 hide-scrollbar">
-						<TabsTrigger value="all">Todos</TabsTrigger>
-						{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
-						{erpOptions.map((opt) => (
-							<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
-								{opt.label}
-							</TabsTrigger>
-						))}
-					</TabsList>
-				</Tabs>
-			)}
-			<div className="px-3 py-2 flex items-center justify-between">
-				<div className="flex items-center gap-4">
-					{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
-						<button
-							type="button"
-							onClick={onMarkAllAsRead}
-							className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
-						>
-							Marcar todas como lidas
-						</button>
+			{grouped.length > 0 && (
+				<div className="flex-1 overflow-y-auto custom-scrollbar p-6 relative">
+					{(erpOptions.length > 0 || activePartnerId) && (
+						<Tabs value={erpFilter} onValueChange={onErpFilter}>
+							<TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b border-brand-border dark:border-dark-border mb-2">
+								<TabsTrigger value="all">Todos</TabsTrigger>
+								{activePartnerId && <TabsTrigger value="current">Este ERP</TabsTrigger>}
+								{erpOptions.map((opt) => (
+									<TabsTrigger key={opt.id} value={opt.id} title={opt.label}>
+										{opt.label}
+									</TabsTrigger>
+								))}
+							</TabsList>
+						</Tabs>
 					)}
+					<div className="px-3 py-2 flex items-center justify-between">
+						<div className="flex items-center gap-4">
+							{(unreadCount ?? 0) > 0 && onMarkAllAsRead && (
+								<button
+									type="button"
+									onClick={onMarkAllAsRead}
+									className="text-xs font-medium text-brand-green hover:text-brand-green/80 transition-colors"
+								>
+									Marcar todas como lidas
+								</button>
+							)}
+						</div>
+						{onDeleteAll && (
+							<button
+								type="button"
+								onClick={() => setShowDeleteAll(true)}
+								className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
+								title="Excluir todas as notificações"
+							>
+								<TrashIcon className="h-3 w-3" />
+								Excluir todas
+							</button>
+						)}
+					</div>
 				</div>
-				{onDeleteAll && (
-					<button
-						type="button"
-						onClick={() => setShowDeleteAll(true)}
-						className="flex items-center gap-1 text-xs font-medium text-brand-red hover:text-brand-red/80 transition-colors"
-						title="Excluir todas as notificações"
-					>
-						<TrashIcon className="h-3 w-3" />
-						Excluir todas
-					</button>
-				)}
-			</div>
-		</div>
-	)}
+			)}
 			{grouped.map((group) => (
 				<div key={group.label} className="px-2 py-1">
 					<p className="text-xs font-medium text-brand-dark dark:text-dark-heading px-2 py-2">

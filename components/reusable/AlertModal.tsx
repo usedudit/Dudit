@@ -124,7 +124,7 @@ const AlertModal: React.FC<AlertModalProps> = ({
   }, [isOpen])
 
   const handleClose = () => {
-    if (disabled || isSubmitting) return
+    if (isSubmitting) return
     // 1. Inicia a animação de saída
     setIsAnimating(false)
     // 2. Espera a animação terminar (200ms) para desmontar de fato
@@ -142,21 +142,14 @@ const AlertModal: React.FC<AlertModalProps> = ({
     }
   }
 
-  const handleButtonClick = (callback: () => void) => {
-    if (disabled || isSubmitting) return
-    setIsSubmitting(true)
-    setIsAnimating(false)
-    setTimeout(callback, 200)
-  }
-
   const buttonsContent = isConfirmation ? (
     <>
-      <Button variant="outline" onClick={() => handleButtonClick(handleClose)} className="transition-all duration-200" disabled={disabled}>
+      <Button variant="outline" onClick={handleClose} className="transition-all duration-200">
         {cancelText}
       </Button>
       <Button
         variant={styles.button}
-        onClick={() => handleButtonClick(handleConfirm)}
+        onClick={handleConfirm}
         className="transition-all duration-200"
         disabled={disabled}
         isLoading={isLoading}
@@ -167,9 +160,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
   ) : (
     <Button
       variant={styles.button}
-      onClick={() => handleButtonClick(handleClose)}
+      onClick={handleClose}
       className="transition-all duration-200"
-      disabled={disabled}
     >
       {confirmText === "Confirmar" ? "Ok, entendi" : confirmText}
     </Button>
@@ -205,15 +197,14 @@ const AlertModal: React.FC<AlertModalProps> = ({
               <>
                 <Button
                   variant="outline"
-                  onClick={() => handleButtonClick(handleClose)}
+                  onClick={handleClose}
                   className="h-12 w-full"
-                  disabled={disabled}
                 >
                   {cancelText}
                 </Button>
                 <Button
                   variant={styles.button}
-                  onClick={() => handleButtonClick(handleConfirm)}
+                  onClick={handleConfirm}
                   className="h-12 w-full"
                   disabled={disabled}
                   isLoading={isLoading}
@@ -224,9 +215,8 @@ const AlertModal: React.FC<AlertModalProps> = ({
             ) : (
               <Button
                 variant={styles.button}
-                onClick={() => handleButtonClick(handleClose)}
+                onClick={handleClose}
                 className="h-12 w-full"
-                disabled={disabled}
               >
                 {confirmText === "Confirmar" ? "Ok, entendi" : confirmText}
               </Button>

@@ -104,8 +104,17 @@ const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { 
     const taxa = Number(calculation.feeAmount || 0);
     const custoMetodo = Number(calculation.fixedFeeAmount || 0);
     const final = Number(calculation.finalAmount || 0);
-    const isMerchant = calculation.feeBearer === "merchant";
-    const totalAbsorbed = juros + taxa + custoMetodo;
+    const installmentCostAmount = Number(calculation.installmentCostAmount || 0);
+    const fixedInterestAmount = Math.max(0, juros - installmentCostAmount);
+    const feeBearer = calculation.feeBearer || "merchant";
+    const installmentFeeBearer = calculation.installmentFeeBearer || "merchant";
+    const isMerchantFee = feeBearer === "merchant";
+    const isMerchantInstallment = installmentFeeBearer === "merchant";
+    const absorbedInterest = isMerchantFee ? fixedInterestAmount : 0;
+    const customerInterest = !isMerchantFee ? fixedInterestAmount : 0;
+    const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0;
+    const customerInstallmentCost = !isMerchantInstallment ? installmentCostAmount : 0;
+    const totalAbsorbed = absorbedInterest + taxa + custoMetodo + absorbedInstallmentCost;
     return (
         <div className="relative group/payinfo inline-flex shrink-0">
             <Badge variant="gray" icon={<InfoIcon className="w-3.5 h-3.5 text-brand-inactive-text dark:text-dark-body" />} className="cursor-help" />
@@ -114,10 +123,11 @@ const PaymentPricingDetailBadge = React.memo(({ calculation, baseAllocated }: { 
                 <div className="space-y-1.5 text-brand-dark dark:text-dark-heading">
                     <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Subtotal</span><span className="font-semibold">{formatCurrency(base)}</span></div>
                     {disc > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Desc. meio pagamento</span><span className="font-semibold">− {formatCurrency(disc)}</span></div>}
-                    {!isMerchant && juros > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros</span><span className="font-semibold">+ {formatCurrency(juros)}</span></div>}
-                    {!isMerchant && taxa > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">+ {formatCurrency(taxa)}</span></div>}
-                    {!isMerchant && custoMetodo > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Custo do método</span><span className="font-semibold">+ {formatCurrency(custoMetodo)}</span></div>}
-                    {isMerchant && totalAbsorbed > 0.009 && (
+                    {customerInterest > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros (fixos)</span><span className="font-semibold">+ {formatCurrency(customerInterest)}</span></div>}
+                    {customerInstallmentCost > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Juros (parcelamento)</span><span className="font-semibold">+ {formatCurrency(customerInstallmentCost)}</span></div>}
+                    {!isMerchantFee && taxa > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Taxa</span><span className="font-semibold">+ {formatCurrency(taxa)}</span></div>}
+                    {!isMerchantFee && custoMetodo > 0 && <div className="flex justify-between gap-3"><span className="text-brand-inactive-text">Custo do método</span><span className="font-semibold">+ {formatCurrency(custoMetodo)}</span></div>}
+                    {totalAbsorbed > 0.009 && (
                         <div className="flex justify-between gap-3"><span className="text-brand-inactive-text/70">Taxas/juros absorvidos</span><span className="font-semibold text-brand-inactive-text/70">{formatCurrency(totalAbsorbed)}</span></div>
                     )}
                     <div className="mt-2 flex justify-between gap-3 border-t border-brand-border pt-2 font-bold dark:border-dark-border"><span>Total a cobrar</span><span>{formatCurrency(final)}</span></div>
@@ -132,16 +142,23 @@ const PaymentPricingTooltipBadge = React.memo(({ calculation, baseAllocated }: {
     const base = Math.max(0, Number(baseAllocated || 0));
     const disc = Number(calculation.paymentMethodDiscountAmount || 0);
     const juros = Number(calculation.interestAmount || 0);
+    const installmentCostAmount = Number(calculation.installmentCostAmount || 0);
+    const fixedInterestAmount = Math.max(0, juros - installmentCostAmount);
     const taxa = Number(calculation.feeAmount || 0);
     const custoMetodo = Number(calculation.fixedFeeAmount || 0);
     const final = Number(calculation.finalAmount || 0);
+    const feeBearer = calculation.feeBearer || "merchant";
+    const installmentFeeBearer = calculation.installmentFeeBearer || "merchant";
+    const isMerchantFee = feeBearer === "merchant";
+    const isMerchantInstallment = installmentFeeBearer === "merchant";
 
     const rows = [
         { label: 'Subtotal', value: formatCurrency(base) },
         disc > 0 ? { label: 'Desconto', value: `- ${formatCurrency(disc)}` } : null,
-        juros > 0 ? { label: 'Juros', value: `+ ${formatCurrency(juros)}` } : null,
-        taxa > 0 ? { label: 'Taxa', value: `+ ${formatCurrency(taxa)}` } : null,
-        custoMetodo > 0 ? { label: 'Custo do método', value: `+ ${formatCurrency(custoMetodo)}` } : null,
+        (!isMerchantFee && fixedInterestAmount > 0) ? { label: 'Juros (fixos)', value: `+ ${formatCurrency(fixedInterestAmount)}` } : null,
+        (!isMerchantInstallment && installmentCostAmount > 0) ? { label: 'Juros (parcelamento)', value: `+ ${formatCurrency(installmentCostAmount)}` } : null,
+        (!isMerchantFee && taxa > 0) ? { label: 'Taxa', value: `+ ${formatCurrency(taxa)}` } : null,
+        (!isMerchantFee && custoMetodo > 0) ? { label: 'Custo do método', value: `+ ${formatCurrency(custoMetodo)}` } : null,
         { label: 'Total a cobrar', value: formatCurrency(final), isTotal: true },
     ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>;
 
@@ -224,6 +241,7 @@ function calculatePaymentDetailsLocally(
                 installmentValue: row.installmentAmounts[0] || row.finalAmount / i,
                 hasInterest: row.interestAmount > 0.009 && (feeBearer === "customer" || installmentFeeBearer === "customer"),
                 totalInterest: row.interestAmount,
+                installmentCostAmount: row.installmentCostAmount || 0,
                 totalFee: row.feeAmount,
                 fixedFee: row.fixedFeeAmount,
                 feeBearer,
@@ -297,17 +315,22 @@ const formatInstallmentOptionLabel = (opt: any) => {
     const installmentValue = Number(opt?.installmentValue || 0);
     const finalAmount = Number(opt?.finalAmount || (installmentValue * installmentsCount));
     const interestAmount = Number(opt?.totalInterest || 0);
+    const installmentCostAmount = Number(opt?.installmentCostAmount || 0);
+    const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
     const feeAmount = Number(opt?.totalFee || 0);
     const fixedFeeAmount = Number(opt?.fixedFee || 0);
-    const pricingAmount = interestAmount + feeAmount + fixedFeeAmount;
-    const passesCostToCustomer = opt?.feeBearer !== "merchant";
+    const feeBearer = opt?.feeBearer || "merchant";
+    const installmentFeeBearer = opt?.installmentFeeBearer || "merchant";
+    const passesCostToCustomer = feeBearer !== "merchant" || installmentFeeBearer !== "merchant";
 
     const parts = [];
-    if (interestAmount > 0.009) parts.push("juros");
+    if (fixedInterestAmount > 0.009) parts.push("juros");
+    if (installmentCostAmount > 0.009) parts.push("custo de parcelamento");
     if (feeAmount > 0.009) parts.push("taxa");
     if (fixedFeeAmount > 0.009) parts.push("custo fixo");
 
     const pricingName = parts.length > 0 ? parts.join("/") : "taxa";
+    const pricingAmount = fixedInterestAmount + installmentCostAmount + feeAmount + fixedFeeAmount;
 
     const pricingLabel = pricingAmount > 0.009
         ? ` · ${formatCurrency(pricingAmount)} ${passesCostToCustomer ? `de ${pricingName}` : `${pricingName} absorvida`}`
@@ -712,9 +735,11 @@ const PaymentModal = ({
         remainingPartial: number
         paymentMethodDiscountAmount: number
         interestAmount: number
+        installmentCostAmount?: number
         feeAmount: number
         fixedFeeAmount: number
         feeBearer: "merchant" | "customer" | null
+        installmentFeeBearer?: "merchant" | "customer" | null
         appliedDiscountPercent?: number
         appliedFeePercent?: number
         appliedInterestPercent?: number
@@ -1627,12 +1652,18 @@ const PaymentModal = ({
             };
         }
         if (paymentCalculation?.success) {
+            const installmentCostAmount = Number(paymentCalculation.installmentCostAmount || 0);
+            const interestAmount = Number(paymentCalculation.interestAmount || 0);
+            const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
             return {
                 paymentMethodDiscountAmount: Number(paymentCalculation.paymentMethodDiscountAmount || 0),
-                interestAmount: Number(paymentCalculation.interestAmount || 0),
+                interestAmount,
+                fixedInterestAmount,
+                installmentCostAmount,
                 feeAmount: Number(paymentCalculation.feeAmount || 0),
                 fixedFeeAmount: Number(paymentCalculation.fixedFeeAmount || 0),
                 feeBearer: paymentCalculation.feeBearer,
+                installmentFeeBearer: paymentCalculation.installmentFeeBearer || "merchant",
                 appliedDiscountPercent: Number(paymentCalculation.appliedDiscountPercent || 0),
                 appliedFeePercent: Number(paymentCalculation.appliedFeePercent || 0),
                 appliedInterestPercent: Number(paymentCalculation.appliedInterestPercent || 0),
@@ -1641,9 +1672,12 @@ const PaymentModal = ({
         return {
             paymentMethodDiscountAmount: 0,
             interestAmount: 0,
+            fixedInterestAmount: 0,
+            installmentCostAmount: 0,
             feeAmount: 0,
             fixedFeeAmount: 0,
             feeBearer: "merchant" as const,
+            installmentFeeBearer: "merchant" as const,
             appliedDiscountPercent: 0,
             appliedFeePercent: 0,
             appliedInterestPercent: 0,
@@ -1663,46 +1697,52 @@ const PaymentModal = ({
             ? {
                 paymentMethodDiscountAmount: successSnapshot.paymentMethodDiscountAmount,
                 interestAmount: successSnapshot.interestAmount,
+                installmentCostAmount: successSnapshot.installmentCostAmount,
                 feeAmount: successSnapshot.feeAmount,
                 fixedFeeAmount: successSnapshot.fixedFeeAmount,
                 feeBearer: successSnapshot.feeBearer,
+                installmentFeeBearer: successSnapshot.installmentFeeBearer || "merchant",
                 appliedDiscountPercent: successSnapshot.appliedDiscountPercent,
                 appliedFeePercent: successSnapshot.appliedFeePercent,
                 appliedInterestPercent: successSnapshot.appliedInterestPercent,
             }
             : currentPricingTotals;
 
-        const isMerchant = source.feeBearer === "merchant";
+        const installmentCostAmount = Number(source.installmentCostAmount || 0);
+        const interestAmount = Number(source.interestAmount || 0);
+        const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount);
+        const isMerchantFee = source.feeBearer === "merchant";
+        const isMerchantInstallment = (source.installmentFeeBearer || "merchant") === "merchant";
 
-        if (isMerchant) {
-            const juros = Number(source.interestAmount || 0);
-            const taxa = Number(source.feeAmount || 0);
-            const custo = Number(source.fixedFeeAmount || 0);
-            const totalAbsorbed = juros + taxa + custo;
+        const absorbedInterest = isMerchantFee ? fixedInterestAmount : 0;
+        const customerInterest = !isMerchantFee ? fixedInterestAmount : 0;
+        const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0;
+        const customerInstallmentCost = !isMerchantInstallment ? installmentCostAmount : 0;
 
-            const tooltipRows = [
-                juros > 0 ? { label: "Juros", value: formatCurrency(juros) } : null,
-                taxa > 0 ? { label: "Taxa", value: formatCurrency(taxa) } : null,
-                custo > 0 ? { label: "Custo do método", value: formatCurrency(custo) } : null,
-            ].filter(Boolean) as Array<{ label: string; value: string }>;
+        const totalAbsorbed = absorbedInterest + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0) + absorbedInstallmentCost;
 
-            return [
-                source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
-                totalAbsorbed > 0.009 ? {
-                    label: "Taxas/juros absorvidos",
-                    amount: totalAbsorbed,
-                    isAbsorbed: true,
-                    tooltipTitle: "Custos absorvidos pela empresa",
-                    tooltipRows,
-                } : null,
-            ].filter(Boolean);
-        }
+        const tooltipRows = [
+            customerInterest > 0.009 ? { label: "Juros (fixos)", value: formatCurrency(customerInterest) } : null,
+            customerInstallmentCost > 0.009 ? { label: "Custo de parcelamento", value: formatCurrency(customerInstallmentCost) } : null,
+            (isMerchantFee && (fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) > 0.009)
+                ? { label: "Juros/taxas absorvidos", value: formatCurrency(fixedInterestAmount + Number(source.feeAmount || 0) + Number(source.fixedFeeAmount || 0)) } : null,
+            (isMerchantInstallment && installmentCostAmount > 0.009)
+                ? { label: "Custo de parcelamento absorvido", value: formatCurrency(installmentCostAmount) } : null,
+        ].filter(Boolean) as Array<{ label: string; value: string }>;
 
         return [
             source.paymentMethodDiscountAmount > 0 ? { label: `Desc. meio pagamento${source.appliedDiscountPercent ? ` (${source.appliedDiscountPercent}%)` : ''}`, amount: source.paymentMethodDiscountAmount, prefix: '-', tone: 'positive' } : null,
-            source.interestAmount > 0 ? { label: `Juros${source.appliedInterestPercent ? ` (${source.appliedInterestPercent}%)` : ''}`, amount: source.interestAmount, prefix: '+', tone: 'neutral' } : null,
-            source.feeAmount > 0 ? { label: `Taxas${source.appliedFeePercent ? ` (${source.appliedFeePercent}%)` : ''}`, amount: source.feeAmount, tone: 'neutral' } : null,
-            source.fixedFeeAmount > 0 ? { label: "Custo do método", amount: source.fixedFeeAmount, prefix: '+', tone: 'neutral' } : null,
+            customerInterest > 0.009 ? { label: "Juros", amount: customerInterest, prefix: '+', tone: 'neutral' } : null,
+            customerInstallmentCost > 0.009 ? { label: "Juros (parcelamento)", amount: customerInstallmentCost, prefix: '+', tone: 'neutral' } : null,
+            (!isMerchantFee && Number(source.feeAmount || 0) > 0.009) ? { label: `Taxas${source.appliedFeePercent ? ` (${source.appliedFeePercent}%)` : ''}`, amount: Number(source.feeAmount || 0), tone: 'neutral' } : null,
+            (!isMerchantFee && Number(source.fixedFeeAmount || 0) > 0.009) ? { label: "Custo do método", amount: Number(source.fixedFeeAmount || 0), prefix: '+', tone: 'neutral' } : null,
+            totalAbsorbed > 0.009 ? {
+                label: "Taxas/juros absorvidos",
+                amount: totalAbsorbed,
+                isAbsorbed: true,
+                tooltipTitle: "Custos absorvidos pela empresa",
+                tooltipRows,
+            } : null,
         ].filter(Boolean);
     }, [paymentStatus, successSnapshot, currentPricingTotals]);
 
@@ -1775,9 +1815,11 @@ const PaymentModal = ({
             remainingPartial,
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
+            installmentCostAmount: Number(currentPricingTotals.installmentCostAmount || 0),
             feeAmount: Number(currentPricingTotals.feeAmount || 0),
             fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
             feeBearer: currentPricingTotals.feeBearer,
+            installmentFeeBearer: currentPricingTotals.installmentFeeBearer || "merchant",
             appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
             appliedFeePercent: currentPricingTotals.appliedFeePercent,
             appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
@@ -2415,9 +2457,11 @@ const PaymentModal = ({
             remainingPartial: snapshotRemainingPartial,
             paymentMethodDiscountAmount: Number(currentPricingTotals.paymentMethodDiscountAmount || 0),
             interestAmount: Number(currentPricingTotals.interestAmount || 0),
+            installmentCostAmount: Number(currentPricingTotals.installmentCostAmount || 0),
             feeAmount: Number(currentPricingTotals.feeAmount || 0),
             fixedFeeAmount: Number(currentPricingTotals.fixedFeeAmount || 0),
             feeBearer: currentPricingTotals.feeBearer,
+            installmentFeeBearer: currentPricingTotals.installmentFeeBearer || "merchant",
             appliedDiscountPercent: currentPricingTotals.appliedDiscountPercent,
             appliedFeePercent: currentPricingTotals.appliedFeePercent,
             appliedInterestPercent: currentPricingTotals.appliedInterestPercent,
@@ -2850,7 +2894,6 @@ const PaymentModal = ({
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
                                                         onChange={handleMoneyInputSync}
-                                                        className="font-bold text-lg"
                                                     />
                                                 </div>
                                                 <div className="flex items-center space-x-2 mt-2 select-none">
@@ -2954,7 +2997,6 @@ const PaymentModal = ({
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
                                                         onChange={handlePaymentBaseAmountChange}
-                                                        className="font-bold text-lg"
                                                     />
                                                 </div>
 
@@ -3085,13 +3127,12 @@ const PaymentModal = ({
                                                     <MoneyInput
                                                         value={paymentBaseAmount}
                                                         onChange={handlePaymentBaseAmountChange}
-                                                        className="font-bold text-lg"
                                                     />
                                                 </div>
                                                 {!isFreePlan && selectedMethodObj && normalizeMethodType(selectedMethodObj.type) !== 'debit_card' && (
                                                     isMarketplaceOrder ? (
-                                                        <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
-                                                            <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
+                                                        <div>
+                                                            <div className="text-brand-inactive-text dark:text-dark-body font-medium mb-1">Parcelas</div>
                                                             <div className="font-bold text-brand-dark dark:text-dark-heading">
                                                                 {(() => {
                                                                     if (installmentOptions.length > 0) {

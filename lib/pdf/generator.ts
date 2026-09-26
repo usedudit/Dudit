@@ -319,19 +319,13 @@ export async function generatePdf(url: string, nextCookies: any[]): Promise<Buff
                     border: none !important;
                 }
 
-                /* DRE: prevent table rows and sections from splitting across pages */
-                .dre-a4-print .dre-content {
-                    overflow: visible !important;
-                }
+                /* DRE: prevent table rows from splitting across pages */
                 .dre-a4-print tr,
                 .dre-a4-print .break-inside-avoid,
                 .dre-a4-print thead tr,
                 .dre-a4-print tbody tr {
                     break-inside: avoid !important;
                     page-break-inside: avoid !important;
-                }
-                .dre-a4-print .dre-table {
-                    break-inside: auto !important;
                 }
 
                 /* Force each page iteration to split into a new page in the PDF */

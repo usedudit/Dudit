@@ -6,6 +6,8 @@ import { createHash } from "node:crypto"
 import { requireDeliveryDriver } from "@/lib/auth/delivery-driver"
 import { getSupabaseServerClient } from "@/lib/supabase/request-client"
 import type { DeliveryBucket } from "@/lib/delivery/types"
+import { toCanonicalPaymentType } from "@/lib/payments/payment-method"
+import { decryptCPF } from "@/lib/crypto"
 
 function hashInviteToken(token: string) {
   return createHash("sha256").update(token).digest("hex")
@@ -436,6 +438,179 @@ export async function confirmDeliveryPaymentReceivedAction(assignmentId: string,
   revalidatePath("/erp/entregas")
   revalidatePath("/erp/logistica")
   return { success: true as const, data }
+}
+
+export async function getDriverPaymentMethodsAction(assignmentId: string) {
+  const { user } = await requireDeliveryDriver()
+  if (!assignmentId) return { success: false as const, error: "ID inválido." }
+
+  const { getAdminClient } = await import("@/lib/supabase/admin")
+  const admin = getAdminClient()
+
+  const { data: assignment, error: assignmentError } = await admin
+    .from("delivery_assignments")
+    .select("partner_id, order_id, payment_confirmed_at")
+    .eq("id", assignmentId)
+    .eq("driver_id", user.id)
+    .maybeSingle()
+
+  if (assignmentError || !assignment) {
+    return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
+  }
+
+  const { data: methods, error: methodsError } = await admin
+    .from("payment_methods")
+    .select(
+      "id, name, type, payment_type, is_active, is_default, is_online_default, " +
+      "fee_percent, fee_fixed, fee_bearer, discount_percent, max_installments, " +
+      "card_brand, priority, pix_key_encrypted, pix_key_type, store_id"
+    )
+    .eq("partner_id", assignment.partner_id)
+    .eq("is_active", true)
+    .order("is_default", { ascending: false })
+    .order("priority", { ascending: false })
+
+  if (methodsError) {
+    return { success: false as const, error: "Não foi possível carregar métodos de pagamento." }
+  }
+
+  const { data: store } = await admin
+    .from("stores")
+    .select("name, business_info")
+    .eq("partner_id", assignment.partner_id)
+    .order("is_headquarters", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const storeName =
+    store?.name ||
+    store?.business_info?.nome_fantasia ||
+    store?.business_info?.razao_social ||
+    "Loja"
+
+  const processed = await Promise.all((methods || []).map(async (m: any) => {
+    let pixKey: string | null = null
+    const keyType = m.pix_key_type
+    const rawKey = m.pix_key_encrypted || m.pix_key
+
+    if (rawKey && keyType !== "cpf") {
+      pixKey = rawKey
+    } else if (rawKey && keyType === "cpf") {
+      try {
+        pixKey = await decryptCPF(rawKey)
+      } catch {
+        pixKey = null
+      }
+    }
+
+    return {
+      id: m.id,
+      name: m.name,
+      type: m.type || toCanonicalPaymentType(m.payment_type),
+      is_active: m.is_active,
+      fee_percent: m.fee_percent,
+      fee_fixed: m.fee_fixed,
+      fee_bearer: m.fee_bearer,
+      discount_percent: m.discount_percent,
+      max_installments: m.max_installments,
+      card_brand: m.card_brand,
+      pix_key: pixKey,
+      pix_key_type: keyType,
+      store_id: m.store_id,
+    }
+  }))
+
+  return { success: true as const, methods: processed, storeName, assignment }
+}
+
+export async function driverConfirmPaymentAction(params: {
+  assignmentId: string
+  paymentMethod: string
+  amountReceived?: number
+  installments?: number
+  paymentMethodId?: string | null
+  note?: string
+}) {
+  const { user } = await requireDeliveryDriver()
+  if (!params.assignmentId) {
+    return { success: false as const, error: "ID inválido." }
+  }
+
+  const supabase = await getSupabaseServerClient()
+
+  const { data: assignment, error: lookupError } = await supabase
+    .from("delivery_assignments")
+    .select("id, partner_id, order_id, driver_id")
+    .eq("id", params.assignmentId)
+    .eq("driver_id", user.id)
+    .maybeSingle()
+
+  if (lookupError || !assignment || assignment.driver_id !== user.id) {
+    return { success: false as const, error: "Entrega não encontrada ou não pertence a você." }
+  }
+
+  const { data: order } = await supabase
+    .from("orders")
+    .select("total_amount, paid_amount")
+    .eq("id", assignment.order_id)
+    .maybeSingle()
+
+  if (!order) {
+    return { success: false as const, error: "Pedido não encontrado." }
+  }
+
+  const totalAmount = Number(order.total_amount || 0)
+  const alreadyPaid = Number(order.paid_amount || 0)
+  const remainingBalance = Math.max(0, totalAmount - alreadyPaid)
+  const amountReceived = params.amountReceived ?? remainingBalance
+
+  if (amountReceived <= 0.009) {
+    return { success: false as const, error: "Informe o valor recebido." }
+  }
+
+  if (amountReceived > totalAmount) {
+    return {
+      success: false as const,
+      error: `O valor recebido (R$${amountReceived.toFixed(2)}) não pode ser maior que o total do pedido (R$${totalAmount.toFixed(2)}).`,
+    }
+  }
+
+  try {
+    const { data, error: rpcError } = await supabase.rpc("confirm_driver_payment", {
+      p_assignment_id: assignment.id,
+      p_payment_method: params.paymentMethod,
+      p_amount_received: amountReceived,
+      p_installments: params.installments || 1,
+      p_payment_method_id: params.paymentMethodId || null,
+      p_note: params.note || null,
+    })
+
+    if (rpcError) {
+      return {
+        success: false as const,
+        error: normalizeError(rpcError, "Não foi possível registrar o recebimento."),
+      }
+    }
+
+    revalidatePath("/entregadores")
+    revalidatePath("/entregadores/entregas")
+    revalidatePath("/erp/entregas")
+    revalidatePath("/erp/pedidos")
+    revalidatePath("/erp/logistica")
+
+    return {
+      success: true as const,
+      data: {
+        confirmedAt: (data as any)?.confirmed_at,
+        orderId: (data as any)?.order_id,
+        situation: (data as any)?.situation,
+        amountReceived: (data as any)?.amount_received,
+        paymentMethod: (data as any)?.payment_method,
+      },
+    }
+  } catch (err: any) {
+    return { success: false as const, error: err?.message || "Erro ao confirmar pagamento." }
+  }
 }
 
 export async function getDeliveryInvitationMetaAction(token: string) {

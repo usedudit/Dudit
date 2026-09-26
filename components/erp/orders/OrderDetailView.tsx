@@ -10,7 +10,8 @@ import {
     MoneyIcon,
     ReturnIcon,
     CalendarIcon,
-    TruckIcon
+    TruckIcon,
+    MapPinIcon
 } from "@/lib/icons"
 import { AppointmentSheet } from "@/components/erp/appointments/sheets/AppointmentSheet"
 import {
@@ -978,13 +979,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                                                     <p><strong>Quantidade:</strong> {formatQuantityWithUnit(ret.quantity, ret.unit || item.products?.unit)}</p>
                                                                                                                     <p><strong>Condição:</strong> {formatReturnConditionLabel(ret.condition)}</p>
                                                                                                                     <p><strong>Motivo:</strong> {formatReturnReasonLabel(ret.reason)}</p>
-                                                                                            <p><strong>Tipo:</strong> {ret.resolution_type ? (ret.resolution_type === "refund" ? "Reembolso" : ret.resolution_type === "exchange" ? "Troca" : ret.resolution_type === "store_credit" ? "Vale-compra" : ret.resolution_type) : "—"}</p>
-                                                                                            {Number(ret.refund_amount || 0) > 0 && (
-                                                                                                <p><strong>Valor reembolsado:</strong> {formatCurrency(Number(ret.refund_amount))}</p>
-                                                                                            )}
-                                                                                            {Number(ret.store_credit_amount || 0) > 0 && (
-                                                                                                <p><strong>Vale-compra:</strong> {formatCurrency(Number(ret.store_credit_amount))}</p>
-                                                                                            )}
+                                                                                                                    <p><strong>Tipo:</strong> {ret.resolution_type ? (ret.resolution_type === "refund" ? "Reembolso" : ret.resolution_type === "exchange" ? "Troca" : ret.resolution_type === "store_credit" ? "Vale-compra" : ret.resolution_type) : "—"}</p>
+                                                                                                                    {Number(ret.refund_amount || 0) > 0 && (
+                                                                                                                        <p><strong>Valor reembolsado:</strong> {formatCurrency(Number(ret.refund_amount))}</p>
+                                                                                                                    )}
+                                                                                                                    {Number(ret.store_credit_amount || 0) > 0 && (
+                                                                                                                        <p><strong>Vale-compra:</strong> {formatCurrency(Number(ret.store_credit_amount))}</p>
+                                                                                                                    )}
                                                                                                                 </div>
                                                                                                             </div>
                                                                                                         );
@@ -1366,91 +1367,6 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                         customer={order.customers || (order.customer_name ? { name: order.customer_name, email: order.buyer_email || null, phone: null } : null)}
                                                         address={order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0] || (order.delivery_address ? parseAddressString(order.delivery_address) : null)}
                                                         billingAddress={order.customers?.addresses?.find((a: any) => a.address_type === "billing")} />
-                                                    {(() => {
-                                                        const isPickup = order.delivery_type === "pickup"
-                                                        const hasDelivery = deliverySummary && deliverySummary.id
-                                                        if (!isPickup && !hasDelivery) return null
-                                                        return (
-                                                            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-brand-border dark:border-dark-border overflow-hidden">
-                                                                <div className="px-4 py-4 space-y-3">
-                                                                    <h3 className="text-sm font-bold text-brand-dark dark:text-dark-heading">
-                                                                        {isPickup ? "Retirada" : "Entrega"}
-                                                                    </h3>
-                                                                    <div className="space-y-2 text-xs">
-                                                                        {isPickup ? (
-                                                                            <>
-                                                                                <div className="flex justify-between">
-                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Retirada no local</span>
-                                                                                </div>
-                                                                                {hasDelivery && deliverySummary.status && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.status}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {hasDelivery && deliverySummary.completedAt && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Retirada em</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.completedAt)}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {!hasDelivery && order.delivery_status && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{order.delivery_status}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <div className="flex justify-between">
-                                                                                    <span className="text-brand-inactive-text dark:text-dark-body">Tipo</span>
-                                                                                    <span className="font-semibold text-brand-dark dark:text-dark-heading">Entrega no endereço</span>
-                                                                                </div>
-                                                                                {deliverySummary.deliveryNumber && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Nº Entrega</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">#{deliverySummary.deliveryNumber}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {deliverySummary.status && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Status</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.status}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {deliverySummary.driverName && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Entregador</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.driverName}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {deliverySummary.departureTime && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Saída</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.departureTime)}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {deliverySummary.completedAt && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Entrega</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(deliverySummary.completedAt)}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {deliverySummary.routeStep && deliverySummary.orderCount && (
-                                                                                    <div className="flex justify-between">
-                                                                                        <span className="text-brand-inactive-text dark:text-dark-body">Rota</span>
-                                                                                        <span className="font-semibold text-brand-dark dark:text-dark-heading">{deliverySummary.routeStep}/{deliverySummary.orderCount}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )
-                                                    })()}
                                                 </div>
                                             </div>
 
@@ -1780,10 +1696,10 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         ? formatCurrency(order.delivery_fee)
                                                                         : formatCurrency(Number(order.delivery_breakdown?.originalFee || order.delivery_breakdown?.deliverySubsidy || 0))}
                                                                     {Number(order.delivery_fee || 0) === 0 && (
-                                                                        <Badge variant="orange">Frete Grátis (Subsidiado pela loja)</Badge>
+                                                                        <span className="text-brand-green">- Frete Grátis (Subsidiado pela loja)</span>
                                                                     )}
                                                                     {Number(order.delivery_fee || 0) > 0 && order.delivery_payer === "seller" && (
-                                                                        <Badge variant="orange">Subsidiado pela loja</Badge>
+                                                                        <span className="text-brand-orange">- Subsidiado pela loja</span>
                                                                     )}
                                                                     {Number(order.delivery_breakdown?.distanceKm || 0) > 0 && (
                                                                         <span className="text-xs text-brand-muted font-normal">({order.delivery_breakdown.distanceKm} km)</span>
@@ -1811,11 +1727,11 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                 value={<span className="text-brand-green font-bold">- {formatCurrency(paymentMethodDiscountAmount)}</span>} />
                                                         )}
                                                         {!hasDetailedAmounts && effectivePaymentMethodExtraAmount > 0 && (
-                                                                <PaymentRow
-                                                                    label="Taxa do Método"
-                                                                    value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>} />
-                                                            )}
-                                                            {hasDetailedAmounts && detailedInterestAmount > 0 && (
+                                                            <PaymentRow
+                                                                label="Taxa do Método"
+                                                                value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(effectivePaymentMethodExtraAmount)}</span>} />
+                                                        )}
+                                                        {hasDetailedAmounts && detailedInterestAmount > 0 && (
                                                             <PaymentRow
                                                                 label="Juros do Método"
                                                                 value={<span className="text-brand-dark dark:text-dark-heading font-bold text-sm">+ {formatCurrency(detailedInterestAmount)}</span>} />
@@ -1889,6 +1805,16 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     if (s === "pending" || s === "not_sent") return "Pendente"
                                                     return "Aguardando preparação para entrega"
                                                 })()
+
+                                                const customerAddressObj = order.customers?.addresses?.find((a: any) => a.address_type === "primary" || a.is_default) || order.customers?.addresses?.[0]
+                                                const deliveryAddressStr = order.delivery_address || customerAddressObj ? (typeof order.delivery_address === "string" ? order.delivery_address : (customerAddressObj?.street ? [customerAddressObj.street, customerAddressObj.number].filter(Boolean).join(", ") + ", " + [customerAddressObj.neighborhood, customerAddressObj.city, customerAddressObj.state].filter(Boolean).join(" - ") : "")) : null
+                                                const deliveryCoords = customerAddressObj?.latitude && customerAddressObj?.longitude
+                                                    ? { lat: Number(customerAddressObj.latitude), lng: Number(customerAddressObj.longitude) }
+                                                    : null
+                                                const mapsUrl = deliveryCoords
+                                                    ? `https://www.google.com/maps/search/?api=1&query=${deliveryCoords.lat},${deliveryCoords.lng}`
+                                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliveryAddressStr || "")}`
+
                                                 return (
                                                     <div className="space-y-6">
                                                         <FormSection title="Status da Entrega">
@@ -1906,8 +1832,17 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                                     ? "O pedido está sendo preparado para entrega."
                                                                                     : ds?.status === "delivery_failed"
                                                                                         ? "Houve uma falha na entrega do pedido."
-                                                                                        : "Aguardando preparação para entrega."
+                                                                                        : order?.delivery_status === "delivered"
+                                                                                            ? "O pedido foi entregue com sucesso."
+                                                                                            : order?.delivery_status === "sent"
+                                                                                                ? "O pedido saiu para entrega e está a caminho."
+                                                                                                : order?.delivery_status === "preparing"
+                                                                                                    ? "O pedido está sendo preparado para entrega."
+                                                                                                    : order?.delivery_status === "delivery_failed"
+                                                                                                        ? "Houve uma falha na entrega do pedido."
+                                                                                                        : "Aguardando preparação para entrega."
                                                                 }
+                                                                className="px-4 py-3"
                                                             />
                                                         </FormSection>
 
@@ -1923,6 +1858,24 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         </span>
                                                                         <span className="text-sm text-brand-inactive-text dark:text-dark-body">
                                                                             Entrega própria do estabelecimento
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </FormSection>
+                                                        )}
+
+                                                        {!isPickup && (ds?.driverName || !hasDeliveryRecord) && (
+                                                            <FormSection title="Entregador">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-10 h-10 rounded-full bg-brand-gray dark:bg-dark-border/30 flex items-center justify-center overflow-hidden border border-brand-border dark:border-dark-border shrink-0 text-brand-inactive-text dark:text-dark-body">
+                                                                        <TruckIcon size={20} />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <span className="text-md font-bold text-brand-dark dark:text-dark-heading truncate block">
+                                                                            {ds?.driverName || "Entrega própria"}
+                                                                        </span>
+                                                                        <span className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                                                            {ds?.driverName ? "Entrega própria do estabelecimento" : "Ainda não há um entregador atribuído a este pedido."}
                                                                         </span>
                                                                     </div>
                                                                 </div>
@@ -1958,6 +1911,21 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                                         <div className="flex justify-between">
                                                                             <span className="text-brand-inactive-text dark:text-dark-body">Entregue em</span>
                                                                             <span className="font-semibold text-brand-dark dark:text-dark-heading">{formatDateTime(ds.completedAt)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {deliveryAddressStr && (
+                                                                        <div className="flex justify-between items-center">
+                                                                            <span className="text-brand-inactive-text dark:text-dark-body">Endereço de entrega</span>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-semibold text-brand-dark dark:text-dark-heading truncate max-w-[200px]">{deliveryAddressStr}</span>
+                                                                                <button
+                                                                                    onClick={() => window.open(mapsUrl, "_blank")}
+                                                                                    className="shrink-0 p-1 rounded-lg border border-brand-border dark:border-dark-border hover:bg-brand-surface dark:hover:bg-dark-surface transition-colors"
+                                                                                    title="Abrir no mapa"
+                                                                                >
+                                                                                    <MapPinIcon size={16} className="text-brand-inactive-text dark:text-dark-body" />
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                     {ds?.distanceKm != null && (

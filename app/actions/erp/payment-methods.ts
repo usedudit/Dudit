@@ -297,11 +297,12 @@ export async function calculatePaymentMethodAmountsAction(input: {
                 installmentValue: calc.installmentAmounts[0] || round2(calc.finalAmount / i),
                 hasInterest: calc.interestAmount > 0.009 && (pmConfig.feeBearer === "customer" || pmConfig.installmentFeeBearer === "customer"),
                 totalInterest: calc.interestAmount,
+                installmentCostAmount: calc.installmentCostAmount || 0,
                 totalFee: calc.feeAmount,
                 fixedFee: calc.fixedFeeAmount,
                 feeBearer: pmConfig.feeBearer,
                 installmentFeeBearer: pmConfig.installmentFeeBearer,
-                finalAmount: calc.finalAmount
+                finalAmount: calc.finalAmount,
             })
         }
     }

@@ -17,7 +17,6 @@ import SelectCustomerSheet from "../clientes/SelectCustomerSheet"
 import SelectProductVariantSheet from "@/components/erp/pdv/SelectProductVariantSheet"
 import { fetchPartnerProductsBucket, fetchPartnerServicesBucket } from "@/app/actions/erp/client-loaders"
 import { useProductBucket } from "../hooks"
-import { useRouter, useSearchParams } from "next/navigation"
 import { useDebouncedRefresh } from "@/hooks/use-debounced-refresh"
 import { useStore } from "@/lib/store-context"
 import { useSidebar } from "@/lib/sidebar-context"
@@ -252,7 +251,6 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     const { planSlug, role, hasSpecific, canRbac } = usePermissions()
     const canDiscount = hasSpecific("orders", "can_apply_discount")
     const { openPlanUpgrade } = usePlanUpgrade()
-    const router = useRouter()
     const debouncedRefresh = useDebouncedRefresh()
     const csrfToken = useCSRFToken()
     const { selectedStore } = useStore()
@@ -695,28 +693,33 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         load()
     }, [editOrderId, partnerId, notifyError, normalizeSalesChannel])
 
-    const searchParams = useSearchParams()
+    const paymentParamConsumedRef = useRef(false)
     const clearPaymentParam = useCallback(() => {
         if (typeof window === "undefined") return
         const params = new URLSearchParams(window.location.search)
         if (params.get("payment") !== "1") return
         params.delete("payment")
         const newQuery = params.toString() ? `?${params.toString()}` : ""
-        router.replace(`${window.location.pathname}${newQuery}`)
-    }, [router])
+        const cleanPath = `${window.location.pathname}${newQuery}${window.location.hash}`
+        window.history.replaceState(window.history.state, "", cleanPath)
+        paymentParamConsumedRef.current = true
+    }, [])
     useEffect(() => {
-        if (!isLoadingData && editOrderId && searchParams?.get("payment") === "1") {
-            if (isAlreadyPaid) {
-                notifyWarning("Pedido já quitado", "Este pedido já foi totalmente pago e não permite novos pagamentos.")
+        if (!isLoadingData && editOrderId && !paymentParamConsumedRef.current) {
+            const urlParams = new URLSearchParams(window.location.search)
+            if (urlParams.get("payment") === "1") {
+                if (isAlreadyPaid) {
+                    notifyWarning("Pedido já quitado", "Este pedido já foi totalmente pago e não permite novos pagamentos.")
+                    clearPaymentParam()
+                    setIsPaymentModalOpen(false)
+                    return
+                }
+                setIsPaymentModalOpen(true)
+                // Consume the one-shot flag so later re-renders / modal closes cannot reopen it.
                 clearPaymentParam()
-                setIsPaymentModalOpen(false)
-                return
             }
-            setIsPaymentModalOpen(true)
-            // Consume the one-shot flag so later re-renders / modal closes cannot reopen it.
-            clearPaymentParam()
         }
-    }, [isLoadingData, editOrderId, searchParams, isAlreadyPaid, notifyWarning, clearPaymentParam])
+    }, [isLoadingData, editOrderId, isAlreadyPaid, notifyWarning, clearPaymentParam])
 
     // Warm payment-methods cache while the order loads (same React Query key as PaymentModal),
     // so opening via payment=1 doesn't wait a second sequential fetch.
@@ -813,6 +816,13 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
     }, [deliveryMethod, selectedCustomer?.id, partnerId])
 
     useEffect(() => {
+        if (editOrderId) {
+            if (deliveryMethod === "pickup") {
+                setShippingFee("0")
+                setDeliveryBreakdown(null)
+            }
+            return
+        }
         let active = true
         const allItemsAreServices = items.length > 0 && items.every((item) => Boolean(item.isService))
         if (deliveryMethod !== "delivery" || isCustomShipping || allItemsAreServices) {
@@ -858,7 +868,7 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
             active = false
             clearTimeout(timer)
         }
-    }, [deliveryMethod, cep, street, number, neighborhood, city, uf, partnerId, isCustomShipping, selectedStore?.id])
+    }, [deliveryMethod, cep, street, number, neighborhood, city, uf, partnerId, isCustomShipping, selectedStore?.id, editOrderId, items])
 
     // --- Handlers ---
     const handleScroll = useCallback(() => {
@@ -1314,7 +1324,8 @@ export default function CreateOrder({ onBack, partnerId, editOrderId }: CreateOr
         setIsPaymentModalOpen(false)
         if (wasSaleSuccessful) {
             // Full cleanup (edit + payment) is done by onBack/closeEntity —
-            // avoid racing clearPaymentParam's router.replace with it.
+            // clearPaymentParam now uses window.history.replaceState so there's
+            // no async router.replace race that could re-add ?edit=*id*.
             resetForm()
             debouncedRefresh()
             setWasSaleSuccessful(false)

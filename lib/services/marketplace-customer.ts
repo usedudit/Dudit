@@ -1,5 +1,6 @@
 import { getAdminClient } from "@/lib/supabase/admin"
 import { validateCPF } from "@/lib/input-validator"
+import { revalidateAddresses } from "@/lib/utils/revalidation"
 
 export interface ExistingCustomerMatch {
   customer: { id: string; name: string; email: string | null }
@@ -92,14 +93,68 @@ interface CustomerParams {
   userId?: string | null
 }
 
+async function syncMarketplaceUserAddress(
+  supabase: any,
+  customerId: string,
+  userId: string | null,
+): Promise<void> {
+  if (!userId) return
+
+  const { data: existingAddress } = await supabase
+    .from("addresses")
+    .select("id")
+    .eq("customer_id", customerId)
+    .maybeSingle()
+
+  if (existingAddress) return
+
+  const { data: userAddress } = await supabase
+    .from("addresses")
+    .select(
+      "zip_code, street, number, complement, neighborhood, city, state, country, municipio_codigo_ibge, latitude, longitude, address_type, is_default",
+    )
+    .eq("user_id", userId)
+    .order("is_default", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (userAddress) {
+    const { error: insertErr } = await supabase.from("addresses").insert({
+      customer_id: customerId,
+      zip_code: userAddress.zip_code,
+      street: userAddress.street,
+      number: userAddress.number,
+      complement: userAddress.complement || null,
+      neighborhood: userAddress.neighborhood,
+      city: userAddress.city,
+      state: userAddress.state,
+      country: userAddress.country || "BR",
+      municipio_codigo_ibge: userAddress.municipio_codigo_ibge || null,
+      latitude: userAddress.latitude ?? null,
+      longitude: userAddress.longitude ?? null,
+      address_type: userAddress.address_type || "primary",
+      is_default: true,
+    })
+
+    if (insertErr) {
+      console.error(
+        "[ensureMarketplaceCustomer] Error syncing user address to customer:",
+        insertErr,
+      )
+    } else {
+      await revalidateAddresses("customer", customerId)
+    }
+  }
+}
+
 export async function ensureMarketplaceCustomer({
-  partnerId,
-  name,
-  email,
-  phone,
-  cpf,
-  userId,
-}: CustomerParams): Promise<string | null> {
+   partnerId,
+   name,
+   email,
+   phone,
+   cpf,
+   userId,
+ }: CustomerParams): Promise<string | null> {
   const supabase = getAdminClient()
 
   const cleanCpf = cpf ? cpf.replace(/\D/g, "") : null
@@ -316,6 +371,10 @@ export async function ensureMarketplaceCustomer({
     if (!custError && newCustomer) {
       customerId = newCustomer.id
     }
+  }
+
+  if (customerId && marketplaceUserId) {
+    await syncMarketplaceUserAddress(supabase, customerId, marketplaceUserId)
   }
 
   return customerId

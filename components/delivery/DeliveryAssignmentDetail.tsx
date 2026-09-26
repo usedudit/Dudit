@@ -48,6 +48,7 @@ import { getPaymentStatusMeta, getDeliveryStatusMeta, getDeliveryStatusIcon } fr
 import { useMediaQuery } from "@/components/erp/hooks"
 import { parseAddressString } from "@/components/erp/orders/CreateOrder"
 import { statusConfig, type DeliveryAssignmentItem } from "./DeliveryAssignmentListRow"
+import DriverPaymentModal from "./DriverPaymentModal"
 
 const STEPS = [
     { key: "assigned", label: "Atribuída" },
@@ -95,6 +96,8 @@ export default function DeliveryAssignmentDetail({
     const [isOrderDetailSheetOpen, setIsOrderDetailSheetOpen] = useState(false)
     const [orderDetailLoading, setOrderDetailLoading] = useState(false)
     const [orderDeliveredMap, setOrderDeliveredMap] = useState<Record<string, boolean>>({})
+    const [showPaymentModal, setShowPaymentModal] = useState(false)
+    const [selectedPaymentOrder, setSelectedPaymentOrder] = useState<any>(null)
     const isMobile = useMediaQuery("(max-width: 768px)")
 
     const [activeTab, setActiveTab] = useState("resumo")
@@ -153,6 +156,17 @@ export default function DeliveryAssignmentDetail({
         return ordersList.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
     }, [ordersList])
 
+    const hasUnpaidPayment = React.useMemo(() => {
+        return ordersList.some((o: any) => {
+            const isPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes(
+                (o.payment_status || assignment.payment_status || "").toLowerCase()
+            ) || ["paid", "concluído", "concluido", "approved", "pago"].includes(
+                (o.situation || "").toLowerCase()
+            )
+            return !isPaid
+        })
+    }, [ordersList, assignment])
+
     const isCashPayment = React.useMemo(() => {
         return ordersList.some((o: any) => {
             const isCash = (o.payment_method || assignment.payment_method || "").toLowerCase().includes("dinheiro") || (o.payment_method || assignment.payment_method || "").toLowerCase().includes("cash")
@@ -160,6 +174,21 @@ export default function DeliveryAssignmentDetail({
             return isCash && !isPaid
         })
     }, [ordersList, assignment])
+
+    const buildOrderForModal = React.useCallback((orderData: any, fallbackAssignment: any) => {
+        return {
+            id: orderData?.order_id || orderData?.id || fallbackAssignment.order_id,
+            order_number: orderData?.order_number || fallbackAssignment.order_number,
+            total_amount: Number(orderData?.total_amount || fallbackAssignment.total_amount || 0),
+            paid_amount: Number(orderData?.paid_amount || orderData?.amount_paid || fallbackAssignment.paid_amount || 0),
+            payment_method: orderData?.payment_method || fallbackAssignment.payment_method,
+            situation: orderData?.payment_status || orderData?.situation || fallbackAssignment.payment_status || fallbackAssignment.situation,
+            payment_breakdown: orderData?.payment_breakdown || fallbackAssignment.payment_breakdown,
+            order_items: orderData?.items || orderData?.order_items || fallbackAssignment.items || [],
+            customer_name: orderData?.customer_name || fallbackAssignment.customer_name || "Cliente",
+            created_at: orderData?.created_at || fallbackAssignment.created_at || fallbackAssignment.ordered_at,
+        }
+    }, [])
 
     const statusMeta = statusConfig[assignment.status] || {
         label: assignment.status,
@@ -352,8 +381,9 @@ export default function DeliveryAssignmentDetail({
     const paginatedItems = items.slice((itemsPage - 1) * ITEMS_PER_PAGE, itemsPage * ITEMS_PER_PAGE)
 
     return (
-        <FadeIn>
-            <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
+        <>
+            <FadeIn>
+                <div className="flex flex-col h-[calc(100vh-65px)] bg-white dark:bg-dark-background overflow-hidden">
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="flex flex-col h-full w-full">
                     <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
@@ -735,15 +765,23 @@ export default function DeliveryAssignmentDetail({
                                                             </>
                                                         )}
                                                     </div>
-                                                    {isCashPayment && (
+                                                    {ordersList.length === 1 && hasUnpaidPayment && (
                                                         <div className="pt-3 border-t border-brand-border dark:border-dark-border mt-4">
                                                             {assignment.payment_confirmed_at ? (
                                                                 <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                                    Recebimento em dinheiro confirmado
+                                                                    Recebimento confirmado
                                                                 </div>
                                                             ) : (
-                                                                <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full">
-                                                                    Confirmar Recebimento em Dinheiro
+                                                                <Button
+                                                                    variant="outline"
+                                                                    onClick={() => {
+                                                                        setSelectedPaymentOrder(buildOrderForModal(ordersList[0], assignment))
+                                                                        setShowPaymentModal(true)
+                                                                    }}
+                                                                    disabled={loading}
+                                                                    className="w-full"
+                                                                >
+                                                                    Processar Pagamento
                                                                 </Button>
                                                             )}
                                                         </div>
@@ -987,8 +1025,7 @@ export default function DeliveryAssignmentDetail({
                     const ordItems = order.items || []
                     const orderDate = order.created_at || order.order_date || order.order_created_at || assignment.assigned_at
                     const orderIsPaid = ["paid", "concluído", "concluido", "approved", "pago"].includes((order.payment_status || order.situation || "").toLowerCase())
-                    const orderIsCash = (order.payment_method || assignment.payment_method || "").toLowerCase().includes("dinheiro") || (order.payment_method || assignment.payment_method || "").toLowerCase().includes("cash")
-                    const orderNeedsPayment = orderIsCash && !orderIsPaid
+                    const orderNeedsPayment = !orderIsPaid
 
                     const orderHistoryEntries: HistoryEntry[] = []
                     if (order.created_at || order.order_date) {
@@ -1100,11 +1137,19 @@ export default function DeliveryAssignmentDetail({
                                             <div className="pt-2">
                                                 {assignment.payment_confirmed_at ? (
                                                     <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                        Recebimento em dinheiro confirmado
+                                                        Recebimento confirmado
                                                     </div>
                                                 ) : (
-                                                    <Button variant="outline" onClick={confirmPayment} disabled={loading} className="w-full">
-                                                        Confirmar Recebimento em Dinheiro
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setSelectedPaymentOrder(buildOrderForModal(order, assignment))
+                                                            setShowPaymentModal(true)
+                                                        }}
+                                                        disabled={loading}
+                                                        className="w-full"
+                                                    >
+                                                        Processar Pagamento
                                                     </Button>
                                                 )}
                                             </div>
@@ -1214,5 +1259,22 @@ export default function DeliveryAssignmentDetail({
                 })()}
             </div>
         </FadeIn>
+
+        <DriverPaymentModal
+            isOpen={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            assignmentId={assignment.assignment_id || assignment.id}
+            order={selectedPaymentOrder}
+            onSuccess={() => {
+                setShowPaymentModal(false)
+                setAssignment((prev: any) => ({
+                    ...prev,
+                    payment_confirmed_at: new Date().toISOString(),
+                    payment_status: "paid",
+                    payment_method: selectedPaymentOrder?.payment_method || prev.payment_method,
+                }))
+            }}
+        />
+        </>
     )
 }

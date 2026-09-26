@@ -262,7 +262,7 @@ export function DreView({ partnerId, stores = [], activeStoreId }: DreViewProps)
             <h1 className="text-xl font-bold text-black tracking-tight uppercase">
               Demonstração do Resultado do Exercício (DRE)
             </h1>
-             <p className="text-sm font-semibold text-black mt-1">
+            <p className="text-sm font-semibold text-black mt-1">
                {report?.companyInfo?.partnerName} {report?.companyInfo?.documentNumber ? `• ${report?.companyInfo?.documentType === "cpf" ? "CPF" : "CNPJ"}: ${report.companyInfo.documentNumber}` : ""}
              </p>
             <p className="text-xs text-gray-700">

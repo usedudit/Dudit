@@ -63,12 +63,14 @@ export default function DeliveryDetailPage({
     onBack,
     onEdit,
     planSlug = "free",
+    userRole,
 }: {
     deliveryId: string
     partnerId: string
     onBack: () => void
     onEdit?: (deliveryId: string) => void
     planSlug?: string
+    userRole?: string | null
 }) {
     const [delivery, setDelivery] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -93,7 +95,6 @@ export default function DeliveryDetailPage({
     } | null>(null)
     const [selectedLink, setSelectedLink] = useState<any | null>(null)
     const [activeLink, setActiveLink] = useState<any | null>(null)
-    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
     const [isOrderPaymentModalOpen, setIsOrderPaymentModalOpen] = useState(false)
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
     const [isDriverModalOpen, setIsDriverModalOpen] = useState(false)
@@ -729,13 +730,6 @@ export default function DeliveryDetailPage({
             </DefaultModal>
 
             <PaymentStatusModal
-                isOpen={isPaymentModalOpen}
-                onClose={() => setIsPaymentModalOpen(false)}
-                order={activeLink?.orders}
-                partnerId={partnerId}
-            />
-
-            <PaymentStatusModal
                 isOpen={isOrderPaymentModalOpen}
                 onClose={() => setIsOrderPaymentModalOpen(false)}
                 order={selectedLink?.orders}
@@ -796,9 +790,10 @@ export default function DeliveryDetailPage({
                         setSimpleConfirmModal(null)
                     }}
                     title="Confirmar alteração de status"
-                    message="Tem certeza que deseja alterar o status deste pedido?"
+                    message={`Tem certeza que deseja alterar o status deste pedido para "${simpleConfirmModal.nextStatus}"?`}
                     confirmText="Confirmar"
                     cancelText="Cancelar"
+                    variant="warning"
                 />
             )}
 
@@ -990,17 +985,19 @@ export default function DeliveryDetailPage({
 
                         <footer className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface">
                             <div className="flex gap-3 w-full">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="flex-1 h-12"
-                                    onClick={() => {
-                                        setActiveLink(selectedLink)
-                                        setIsOrderPaymentModalOpen(true)
-                                    }}
-                                >
-                                    Status de Pagamento
-                                </Button>
+                                {userRole !== "delivery" && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1 h-12"
+                                        onClick={() => {
+                                            setActiveLink(selectedLink)
+                                            setIsOrderPaymentModalOpen(true)
+                                        }}
+                                    >
+                                        Status de Pagamento
+                                    </Button>
+                                )}
                                 <Button
                                     type="button"
                                     variant="outline"

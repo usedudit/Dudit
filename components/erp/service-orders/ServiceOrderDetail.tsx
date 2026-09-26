@@ -1133,7 +1133,7 @@ export default function ServiceOrderDetail({ data, partnerId, onBack, onMutation
                         await handleStatusChange(nextStatus)
                     }
                 }}
-                variant="info"
+                variant="warning"
             />
 
             <AlertModal

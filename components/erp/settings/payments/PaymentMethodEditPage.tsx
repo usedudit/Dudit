@@ -559,7 +559,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                 </div>
                             </SidebarCard>
 
-                            <SidebarCard hasSeparator title="Preferências">
+                            <SidebarCard hasSeparator hasTopStrip title="Preferências">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -819,7 +819,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                         {formData.supports_installments && (
                                                             <div className="space-y-4">
                                                                 <FormDropdown
-                                                                    label="Quem paga o custo de parcelamento?"
+                                                                    label="Quem paga o custo de parcelamento"
                                                                     value={formData.installment_fee_bearer}
                                                                     setValue={(val: any) => setFormData({ ...formData, installment_fee_bearer: val })}
                                                                     options={[
@@ -830,7 +830,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                                 <div className="flex items-center justify-between">
                                                                     <label className="block text-sm font-bold text-brand-dark dark:text-dark-heading">Custo de Parcelamento</label>
                                                                     {formData.installment_fees.length > 0 && formData.installment_fees.some(f => f.feePercent > 0) && (
-                                                                        <Button variant="link" size="sm" onClick={() => setIsInstallmentModalOpen(true)} className="p-0 h-auto font-bold text-brand-green">
+                                                                        <Button variant="link" onClick={() => setIsInstallmentModalOpen(true)} className="text-sm h-auto text-brand-green">
                                                                             Configurar Taxas
                                                                         </Button>
                                                                     )}
@@ -1008,7 +1008,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         </div>
                                     </SidebarCard>
 
-                                    <SidebarCard hasSeparator title="Preferências">
+                                    <SidebarCard hasSeparator hasTopStrip title="Preferências">
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <div>

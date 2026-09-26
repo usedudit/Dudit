@@ -797,9 +797,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                     <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
                                                         {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
                                                     </span>
-                                                    <span className="ml-2 inline-block rounded bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                                        Subsidiado pela loja
-                                                    </span>
+                                                    <span className="text-brand-orange"> - Subsidiado pela loja</span>
                                                 </div>
                                             ) : (
                                                 <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>
@@ -976,9 +974,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 {(originalDeliveryPayer === "seller" || Number(originalDeliverySubsidy || 0) > 0) ? (
                                                     <div>
                                                         <span>{formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}</span>
-                                                        <span className="ml-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded">
-                                                            (Subsidiado pela loja)
-                                                        </span>
+                                                        <span className="text-brand-orange"> - Subsidiado pela loja</span>
                                                     </div>
                                                 ) : (
                                                     formatCurrency(shippingFee)
@@ -1451,9 +1447,7 @@ export const OrderGeneralTab: React.FC<OrderGeneralTabProps> = ({
                                                 <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">
                                                     {formatCurrency(Number(originalDeliverySubsidy || shippingFee || 0))}
                                                 </span>
-                                                <span className="ml-2 inline-block rounded bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                                                    Subsidiado pela loja
-                                                </span>
+                                                <span className="text-brand-orange"> - Subsidiado pela loja</span>
                                             </div>
                                         ) : (
                                             <span className="text-brand-dark dark:text-dark-heading font-bold text-sm">{formatCurrency(shippingFee)}</span>

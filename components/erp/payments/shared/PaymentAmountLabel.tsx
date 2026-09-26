@@ -9,16 +9,23 @@ const PaymentPricingTooltipBadge = React.memo(
     const base = Math.max(0, Number(baseAllocated || 0))
     const disc = Number(calculation.paymentMethodDiscountAmount || 0)
     const juros = Number(calculation.interestAmount || 0)
+    const installmentCostAmount = Number(calculation.installmentCostAmount || 0)
+    const fixedInterestAmount = Math.max(0, juros - installmentCostAmount)
     const taxa = Number(calculation.feeAmount || 0)
     const custoMetodo = Number(calculation.fixedFeeAmount || 0)
     const final = Number(calculation.finalAmount || 0)
+    const feeBearer = calculation.feeBearer || "merchant"
+    const installmentFeeBearer = calculation.installmentFeeBearer || "merchant"
+    const isMerchantFee = feeBearer === "merchant"
+    const isMerchantInstallment = installmentFeeBearer === "merchant"
 
     const rows = [
       { label: "Subtotal", value: formatCurrency(base) },
       disc > 0 ? { label: "Desconto", value: `- ${formatCurrency(disc)}` } : null,
-      juros > 0 ? { label: "Juros", value: `+ ${formatCurrency(juros)}` } : null,
-      taxa > 0 ? { label: "Taxa", value: `+ ${formatCurrency(taxa)}` } : null,
-      custoMetodo > 0 ? { label: "Custo do método", value: `+ ${formatCurrency(custoMetodo)}` } : null,
+      (!isMerchantFee && fixedInterestAmount > 0.009) ? { label: "Juros (fixos)", value: `+ ${formatCurrency(fixedInterestAmount)}` } : null,
+      (!isMerchantInstallment && installmentCostAmount > 0.009) ? { label: "Juros (parcelamento)", value: `+ ${formatCurrency(installmentCostAmount)}` } : null,
+      (!isMerchantFee && taxa > 0.009) ? { label: "Taxa", value: `+ ${formatCurrency(taxa)}` } : null,
+      (!isMerchantFee && custoMetodo > 0.009) ? { label: "Custo do método", value: `+ ${formatCurrency(custoMetodo)}` } : null,
       { label: "Total a cobrar", value: formatCurrency(final), isTotal: true },
     ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
 
@@ -61,15 +68,25 @@ const AbsorbedCostsTooltipBadge = React.memo(
   ({ calculation }: { calculation: any }) => {
     if (!calculation?.success) return null
     const juros = Number(calculation.interestAmount || 0)
+    const installmentCostAmount = Number(calculation.installmentCostAmount || 0)
+    const fixedInterestAmount = Math.max(0, juros - installmentCostAmount)
     const taxa = Number(calculation.feeAmount || 0)
     const custoMetodo = Number(calculation.fixedFeeAmount || 0)
-    const totalAbsorbed = juros + taxa + custoMetodo
+    const feeBearer = calculation.feeBearer || "merchant"
+    const installmentFeeBearer = calculation.installmentFeeBearer || "merchant"
+    const isMerchantFee = feeBearer === "merchant"
+    const isMerchantInstallment = installmentFeeBearer === "merchant"
+
+    const absorbedInterest = isMerchantFee ? fixedInterestAmount : 0
+    const absorbedInstallmentCost = isMerchantInstallment ? installmentCostAmount : 0
+    const totalAbsorbed = absorbedInterest + taxa + custoMetodo + absorbedInstallmentCost
     if (totalAbsorbed <= 0.009) return null
 
     const rows = [
-      juros > 0 ? { label: "Juros", value: formatCurrency(juros) } : null,
-      taxa > 0 ? { label: "Taxa", value: formatCurrency(taxa) } : null,
-      custoMetodo > 0 ? { label: "Custo do método", value: formatCurrency(custoMetodo) } : null,
+      absorbedInterest > 0.009 ? { label: "Juros (fixos)", value: formatCurrency(absorbedInterest) } : null,
+      absorbedInstallmentCost > 0.009 ? { label: "Custo de parcelamento", value: formatCurrency(absorbedInstallmentCost) } : null,
+      isMerchantFee && taxa > 0.009 ? { label: "Taxa", value: formatCurrency(taxa) } : null,
+      isMerchantFee && custoMetodo > 0.009 ? { label: "Custo do método", value: formatCurrency(custoMetodo) } : null,
       { label: "Total absorvido", value: formatCurrency(totalAbsorbed), isTotal: true },
     ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
 
@@ -124,18 +141,22 @@ export const PaymentAmountLabel = React.memo(
     baseAllocated: number
     flatAmount?: boolean
   }) => {
-    const isMerchantBearer = calculation?.feeBearer === "merchant"
+     const feeBearer = calculation?.feeBearer || "merchant"
+    const installmentFeeBearer = calculation?.installmentFeeBearer || "merchant"
+    const isMerchantFee = feeBearer === "merchant"
+    const isMerchantInstallment = installmentFeeBearer === "merchant"
+    const hasAbsorbedCost = isMerchantFee || isMerchantInstallment
     const hasAdjustment = calculation?.success && baseAllocated > 0.009
 
     return (
       <div className="mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-brand-dark dark:text-dark-heading">{label}</span>
+          <span className="block text-sm font-medium text-brand-dark dark:text-dark-heading truncate">{label}</span>
           {!flatAmount && hasAdjustment ? (
             <PaymentPricingTooltipBadge calculation={calculation} baseAllocated={baseAllocated} />
           ) : null}
         </div>
-        {!flatAmount && hasAdjustment && isMerchantBearer ? (
+        {!flatAmount && hasAdjustment && hasAbsorbedCost ? (
           <AbsorbedCostsTooltipBadge calculation={calculation} />
         ) : null}
       </div>

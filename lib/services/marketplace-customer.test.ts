@@ -32,6 +32,7 @@ function createMockChain() {
   chain.update = vi.fn(() => chain)
   chain.is = vi.fn(() => chain)
   chain.order = vi.fn(() => chain)
+  chain.limit = vi.fn(() => chain)
   return chain
 }
 
@@ -70,6 +71,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: newCustomerId },
         error: null,
       })
+      // Address sync: customer has no existing address + user has no saved address
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const result = await ensureMarketplaceCustomer({
         partnerId: partnerA,
@@ -88,6 +92,102 @@ describe("ensureMarketplaceCustomer", () => {
     })
   })
 
+  describe("address sync from user to customer", () => {
+    it("copies user's address to customer when creating a new customer", async () => {
+      const { client, chain } = createAdminMock()
+      getAdminClientMock.mockReturnValue(client)
+
+      const newCustomerId = "new-customer-with-addr"
+      const userAddress = {
+        id: "user-addr-1",
+        zip_code: "01310-100",
+        street: "Rua Teste",
+        number: "123",
+        complement: "Apto 45",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        country: "BR",
+        municipio_codigo_ibge: "3663016",
+        latitude: -23.5733,
+        longitude: -46.6417,
+        address_type: "primary",
+        is_default: true,
+      }
+
+      // Step 1: lookup by marketplace_user_id -> null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      // Step 2: lookup by email -> null
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      // Step 4: insert customer -> success
+      chain.single.mockResolvedValueOnce({
+        data: { id: newCustomerId },
+        error: null,
+      })
+      // Address sync: check existing customer address -> null (no address yet)
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      // Address sync: fetch user's address -> found
+      chain.maybeSingle.mockResolvedValueOnce({ data: userAddress, error: null })
+
+      const result = await ensureMarketplaceCustomer({
+        partnerId: partnerA,
+        name,
+        email,
+        phone,
+        userId,
+      })
+
+      expect(result).toBe(newCustomerId)
+
+      // Second insert call should be the address synced to the customer
+      const addressInsertCall = chain.insert.mock.calls[1][0]
+      expect(addressInsertCall.customer_id).toBe(newCustomerId)
+      expect(addressInsertCall.zip_code).toBe(userAddress.zip_code)
+      expect(addressInsertCall.street).toBe(userAddress.street)
+      expect(addressInsertCall.number).toBe(userAddress.number)
+      expect(addressInsertCall.complement).toBe(userAddress.complement)
+      expect(addressInsertCall.neighborhood).toBe(userAddress.neighborhood)
+      expect(addressInsertCall.city).toBe(userAddress.city)
+      expect(addressInsertCall.state).toBe(userAddress.state)
+      expect(addressInsertCall.country).toBe("BR")
+      expect(addressInsertCall.municipio_codigo_ibge).toBe(userAddress.municipio_codigo_ibge)
+      expect(addressInsertCall.latitude).toBe(userAddress.latitude)
+      expect(addressInsertCall.longitude).toBe(userAddress.longitude)
+      expect(addressInsertCall.is_default).toBe(true)
+      expect(addressInsertCall.address_type).toBe("primary")
+    })
+
+    it("does not copy address when customer already has one", async () => {
+      const { client, chain } = createAdminMock()
+      getAdminClientMock.mockReturnValue(client)
+
+      const existingCustomerId = "existing-customer-with-addr"
+
+      // Step 1: found by marketplace_user_id
+      chain.maybeSingle.mockResolvedValueOnce({
+        data: { id: existingCustomerId, name, email, phone, cpf: null },
+        error: null,
+      })
+      // Address sync: customer already has an address -> skip
+      chain.maybeSingle.mockResolvedValueOnce({
+        data: { id: "existing-customer-addr" },
+        error: null,
+      })
+
+      const result = await ensureMarketplaceCustomer({
+        partnerId: partnerA,
+        name,
+        email,
+        phone,
+        userId,
+      })
+
+      expect(result).toBe(existingCustomerId)
+      // No second insert (only the customer update if needed, no address insert)
+      expect(chain.insert).not.toHaveBeenCalled()
+    })
+  })
+
   describe("second purchase reuses the same customer", () => {
     it("returns existing customer when marketplace_user_id matches", async () => {
       const { client, chain } = createAdminMock()
@@ -99,6 +199,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,
       })
+      // Address sync: customer has no address + user has no saved address
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const result = await ensureMarketplaceCustomer({
         partnerId: partnerA,
@@ -130,6 +233,9 @@ describe("ensureMarketplaceCustomer", () => {
 
       // update() returns chain; final .eq().await resolves to chain (no error)
       chain.update.mockReturnValueOnce(chain)
+      // Address sync mocks
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const result = await ensureMarketplaceCustomer({
         partnerId: partnerA,
@@ -159,6 +265,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: "customer-a" },
         error: null,
       })
+      // Address sync for Partner A
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const resultA = await ensureMarketplaceCustomer({
         partnerId: partnerA,
@@ -180,6 +289,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: "customer-b" },
         error: null,
       })
+      // Address sync for Partner B
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const resultB = await ensureMarketplaceCustomer({
         partnerId: partnerB,
@@ -209,6 +321,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,
       })
+      // Address sync mocks
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const result = await ensureMarketplaceCustomer({
         partnerId: partnerA,
@@ -238,6 +353,9 @@ describe("ensureMarketplaceCustomer", () => {
         data: { id: existingCustomerId, name, email, phone, cpf: null },
         error: null,
       })
+      // Address sync mocks
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      chain.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
       const result = await ensureMarketplaceCustomer({
         partnerId: partnerA,

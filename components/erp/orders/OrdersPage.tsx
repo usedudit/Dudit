@@ -307,8 +307,9 @@ export default function OrdersPage({
         if (entityState.entityId) cache.invalidateEntity(entityState.entityId)
         afterMutation(entityState.entityId || undefined)
         closeEntity()
-        // Force Next.js URL state clean — replaceState alone can be overwritten
-        // by an in-flight router.replace (e.g. clearPaymentParam) and leave ?edit=*id*.
+        // Ensure URL is fully clean — closeEntity() uses window.history.replaceState
+        // which doesn't notify Next.js router, so we also use router.replace as a
+        // belt-and-suspenders cleanup if any entity params remain.
         if (typeof window !== "undefined") {
             const hasStaleParams = /[?&](edit|view|create|duplicate|payment|type)=/.test(window.location.search)
             if (hasStaleParams) {

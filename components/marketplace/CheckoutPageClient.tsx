@@ -138,8 +138,10 @@ interface MarketplacePaymentPreview {
     methodType: string
     maxInstallments: number
     feeBearer?: "merchant" | "customer"
+    installmentFeeBearer?: "merchant" | "customer"
     finalAmount: number
     interestAmount: number
+    installmentCostAmount?: number
     feeAmount: number
     fixedFeeAmount: number
     paymentMethodDiscountAmount: number
@@ -153,6 +155,7 @@ interface MarketplacePaymentPreview {
         totalFee?: number
         fixedFee?: number
         feeBearer?: "merchant" | "customer"
+        installmentFeeBearer?: "merchant" | "customer"
         finalAmount: number
     }[]
 }
@@ -164,7 +167,7 @@ const formatCheckoutInstallmentOptionLabel = (opt: MarketplaceInstallmentOption)
     const interestAmount = Number(opt.totalInterest || 0)
     const feeAmount = Number(opt.totalFee || 0)
     const pricingAmount = interestAmount + feeAmount
-    const hasInterest = pricingAmount > 0.009
+    const hasInterest = opt.hasInterest !== undefined ? opt.hasInterest : (pricingAmount > 0.009)
     const pricingLabel = hasInterest ? "" : " sem juros"
     return `${installmentsCount}x de ${formatCurrency(opt.installmentValue)}${pricingLabel}`
 }
@@ -836,15 +839,20 @@ export function CheckoutPageClient() {
     )
 
     const depositAvailable = Boolean(checkoutContext?.deposit.available)
+    const appliedCoupon = useMemo(
+        () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
+        [availableCoupons, couponCode]
+    )
+    const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
     const checkoutFullTotal = checkoutAmounts?.fullOrderTotal ?? 0
     const checkoutDepositChargeTotal = checkoutAmounts?.depositChargeTotal ?? 0
     const checkoutServiceDepositAmount = checkoutAmounts?.serviceDepositAmount ?? 0
     const checkoutChargeTotal = useMemo(() => {
-        if (!checkoutAmounts) return contextTotalSubtotal + (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
+        if (!checkoutAmounts) return contextTotalSubtotal + (showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0)
         const usesDeposit = depositAvailable && payDepositOnly
         return usesDeposit ? checkoutAmounts.depositChargeTotal : checkoutAmounts.fullOrderTotal
-    }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal, showDeliveryFeeRow, isPickup, deliveryFee])
-    const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup ? deliveryFee : 0)
+    }, [checkoutAmounts, depositAvailable, payDepositOnly, contextTotalSubtotal, showDeliveryFeeRow, isPickup, deliveryFee, hasFreeDeliveryCoupon])
+    const checkoutDeliveryFee = checkoutAmounts?.deliveryFee ?? (showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0)
     const checkoutAmountsReady = Boolean(checkoutAmounts && !checkoutAmountsLoading)
     const paymentTypeLabelMap: Record<string, string> = {
         pix: "Pix",
@@ -1073,14 +1081,6 @@ export function CheckoutPageClient() {
 
     const couponItemsKey = useMemo(() => JSON.stringify(couponItems), [couponItems])
 
-    const appliedCoupon = useMemo(
-        () => availableCoupons.find((coupon) => coupon.code === couponCode) || null,
-        [availableCoupons, couponCode]
-    )
-    const hasFreeDeliveryCoupon = Boolean(appliedCoupon?.freeShipping || appliedCoupon?.discountType === "free_shipping")
-
-
-
     // Effect 1: Checkout amounts + Delivery fee quote in a single unified call
     useEffect(() => {
         let active = true
@@ -1284,16 +1284,15 @@ export function CheckoutPageClient() {
         const methodDiscount = paymentOption === "traditional" && paymentPreview?.success
             ? Number(paymentPreview.paymentMethodDiscountAmount || 0)
             : 0
-        const passesPaymentCostToCustomer = paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant"
-        const methodInterest = passesPaymentCostToCustomer
-            ? Number(paymentPreview.interestAmount || 0)
-            : 0
-        const methodFee = passesPaymentCostToCustomer
-            ? Number(paymentPreview.feeAmount || 0)
-            : 0
-        const methodFixedFee = passesPaymentCostToCustomer
-            ? Number(paymentPreview.fixedFeeAmount || 0)
-            : 0
+        const isCustomerFeeBearer = (paymentPreview?.feeBearer || "merchant") !== "merchant"
+        const isCustomerInstallmentFeeBearer = (paymentPreview?.installmentFeeBearer || "merchant") !== "merchant"
+        const interestAmount = Number(paymentPreview?.interestAmount || 0)
+        const installmentCostAmount = Number(paymentPreview?.installmentCostAmount || 0)
+        const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount)
+        const customerInterest = (isCustomerFeeBearer ? fixedInterestAmount : 0)
+            + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0)
+        const customerFee = isCustomerFeeBearer ? Number(paymentPreview?.feeAmount || 0) : 0
+        const customerFixedFee = isCustomerFeeBearer ? Number(paymentPreview?.fixedFeeAmount || 0) : 0
 
         const snapshotSubtotal = checkoutAmounts
             ? (payDepositOnly && depositAvailable
@@ -1305,9 +1304,9 @@ export function CheckoutPageClient() {
             subtotal: snapshotSubtotal,
             couponDiscount: checkoutAmounts?.couponDiscountAmount ?? couponDiscount,
             paymentMethodDiscount: methodDiscount,
-            paymentMethodInterest: methodInterest,
-            paymentMethodFee: methodFee,
-            paymentMethodFixedFee: methodFixedFee,
+            paymentMethodInterest: customerInterest,
+            paymentMethodFee: customerFee,
+            paymentMethodFixedFee: customerFixedFee,
             deliveryFee: checkoutDeliveryFee,
             finalTotal: checkoutTotalToCharge,
         }
@@ -1344,22 +1343,31 @@ export function CheckoutPageClient() {
         ? preparationEstimate.pickupWindowEnd.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
         : null
     const paymentPreviewTooltipRows = paymentOption === "traditional" && paymentPreview?.success
-        ? [
-            { label: "Subtotal", value: formatCurrency(checkoutChargeTotal - checkoutDeliveryFee) },
-            Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
-                ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
-                : null,
-            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0
-                ? { label: "Juros", value: `+ ${formatCurrency(paymentPreview.interestAmount)}` }
-                : null,
-            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0
-                ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
-                : null,
-            paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.fixedFeeAmount || 0) > 0
-                ? { label: "Custo do método", value: `+ ${formatCurrency(paymentPreview.fixedFeeAmount)}` }
-                : null,
-            { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
-        ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
+        ? (() => {
+            const isCustomerFeeBearer = (paymentPreview.feeBearer || "merchant") !== "merchant"
+            const isCustomerInstallmentFeeBearer = (paymentPreview.installmentFeeBearer || "merchant") !== "merchant"
+            const interestAmount = Number(paymentPreview.interestAmount || 0)
+            const installmentCostAmount = Number(paymentPreview.installmentCostAmount || 0)
+            const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount)
+            const customerInterest = (isCustomerFeeBearer ? fixedInterestAmount : 0)
+                + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0)
+            return [
+                { label: "Subtotal", value: formatCurrency(checkoutChargeTotal - checkoutDeliveryFee) },
+                Number(paymentPreview.paymentMethodDiscountAmount || 0) > 0
+                    ? { label: "Desconto", value: `- ${formatCurrency(paymentPreview.paymentMethodDiscountAmount)}` }
+                    : null,
+                customerInterest > 0
+                    ? { label: "Juros", value: `+ ${formatCurrency(customerInterest)}` }
+                    : null,
+                isCustomerFeeBearer && Number(paymentPreview.feeAmount || 0) > 0
+                    ? { label: "Taxa", value: `+ ${formatCurrency(paymentPreview.feeAmount)}` }
+                    : null,
+                isCustomerFeeBearer && Number(paymentPreview.fixedFeeAmount || 0) > 0
+                    ? { label: "Custo do método", value: `+ ${formatCurrency(paymentPreview.fixedFeeAmount)}` }
+                    : null,
+                { label: "Total a cobrar", value: formatCurrency(checkoutTotalToCharge), isTotal: true },
+            ].filter(Boolean) as Array<{ label: string; value: string; isTotal?: boolean }>
+        })()
         : []
     const paymentMethodPreviewBadge = paymentPreviewTooltipRows.length > 0 ? (
         <Tooltip
@@ -1725,13 +1733,13 @@ export function CheckoutPageClient() {
                         <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                     </div>
                 )}
-                {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0 && (
+                {paymentOption === "traditional" && paymentPreview?.success && (paymentPreview.feeBearer !== "merchant" || (paymentPreview.installmentFeeBearer || "merchant") !== "merchant") && Number(paymentPreview.interestAmount || 0) > 0 && (
                     <div className="flex justify-between text-sm font-medium text-brand-inactive-text dark:text-dark-body">
                         <span className="flex items-center gap-2">
                             <span>Juros</span>
                             {paymentMethodPreviewBadge}
                         </span>
-                        <span>+{formatCurrency(paymentPreview.interestAmount)}</span>
+                        <span>+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                     </div>
                 )}
                 {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
@@ -1976,8 +1984,14 @@ export function CheckoutPageClient() {
         }
         if (paymentPreview?.success) {
             const methodDiscount = Number(paymentPreview.paymentMethodDiscountAmount || 0)
-            const methodInterest = paymentPreview.feeBearer !== "merchant" ? Number(paymentPreview.interestAmount || 0) : 0
-            const methodFee = paymentPreview.feeBearer !== "merchant" ? Number(paymentPreview.feeAmount || 0) : 0
+            const isCustomerFeeBearer = (paymentPreview.feeBearer || "merchant") !== "merchant"
+            const isCustomerInstallmentFeeBearer = (paymentPreview.installmentFeeBearer || "merchant") !== "merchant"
+            const interestAmount = Number(paymentPreview.interestAmount || 0)
+            const installmentCostAmount = Number(paymentPreview.installmentCostAmount || 0)
+            const fixedInterestAmount = Math.max(0, interestAmount - installmentCostAmount)
+            const methodInterest = (isCustomerFeeBearer ? fixedInterestAmount : 0)
+                + (isCustomerInstallmentFeeBearer ? installmentCostAmount : 0)
+            const methodFee = isCustomerFeeBearer ? Number(paymentPreview.feeAmount || 0) : 0
 
             if (methodDiscount > 0) {
                 msg += `- Desconto de Pagamento: -${formatCurrency(methodDiscount)}\n`
@@ -2436,7 +2450,7 @@ export function CheckoutPageClient() {
                             notes: formData.notes,
                             couponCode: couponCode || null,
                             couponDiscount: couponDiscount,
-                            deliveryFee: showDeliveryFeeRow && !isPickup ? deliveryFee : 0,
+                            deliveryFee: showDeliveryFeeRow && !isPickup && !hasFreeDeliveryCoupon ? deliveryFee : 0,
                             checkoutPricing: checkoutPricingSnapshot,
                         },
                         sellerName: sessionData?.partnerInfo?.store_name || "Loja",
@@ -3499,10 +3513,10 @@ export function CheckoutPageClient() {
                                                 <span>-{formatCurrency(paymentPreview.paymentMethodDiscountAmount)}</span>
                                             </div>
                                         )}
-                                        {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.interestAmount || 0) > 0 && (
+                                        {paymentOption === "traditional" && paymentPreview?.success && (paymentPreview.feeBearer !== "merchant" || (paymentPreview.installmentFeeBearer || "merchant") !== "merchant") && Number(paymentPreview.interestAmount || 0) > 0 && (
                                             <div className="flex justify-between">
                                                 <span>Juros</span>
-                                                <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(paymentPreview.interestAmount)}</span>
+                                                <span className="text-brand-dark dark:text-dark-heading">+{formatCurrency(checkoutPricingSnapshot.paymentMethodInterest)}</span>
                                             </div>
                                         )}
                                         {paymentOption === "traditional" && paymentPreview?.success && paymentPreview.feeBearer !== "merchant" && Number(paymentPreview.feeAmount || 0) > 0 && (
