@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 import { useSupabase } from "@/providers/supabase-provider"
-import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon, ClockIcon, BoxIcon, SparklesIcon, AwardIcon, ShieldIcon } from "@/lib/icons"
+import { HeartIcon, ShareIcon, StarIcon, ChevronRightIcon, ChevronLeftIcon, ChevronDownIcon, CheckCircleIcon, XIcon, ShoppingCartIcon, FlagIcon, ArrowLeftRightIcon, PlusIcon, TagIcon, WhatsappIcon, ClockIcon, BoxIcon, SparklesIcon, AwardIcon, ShieldIcon, PackagePlusIcon } from "@/lib/icons"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MarketplaceHeader } from "./MarketplaceHeader"
@@ -1479,6 +1479,7 @@ export function ProductDetailsPageClient({
 
                         return (
                             <ListItem
+                                icon={PackagePlusIcon}
                                 title={
                                     <div className="flex items-center gap-2">
                                         <span>Complementos</span>
@@ -1506,7 +1507,7 @@ export function ProductDetailsPageClient({
                                     </div>
                                 }
                                 onClick={openAddonsModal}
-                                className="!cursor-pointer"
+                                className="px-4 py-3 !cursor-pointer"
                             />
                         )
                     })()}
@@ -1558,7 +1559,7 @@ export function ProductDetailsPageClient({
                                                 {grp.name || "Adicionais"}
                                             </h4>
                                             {grp.required ? (
-                                                <Badge variant={isSatisfied ? "green" : "red"} className="scale-90">
+                                                <Badge variant={isSatisfied ? "green" : "red"} className="scale-90" icon={null}>
                                                     {isSatisfied ? "Selecionado" : "Obrigatório"}
                                                 </Badge>
                                             ) : selectedIds.length > 0 ? (
@@ -1566,7 +1567,7 @@ export function ProductDetailsPageClient({
                                                     {selectedIds.length}
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="gray" className="scale-90">
+                                                <Badge variant="gray" className="scale-90" icon={null}>
                                                     Opcional
                                                 </Badge>
                                             )}
@@ -1629,7 +1630,7 @@ export function ProductDetailsPageClient({
                                                             )}
                                                         </div>
                                                         {optionPrice > 0 && (
-                                                            <span className="text-xs font-bold text-brand-green shrink-0 ml-2">
+                                                            <span className="text-sm font-bold text-brand-green shrink-0 ml-2">
                                                                 + {formatMoney(optionPrice)}
                                                             </span>
                                                         )}

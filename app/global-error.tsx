@@ -27,7 +27,7 @@ export default function GlobalError({
                 localStorage.getItem("theme") === "dark"
             setIsDark(dark)
             document.documentElement.classList.toggle("dark", dark)
-        } catch {}
+        } catch { }
     }, [])
 
     useEffect(() => {
@@ -44,50 +44,153 @@ export default function GlobalError({
                             action: "global_error_boundary",
                             metadata: { boundary: "app/global-error" },
                         })
-                    } catch {}
+                    } catch { }
                 })
-                .catch(() => {})
-        } catch {}
+                .catch(() => { })
+        } catch { }
     }, [error])
 
-    const digest =
-        typeof error?.digest === "string" ? error.digest : undefined
+    useEffect(() => {
+        try {
+            const isChunkError =
+                error.name === "ChunkLoadError" ||
+                error.message?.includes("ChunkLoadError") ||
+                error.message?.includes("Loading chunk") ||
+                error.message?.includes("Failed to fetch dynamically imported module")
+
+            if (isChunkError) {
+                const lastReload = sessionStorage.getItem("last-chunk-error-reload")
+                const now = Date.now()
+                if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+                    sessionStorage.setItem("last-chunk-error-reload", now.toString())
+                    window.location.reload()
+                }
+            }
+        } catch { }
+    }, [error])
+
+    const digest = typeof error?.digest === "string" ? error.digest : undefined
     const message = safeErrorMessage(error)
+
+    const pageBg = isDark ? "#18181b" : "#ffffff"
+    const headerBg = isDark ? "#18181b" : "#003229"
+    const footerBg = isDark ? "#18181b" : "#003229"
+    const titleColor = isDark ? "#f0f0f0" : "#003229"
+    const subtitleColor = isDark ? "#a1a1aa" : "#6b7280"
+    const tryAgainBorder = isDark ? "#24252b" : "#ebebeb"
+    const tryAgainBg = isDark ? "#18181b" : "#ffffff"
+    const tryAgainText = isDark ? "#f0f0f0" : "#003229"
+    const cardBg = isDark ? "rgba(127, 29, 29, 0.1)" : "#fef2f2"
+    const cardBorder = isDark ? "rgba(127, 29, 29, 0.3)" : "#fee2e2"
+    const cardTextColor = isDark ? "rgba(252, 165, 165, 0.8)" : "#b91c1c"
 
     return (
         <html lang="pt-BR">
-            <body style={isDark ? styles.bodyDark : styles.body}>
-                <div style={styles.wrapper}>
-                    <img
-                        src="https://img.dudit.com.br/static/mascots/Ops.png"
-                        alt="Ops"
-                        loading="lazy"
-                        style={styles.mascot}
-                    />
-
-                    <h1 style={isDark ? styles.titleDark : styles.title}>
-                        Ops! Algo deu errado por aqui
-                    </h1>
-
-                    <p style={isDark ? styles.subtitleDark : styles.subtitle}>
-                        Algo inesperado aconteceu. Tente novamente em alguns
-                        instantes.
-                    </p>
-
-                    <button onClick={() => reset()} style={styles.button}>
-                        Tentar novamente
-                    </button>
-
-                    <div style={styles.card}>
-                        <div style={styles.cardBar} />
-                        <div style={styles.cardContent}>
-                            <p style={styles.cardTitle}>Detalhes do erro</p>
-                            <p style={styles.cardMessage}>{message}</p>
-                            {digest && (
-                                <p style={styles.cardDigest}>ID: {digest}</p>
-                            )}
+            <body
+                style={{
+                    margin: 0,
+                    minHeight: "100vh",
+                    backgroundColor: pageBg,
+                    fontFamily:
+                        'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+                    padding: "24px",
+                    transition: "background-color 0.3s, color 0.3s",
+                }}
+            >
+                <div style={styles.pageWrap}>
+                    {/* Header */}
+                    <header style={{ ...styles.header, backgroundColor: headerBg }}>
+                        <div style={styles.headerInner}>
+                            <a href="/" style={styles.logoLink}>
+                                <img
+                                    src="https://img.dudit.com.br/static/Logo.png"
+                                    alt="Dudit"
+                                    width={140}
+                                    height={40}
+                                    loading="lazy"
+                                    style={styles.logoImg}
+                                />
+                            </a>
                         </div>
-                    </div>
+                    </header>
+
+                    {/* Main */}
+                    <main style={styles.main}>
+                        <div style={styles.mainInner}>
+                            <img
+                                src="https://img.dudit.com.br/static/mascots/Ops.png"
+                                alt="Erro"
+                                loading="lazy"
+                                style={styles.mascot}
+                            />
+
+                            <h1 style={{ ...styles.title, color: titleColor }}>
+                                Ops! Algo deu errado por aqui
+                            </h1>
+
+                            <p style={{ ...styles.subtitle, color: subtitleColor }}>
+                                Algo inesperado aconteceu. Tente novamente em alguns
+                                instantes.
+                            </p>
+
+                            <div style={styles.buttonContainer}>
+                                <a href="/" style={styles.homeButton}>
+                                    Voltar para o início
+                                </a>
+                                <button
+                                    onClick={() => reset()}
+                                    style={{
+                                        ...styles.tryAgainButton,
+                                        borderColor: tryAgainBorder,
+                                        backgroundColor: tryAgainBg,
+                                        color: tryAgainText,
+                                    }}
+                                >
+                                    Tentar novamente
+                                </button>
+                            </div>
+
+                            <div style={styles.cardContainer}>
+                                <div
+                                    style={{
+                                        ...styles.card,
+                                        backgroundColor: cardBg,
+                                        borderColor: cardBorder,
+                                    }}
+                                >
+                                    <div style={styles.cardBar} />
+                                    <div style={styles.cardContent}>
+                                        <p style={{ ...styles.cardTitle, color: cardTextColor }}>
+                                            Detalhes do erro
+                                        </p>
+                                        <p style={{ ...styles.cardMessage, color: cardTextColor }}>
+                                            {message}
+                                        </p>
+                                        {digest && (
+                                            <p
+                                                style={{
+                                                    ...styles.cardDigest,
+                                                    color: cardTextColor,
+                                                }}
+                                            >
+                                                ID: {digest}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer style={{ ...styles.footer, backgroundColor: footerBg }}>
+                        <div style={styles.footerInner}>
+                            <p style={styles.footerText}>
+                                © {new Date().getFullYear()} Dudit Tecnologia Ltda. Todos os
+                                direitos reservados.
+                            </p>
+                        </div>
+                    </footer>
                 </div>
             </body>
         </html>
@@ -105,92 +208,131 @@ function safeErrorMessage(error: unknown): string {
 }
 
 const styles = {
-    body: {
-        margin: 0,
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#ffffff",
-        fontFamily:
-            'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        padding: "24px",
-        transition: "background-color 0.3s, color 0.3s",
-    },
-    bodyDark: {
-        margin: 0,
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#18181b",
-        fontFamily:
-            'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        padding: "24px",
-        transition: "background-color 0.3s, color 0.3s",
-    },
-    wrapper: {
-        maxWidth: "576px",
+    pageWrap: {
+        maxWidth: "100%",
         width: "100%",
         display: "flex",
-        flexDirection: "column",
+        flexDirection: "column" as const,
+        minHeight: "100vh",
+    },
+    header: {
+        display: "flex",
+        flexDirection: "column" as const,
+        width: "100%",
+        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        position: "sticky" as const,
+        top: 0,
+        zIndex: 50,
+        boxShadow:
+            "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)",
+    },
+    headerInner: {
+        width: "100%",
+        height: "68px",
+        display: "flex",
         alignItems: "center",
-        textAlign: "center" as const,
+        justifyContent: "center",
+        maxWidth: "1400px",
+        padding: "0 8px",
+        margin: "0 auto",
+        gap: "16px",
+    },
+    logoLink: {
+        cursor: "pointer",
+        flexShrink: 0,
+        zIndex: 110,
+        paddingTop: "4px",
+    },
+    logoImg: {
+        height: "40px",
+        width: "auto",
+        objectFit: "contain" as const,
+    },
+    main: {
+        flex: 1,
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px",
+        marginTop: "80px",
+    },
+    mainInner: {
+        maxWidth: "704px",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center",
     },
     mascot: {
-        width: "192px",
-        height: "192px",
+        width: "288px",
+        height: "288px",
         objectFit: "contain" as const,
-        marginBottom: "24px",
+        marginBottom: "16px",
     },
     title: {
         fontSize: "24px",
         fontWeight: 700,
-        color: "#003229",
         margin: "0 0 8px 0",
-    },
-    titleDark: {
-        fontSize: "24px",
-        fontWeight: 700,
-        color: "#f0f0f0",
-        margin: "0 0 8px 0",
+        textAlign: "center" as const,
     },
     subtitle: {
         fontSize: "18px",
-        color: "#6b7280",
         margin: "0 0 32px 0",
+        maxWidth: "384px",
+        textAlign: "center" as const,
     },
-    subtitleDark: {
-        fontSize: "18px",
-        color: "#a1a1aa",
-        margin: "0 0 32px 0",
+    buttonContainer: {
+        display: "flex",
+        flexDirection: "row" as const,
+        flexWrap: "wrap",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        marginTop: "32px",
     },
-    button: {
-        backgroundColor: "#059669",
-        color: "#ffffff",
-        border: "none",
+    homeButton: {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
         borderRadius: "9999px",
+        backgroundColor: "#059669",
         padding: "10px 24px",
-        fontSize: "16px",
+        fontSize: "14px",
+        fontWeight: 600,
+        color: "#ffffff",
+        textDecoration: "none",
+    },
+    tryAgainButton: {
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        borderRadius: "9999px",
+        border: "1px solid",
+        padding: "10px 24px",
+        fontSize: "14px",
         fontWeight: 600,
         cursor: "pointer",
     },
-    card: {
+    cardContainer: {
         width: "100%",
         marginTop: "48px",
         maxWidth: "512px",
+    },
+    card: {
         display: "flex",
         gap: "12px",
         alignItems: "flex-start",
-        backgroundColor: "rgba(240, 68, 56, 0.08)",
-        border: "1px solid #f04438",
+        border: "1px solid",
         borderRadius: "8px",
         padding: "12px 16px",
     },
     cardBar: {
         width: "4px",
-        alignSelf: "stretch",
-        backgroundColor: "#f04438",
+        alignSelf: "stretch" as const,
+        backgroundColor: "#f87171",
         borderRadius: "9999px",
         flexShrink: 0,
     },
@@ -201,19 +343,35 @@ const styles = {
     cardTitle: {
         fontSize: "14px",
         fontWeight: 700,
-        color: "#f04438",
         margin: "0 0 4px 0",
     },
     cardMessage: {
         fontSize: "12px",
-        color: "#f04438",
         margin: 0,
         wordBreak: "break-all" as const,
     },
     cardDigest: {
         fontSize: "10px",
-        color: "#f04438",
         opacity: 0.7,
         margin: "4px 0 0 0",
+    },
+    footer: {
+        width: "100%",
+        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+    },
+    footerInner: {
+        maxWidth: "1400px",
+        margin: "0 auto",
+        padding: "0 24px",
+        display: "flex",
+        flexDirection: "column" as const,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    footerText: {
+        color: "#ffffff",
+        fontSize: "12px",
+        fontWeight: 500,
+        letterSpacing: "0.025em",
     },
 } as const

@@ -54,6 +54,7 @@ import {
     SubnodeAddIcon,
     MapsIcon as MapsIcon01,
     Menu01Icon,
+    PackagePlusIcon as PackagePlusIcon01,
     Moon02Icon,
     Flag01Icon,
     Search01Icon,
@@ -319,6 +320,7 @@ export const MoneyBagIcon = CreateIcon(MoneyBag02Icon)
 
 export const Package = CreateIcon(DeliveryBox01Icon)
 export const BoxIcon = CreateIcon(DeliveryBox01Icon)
+export const PackagePlusIcon = CreateIcon(PackagePlusIcon01)
 
 export const PackageIcon = CreateIcon(DeliveryBox01Icon)
 export const NormalProductsIcon = CreateIcon(PackageDeliveredIcon)

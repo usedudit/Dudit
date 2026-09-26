@@ -160,6 +160,12 @@ interface MarketplacePaymentPreview {
     }[]
 }
 
+type PaymentPreviewResult = Awaited<ReturnType<typeof previewMarketplacePaymentAction>>
+type CachedPaymentPreview = {
+    promise: Promise<PaymentPreviewResult>
+    expiresAt: number
+}
+
 type MarketplaceInstallmentOption = NonNullable<MarketplacePaymentPreview["installmentOptions"]>[number]
 
 const formatCheckoutInstallmentOptionLabel = (opt: MarketplaceInstallmentOption) => {
@@ -372,6 +378,8 @@ export function CheckoutPageClient() {
     const [showDepositChoiceModal, setShowDepositChoiceModal] = useState(false)
     const bypassDepositModalRef = useRef(false)
     const bypassSubmitRef = useRef(false)
+    const submitInFlightRef = useRef(false)
+    const paymentPreviewRequestsRef = useRef<Map<string, CachedPaymentPreview>>(new Map())
 
     const handleBulkFulfillmentModesSave = async (changes: Array<{ cartItemId: string; mode: "on_site" | "customer_location" }>) => {
         try {
@@ -690,15 +698,19 @@ export function CheckoutPageClient() {
     const [mpAcceptedPaymentMethods, setMpAcceptedPaymentMethods] = useState<MpAcceptedPaymentMethods | undefined>(undefined)
 
     useEffect(() => {
-        if (user) {
-            setUserId(user.id)
-            setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuário")
-            setUserEmail(user.email || "")
-            if (userAddresses.length === 0) {
-                void loadUserAddresses(undefined, user.id)
-            }
-        }
+        if (!user) return
+        setUserId(user.id)
+        setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuário")
+        setUserEmail(user.email || "")
     }, [user])
+
+    // The checkout context already contains the user's addresses. Only use the
+    // legacy action as a fallback after context loading failed/was skipped;
+    // otherwise the first render used to issue the same address query twice.
+    useEffect(() => {
+        if (!user?.id || contextLoading || checkoutContext || userAddresses.length > 0) return
+        void loadUserAddresses(undefined, user.id)
+    }, [user?.id, contextLoading, checkoutContext, userAddresses.length])
 
     const loadUserAddresses = async (targetSelectedId?: string, overrideUserId?: string) => {
         const targetUserId = overrideUserId || userId || user?.id
@@ -1215,12 +1227,29 @@ export function CheckoutPageClient() {
                 }
                 setPaymentPreviewLoading(true)
                 setPaymentError(null)
-                const result = await previewMarketplacePaymentAction({
+                const previewInput = {
                     partnerId,
                     paymentMethodId: formData.paymentMethod,
                     originalAmount: checkoutChargeTotal,
                     installmentNumber: Math.max(1, Number(formData.installments || 1)),
-                })
+                }
+                const previewKey = JSON.stringify(previewInput)
+                const now = Date.now()
+                for (const [requestKey, request] of paymentPreviewRequestsRef.current) {
+                    if (request.expiresAt <= now) paymentPreviewRequestsRef.current.delete(requestKey)
+                }
+                let cachedRequest = paymentPreviewRequestsRef.current.get(previewKey)
+                if (!cachedRequest || cachedRequest.expiresAt <= now) {
+                    if (cachedRequest) paymentPreviewRequestsRef.current.delete(previewKey)
+                    const promise = previewMarketplacePaymentAction(previewInput)
+                    cachedRequest = { promise, expiresAt: now + 5_000 }
+                    paymentPreviewRequestsRef.current.set(previewKey, cachedRequest)
+                    promise.catch(() => {
+                        const current = paymentPreviewRequestsRef.current.get(previewKey)
+                        if (current?.promise === promise) paymentPreviewRequestsRef.current.delete(previewKey)
+                    })
+                }
+                const result = await cachedRequest.promise
                 if (!active) return
                 if (result.success) {
                     setPaymentPreview(result)
@@ -2023,6 +2052,16 @@ export function CheckoutPageClient() {
     }
 
     const handleSubmit = async (e?: React.FormEvent) => {
+        if (submitInFlightRef.current) return
+        submitInFlightRef.current = true
+        try {
+            await handleSubmitInternal(e)
+        } finally {
+            submitInFlightRef.current = false
+        }
+    }
+
+    const handleSubmitInternal = async (e?: React.FormEvent) => {
         if (e) e.preventDefault()
         setDeliveryError(null)
         setPaymentError(null)

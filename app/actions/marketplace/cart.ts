@@ -888,12 +888,16 @@ export async function checkoutCartAction(
 
   const cartItemIds = partnerItems.map((item: any) => item.cartItemId).filter(Boolean)
 
+  // Checkout can be reached again after a stale click/re-render. Avoid
+  // touching rows whose checkout flags already have the requested value;
+  // besides reducing write traffic, this prevents needless updated_at churn.
   await adminClient
     .from("cart_items")
     .update({ pay_deposit_only: Boolean(payDepositOnly), updated_at: new Date().toISOString() })
     .in("id", cartItemIds)
     .eq("user_id", user.id)
     .eq("item_type", "service_booking")
+    .or(`pay_deposit_only.is.null,pay_deposit_only.neq.${Boolean(payDepositOnly)}`)
 
   const defaultProductMode = deliveryType === "delivery" ? "delivery" : "pickup"
   const fulfillmentUpdates = new Map<string, string[]>()
@@ -908,7 +912,8 @@ export async function checkoutCartAction(
         .from("cart_items")
         .update({ fulfillment_mode: mode, updated_at: new Date().toISOString() })
         .in("id", ids)
-        .eq("user_id", user.id),
+        .eq("user_id", user.id)
+        .or(`fulfillment_mode.is.null,fulfillment_mode.neq.${mode}`),
     ),
   )
 
