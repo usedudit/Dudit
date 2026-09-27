@@ -80,12 +80,7 @@ export const OfficialCategoryCard: React.FC<OfficialCategoryCardProps> = ({
     return (
         <>
             <SidebarCard
-                title={
-                    <>
-                        <Package className="w-5 h-5 text-brand-green" />
-                        {" Categoria Oficial"}
-                    </>
-                }
+                title="Categoria Oficial"
                 headerRight={categorizadoBadge}
                 hasSeparator
             >

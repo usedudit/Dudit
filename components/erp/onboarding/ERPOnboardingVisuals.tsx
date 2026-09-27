@@ -44,24 +44,24 @@ const VISUALS_BY_MODE: Record<string, Record<number, StepVisualData>> = {
     1: {
       title: "Anuncie seus produtos e serviços",
       subtitle: "A Dudit organiza seus itens para você anunciar com seu link próprio e negociar no WhatsApp.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+      image: "https://img.dudit.com.br/static/mascots/Segmentos.png",
     },
     2: {
       title: "Seu primeiro cadastro",
       subtitle: "Cadastre com nome e valor para começar a divulgar e combinar vendas com segurança.",
-      image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+      image: "https://img.dudit.com.br/static/mascots/Produtos.png",
     },
     3: {
       title: "Pronto para divulgar!",
       subtitle: "Seu link exclusivo já pode ser compartilhado com interessados e grupos do WhatsApp.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+      image: "https://img.dudit.com.br/static/mascots/HappyDino.png",
     },
   },
   erp: {
     1: {
       title: "Gestão completa do negócio",
       subtitle: "PDV no balcão, controle de estoque, financeiro e equipe integrados em um só lugar.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+      image: "https://img.dudit.com.br/static/mascots/Gestao.png",
     },
     2: {
       title: "Cadastre seu primeiro item",
@@ -71,24 +71,24 @@ const VISUALS_BY_MODE: Record<string, Record<number, StepVisualData>> = {
     3: {
       title: "Seu ERP está configurado!",
       subtitle: "Tudo pronto para operar o balcão, acompanhar relatórios e gerenciar seu negócio.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+      image: "https://img.dudit.com.br/static/mascots/HappyDino.png",
     },
   },
   quick: {
     1: {
       title: "Seu negócio do seu jeito",
       subtitle: "A Dudit organiza sua vitrine e catálogo sem complicação ou telas que você não vai usar.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoVender.png",
+      image: "https://img.dudit.com.br/static/mascots/Gestao.png",
     },
     2: {
       title: "Seu catálogo em 30 segundos",
       subtitle: "Cadastre com nome e preço direto ao ponto para começar a divulgar para seus clientes.",
-      image: "https://img.dudit.com.br/static/mascots/Servicos.png",
+      image: "https://img.dudit.com.br/static/mascots/Segmentos.png",
     },
     3: {
       title: "Parabéns, está tudo pronto!",
       subtitle: "Seu link exclusivo já pode ser compartilhado com seus clientes pelo WhatsApp.",
-      image: "https://img.dudit.com.br/static/mascots/PlanoEscalar.png",
+      image: "https://img.dudit.com.br/static/mascots/HappyDino.png",
     },
   },
 }
@@ -169,13 +169,12 @@ export const ERPOnboardingVisuals = React.memo(({
             return (
               <div
                 key={s}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  s === currentStep
-                    ? "w-8 bg-green-400"
-                    : s < currentStep
+                className={`h-1.5 rounded-full transition-all duration-300 ${s === currentStep
+                  ? "w-8 bg-green-400"
+                  : s < currentStep
                     ? "w-2 bg-green-600"
                     : "w-2 bg-white/20"
-                }`}
+                  }`}
               />
             )
           })}

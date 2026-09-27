@@ -18,6 +18,7 @@ import {
     EditIcon,
     AlertCircleIcon,
     ArrowUpIcon,
+    ReturnIcon,
 } from "@/lib/icons"
 
 const CANCELLATION_REASONS = [
@@ -46,6 +47,7 @@ import { getActiveRefundForPartnerAction } from "@/app/actions/billing/refunds"
 import { FadeIn } from "@/components/animations/FadeIn"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { getHardcodedPlan } from "@/lib/subscription/feature-labels"
+import { planTierIndex } from "@/lib/subscription/plan-tier"
 import { BillingPage } from "@/components/billing/BillingPage"
 import { BillingRefundModal } from "@/components/billing/BillingRefundModal"
 
@@ -137,7 +139,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
                     ) : price === 0 ? (
                         "Começar"
                     ) : (
-                        "Assinar"
+                        "Fazer upgrade"
                     )}
                 </Button>
 
@@ -444,10 +446,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
             setSubscribeModal({ open: true, planId: plan.id, planName: plan.name })
         } else {
             // Has active subscription: upgrade or downgrade
-            const currentPrice = currentPlan.price
-            const newPrice = plan.price
+            const isUpgrade = planTierIndex(plan.slug) > planTierIndex(currentPlan.slug)
 
-            if (newPrice > currentPrice) {
+            if (isUpgrade) {
                 // Upgrade - go through subscribe modal for new MP preapproval
                 setSubscribeModal({ open: true, planId: plan.id, planName: plan.name })
             } else {
@@ -805,6 +806,14 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                     <CancelIcon size={18} /> Cancelar Plano
                                                 </DropdownItem>
                                             )}
+                                            {hasActivePaidSub && !activeRefund && displayPlanPrice > 0 && displayPlanSlug !== "free" && (
+                                                <DropdownItem
+                                                    onClick={handleOpenRefundModal}
+                                                    disabled={loadingRefund}
+                                                >
+                                                    <ReturnIcon size={18} /> Solicitar Reembolso
+                                                </DropdownItem>
+                                            )}
                                             {activeRefund && (
                                                 <DropdownItem onClick={() => window.open(`/reembolso/${activeRefund.token}`, "_blank")}>
                                                     <EyeIcon size={18} /> Acompanhar Reembolso
@@ -855,20 +864,9 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                                 variant="default"
                                                 className="h-11"
                                                 onClick={() => setPlansOpen(true)}
+                                                leftIcon={<ArrowUpIcon size={18} />}
                                             >
-                                                <ArrowUpIcon size={16} className="mr-1.5" /> Fazer upgrade
-                                            </Button>
-                                        )}
-
-                                        {hasActivePaidSub && !activeRefund && displayPlanPrice > 0 && displayPlanSlug !== "free" && (
-                                            <Button
-                                                variant="outline"
-                                                className="h-11 border-brand-orange/40 text-brand-orange hover:bg-brand-orange/10 dark:hover:bg-brand-orange/20"
-                                                onClick={handleOpenRefundModal}
-                                                disabled={loadingRefund}
-                                                isLoading={loadingRefund}
-                                            >
-                                                Solicitar Reembolso
+                                                Fazer upgrade
                                             </Button>
                                         )}
                                     </div>
@@ -1037,7 +1035,7 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                                             ) : (
                                                 plans.map((plan) => {
                                                     const isCurrent = subData?.plan?.id === plan.id
-                                                    const isDowngrade = plan.price < currentPlanPrice && currentPlanSlug !== "free"
+                                                    const isDowngrade = planTierIndex(plan.slug) < planTierIndex(currentPlanSlug) && currentPlanSlug !== "free"
                                                     const isPopular = plan.slug === "crescer"
 
                                                     return (

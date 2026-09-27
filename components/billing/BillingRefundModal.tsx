@@ -18,7 +18,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { requestSubscriptionRefundAction } from "@/app/actions/billing/refunds"
 import ProductImagesSection from "@/components/erp/product/ProductImagesSection"
-import { TrashIcon, UploadIcon, CheckCircleIcon, FileIcon } from "@/lib/icons"
+import { TrashIcon, CheckCircleIcon, FileIcon } from "@/lib/icons"
 
 interface BillingRefundModalProps {
     isOpen: boolean
@@ -318,9 +318,9 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
 
                         {/* Alerta de Garantia Legal do CDC */}
                         {isWithin7Days ? (
-                            <InfoCard title="Garantia Legal do CDC (Art. 49) Ativa" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dia(s). Você possui direito ao reembolso integral de 100% do valor pago.`} color="green" />
+                            <InfoCard title="Garantia Legal do CDC (Art. 49) Ativa" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dia(s). Você possui direito ao reembolso integral de 100% do valor pago.`} color="green" className="mt-4" />
                         ) : (
-                            <InfoCard title="Período Superior a 7 Dias" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dias. Conforme os Termos de Uso, a solicitação será analisada individualmente pela administração.`} color="orange" />
+                            <InfoCard title="Período Superior a 7 Dias" message={`Sua compra foi realizada há ${Math.floor(daysElapsed)} dias. Conforme os Termos de Uso, a solicitação será analisada individualmente pela administração.`} color="orange" className="mt-4" />
                         )}
 
                         {/* ─── TAB 1: DADOS GERAIS ─── */}
@@ -400,7 +400,7 @@ export function BillingRefundModal({ isOpen, onClose, purchase, partnerId, onSuc
                                             className="w-full border-2 border-dashed border-brand-border dark:border-dark-border rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-brand-green dark:hover:border-brand-green transition-colors"
                                         >
                                             <IconPlaceholder
-                                                icon={UploadIcon}
+                                                icon={FileIcon}
                                                 iconSize="w-7 h-7"
                                                 title="Adicionar documento PDF"
                                                 subtitle="Clique para anexar arquivo PDF"

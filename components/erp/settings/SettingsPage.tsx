@@ -486,6 +486,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               planGate={paymentsPlanBlocked ? { requiredPlanSlug: "crescer" as const } : undefined}
               storeId={selectedStore?.id}
               orderFlow={(selectedStore as any)?.order_flow || (isQuick ? "whatsapp" : "dudit")}
+              isQuick={isQuick}
             />
           )}
 

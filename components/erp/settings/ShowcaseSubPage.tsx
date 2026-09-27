@@ -437,7 +437,7 @@ export const ShowcaseSubPage = ({
                                             <div className="grid gap-3">
                                                 <ListItem
                                                     title="Vitrine Ativa"
-                                                    description="Seus anúncios estão visíveis e disponíveis no marketplace."
+                                                    description="Seus anúncios estão visíveis e disponíveis"
                                                     icon={<Store className="text-brand-green" />}
                                                     onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })}
                                                     right={<RadioButton name="isShowcaseActive" value="active" checked={generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: true })} />}
@@ -445,7 +445,7 @@ export const ShowcaseSubPage = ({
                                                 />
                                                 <ListItem
                                                     title="Vitrine Inativa"
-                                                    description="Seus anúncios ficam ocultos temporariamente no marketplace."
+                                                    description="Seus anúncios ficam ocultos temporariamente"
                                                     icon={<Store className="text-brand-inactive-text" />}
                                                     onClick={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })}
                                                     right={<RadioButton name="isShowcaseActive" value="inactive" checked={!generalInfo.isShowcaseActive} onChange={() => setGeneralInfo({ ...generalInfo, isShowcaseActive: false })} />}

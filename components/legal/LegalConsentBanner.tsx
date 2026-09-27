@@ -86,7 +86,7 @@ export function LegalConsentBanner() {
   return (
     <DefaultModal
       isOpen={isOpen}
-      onClose={() => {}}
+      onClose={() => { }}
       title="Documentos atualizados"
       maxWidth="md"
       footer={
@@ -130,6 +130,7 @@ export function LegalConsentBanner() {
                     </Link>
                   ) : null
                 }
+                className="px-4 py-3"
               />
             )
           })}

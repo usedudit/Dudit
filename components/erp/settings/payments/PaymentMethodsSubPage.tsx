@@ -28,6 +28,7 @@ interface PaymentMethodsSubPageProps {
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
     storeId?: string | null
     embedded?: boolean
+    isQuick?: boolean
 }
 
 type PaymentFilters = {
@@ -40,7 +41,15 @@ const INITIAL_FILTERS: PaymentFilters = {
     status: [],
 }
 
-const LIST_COLUMNS = [
+const BASE_LIST_COLUMNS = [
+    { id: "name", label: "Método", align: "left" as const },
+    { id: "type", label: "Tipo", align: "left" as const },
+    { id: "discount", label: "Desconto", align: "left" as const },
+    { id: "status", label: "Status", align: "center" as const },
+    { id: "actions", label: "Ações", align: "center" as const },
+]
+
+const FULL_LIST_COLUMNS = [
     { id: "name", label: "Método", align: "left" as const },
     { id: "type", label: "Tipo", align: "left" as const },
     { id: "discount", label: "Desconto", align: "left" as const },
@@ -49,11 +58,15 @@ const LIST_COLUMNS = [
     { id: "actions", label: "Ações", align: "center" as const },
 ]
 
-export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, storeId, embedded }: PaymentMethodsSubPageProps) {
+export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onEdit, onCreate, planGate, storeId, embedded, isQuick }: PaymentMethodsSubPageProps) {
     const { openPlanUpgrade } = usePlanUpgrade()
     const { success: notifySuccess, error: notifyError } = useNotification()
     const isMobile = useMediaQuery("(max-width: 767px)")
     const isTablet = useMediaQuery("(max-width: 1024px)")
+
+    const LIST_COLUMNS = useMemo(() => {
+        return isQuick ? BASE_LIST_COLUMNS : FULL_LIST_COLUMNS
+    }, [isQuick])
 
     const [methods, setMethods] = useState<PaymentMethodListItem[]>(paymentMethods || [])
     const [search, setSearch] = useState("")
@@ -473,6 +486,7 @@ export function PaymentMethodsSubPage({ partner, paymentMethods, handleBack, onE
                             onSelect={() => handleSelectRow(method.id)}
                             onEdit={(current) => onEdit(current.id)}
                             onDelete={(current) => setMethodToDelete(current)}
+                            isQuick={isQuick}
                         />
                     ))}
                 </div>

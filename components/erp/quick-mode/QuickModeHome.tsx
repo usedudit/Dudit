@@ -620,9 +620,9 @@ function ModeCard({
                         <ListItem
                             title="Vitrine Online"
                             description="Crie uma vitrine com sua marca para divulgar e vender seus produtos"
-                            icon={<Store className="text-brand-green w-5 h-5" />}
+                            icon={<Store />}
                             onClick={() => setSelectedMode("quick")}
-                            left={
+                            right={
                                 <RadioButton
                                     name="evolveMode"
                                     value="quick"
@@ -630,15 +630,15 @@ function ModeCard({
                                     onChange={() => setSelectedMode("quick")}
                                 />
                             }
-                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            className="px-4 py-3"
                         />
 
                         <ListItem
                             title="Gerenciar meu negócio"
                             description="Controle completo do seu negócio, financeiro, equipe e relatórios."
-                            icon={<RocketIcon className="text-brand-green w-5 h-5" />}
+                            icon={<RocketIcon />}
                             onClick={() => setSelectedMode("erp")}
-                            left={
+                            right={
                                 <RadioButton
                                     name="evolveMode"
                                     value="erp"
@@ -646,7 +646,7 @@ function ModeCard({
                                     onChange={() => setSelectedMode("erp")}
                                 />
                             }
-                            className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
+                            className="px-4 py-3"
                         />
 
                         <div className="flex justify-end gap-3 pt-3 border-t border-brand-border dark:border-dark-border">

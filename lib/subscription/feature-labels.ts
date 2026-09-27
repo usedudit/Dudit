@@ -106,11 +106,11 @@ export const HARDCODED_PLANS: Record<string, { name: string; objective: string; 
     features: [
       "Tudo do plano Crescer +",
       "Financeiro completo com fluxo de caixa e DRE",
-      "Controle de expedição e entregas",
+      "Controle de entregas e envios",
       "Campanhas promocionais",
       "Metas e desempenho da equipe",
       "Lembretes e envios automáticos via WhatsApp",
-      "Importação XML (NF-e) ilimitada",
+      "Importação de XML (NF-e)"
     ],
     limits: [
       "Itens e pedidos ilimitados",

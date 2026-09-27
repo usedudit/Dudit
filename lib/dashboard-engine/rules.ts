@@ -210,7 +210,7 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
       description: "Para continuar cadastrando mais produtos e expandir sua vitrine, migre para o Plano Crescer.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
-      actionHref: "/erp/configuracoes"
+      actionHref: "/erp/configuracoes?tab=assinatura"
     });
   }
 
@@ -222,7 +222,7 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
       description: "Seu negócio está crescendo! Faça o upgrade para continuar recebendo pedidos sem interrupções.",
       type: "danger",
       actionLabel: "Fazer Upgrade",
-      actionHref: "/erp/configuracoes"
+      actionHref: "/erp/configuracoes?tab=assinatura"
     });
   }
 
@@ -231,10 +231,10 @@ export function getAlerts(ctx: DashboardContext): DashboardAlert[] {
     alerts.push({
       id: "alert-mp-missing",
       title: "Pagamento online pendente",
-      description: "Seu plano permite checkout transparente e Pix automático. Conecte sua conta do Mercado Pago para ativar.",
+      description: "Seu plano permite receber pagamentos online! Conecte sua conta do Mercado Pago para ativar.",
       type: "warning",
       actionLabel: "Conectar Mercado Pago",
-      actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
+      actionHref: "/erp/configuracoes?tab=integracoes"
     });
   }
 
@@ -256,9 +256,9 @@ export function getIntegrations(ctx: DashboardContext): DashboardIntegration[] {
     {
       id: "mercadopago",
       name: "Mercado Pago",
-      description: "Receba no Pix automático, boleto e cartão no checkout da sua vitrine.",
+      description: "Receba pagamentos online via Pix, Boleto e Cartão no checkout da sua vitrine.",
       status: ctx.isMercadoPagoConnected ? "connected" : "disconnected",
-      actionHref: "/erp/configuracoes?tab=formas-de-pagamento"
+      actionHref: "/erp/configuracoes?tab=integracoes"
     }
   ];
 }
@@ -277,7 +277,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       description: "Aumente seu catálogo para 100 itens, receba no Pix automático com Mercado Pago e crie cupons de desconto para fidelizar clientes.",
       badge: "RECOMENDADO",
       actionLabel: "Conhecer Plano Crescer",
-      actionHref: "/erp/configuracoes",
+      actionHref: "/erp/configuracoes?tab=assinatura",
       variant: "upgrade"
     });
   }
@@ -290,7 +290,7 @@ export function getRecommendations(ctx: DashboardContext): DashboardRecommendati
       description: "Tenha produtos e pedidos ilimitados, fluxo de caixa avançado, DRE simplificado e gestão completa de devoluções.",
       badge: "GESTÃO COMPLETA",
       actionLabel: "Conhecer Plano Escalar",
-      actionHref: "/erp/configuracoes",
+      actionHref: "/erp/configuracoes?tab=assinatura",
       variant: "upgrade"
     });
   }

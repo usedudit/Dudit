@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input, FormDropdown, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -18,8 +18,8 @@ import {
     disconnectSuperFreteAction,
     setupSuperFreteWebhookAction,
     saveSuperFreteConfigAction,
-  type SuperFreteStatus,
-  type SuperFreteConfig,
+    type SuperFreteStatus,
+    type SuperFreteConfig,
 } from "@/app/actions/shipping/superfrete"
 import type { SuperFreteEnvironment } from "@/lib/services/shipping/superfrete"
 import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
@@ -111,8 +111,9 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | "sfKnowMore" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
+    const [sfKnowMoreStep, setSfKnowMoreStep] = useState(0)
 
     // Accepted payment methods state
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
@@ -158,7 +159,7 @@ export const IntegrationsSubPage = ({
     useEffect(() => {
         return () => {
             if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
-                resetEvolutionPairingStatusAction(currentStoreId).catch(() => {})
+                resetEvolutionPairingStatusAction(currentStoreId).catch(() => { })
             }
         }
     }, [])
@@ -305,7 +306,7 @@ export const IntegrationsSubPage = ({
 
     const handleEvoModalClose = () => {
         if (evoStatusRef.current === "qr_pending" || evoStatusRef.current === "connecting") {
-            resetEvolutionPairingStatusAction(currentStoreId).catch(() => {})
+            resetEvolutionPairingStatusAction(currentStoreId).catch(() => { })
         }
         setEvoStatus("disconnected")
         setEvoQrCode(null)
@@ -567,6 +568,21 @@ export const IntegrationsSubPage = ({
                 "💰 Possibilidade de crédito para o seu negócio",
                 "⚡ Pagamento rápido, sem complicação",
             ],
+        },
+    ]
+
+    const SF_KNOW_MORE_STEPS: { title: string; description?: string; list?: string[] }[] = [
+        {
+            title: "O que é o SuperFrete?",
+            description: "O SuperFrete é uma plataforma de logística que permite gerar etiquetas de envio com Correios, JadLog, Loggi, J&T e outras transportadoras.\n\nCom ele, você oferece frete grátis ou calculado automaticamente na hora do checkout.\n\nTudo isso com diversas transportadoras em um só lugar.",
+        },
+        {
+            title: "Como funciona?",
+            description: "A integração é rápida e prática. Conecte sua conta informando o token de API gerado no painel do SuperFrete.\n\nDepois, configure o CEP de origem e as dimensões padrão dos seus produtos.\n\nAs etiquetas são geradas automaticamente quando o cliente finaliza a compra.",
+        },
+        {
+            title: "Como configurar?",
+            description: "Clique em Conectar e cole o token de API gerado no painel do SuperFrete (sandbox.superfrete.com ou web.superfrete.com).\n\nEscolha entre sandbox (teste) e produção, e configure o CEP de origem e dimensões padrão para que os fretes sejam calculados corretamente.",
         },
     ]
 
@@ -833,9 +849,9 @@ export const IntegrationsSubPage = ({
                                 <div>
                                     <div className="flex gap-4 items-start">
                                         <img
-                                            src="https://img.dudit.com.br/static/icons/payments/SuperFrete.png"
+                                            src="https://img.dudit.com.br/static/icons/brands/Superfrete.png"
                                             alt="SuperFrete"
-                                            className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                            className="w-12 h-12 object-contain shrink-0"
                                         />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -853,19 +869,16 @@ export const IntegrationsSubPage = ({
                                                     <Badge variant="gray"></Badge>
                                                 )}
                                             </div>
-                                            {(sfStatus?.email || sfStatus?.balance !== undefined) && (
-                                                <div className="mt-1">
-                                                    {sfStatus?.email && (
-                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block font-medium">
-                                                            {sfStatus.email}
-                                                        </span>
-                                                    )}
-                                                    {sfStatus?.balance !== undefined && (
-                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block font-medium">
-                                                            Saldo: R$ {Number(sfStatus.balance).toFixed(2)}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                            {(sfStatus?.connected || superfreteConnected) && (
+                                                <a
+                                                    href="https://www.superfrete.com.br"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-brand-blue dark:text-blue-400 hover:underline w-max mt-1 font-medium block"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    superfrete.com.br
+                                                </a>
                                             )}
                                         </div>
                                     </div>
@@ -881,8 +894,8 @@ export const IntegrationsSubPage = ({
                                             <Button
                                                 variant="link"
                                                 onClick={() => {
-                                                    setSfActiveTab("connect")
-                                                    setActiveModal("superfreteConfig")
+                                                    setSfKnowMoreStep(0)
+                                                    setActiveModal("sfKnowMore")
                                                 }}
                                             >
                                                 Saber mais
@@ -904,6 +917,10 @@ export const IntegrationsSubPage = ({
                                             onCheckedChange={(checked) => {
                                                 if (sfIsLoading || isCheckingPlan) return
                                                 if (checked) {
+                                                    if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                        openPlanUpgrade("escalar")
+                                                        return
+                                                    }
                                                     setSfActiveTab("connect")
                                                     setActiveModal("superfreteConfig")
                                                 } else {
@@ -912,9 +929,9 @@ export const IntegrationsSubPage = ({
                                             }}
                                             className={sfIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
                                         />
-                                        </div>
                                     </div>
                                 </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -926,256 +943,333 @@ export const IntegrationsSubPage = ({
                     title="SuperFrete"
                     maxWidth="lg"
                 >
-                    <div className="flex gap-4 mb-6 border-b border-brand-border dark:border-dark-border">
-                        <button
-                            onClick={() => setSfActiveTab("connect")}
-                            className={`pb-2 px-1 text-sm font-medium transition-colors ${
-                                sfActiveTab === "connect"
-                                    ? "text-brand-blue dark:text-blue-400 border-b-2 border-brand-blue dark:border-blue-400"
-                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:text-dark-heading"
-                            }`}
-                        >
-                            Conectar
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (sfStatus?.connected || superfreteConnected) {
-                                    setSfActiveTab("settings")
-                                }
-                            }}
-                            className={`pb-2 px-1 text-sm font-medium transition-colors ${
-                                sfActiveTab === "settings"
-                                    ? "text-brand-blue dark:text-blue-400 border-b-2 border-brand-blue dark:border-blue-400"
-                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:text-dark-heading"
-                            }`}
-                            disabled={!(sfStatus?.connected || superfreteConnected)}
-                        >
-                            Configurações
-                        </button>
-                    </div>
+                    <Tabs value={sfActiveTab} onValueChange={(v) => setSfActiveTab(v as "connect" | "settings")} className="w-full">
+                        <TabsList className="bg-transparent p-0 gap-6 w-full justify-start border-b-0">
+                            <TabsTrigger value="connect">
+                                Conectar
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="settings"
+                                disabled={!(sfStatus?.connected || superfreteConnected)}
+                            >
+                                Configurações
+                            </TabsTrigger>
+                        </TabsList>
 
-                    {sfActiveTab === "connect" && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Conecte sua conta SuperFrete informando o token de API gerado em https://sandbox.superfrete.com/#/integrations
-                            </p>
-                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4">
-                                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-2">
-                                    Como obter o token:
+                        <TabsContent value="connect" className="mt-0">
+                            <div className="space-y-4">
+                                {(sfStatus?.email || sfStatus?.balance !== undefined) && (
+                                    <ListItem
+                                        className="px-4 py-3"
+                                        icon={<img src="https://img.dudit.com.br/static/icons/brands/Superfrete.png" alt="SuperFrete" className="object-contain" />}
+                                        title={sfStatus?.email || ""}
+                                        description={
+                                            sfStatus?.balance !== undefined
+                                                ? `Saldo: R$ ${Number(sfStatus.balance).toFixed(2)}`
+                                                : undefined
+                                        }
+                                    />
+                                )}
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                    Conecte sua conta SuperFrete informando o token de API gerado em https://sandbox.superfrete.com/#/integrations
                                 </p>
-                                <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
-                                    <li>Acesse sandbox.superfrete.com/#/integrations (teste) ou web.superfrete.com/#/integrations (produção)</li>
-                                    <li>Clique em "Desenvolvedores" → "Integrar"</li>
-                                    <li>Copie o token gerado e cole abaixo</li>
-                                </ol>
-                            </div>
-                            <Input
-                                label="Token de API SuperFrete"
-                                placeholder="Cole seu token aqui..."
-                                value={sfTokenInput}
-                                onChange={(e) => setSfTokenInput(e.target.value)}
-                                variant="full-rounded"
-                            />
-                            <FormDropdown
-                                label="Ambiente"
-                                options={[
-                                    { value: "sandbox", label: "Sandbox (teste)" },
-                                    { value: "production", label: "Produção" },
-                                ]}
-                                value={sfEnvironment}
-                                setValue={(v: string) => setSfEnvironment(v === "production" ? "production" : "sandbox")}
-                                placeholder="Selecione o ambiente"
-                            />
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
-                                O token deve ser do mesmo ambiente selecionado. Em Sandbox as etiquetas são apenas para testes.
-                            </p>
-                            {sfStatus?.balance !== undefined && (
-                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/40 rounded-xl p-3">
-                                    <p className="text-xs text-green-700 dark:text-green-400">
-                                        Saldo atual na carteira: R$ {Number(sfStatus.balance).toFixed(2)}
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4">
+                                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-2">
+                                        Como obter o token:
                                     </p>
+                                    <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
+                                        <li>Acesse sandbox.superfrete.com/#/integrations (teste) ou web.superfrete.com/#/integrations (produção)</li>
+                                        <li>Clique em "Desenvolvedores" → "Integrar"</li>
+                                        <li>Copie o token gerado e cole abaixo</li>
+                                    </ol>
                                 </div>
-                            )}
-                            <div className="flex gap-3 pt-2">
-                                <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    className="flex-1"
-                                    disabled={sfIsConnecting || !sfTokenInput.trim()}
-                                    isLoading={sfIsConnecting}
-                                    onClick={handleSfConnect}
-                                >
-                                    {sfIsConnecting ? "Conectando..." : "Conectar"}
-                                </Button>
+                                <Input
+                                    label="Token de API SuperFrete"
+                                    placeholder="Cole seu token aqui..."
+                                    value={sfTokenInput}
+                                    onChange={(e) => setSfTokenInput(e.target.value)}
+                                />
+                                <FormDropdown
+                                    label="Ambiente"
+                                    options={[
+                                        { value: "sandbox", label: "Sandbox (teste)" },
+                                        { value: "production", label: "Produção" },
+                                    ]}
+                                    value={sfEnvironment}
+                                    setValue={(v: string) => setSfEnvironment(v === "production" ? "production" : "sandbox")}
+                                    placeholder="Selecione o ambiente"
+                                />
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body -mt-2">
+                                    O token deve ser do mesmo ambiente selecionado. Em Sandbox as etiquetas são apenas para testes.
+                                </p>
+                                <div className="flex gap-3 pt-2">
+                                    <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        disabled={sfIsConnecting || !sfTokenInput.trim()}
+                                        isLoading={sfIsConnecting}
+                                        onClick={handleSfConnect}
+                                    >
+                                        {sfIsConnecting ? "Conectando..." : "Conectar"}
+                                    </Button>
+                                </div>
                             </div>
+                        </TabsContent>
+
+                        <TabsContent value="settings" className="mt-0">
+                            <div className="space-y-4">
+                                <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                    Configure as preferências padrão para geração de etiquetas.
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="CEP de origem"
+                                        placeholder="00000-000"
+                                        value={sfOriginCep}
+                                        onChange={(e) => setSfOriginCep(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Altura (cm)"
+                                        type="number"
+                                        placeholder="10"
+                                        value={sfDefaultHeight}
+                                        onChange={(e) => setSfDefaultHeight(e.target.value)}
+                                    />
+                                    <Input
+                                        label="Largura (cm)"
+                                        type="number"
+                                        placeholder="10"
+                                        value={sfDefaultWidth}
+                                        onChange={(e) => setSfDefaultWidth(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input
+                                        label="Comprimento (cm)"
+                                        type="number"
+                                        placeholder="10"
+                                        value={sfDefaultLength}
+                                        onChange={(e) => setSfDefaultLength(e.target.value)}
+                                    />
+                                    <Input
+                                        label="Peso (kg)"
+                                        type="number"
+                                        placeholder="0.5"
+                                        value={sfDefaultWeight}
+                                        onChange={(e) => setSfDefaultWeight(e.target.value)}
+                                    />
+                                </div>
+
+                                <Input
+                                    label="Valor do seguro (R$)"
+                                    type="number"
+                                    placeholder="0"
+                                    value={sfInsuranceValue}
+                                    onChange={(e) => setSfInsuranceValue(e.target.value)}
+                                />
+                                <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                    Valor declarado da encomenda para seguro. Deixe 0 para desativar.
+                                </p>
+
+                                <div className="flex items-center justify-between py-2">
+                                    <div>
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                            Mão própria
+                                        </span>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            Garantir que a encomenda seja entregue apenas ao destinatário autorizado.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={sfOwnHand}
+                                        onCheckedChange={setSfOwnHand}
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between py-2">
+                                    <div>
+                                        <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                            Aviso de recebimento
+                                        </span>
+                                        <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                            Solicitar confirmação de recebimento do destinatário.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={sfReceipt}
+                                        onCheckedChange={setSfReceipt}
+                                    />
+                                </div>
+
+                                <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                    <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">
+                                        Serviços de frete
+                                    </p>
+                                    <div className="space-y-2">
+                                        {[
+                                            { id: 1 as SuperFreteServiceId, label: "PAC" },
+                                            { id: 2 as SuperFreteServiceId, label: "SEDEX" },
+                                            { id: 17 as SuperFreteServiceId, label: "Mini Envios" },
+                                            { id: 3 as SuperFreteServiceId, label: "JadLog" },
+                                            { id: 31 as SuperFreteServiceId, label: "Loggi" },
+                                            { id: 33 as SuperFreteServiceId, label: "J&T" },
+                                        ].map((svc) => (
+                                            <div key={svc.id} className="flex items-center justify-between py-2">
+                                                <span className="text-sm text-brand-dark dark:text-dark-heading">
+                                                    {svc.label}
+                                                </span>
+                                                <Switch
+                                                    checked={sfServices.includes(svc.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSfServices([...sfServices, svc.id])
+                                                        } else {
+                                                            setSfServices(sfServices.filter((s) => s !== svc.id))
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                                    <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        className="flex-1"
+                                        onClick={async () => {
+                                            const res = await saveSuperFreteConfigAction({
+                                                originCep: sfOriginCep,
+                                                height: Number(sfDefaultHeight),
+                                                width: Number(sfDefaultWidth),
+                                                length: Number(sfDefaultLength),
+                                                weight: Number(sfDefaultWeight),
+                                                insuranceValue: Number(sfInsuranceValue || "0"),
+                                                ownHand: sfOwnHand,
+                                                receipt: sfReceipt,
+                                                services: sfServices,
+                                                environment: sfEnvironment,
+                                            })
+                                            if (res.success) {
+                                                toast.success("Configurações salvas!")
+                                                if (sfStatus?.webhookConfigured !== true) {
+                                                    await setupSuperFreteWebhookAction()
+                                                }
+                                                await fetchSfStatus()
+                                                setActiveModal(null)
+                                            } else {
+                                                toast.error(res.error || "Erro ao salvar configurações")
+                                            }
+                                        }}
+                                    >
+                                        Salvar
+                                    </Button>
+                                </div>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+                </DefaultModal>
+
+                {/* SuperFrete Know More Modal */}
+                <DefaultModal
+                    isOpen={activeModal === "sfKnowMore"}
+                    onClose={() => setActiveModal(null)}
+                    title="O que é a SuperFrete?"
+                    maxWidth="lg"
+                >
+                    <div className="flex flex-col min-h-[500px]">
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
+                            <img src="https://img.dudit.com.br/static/icons/brands/SuperfreteLogo.png" alt="SuperFrete" className="w-full h-full object-contain" />
                         </div>
-                    )}
 
-                    {sfActiveTab === "settings" && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
-                                Configure as preferências padrão para geração de etiquetas.
-                            </p>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="CEP de origem"
-                                    placeholder="00000-000"
-                                    value={sfOriginCep}
-                                    onChange={(e) => setSfOriginCep(e.target.value)}
-                                    variant="full-rounded"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="Altura (cm)"
-                                    type="number"
-                                    placeholder="10"
-                                    value={sfDefaultHeight}
-                                    onChange={(e) => setSfDefaultHeight(e.target.value)}
-                                    variant="full-rounded"
-                                />
-                                <Input
-                                    label="Largura (cm)"
-                                    type="number"
-                                    placeholder="10"
-                                    value={sfDefaultWidth}
-                                    onChange={(e) => setSfDefaultWidth(e.target.value)}
-                                    variant="full-rounded"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="Comprimento (cm)"
-                                    type="number"
-                                    placeholder="10"
-                                    value={sfDefaultLength}
-                                    onChange={(e) => setSfDefaultLength(e.target.value)}
-                                    variant="full-rounded"
-                                />
-                                <Input
-                                    label="Peso (kg)"
-                                    type="number"
-                                    placeholder="0.5"
-                                    value={sfDefaultWeight}
-                                    onChange={(e) => setSfDefaultWeight(e.target.value)}
-                                    variant="full-rounded"
-                                />
-                            </div>
-
-                            <Input
-                                label="Valor do seguro (R$)"
-                                type="number"
-                                placeholder="0"
-                                value={sfInsuranceValue}
-                                onChange={(e) => setSfInsuranceValue(e.target.value)}
-                                variant="full-rounded"
-                            />
-                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                Valor declarado da encomenda para seguro. Deixe 0 para desativar.
-                            </p>
-
-                            <div className="flex items-center justify-between py-2">
-                                <div>
-                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                        Mão própria
-                                    </span>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Garantir que a encomenda seja entregue apenas ao destinatário autorizado.
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={sfOwnHand}
-                                    onCheckedChange={setSfOwnHand}
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-between py-2">
-                                <div>
-                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
-                                        Aviso de recebimento
-                                    </span>
-                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
-                                        Solicitar confirmação de recebimento do destinatário.
-                                    </p>
-                                </div>
-                                <Switch
-                                    checked={sfReceipt}
-                                    onCheckedChange={setSfReceipt}
-                                />
-                            </div>
-
-                            <div className="border-t border-brand-border dark:border-dark-border pt-4">
-                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">
-                                    Serviços de frete
-                                </p>
-                                <div className="space-y-2">
-                                    {[
-                                        { id: 1 as SuperFreteServiceId, label: "PAC" },
-                                        { id: 2 as SuperFreteServiceId, label: "SEDEX" },
-                                        { id: 17 as SuperFreteServiceId, label: "Mini Envios" },
-                                        { id: 3 as SuperFreteServiceId, label: "JadLog" },
-                                        { id: 31 as SuperFreteServiceId, label: "Loggi" },
-                                        { id: 33 as SuperFreteServiceId, label: "J&T" },
-                                    ].map((svc) => (
-                                        <div key={svc.id} className="flex items-center justify-between py-2">
-                                            <span className="text-sm text-brand-dark dark:text-dark-heading">
-                                                {svc.label}
-                                            </span>
-                                            <Switch
-                                                checked={sfServices.includes(svc.id)}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                        setSfServices([...sfServices, svc.id])
-                                                    } else {
-                                                        setSfServices(sfServices.filter((s) => s !== svc.id))
-                                                    }
-                                                }}
-                                            />
-                                        </div>
+                        <div className="p-8 flex-1 flex flex-col">
+                            <div className="mb-8">
+                                <div className="flex gap-2">
+                                    {SF_KNOW_MORE_STEPS.map((_, i) => (
+                                        <motion.div
+                                            key={i}
+                                            layout
+                                            className={`h-1 flex-1 rounded-full transition-colors duration-500 ${i <= sfKnowMoreStep ? "bg-brand-green" : "bg-brand-gray dark:bg-dark-border"
+                                                }`}
+                                        />
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
-                                <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
-                                    Cancelar
-                                </Button>
-                                <Button
+                            <AnimatePresence mode="wait">
+                                <motion.div
+                                    key={sfKnowMoreStep}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -10 }}
+                                    transition={{ duration: 0.2 }}
                                     className="flex-1"
-                                    onClick={async () => {
-                                        const res = await saveSuperFreteConfigAction({
-                                            originCep: sfOriginCep,
-                                            height: Number(sfDefaultHeight),
-                                            width: Number(sfDefaultWidth),
-                                            length: Number(sfDefaultLength),
-                                            weight: Number(sfDefaultWeight),
-                                            insuranceValue: Number(sfInsuranceValue || "0"),
-                                            ownHand: sfOwnHand,
-                                            receipt: sfReceipt,
-                                            services: sfServices,
-                                            environment: sfEnvironment,
-                                        })
-                                        if (res.success) {
-                                            toast.success("Configurações salvas!")
-                                            if (sfStatus?.webhookConfigured !== true) {
-                                                await setupSuperFreteWebhookAction()
-                                            }
-                                            await fetchSfStatus()
-                                            setActiveModal(null)
-                                        } else {
-                                            toast.error(res.error || "Erro ao salvar configurações")
-                                        }
-                                    }}
                                 >
-                                    Salvar
+                                    {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description && (
+                                        <p className="text-md text-brand-inactive-text dark:text-dark-body leading-relaxed whitespace-pre-wrap">
+                                            {SF_KNOW_MORE_STEPS[sfKnowMoreStep].description}
+                                        </p>
+                                    )}
+
+                                    {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list && (
+                                        <ul className="space-y-4 mt-6">
+                                            {SF_KNOW_MORE_STEPS[sfKnowMoreStep].list.map((item, i) => (
+                                                <li key={i} className="flex items-start gap-3 text-md text-brand-inactive-text dark:text-dark-body">
+                                                    <span className="flex shrink-0 items-center justify-center text-md">
+                                                        ●
+                                                    </span>
+                                                    {item}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </motion.div>
+                            </AnimatePresence>
+
+                            <div className="flex flex-col md:flex-row gap-3 mt-8">
+                                <Button
+                                    variant="outline"
+                                    disabled={sfKnowMoreStep === 0}
+                                    onClick={() => setSfKnowMoreStep(prev => prev - 1)}
+                                    className="flex-1 h-[46px]"
+                                >
+                                    Anterior
                                 </Button>
+
+                                {sfKnowMoreStep === SF_KNOW_MORE_STEPS.length - 1 ? (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => {
+                                            if (!hasMinimumPlan(planSlug, "escalar")) {
+                                                setActiveModal(null)
+                                                openPlanUpgrade("escalar")
+                                                return
+                                            }
+                                            setActiveModal(null)
+                                        }}
+                                    >
+                                        Entendido
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="flex-1 h-[46px]"
+                                        onClick={() => setSfKnowMoreStep(prev => prev + 1)}
+                                    >
+                                        Próximo
+                                    </Button>
+                                )}
                             </div>
                         </div>
-                    )}
+                    </div>
                 </DefaultModal>
                 <DefaultModal
                     isOpen={waActiveModal === "info"}

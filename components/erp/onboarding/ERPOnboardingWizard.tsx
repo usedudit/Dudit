@@ -21,7 +21,6 @@ import {
   ChartIcon,
 } from "@/lib/icons"
 import { ListItem } from "@/components/reusable/ListItem"
-import { Checkbox } from "@/components/reusable/Checkbox"
 import { RadioButton } from "@/components/reusable/RadioButton"
 import { Button } from "@/components/reusable/Button"
 import Input from "@/components/reusable/Input"
@@ -73,26 +72,31 @@ export function ERPOnboardingWizard({
   const isERP = businessMode === "erp"
   const isVitrine = !isDesapego && !isERP
 
-  // Step 1: Objetivos principais adaptados dinamicamente ao modo
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(() => {
+  // Objetivos principais derivados das props (para envio na ação)
+  const goals = React.useMemo(() => {
+    const g: string[] = []
     if (isDesapego) {
-      const initial: string[] = []
-      if (sellsProducts) initial.push("products")
-      if (sellsServices) initial.push("services")
-      return initial.length > 0 ? initial : ["products"]
+      if (sellsProducts) g.push("products")
+      if (sellsServices) g.push("services")
+      return g.length > 0 ? g : ["products"]
     }
     if (isERP) {
-      if (sellsServices) return ["pos", "financial_control", "appointments_team"]
-      return ["pos", "stock_control", "financial_control"]
+      g.push("pos")
+      if (sellsProducts) g.push("stock_control")
+      g.push("financial_control")
+      if (sellsServices) g.push("appointments_team")
+      g.push("performance_reports")
+      return g
     }
     // Vitrine (quick / showcase)
-    if (sellsServices) return ["appointments", "whatsapp_services"]
-    return ["whatsapp_catalog", "pix_payments"]
-  })
+    g.push("dudit_orders", "payment_methods", "coupons_promotions", "customers_management")
+    if (sellsServices) g.push("appointments")
+    return g
+  }, [isDesapego, isERP, sellsProducts, sellsServices])
 
   // Step 2: Primeiro item (adaptado)
-  const hasProducts = isDesapego ? selectedGoals.includes("products") : sellsProducts
-  const hasServices = isDesapego ? selectedGoals.includes("services") : sellsServices
+  const hasProducts = isDesapego ? sellsProducts : sellsProducts
+  const hasServices = isDesapego ? sellsServices : sellsServices
   const isHybrid = hasProducts && hasServices
 
   const [itemType, setItemType] = useState<"service" | "product">(() => {
@@ -123,22 +127,6 @@ export function ERPOnboardingWizard({
   const publicStoreUrl = partnerUrl.startsWith("http") ? partnerUrl : `${origin}${partnerUrl}`
   const totalSteps = 3
 
-  const toggleGoal = (id: string) => {
-    setSelectedGoals((prev) => {
-      if (isDesapego) {
-        // Pelo menos um tem que ser obrigatório
-        if (prev.includes(id)) {
-          if (prev.length <= 1) {
-            return prev
-          }
-          return prev.filter((g) => g !== id)
-        }
-        return [...prev, id]
-      }
-      return prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
-    })
-  }
-
   const prevStep = () => {
     setDirection(-1)
     if (step > 1) {
@@ -149,17 +137,6 @@ export function ERPOnboardingWizard({
   }
 
   const handleNextFromGoals = () => {
-    if (isDesapego) {
-      const hasProd = selectedGoals.includes("products")
-      const hasServ = selectedGoals.includes("services")
-      if (hasProd && !hasServ) {
-        setItemType("product")
-      } else if (hasServ && !hasProd) {
-        setItemType("service")
-      } else if (!itemType) {
-        setItemType("product")
-      }
-    }
     setDirection(1)
     setStep(2)
   }
@@ -171,7 +148,7 @@ export function ERPOnboardingWizard({
 
       const res = await completeERPOnboardingWizardAction({
         partnerId,
-        goals: selectedGoals,
+        goals,
         firstItem: hasValidItem
           ? {
             name: itemName.trim(),
@@ -340,7 +317,7 @@ export function ERPOnboardingWizard({
                         </p>
                       </div>
 
-                      {/* STEP 1: OBJETIVOS PRINCIPAIS COM CHECKBOX ADAPTADO */}
+                      {/* STEP 1: OBJETIVOS PRINCIPAIS INFORMATIVOS (sem interação) */}
                       {step === 1 && (
                         <div className="space-y-3">
                           {/* MODO DESAPEGO */}
@@ -350,28 +327,14 @@ export function ERPOnboardingWizard({
                                 icon={Package}
                                 title="Anunciar produtos ou desapegos"
                                 description="Venda itens novos, usados, eletrônicos, roupas ou produtos da sua loja"
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("products")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("products")}
-                                    onChange={() => toggleGoal("products")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               <ListItem
                                 icon={WrenchIcon}
                                 title="Anunciar serviço ou atendimento"
                                 description="Divulgue seus serviços, agendamentos, consultoria, manutenções ou procedimentos"
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("services")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("services")}
-                                    onChange={() => toggleGoal("services")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
                             </>
                           )}
@@ -383,56 +346,28 @@ export function ERPOnboardingWizard({
                                 icon={ShoppingBagIcon}
                                 title="Receber pedidos pela Dudit"
                                 description="Ativar fluxo de pedidos direto pela plataforma, sem precisar repassar no WhatsApp."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("dudit_orders")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("dudit_orders")}
-                                    onChange={() => toggleGoal("dudit_orders")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               <ListItem
                                 icon={MoneyIcon}
                                 title="Configurar formas de pagamento"
                                 description="Mostrar aos clientes seus meios de pagamento aceitos (Pix, cartão, dinheiro)."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("payment_methods")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("payment_methods")}
-                                    onChange={() => toggleGoal("payment_methods")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               <ListItem
                                 icon={MegaphoneIcon}
                                 title="Gerenciar cupons e promoções"
                                 description="Criar cupons de desconto e campanhas para atrair mais clientes."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("coupons_promotions")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("coupons_promotions")}
-                                    onChange={() => toggleGoal("coupons_promotions")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               <ListItem
                                 icon={Users}
                                 title="Gerenciar clientes"
                                 description="Acompanhar cadastros, histórico de compras e fidelizar seu público."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("customers_management")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("customers_management")}
-                                    onChange={() => toggleGoal("customers_management")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               {sellsServices && (
@@ -440,14 +375,7 @@ export function ERPOnboardingWizard({
                                   icon={CalendarIcon}
                                   title="Organizar agendamentos e horários"
                                   description="Clientes escolhem data e hora pelo link, evitando desencontros no WhatsApp."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                  onClick={() => toggleGoal("appointments")}
-                                  right={
-                                    <Checkbox
-                                      checked={selectedGoals.includes("appointments")}
-                                      onChange={() => toggleGoal("appointments")}
-                                    />
-                                  }
+                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                                 />
                               )}
                             </>
@@ -460,14 +388,7 @@ export function ERPOnboardingWizard({
                                 icon={CashierIcon}
                                 title="Frente de Caixa (PDV) e vendas no balcão"
                                 description="Registrar vendas rápidas no computador e imprimir recibos na hora."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("pos")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("pos")}
-                                    onChange={() => toggleGoal("pos")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               {sellsProducts && (
@@ -475,14 +396,7 @@ export function ERPOnboardingWizard({
                                   icon={PackageIcon}
                                   title="Controle de estoque e reposição"
                                   description="Acompanhar entradas, saídas e estoque mínimo para evitar falta de mercadorias."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                  onClick={() => toggleGoal("stock_control")}
-                                  right={
-                                    <Checkbox
-                                      checked={selectedGoals.includes("stock_control")}
-                                      onChange={() => toggleGoal("stock_control")}
-                                    />
-                                  }
+                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                                 />
                               )}
 
@@ -490,14 +404,7 @@ export function ERPOnboardingWizard({
                                 icon={MoneyIcon}
                                 title="Fluxo de caixa e gestão financeira"
                                 description="Controlar entradas, despesas, faturamento do mês e demonstrativo (DRE)."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("financial_control")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("financial_control")}
-                                    onChange={() => toggleGoal("financial_control")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
 
                               {sellsServices && (
@@ -505,14 +412,7 @@ export function ERPOnboardingWizard({
                                   icon={CalendarIcon}
                                   title="Agenda da equipe e profissionais"
                                   description="Gerenciar horários dos profissionais, comissões e fila de atendimento."
-                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                  onClick={() => toggleGoal("appointments_team")}
-                                  right={
-                                    <Checkbox
-                                      checked={selectedGoals.includes("appointments_team")}
-                                      onChange={() => toggleGoal("appointments_team")}
-                                    />
-                                  }
+                                  className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                                 />
                               )}
 
@@ -520,14 +420,7 @@ export function ERPOnboardingWizard({
                                 icon={ChartIcon}
                                 title="Desempenho e relatórios"
                                 description="Acompanhar visão geral, metas, comissões e estatísticas da equipe."
-                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
-                                onClick={() => toggleGoal("performance_reports")}
-                                right={
-                                  <Checkbox
-                                    checked={selectedGoals.includes("performance_reports")}
-                                    onChange={() => toggleGoal("performance_reports")}
-                                  />
-                                }
+                                className="px-4 py-3.5 gap-4 border border-brand-border dark:border-dark-border rounded-2xl"
                               />
                             </>
                           )}

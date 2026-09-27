@@ -79,9 +79,10 @@ interface PaymentMethodEditPageProps {
     existingMethods?: any[]
     onBack: (shouldReload?: boolean) => void
     embedded?: boolean
+    isQuick?: boolean
 }
 
-export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editingMethod, existingMethods = [], onBack, embedded }: PaymentMethodEditPageProps) {
+export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editingMethod, existingMethods = [],         onBack, embedded, isQuick }: PaymentMethodEditPageProps) {
     let selectedStoreId: string | null = null
     try {
         const storeCtx = useStore()
@@ -217,9 +218,6 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
     const validate = () => {
         const errors: Record<string, string> = {}
         if (!formData.name.trim()) errors.name = "Nome é obrigatório"
-        if (isPix && !formData.use_partner_pix_data && !formData.pix_key.trim()) {
-            errors.pix_key = "Chave PIX é obrigatória"
-        }
         setFieldErrors(errors)
         return Object.keys(errors).length === 0
     }
@@ -315,43 +313,45 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         maxLength={50}
                                     />
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FormDropdown
-                                            label="Tipo de método"
-                                            placeholder="Selecione o tipo"
-                                            value={formData.type}
-                                            setValue={(val) => {
-                                                const updates: any = { type: val }
-                                                if (val === "credit_card") updates.supports_installments = true
-                                                else {
-                                                    updates.supports_installments = false
-                                                    updates.max_installments = 1
-                                                }
-                                                if (!editingMethod) {
-                                                    const hasDefault = existingMethods.some(m => (m.type === val || m.payment_type === val) && m.is_online_default)
-                                                    updates.is_online_default = !hasDefault
-                                                }
-                                                setFormData({ ...formData, ...updates })
-                                            }}
-                                            options={[
-                                                { value: "credit_card", label: "Crédito" },
-                                                { value: "debit_card", label: "Débito" },
-                                                { value: "pix", label: "Pix" },
-                                                { value: "bank_transfer", label: "Transferência Bancária" },
-                                            ]}
-                                        />
+                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                             <FormDropdown
+                                                 label="Tipo de método"
+                                                 placeholder="Selecione o tipo"
+                                                 value={formData.type}
+                                                 setValue={(val) => {
+                                                     const updates: any = { type: val }
+                                                     if (val === "credit_card") updates.supports_installments = true
+                                                     else {
+                                                         updates.supports_installments = false
+                                                         updates.max_installments = 1
+                                                     }
+                                                     if (!editingMethod) {
+                                                         const hasDefault = existingMethods.some(m => (m.type === val || m.payment_type === val) && m.is_online_default)
+                                                         updates.is_online_default = !hasDefault
+                                                     }
+                                                     setFormData({ ...formData, ...updates })
+                                                 }}
+                                                 options={[
+                                                     { value: "credit_card", label: "Crédito" },
+                                                     { value: "debit_card", label: "Débito" },
+                                                     { value: "pix", label: "Pix" },
+                                                     { value: "bank_transfer", label: "Transferência Bancária" },
+                                                 ]}
+                                             />
 
-                                        <FormDropdown
-                                            label="Conta Financeira (Opcional)"
-                                            placeholder="Selecione uma conta"
-                                            value={formData.default_finance_account_id}
-                                            setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
-                                            options={[
-                                                { value: "", label: "Nenhuma (não vincular)" },
-                                                ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
-                                            ]}
-                                        />
-                                    </div>
+                                             {!isQuick && (
+                                                 <FormDropdown
+                                                     label="Conta Financeira (Opcional)"
+                                                     placeholder="Selecione uma conta"
+                                                     value={formData.default_finance_account_id}
+                                                     setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
+                                                     options={[
+                                                         { value: "", label: "Nenhuma (não vincular)" },
+                                                         ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
+                                                     ]}
+                                                 />
+                                             )}
+                                         </div>
                                 </div>
                             </FormSection>
 
@@ -409,7 +409,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                     )}
                                                 </div>
 
-                                                {formData.supports_installments && formData.max_installments > 1 && (
+                                                {formData.supports_installments && formData.max_installments > 1 && !isQuick && (
                                                     <div className="flex items-center justify-between py-2">
                                                         <label className="text-sm font-bold text-brand-dark dark:text-dark-heading">Custo de parcelamento</label>
                                                         <Button variant="link" onClick={() => setIsInstallmentModalOpen(true)}>Configurar</Button>
@@ -438,7 +438,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                 </FormSection>
                             )}
 
-                            {isPix && (
+                            {isPix && !isQuick && (
                                 <FormSection hasSeparator title="Chave PIX">
                                     <div className="grid grid-cols-1 gap-6">
                                         <FormDropdown
@@ -527,37 +527,39 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                         {/* Right Column */}
                         <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                            <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
-                                <div className="grid grid-cols-1 gap-6">
-                                    <FormDropdown
-                                        label="Quem paga a taxa?"
-                                        value={formData.fee_bearer}
-                                        setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
-                                        options={[
-                                            { value: "merchant", label: "Empresa (absorve)" },
-                                            { value: "customer", label: "Cliente (acrescenta no valor)" },
-                                        ]}
-                                    />
-                                    <PercentageInput
-                                        label="Taxa Administrativa (%)"
-                                        value={formData.fee_percent}
-                                        onChange={(value) => setFormData({ ...formData, fee_percent: value })}
-                                        suffix="%"
-                                    />
-                                    <MoneyInput
-                                        label="Taxa Fixa por Venda (R$)"
-                                        value={formData.fee_fixed}
-                                        onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
-                                        prefix="R$"
-                                    />
-                                    <PercentageInput
-                                        label="Desconto (%)"
-                                        value={formData.discount_percent}
-                                        onChange={(value) => setFormData({ ...formData, discount_percent: value })}
-                                        suffix="%"
-                                    />
-                                </div>
-                            </SidebarCard>
+                            {!isQuick && (
+                                <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <FormDropdown
+                                            label="Quem paga a taxa?"
+                                            value={formData.fee_bearer}
+                                            setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
+                                            options={[
+                                                { value: "merchant", label: "Empresa (absorve)" },
+                                                { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                            ]}
+                                        />
+                                        <PercentageInput
+                                            label="Taxa Administrativa (%)"
+                                            value={formData.fee_percent}
+                                            onChange={(value) => setFormData({ ...formData, fee_percent: value })}
+                                            suffix="%"
+                                        />
+                                        <MoneyInput
+                                            label="Taxa Fixa por Venda (R$)"
+                                            value={formData.fee_fixed}
+                                            onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
+                                            prefix="R$"
+                                        />
+                                        <PercentageInput
+                                            label="Desconto (%)"
+                                            value={formData.discount_percent}
+                                            onChange={(value) => setFormData({ ...formData, discount_percent: value })}
+                                            suffix="%"
+                                        />
+                                    </div>
+                                </SidebarCard>
+                            )}
 
                             <SidebarCard hasSeparator hasTopStrip title="Preferências">
                                 <div className="space-y-4">
@@ -747,16 +749,18 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                     ]}
                                                 />
 
-                                                <FormDropdown
-                                                    label="Conta Financeira (Opcional)"
-                                                    placeholder="Selecione uma conta"
-                                                    value={formData.default_finance_account_id}
-                                                    setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
-                                                    options={[
-                                                        { value: "", label: "Nenhuma (não vincular)" },
-                                                        ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
-                                                    ]}
-                                                />
+                                                {!isQuick && (
+                                                    <FormDropdown
+                                                        label="Conta Financeira (Opcional)"
+                                                        placeholder="Selecione uma conta"
+                                                        value={formData.default_finance_account_id}
+                                                        setValue={(val) => setFormData({ ...formData, default_finance_account_id: val })}
+                                                        options={[
+                                                            { value: "", label: "Nenhuma (não vincular)" },
+                                                            ...financeAccounts.map(a => ({ value: a.id, label: a.name }))
+                                                        ]}
+                                                    />
+                                                )}
                                             </div>
                                         </div>
                                     </FormSection>
@@ -816,7 +820,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                                             )}
                                                         </div>
 
-                                                        {formData.supports_installments && (
+                                                        {formData.supports_installments && !isQuick && (
                                                             <div className="space-y-4">
                                                                 <FormDropdown
                                                                     label="Quem paga o custo de parcelamento"
@@ -896,7 +900,7 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
                                         </FormSection>
                                     )}
 
-                                    {isPix && (
+                                    {isPix && !isQuick && (
                                         <FormSection hasSeparator title="Configuração de Chave PIX">
                                             <div className="space-y-6">
                                                 <div className="bg-brand-gray/30 dark:bg-dark-surface/50 p-4 rounded-2xl border border-brand-border dark:border-dark-border flex items-center justify-between">
@@ -976,37 +980,39 @@ export function PaymentMethodEditPage({ partnerId, storeId: propStoreId, editing
 
                                 {/* Right Column */}
                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 border-l-0 lg:border-l border-brand-border dark:border-dark-border mt-8 lg:mt-0 space-y-6">
-                                    <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
-                                        <div className="grid grid-cols-1 gap-6">
-                                            <FormDropdown
-                                                label="Quem paga a taxa?"
-                                                value={formData.fee_bearer}
-                                                setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
-                                                options={[
-                                                    { value: "merchant", label: "Empresa (absorve)" },
-                                                    { value: "customer", label: "Cliente (acrescenta no valor)" },
-                                                ]}
-                                            />
-                                            <PercentageInput
-                                                label="Taxa Administrativa (%)"
-                                                value={formData.fee_percent}
-                                                onChange={(value) => setFormData({ ...formData, fee_percent: value })}
-                                                suffix="%"
-                                            />
-                                            <MoneyInput
-                                                label="Taxa Fixa por Venda (R$)"
-                                                value={formData.fee_fixed}
-                                                onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
-                                                prefix="R$"
-                                            />
-                                            <PercentageInput
-                                                label="Desconto (%)"
-                                                value={formData.discount_percent}
-                                                onChange={(value) => setFormData({ ...formData, discount_percent: value })}
-                                                suffix="%"
-                                            />
-                                        </div>
-                                    </SidebarCard>
+                                    {!isQuick && (
+                                        <SidebarCard hasSeparator hasTopStrip title="Taxas e Custos">
+                                            <div className="grid grid-cols-1 gap-6">
+                                                <FormDropdown
+                                                    label="Quem paga a taxa?"
+                                                    value={formData.fee_bearer}
+                                                    setValue={(val: any) => setFormData({ ...formData, fee_bearer: val })}
+                                                    options={[
+                                                        { value: "merchant", label: "Empresa (absorve)" },
+                                                        { value: "customer", label: "Cliente (acrescenta no valor)" },
+                                                    ]}
+                                                />
+                                                <PercentageInput
+                                                    label="Taxa Administrativa (%)"
+                                                    value={formData.fee_percent}
+                                                    onChange={(value) => setFormData({ ...formData, fee_percent: value })}
+                                                    suffix="%"
+                                                />
+                                                <MoneyInput
+                                                    label="Taxa Fixa por Venda (R$)"
+                                                    value={formData.fee_fixed}
+                                                    onChange={(value) => setFormData({ ...formData, fee_fixed: value })}
+                                                    prefix="R$"
+                                                />
+                                                <PercentageInput
+                                                    label="Desconto (%)"
+                                                    value={formData.discount_percent}
+                                                    onChange={(value) => setFormData({ ...formData, discount_percent: value })}
+                                                    suffix="%"
+                                                />
+                                            </div>
+                                        </SidebarCard>
+                                    )}
 
                                     <SidebarCard hasSeparator hasTopStrip title="Preferências">
                                         <div className="space-y-4">

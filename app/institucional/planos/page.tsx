@@ -104,7 +104,7 @@ const PricingCards = () => {
          features: [
             "Tudo do plano Crescer +",
             "Financeiro completo com fluxo de caixa e DRE",
-            "Controle de expedição e entregas",
+            "Controle de entregas e envios",
             "Campanhas promocionais",
             "Metas e desempenho da equipe",
             "Lembretes e envios automáticos via WhatsApp",

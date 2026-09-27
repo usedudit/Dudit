@@ -578,7 +578,7 @@ export const PartnerWizard = ({ onBack, isUserLoggedIn }: { onBack: () => void; 
                                         description={opt.description}
                                         className="px-4 py-3 border border-brand-border dark:border-dark-border hover:border-brand-green/60 rounded-2xl cursor-pointer transition-all"
                                         onClick={() => setMode(opt.value)}
-                                        left={
+                                        right={
                                             <RadioButton
                                                 name="businessMode"
                                                 value={opt.value}

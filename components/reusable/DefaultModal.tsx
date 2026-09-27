@@ -96,7 +96,7 @@ const DefaultModal: React.FC<DefaultModalProps> = ({
                                 <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">{children}</div>
 
                                 {footer && (
-                                    <div className="shrink-0 border-t border-brand-border bg-white p-4 dark:border-dark-border dark:bg-dark-surface -mx-0 -mb-0">
+                                    <div className="shrink-0 border-t border-brand-border bg-white p-4 gap-3 dark:border-dark-border dark:bg-dark-surface -mx-0 -mb-0">
                                         {footer}
                                     </div>
                                 )}

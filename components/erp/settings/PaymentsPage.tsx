@@ -28,6 +28,7 @@ export function PaymentsPage({
     planGate,
     storeId,
     orderFlow,
+    isQuick,
 }: {
     partner: any
     paymentMethods: any[]
@@ -35,6 +36,7 @@ export function PaymentsPage({
     planGate?: { requiredPlanSlug: "crescer" | "escalar" }
     storeId?: string | null
     orderFlow?: "whatsapp" | "dudit"
+    isQuick?: boolean
 }) {
     const isWhatsAppFlow = orderFlow === "whatsapp"
     const { openPlanUpgrade } = usePlanUpgrade()
@@ -211,6 +213,7 @@ export function PaymentsPage({
                 editingMethod={isCreating ? null : { id: editMethodId!, name: "", is_active: true }}
                 existingMethods={paymentMethods}
                 onBack={handleCloseEdit}
+                isQuick={isQuick}
             />
         )
     }
@@ -284,6 +287,7 @@ export function PaymentsPage({
                                             onCreate={handleCreateMethod}
                                             storeId={storeId}
                                             embedded
+                                            isQuick={isQuick}
                                         />
                                     </motion.div>
                                 </TabsContent>

@@ -94,25 +94,51 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
 
     return (
         <>
-            <DefaultModal isOpen={isOpen} onClose={onClose} title="Detalhes da Compra" maxWidth="2xl">
+            <DefaultModal
+                isOpen={isOpen}
+                onClose={onClose}
+                title="Detalhes da Compra"
+                maxWidth="2xl"
+                footer={
+                    <div className="flex justify-end w-full">
+                        {purchase.status === "completed" && Number(purchase.total_amount || purchase.amount || 0) > 0 && (
+                            <Button
+                                variant="outline"
+                                leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
+                                onClick={() => setRefundModalOpen(true)}
+                            >
+                                Solicitar Reembolso
+                            </Button>
+                        )}
+                        {purchase.status === "pending" && onCancel && (
+                            <Button
+                                variant="destructive"
+                                leftIcon={<XIcon />}
+                                onClick={() => onCancel(purchase)}
+                            >
+                                Cancelar compra
+                            </Button>
+                        )}
+                    </div>
+                }>
                 <div className="space-y-6 pt-2 pb-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <p className="text-xs text-brand-inactive-text font-medium">Tipo</p>
+                            <p className="text-sm text-brand-inactive-text font-medium">Tipo</p>
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{getTypeLabel(purchase.purchase_type)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-brand-inactive-text font-medium">Data</p>
+                            <p className="text-sm text-brand-inactive-text font-medium">Data</p>
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{formatDate(purchase.created_at)}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-brand-inactive-text font-medium">Parceiro</p>
+                            <p className="text-sm text-brand-inactive-text font-medium">Parceiro</p>
                             <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{purchase.partner_name || purchase.partner_id}</p>
                         </div>
                         {purchase.description && (
-                            <div className="col-span-2">
-                                <p className="text-xs text-brand-inactive-text font-medium">Descrição</p>
-                                <p className="text-sm text-brand-dark dark:text-dark-heading">{purchase.description}</p>
+                            <div>
+                                <p className="text-sm text-brand-inactive-text font-medium">Descrição</p>
+                                <p className="text-sm font-bold text-brand-dark dark:text-dark-heading">{purchase.description}</p>
                             </div>
                         )}
                     </div>
@@ -165,12 +191,13 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                         <ListItem
                             icon={FileIcon}
                             title={`Fatura ${invoice.invoice_number}`}
-                            description="Clique para visualizar"
+                            description="Sua fatura está disponível"
                             right={
-                                <Button variant="link" leftIcon={<PrinterIcon />} onClick={() => onInvoice?.(invoice)}>
+                                <Button variant="link" onClick={() => onInvoice?.(invoice)}>
                                     Imprimir
                                 </Button>
                             }
+                            className="px-4 py-3"
                         />
                     )}
 
@@ -185,29 +212,6 @@ export function BillingDetailSheet({ isOpen, onClose, purchase, onInvoice, onCan
                             Gerar Fatura
                         </Button>
                     )}
-
-                    <div className="flex items-center justify-between pt-4 border-t border-brand-border dark:border-dark-border">
-                        <div className="flex items-center gap-2">
-                            {purchase.status === "completed" && Number(purchase.total_amount || purchase.amount || 0) > 0 && (
-                                <Button
-                                    variant="outline"
-                                    leftIcon={<RotateCcw className="w-4 h-4 text-brand-orange" />}
-                                    onClick={() => setRefundModalOpen(true)}
-                                >
-                                    Solicitar Reembolso
-                                </Button>
-                            )}
-                            {purchase.status === "pending" && onCancel && (
-                                <Button
-                                    variant="destructive"
-                                    leftIcon={<XIcon />}
-                                    onClick={() => onCancel(purchase)}
-                                >
-                                    Cancelar compra
-                                </Button>
-                            )}
-                        </div>
-                    </div>
                 </div>
             </DefaultModal>
 

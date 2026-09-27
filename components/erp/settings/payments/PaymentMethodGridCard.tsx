@@ -13,6 +13,7 @@ interface PaymentMethodGridCardProps {
     onSelect: () => void
     onEdit: (method: PaymentMethodListItem) => void
     onDelete: (method: PaymentMethodListItem) => void
+    isQuick?: boolean
 }
 
 const getPaymentIcon = (method: PaymentMethodListItem) => {
@@ -36,7 +37,7 @@ const isSystemCashMethod = (method: PaymentMethodListItem) => {
 }
 
 const PaymentMethodGridCard = React.memo(
-    ({ method, selected, onSelect, onEdit, onDelete }: PaymentMethodGridCardProps) => {
+    ({ method, selected, onSelect, onEdit, onDelete, isQuick }: PaymentMethodGridCardProps) => {
         return (
             <motion.div
                 initial={{ opacity: 0 }}
@@ -87,22 +88,24 @@ const PaymentMethodGridCard = React.memo(
                 </div>
 
                 <div className="mt-auto pt-3 border-t border-brand-border dark:border-dark-border flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className={`grid gap-4 ${isQuick ? "grid-cols-1" : "grid-cols-2"}`}>
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Desconto</span>
                             <span className="text-[14px] font-bold text-brand-dark dark:text-dark-heading">
                                 {method.discount_percent ? `${method.discount_percent}%` : "-"}
                             </span>
                         </div>
-                        <div className="flex flex-col gap-0.5 items-end min-w-0">
-                            <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Conta Financeira</span>
-                            <span
-                                className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-full"
-                                title={method.finance_account_name || "-"}
-                            >
-                                {method.finance_account_name || "-"}
-                            </span>
-                        </div>
+                        {!isQuick && (
+                            <div className="flex flex-col gap-0.5 items-end min-w-0">
+                                <span className="text-sm font-medium text-brand-inactive-text dark:text-dark-body">Conta Financeira</span>
+                                <span
+                                    className="text-[14px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-full"
+                                    title={method.finance_account_name || "-"}
+                                >
+                                    {method.finance_account_name || "-"}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-end justify-between mt-1">
@@ -136,7 +139,8 @@ const PaymentMethodGridCard = React.memo(
         prev.method.discount_percent === next.method.discount_percent &&
         prev.method.fee_percent === next.method.fee_percent &&
         prev.method.finance_account_name === next.method.finance_account_name &&
-        prev.method.is_online_default === next.method.is_online_default
+        prev.method.is_online_default === next.method.is_online_default &&
+        prev.isQuick === next.isQuick
 )
 
 PaymentMethodGridCard.displayName = "PaymentMethodGridCard"
