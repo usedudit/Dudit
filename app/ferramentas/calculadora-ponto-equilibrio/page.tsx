@@ -4,23 +4,18 @@ import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
+import { Navbar, Footer, GridLines, CTA, ToolPageHero, FaqSection } from "@/components/InstitucionalShared"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/reusable/Button"
+import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
-import {
-    TrendingUp,
-    CheckCircle2,
-    ArrowRight,
-    HelpCircle,
-    ChevronDown,
-    Target
-} from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraPontoEquilibrioPage() {
     const router = useRouter()
     const [custosFixos, setCustosFixos] = useState<number>(4500)
     const [precoVendaMedio, setPrecoVendaMedio] = useState<number>(80)
     const [custoVariavelMedio, setCustoVariavelMedio] = useState<number>(35)
-    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
@@ -43,16 +38,16 @@ export default function CalculadoraPontoEquilibrioPage() {
 
     const faqs = [
         {
-            q: "O que é o Ponto de Equilíbrio (Break-Even Point)?",
-            a: "O Ponto de Equilíbrio é o volume de vendas (em quantidade de produtos ou faturamento em R$) necessário para pagar exatamente todas as despesas fixas e variáveis da empresa, sem ter lucro e sem ter prejuízo (resultado zero). A partir desse ponto, cada venda adicional gera lucro líquido real."
+            question: "O que é o ponto de equilíbrio (break-even point)?",
+            answer: "O ponto de equilíbrio é o volume de vendas (em quantidade de produtos ou em faturamento) necessário para pagar exatamente todas as despesas fixas e variáveis da empresa, sem ter lucro e sem ter prejuízo. A partir desse ponto, cada venda adicional gera lucro líquido real."
         },
         {
-            q: "O que são Custos Fixos vs Custos Variáveis?",
-            a: "Custos Fixos são aqueles que não mudam independentemente de você vender muito ou pouco no mês (ex: aluguel do ponto comercial, internet, luz, pró-labore dos sócios, salários). Custos Variáveis são aqueles que só existem quando uma venda acontece (ex: custo de compra da mercadoria, taxa de cartão de crédito, comissão de vendedores e impostos sobre a nota)."
+            question: "O que são custos fixos e custos variáveis?",
+            answer: "Custos fixos são aqueles que não mudam independentemente de você vender muito ou pouco no mês (ex: aluguel do ponto comercial, internet, luz, pró-labore dos sócios e salários). Custos variáveis são aqueles que só existem quando uma venda acontece (ex: custo de compra da mercadoria, taxa de cartão, comissão de vendedores e impostos sobre a nota)."
         },
         {
-            q: "Como o fluxo de caixa e DRE da Dudit ajudam no ponto de equilíbrio?",
-            a: "No plano Escalar da Dudit, o DRE (Demonstrativo do Resultado do Exercício) e o Fluxo de Caixa são gerados automaticamente a partir das vendas registradas no PDV e dos custos lançados no sistema, mostrando exatamente em qual dia do mês seu negócio bateu o ponto de equilíbrio."
+            question: "Como o fluxo de caixa e o DRE da Dudit ajudam no ponto de equilíbrio?",
+            answer: "No plano Escalar da Dudit, o DRE e o fluxo de caixa são gerados automaticamente a partir das vendas registradas no PDV e dos custos lançados no sistema, mostrando exatamente em qual dia do mês seu negócio bateu o ponto de equilíbrio."
         }
     ]
 
@@ -61,10 +56,10 @@ export default function CalculadoraPontoEquilibrioPage() {
         "@type": "FAQPage",
         mainEntity: faqs.map(f => ({
             "@type": "Question",
-            name: f.q,
+            name: f.question,
             acceptedAnswer: {
                 "@type": "Answer",
-                text: f.a,
+                text: f.answer,
             }
         }))
     }
@@ -93,194 +88,128 @@ export default function CalculadoraPontoEquilibrioPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-                    <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
-                                <Link href="/" className="hover:text-brand-green">Início</Link>
-                                <span>/</span>
-                                <Link href="/ferramentas" className="hover:text-brand-green">Ferramentas</Link>
-                                <span>/</span>
-                                <span className="text-brand-dark font-semibold">Ponto de Equilíbrio</span>
-                            </nav>
+                <ToolPageHero
+                    current="Ponto de Equilíbrio"
+                    title="Calculadora de Ponto de Equilíbrio"
+                    description="Descubra quantas vendas você precisa fazer por mês para cobrir seus custos fixos e começar a ter lucro."
+                />
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
-                                Calculadora de Ponto de Equilíbrio (Break-Even)
-                            </h1>
-                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
-                                Descubra quantas vendas você precisa fazer por mês para cobrir seus custos fixos e começar a ter lucro.
-                            </p>
-                        </motion.div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
+                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
-                                initial={{ opacity: 0, x: -30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-white rounded-xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-6"
+                                className="lg:col-span-7"
                             >
-                                <h2 className="text-xl font-bold text-brand-dark flex items-center gap-2">
-                                    <Target className="w-5 h-5 text-purple-600" />
-                                    Entradas Financeiras
-                                </h2>
+                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                    <CardContent className="px-6 py-6 space-y-5">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-brand-dark">Entradas financeiras</h2>
+                                            <p className="text-sm text-brand-inactive-text mt-1">
+                                                Preencha os valores do seu negócio para descobrir a meta mensal.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Custos Fixos Mensais Totais (R$)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="100"
-                                            value={custosFixos}
-                                            onChange={(e) => setCustosFixos(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-lg"
-                                        />
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Aluguel, contas, internet, folha e pró-labore.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Custos fixos mensais"
+                                                name="custos-fixos"
+                                                value={custosFixos}
+                                                onChange={setCustosFixos}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Aluguel, contas, internet, folha e pró-labore.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Preço Médio de Venda (R$)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={precoVendaMedio}
-                                            onChange={(e) => setPrecoVendaMedio(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                        />
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Ticket médio de venda por produto ou serviço.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Preço médio de venda"
+                                                name="preco-medio"
+                                                value={precoVendaMedio}
+                                                onChange={setPrecoVendaMedio}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Ticket médio por produto ou serviço vendido.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Custo Variável Médio por Unidade (R$)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            value={custoVariavelMedio}
-                                            onChange={(e) => setCustoVariavelMedio(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                        />
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Custo de compra + taxa de cartão + embalagem + imposto unitário.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Custo variável por unidade"
+                                                name="custo-variavel"
+                                                value={custoVariavelMedio}
+                                                onChange={setCustoVariavelMedio}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Custo de compra + taxa de cartão + embalagem + imposto unitário.
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </motion.div>
 
                             <motion.div
-                                initial={{ opacity: 0, x: 30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
+                                className="lg:col-span-5"
                             >
-                                <div>
-                                    <span className="text-brand-green text-xs font-bold uppercase tracking-widest block mb-4">
-                                        META DE EQUILÍBRIO MENSAL
-                                    </span>
+                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                    <CardContent className="px-6 py-6">
+                                        <div className="rounded-xl bg-brand-green/10 border border-brand-green/20 p-5 text-center">
+                                            <p className="text-sm font-medium text-brand-green">
+                                                Faturamento mínimo para não ter prejuízo
+                                            </p>
+                                            <p className="text-4xl font-bold text-brand-green mt-1">
+                                                {formatBRL(pontoEquilibrioFaturamento)}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-2">
+                                                São no mínimo <span className="font-semibold text-white">{pontoEquilibrioUnidades} vendas</span> por mês
+                                            </p>
+                                        </div>
 
-                                    <div className="mb-6 p-6 rounded-2xl bg-brand-green/15 border border-brand-green/30 text-center">
-                                        <div className="text-xs font-bold text-brand-green uppercase tracking-wider mb-1">
-                                            Faturamento Mínimo para não ter prejuízo:
-                                        </div>
-                                        <div className="text-4xl sm:text-5xl font-bold text-brand-green mb-2">
-                                            {formatBRL(pontoEquilibrioFaturamento)}
-                                        </div>
-                                        <div className="text-xs text-gray-300">
-                                            Você precisa realizar no mínimo <strong>{pontoEquilibrioUnidades} vendas</strong> no mês.
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3 mb-8 text-xs">
-                                        <div className="flex justify-between py-2 border-b border-white/10">
-                                            <span className="text-gray-300">Margem de Contribuição Unitária:</span>
-                                            <span className="font-bold text-white">{formatBRL(margemContribuicaoUnit)} ({(indiceMargemContribuicao * 100).toFixed(1)}%)</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b border-white/10">
-                                            <span className="text-gray-300">Vendas diárias necessárias (26 dias úteis):</span>
-                                            <span className="font-bold text-white">~{Math.ceil(pontoEquilibrioUnidades / 26)} pedidos/dia</span>
-                                        </div>
-                                        <div className="flex justify-between py-2.5 bg-white/5 px-3 rounded-lg">
-                                            <span className="font-bold text-brand-green">A partir da {pontoEquilibrioUnidades + 1}ª venda:</span>
-                                            <span className="font-bold text-brand-green">100% de Lucro Líquido ({formatBRL(margemContribuicaoUnit)}/venda)</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <Link
-                                        href="/auth/login?mode=partner"
-                                        className="w-full py-4 rounded-xl bg-brand-green text-white font-bold flex items-center justify-center gap-2 hover:bg-brand-green/90 transition-all shadow-lg hover:scale-[1.02]"
-                                    >
-                                        <span>Controlar finanças no Dudit</span>
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Link>
-                                    <p className="text-center text-[11px] text-gray-400 mt-3">
-                                        DRE simples, fluxo de caixa e controle de lucro por pedido
-                                    </p>
-                                </div>
-                            </motion.div>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <h3 className="text-2xl font-bold text-brand-dark mb-6 flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5 text-brand-green" />
-                            Entenda o Ponto de Equilíbrio
-                        </h3>
-
-                        <div className="space-y-4">
-                            {faqs.map((faq, i) => {
-                                const isOpen = openFaq === i
-                                return (
-                                    <div
-                                        key={i}
-                                        className="border border-gray-100 rounded-xl overflow-hidden bg-white"
-                                    >
-                                        <button
-                                            onClick={() => setOpenFaq(isOpen ? null : i)}
-                                            className="w-full flex items-center justify-between p-5 text-left font-bold text-brand-dark text-base hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span>{faq.q}</span>
-                                            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                                        </button>
-                                        {isOpen && (
-                                            <div className="px-5 pb-5 text-sm text-brand-inactive-text leading-relaxed">
-                                                {faq.a}
+                                        <div className="mt-6 border-t border-white/10 pt-4 space-y-3 text-sm">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Margem de contribuição por venda</span>
+                                                <span className="font-semibold text-white">
+                                                    {formatBRL(margemContribuicaoUnit)} ({(indiceMargemContribuicao * 100).toFixed(1)}%)
+                                                </span>
                                             </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Vendas por dia (26 dias úteis)</span>
+                                                <span className="font-semibold text-white">~{Math.ceil(pontoEquilibrioUnidades / 26)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-brand-green/10 px-3 py-2.5">
+                                                <span className="font-semibold text-brand-green">A partir da {pontoEquilibrioUnidades + 1}ª venda</span>
+                                                <span className="font-semibold text-brand-green">{formatBRL(margemContribuicaoUnit)} de lucro</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6">
+                                            <Button asChild size="lg" className="w-full">
+                                                <Link href="/auth/login?mode=partner">
+                                                    <span>Controlar minhas finanças no Dudit</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </Button>
+                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                                DRE, fluxo de caixa e lucro por pedido direto no sistema
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
                         </div>
                     </div>
                 </section>
+
+                <FaqSection title="Entenda o ponto de equilíbrio" items={faqs} />
             </main>
 
             <CTA onNavigate={onNavigate} />

@@ -142,7 +142,7 @@ export function DeliverySidebar({
                     onClick={toggleSidebar}
                     className={cn(
                         "hidden md:flex items-center justify-center absolute -right-3 top-8 z-50 w-6 h-6",
-                        "border-white/30 bg-white/10 hover:bg-white/20 text-white border dark:bg-dark-surface dark:border-dark-border rounded-full dark:hover:bg-dark-border",
+                        "border-white/30 bg-brand-dark hover:bg-brand-dark/90 text-white border dark:bg-dark-surface dark:border-dark-border rounded-full dark:hover:bg-dark-border",
                         "transition-transform duration-300",
                     )}
                 >

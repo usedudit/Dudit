@@ -7,22 +7,24 @@ import { getPartnerPlan } from "@/lib/services/subscription.service"
 import { hasMinimumPlan } from "@/lib/subscription/plan-tier"
 import { normalizeBusinessInfo } from "@/lib/business-info"
 import { isSystemResourceActive } from "@/lib/system-resources"
+import { getPartnerOrderFlow } from "@/lib/partner-order-flow"
 
 export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
   try {
     const supabase = getAdminClient()
 
-    const [{ data: policyRow }, { data: store }, { data: partner }, plan] = await Promise.all([
+    const [{ data: policyRow }, { data: store }, { data: partner }, plan, orderFlow] = await Promise.all([
       supabase.from("partner_return_policies").select("*").eq("partner_id", partnerId).maybeSingle(),
       supabase.from("stores").select("name, phone, business_info").eq("partner_id", partnerId).order("is_headquarters", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("partners").select("business_info").eq("id", partnerId).maybeSingle(),
+      supabase.from("partners").select("business_info, order_flow").eq("id", partnerId).maybeSingle(),
       getPartnerPlan(partnerId).catch(() => null),
+      getPartnerOrderFlow(partnerId),
     ])
 
     const businessInfo = normalizeBusinessInfo(store?.business_info || partner?.business_info)
     const planSlug = plan?.slug || "free"
     const hasReturnsPlan = hasMinimumPlan(planSlug, "crescer")
-    const hasReturnsModule = hasReturnsPlan && isSystemResourceActive(businessInfo, "returns")
+    const hasReturnsModule = orderFlow !== "whatsapp" && hasReturnsPlan && isSystemResourceActive(businessInfo, "returns")
 
     if (policyRow) {
       const policy = normalizePolicyRow(policyRow, partnerId)
@@ -35,6 +37,7 @@ export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
         phone: store?.phone || null,
         hasReturnsModule,
         planSlug,
+        orderFlow,
       })
     }
 
@@ -49,6 +52,7 @@ export async function getPartnerReturnPolicyPublicAction(partnerId: string) {
       phone: store?.phone || null,
       hasReturnsModule,
       planSlug,
+      orderFlow,
       isDefault: true,
     })
   } catch (e: unknown) {

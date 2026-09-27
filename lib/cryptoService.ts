@@ -56,6 +56,7 @@ const CONTEXT_INFO = {
   cpf: "cpf-encryption",
   mercadopago: "mercadopago-token-encryption",
   whatsapp: "whatsapp-token-encryption",
+  superfrete: "superfrete-token-encryption",
 } as const
 
 type CryptoContext = keyof typeof CONTEXT_INFO

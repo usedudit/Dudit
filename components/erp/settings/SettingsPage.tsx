@@ -66,6 +66,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
   const [activeTab, setActiveTab] = useState("empresa")
   const pendingUrlSyncRef = useRef(false)
   const [mpConnected] = useState(!!partner.mp_user_id)
+  const [superfreteConnected] = useState(Boolean(partner.superfreteConnected))
   const { setHeaderOverride } = useSidebar()
   const { planSlug, canRbac } = usePermissions()
   const { openPlanUpgrade } = usePlanUpgrade()
@@ -493,6 +494,7 @@ export function SettingsTabs({ partner, paymentMethods, role }: SettingsTabsProp
               key="integrations"
               partner={partner}
               mpConnected={mpConnected}
+              superfreteConnected={superfreteConnected}
               onBack={() => navigateToSubpage("home")}
             />
           )}

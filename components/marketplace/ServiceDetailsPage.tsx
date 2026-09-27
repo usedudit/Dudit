@@ -64,6 +64,7 @@ import { VendorPaymentMethodsModal } from "./VendorPaymentMethodsModal"
 import { StorePoliciesModal } from "./StorePoliciesModal"
 import { getStoreUrl, getServiceUrl, formatCityStateSlug } from "@/lib/utils/url-generator"
 import { createSlug, createCategorySlug } from "@/lib/utils/slugify"
+import { normalizeBusinessInfo } from "@/lib/business-info"
 
 import { listActivePromotionsForMarketplaceAction } from "@/app/actions/shared/promotions"
 import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
@@ -249,6 +250,11 @@ export function ServiceDetailsPageClient({
         const acceptOrdersWhenClosed = (store?.accept_orders_when_closed ?? p?.accept_orders_when_closed ?? true) !== false
         const timezone = store?.timezone || p?.timezone || "America/Sao_Paulo"
 
+        const rawOrderFlow = p?.order_flow
+        const orderFlow = (rawOrderFlow === "whatsapp" || rawOrderFlow === "dudit")
+          ? rawOrderFlow
+          : (normalizeBusinessInfo(p?.business_info).mode === "quick" || normalizeBusinessInfo(p?.business_info).mode === "showcase" ? "whatsapp" : "dudit")
+
         return {
             isShowcaseActive,
             acceptOrdersWhenClosed,
@@ -276,6 +282,7 @@ export function ServiceDetailsPageClient({
             mp_accepted_payment_methods: p?.mp_accepted_payment_methods || null,
             vendas_totais: store?.vendas_totais || p?.vendas_totais || 0,
             created_at: store?.created_at || p?.created_at,
+            orderFlow,
         }
     }, [service])
 
@@ -988,7 +995,8 @@ export function ServiceDetailsPageClient({
     const handleRequestQuoteClick = useCallback(() => {
         if (isProductOwner) return
         const canUseSystemQuote = hasMinimumPlan(partnerPlanSlug || "free", "crescer")
-        if (!canUseSystemQuote) {
+        const isWhatsappFlow = partner.orderFlow === "whatsapp"
+        if (!canUseSystemQuote || isWhatsappFlow) {
             const cleanPhone = partner.phone ? partner.phone.replace(/\D/g, "") : ""
             const formattedPhone = cleanPhone.startsWith("55") ? cleanPhone : cleanPhone.length >= 10 ? `55${cleanPhone}` : cleanPhone
             const startingPriceFormatted = formatCurrency(Number(service.price || 0))
@@ -1002,7 +1010,7 @@ export function ServiceDetailsPageClient({
             return
         }
         setShowRequestQuoteModal(true)
-    }, [isProductOwner, partnerPlanSlug, partner.phone, service.name, service.price, userId, router])
+    }, [isProductOwner, partnerPlanSlug, partner.phone, partner.orderFlow, service.name, service.price, userId, router])
 
     const handleLearnMoreClick = useCallback(() => {
         const descEl = document.getElementById("service-description")

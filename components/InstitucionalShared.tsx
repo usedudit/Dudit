@@ -12,6 +12,7 @@ import {
     InstagramIcon
 } from '@/lib/icons';
 import { Button } from '@/components/reusable/Button';
+import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 export const GridLines = ({ dark = false }: { dark?: boolean }) => null;
@@ -35,6 +36,102 @@ export const SectionHeader = ({ title, subtitle, light = false, center = false }
         </h2>
     </div>
 );
+
+interface ToolPageHeroProps {
+    current: string;
+    title: React.ReactNode;
+    description: string;
+}
+
+export const ToolPageHero = ({ current, title, description }: ToolPageHeroProps) => (
+    <section className="relative bg-white pt-32 pb-16 overflow-hidden flex flex-col justify-center">
+        <GridLines />
+        <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
+            <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+            >
+                <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
+                    <Link href="/" prefetch={false} className="hover:text-brand-green transition-colors">Início</Link>
+                    <span>/</span>
+                    <Link href="/ferramentas" prefetch={false} className="hover:text-brand-green transition-colors">Ferramentas</Link>
+                    <span>/</span>
+                    <span className="text-brand-dark font-semibold">{current}</span>
+                </nav>
+
+                <h1 className="text-4xl md:text-5xl font-bold text-brand-dark mb-4 leading-tight">
+                    {title}
+                </h1>
+                <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
+                    {description}
+                </p>
+            </motion.div>
+        </div>
+    </section>
+);
+
+interface FaqItem {
+    question: string;
+    answer: string;
+}
+
+export const FaqSection = ({ title, items }: { title: string; items: FaqItem[] }) => {
+    const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+    return (
+        <section className="py-24 bg-white relative border-t border-gray-100">
+            <GridLines />
+            <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
+                <div className="max-w-3xl">
+                    <h2 className="text-3xl md:text-4xl font-bold text-brand-dark mb-8">
+                        {title}
+                    </h2>
+
+                    <div>
+                        {items.map((item, idx) => {
+                            const isOpen = openIndex === idx;
+                            return (
+                                <div
+                                    key={idx}
+                                    className={`border-t border-gray-200 ${idx === items.length - 1 ? 'border-b' : ''}`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => setOpenIndex(isOpen ? null : idx)}
+                                        className="w-full flex items-center gap-4 py-5 text-left group cursor-pointer"
+                                    >
+                                        <span className={`text-lg font-bold flex-1 transition-colors ${isOpen ? 'text-brand-dark' : 'text-brand-dark group-hover:text-brand-green'}`}>
+                                            {item.question}
+                                        </span>
+                                        <ChevronDown
+                                            className={`w-5 h-5 text-brand-inactive-text transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+                                        />
+                                    </button>
+                                    <AnimatePresence initial={false}>
+                                        {isOpen && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                                className="overflow-hidden"
+                                            >
+                                                <p className="text-brand-inactive-text text-sm leading-relaxed pb-5 pr-8">
+                                                    {item.answer}
+                                                </p>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+};
 
 export const Navbar = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
     const [mobileOpen, setMobileOpen] = useState(false);

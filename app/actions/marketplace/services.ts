@@ -45,6 +45,7 @@ async function _getMarketplaceService(serviceId: string, storeId?: string | null
         mp_user_id,
         mp_public_key,
         mp_accepted_payment_methods,
+        order_flow,
         created_at,
         addresses (id, street, number, neighborhood, city, state, zip_code),
         payment_methods (*)

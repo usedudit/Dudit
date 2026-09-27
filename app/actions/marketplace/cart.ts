@@ -9,6 +9,7 @@ import { sanitizeNotes } from "@/lib/input-validator"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { getUserSessionData } from "@/lib/data/user"
 import { checkLimit, increment_usage_counter } from "@/lib/services/subscription.service"
+import { isPartnerWhatsappFlow } from "@/lib/partner-order-flow"
 import { reserveOrderInventory } from "@/lib/stock/reservations"
 import { invalidateProductCache } from "@/lib/cache/invalidation"
 import { resolveMarketplaceOrderFinanceAccountId } from "@/app/actions/erp/finance-accounts"
@@ -1000,6 +1001,7 @@ export async function checkoutCartAction(
     deliveryQuote,
     promotionsData,
     methodResult,
+    isWhatsappFlow,
   ] = await Promise.all([
     checkLimit(partnerId, "monthly_orders"),
     supabase
@@ -1037,10 +1039,11 @@ export async function checkoutCartAction(
         .eq("partner_id", partnerId)
         .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    isPartnerWhatsappFlow(partnerId),
   ])
 
-  if (!limitCheck.allowed) {
-    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos." }
+  if (!limitCheck.allowed && !isWhatsappFlow) {
+    return { error: limitCheck.message || "A loja atingiu o limite mensal de pedidos.", whatsappFallback: true }
   }
 
   const buyerProfile = buyerProfileResult.data
@@ -1485,7 +1488,9 @@ export async function checkoutCartAction(
   }
 
   // Increment usage counter
-  increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
+  if (!isWhatsappFlow) {
+    increment_usage_counter(partnerId, "orders_month_count").catch(console.error)
+  }
 
   const itemsToInsert = orderItems.map((item: any) => ({
     ...item,

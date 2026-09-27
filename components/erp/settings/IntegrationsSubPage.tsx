@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
-import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal } from "@/components/reusable"
+import { Button, InfoCard, DefaultModal, ListItem, Badge, FormSection, IconPlaceholder, AlertModal, SavingStatusModal, Input } from "@/components/reusable"
 import { formatBrazilPhone } from "@/lib/utils/phone-utils"
 import { Switch } from "@/components/reusable/Switch"
 import { CheckCircleIcon, ChevronLeftIcon, ArrowLeftRightIcon, XIcon, InfoIcon, QRCodeIcon } from "@/lib/icons"
@@ -12,6 +12,16 @@ import {
     updateMpAcceptedPaymentMethodsAction,
     type MpAcceptedPaymentMethods,
 } from "@/app/actions/mercadopago"
+import {
+    getSuperFreteStatusAction,
+    connectSuperFreteAction,
+    disconnectSuperFreteAction,
+    setupSuperFreteWebhookAction,
+    saveSuperFreteConfigAction,
+    type SuperFreteStatus,
+    type SuperFreteConfig,
+} from "@/app/actions/shipping/superfrete"
+import type { SuperFreteServiceId } from "@/lib/services/shipping/superfrete"
 import {
     getWhatsappIntegrationAction,
     disconnectWhatsappAction,
@@ -82,10 +92,12 @@ const DEFAULT_MP_ACCEPTED_PAYMENT_METHODS: MpAcceptedPaymentMethods = {
 export const IntegrationsSubPage = ({
     partner,
     mpConnected,
+    superfreteConnected,
     onBack,
 }: {
     partner: any
     mpConnected: boolean
+    superfreteConnected: boolean
     onBack: () => void
 }) => {
     const searchParams = useSearchParams()
@@ -94,13 +106,29 @@ export const IntegrationsSubPage = ({
     const [planSlug, setPlanSlug] = useState<string>("free")
     const { openPlanUpgrade } = usePlanUpgrade()
 
-    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | null>(null)
+    const [activeModal, setActiveModal] = useState<"info" | "knowMore" | "permissions" | "mpConfig" | "superfreteConfig" | null>(null)
     const [knowMoreStep, setKnowMoreStep] = useState(0)
 
     // Accepted payment methods state
     const [acceptedMethods, setAcceptedMethods] = useState<MpAcceptedPaymentMethods>(DEFAULT_MP_ACCEPTED_PAYMENT_METHODS)
     const [isLoadingMethods, setIsLoadingMethods] = useState(false)
     const [isSavingMethods, setIsSavingMethods] = useState<string | null>(null)
+
+    // SuperFrete integration state
+    const [sfStatus, setSfStatus] = useState<SuperFreteStatus | null>(null)
+    const [sfIsLoading, setSfIsLoading] = useState(false)
+    const [sfActiveTab, setSfActiveTab] = useState<"connect" | "settings">("connect")
+    const [sfTokenInput, setSfTokenInput] = useState("")
+    const [sfOriginCep, setSfOriginCep] = useState("")
+    const [sfDefaultHeight, setSfDefaultHeight] = useState("10")
+    const [sfDefaultWidth, setSfDefaultWidth] = useState("10")
+    const [sfDefaultLength, setSfDefaultLength] = useState("10")
+    const [sfDefaultWeight, setSfDefaultWeight] = useState("0.5")
+    const [sfInsuranceValue, setSfInsuranceValue] = useState("")
+    const [sfOwnHand, setSfOwnHand] = useState(false)
+    const [sfReceipt, setSfReceipt] = useState(false)
+    const [sfServices, setSfServices] = useState<SuperFreteServiceId[]>([1, 2])
+    const [sfIsConnecting, setSfIsConnecting] = useState(false)
 
     // WhatsApp integration state
     const [waConnection, setWaConnection] = useState<WhatsappConnectionView | null>(null)
@@ -349,11 +377,81 @@ export const IntegrationsSubPage = ({
         }
     }
 
+    const fetchSfStatus = useCallback(async () => {
+        if (!hasMinimumPlan(planSlug, "escalar")) return
+        try {
+            const res = await getSuperFreteStatusAction()
+            if (res.success) {
+                setSfStatus(res.data)
+                const cfg = res.data.config
+                if (cfg) {
+                    if (cfg.originCep) setSfOriginCep(cfg.originCep)
+                    if (cfg.height !== undefined) setSfDefaultHeight(String(cfg.height))
+                    if (cfg.width !== undefined) setSfDefaultWidth(String(cfg.width))
+                    if (cfg.length !== undefined) setSfDefaultLength(String(cfg.length))
+                    if (cfg.weight !== undefined) setSfDefaultWeight(String(cfg.weight))
+                    if (cfg.insuranceValue !== undefined) setSfInsuranceValue(String(cfg.insuranceValue))
+                    if (cfg.ownHand !== undefined) setSfOwnHand(cfg.ownHand)
+                    if (cfg.receipt !== undefined) setSfReceipt(cfg.receipt)
+                    if (cfg.services && cfg.services.length > 0) setSfServices(cfg.services)
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching SuperFrete status:", err)
+        }
+    }, [planSlug])
+
+    const handleSfConnect = async () => {
+        if (!hasMinimumPlan(planSlug, "escalar")) {
+            openPlanUpgrade("escalar")
+            return
+        }
+        setSfIsConnecting(true)
+        try {
+            const res = await connectSuperFreteAction({
+                token: sfTokenInput,
+                webhookSecret: crypto.randomUUID(),
+            })
+            if (res.success) {
+                toast.success("SuperFrete conectado com sucesso!")
+                if (res.balance !== undefined) {
+                    toast.success(`Saldo atual: R$ ${Number(res.balance).toFixed(2)}`)
+                }
+                setActiveModal(null)
+                await fetchSfStatus()
+            } else {
+                toast.error(res.error || "Erro ao conectar SuperFrete")
+            }
+        } catch (err: any) {
+            toast.error(`Erro: ${err.message}`)
+        } finally {
+            setSfIsConnecting(false)
+        }
+    }
+
+    const handleSfDisconnect = async () => {
+        setSfIsLoading(true)
+        try {
+            const res = await disconnectSuperFreteAction()
+            if (res.success) {
+                toast.success("SuperFrete desconectado")
+                setSfStatus({ connected: false, webhookConfigured: false, planAllowed: true })
+            } else {
+                toast.error(res.error || "Erro ao desconectar SuperFrete")
+            }
+        } catch (err) {
+            toast.error("Erro inesperado")
+        } finally {
+            setSfIsLoading(false)
+        }
+    }
+
     useEffect(() => {
         checkPlan()
         fetchWaStatus()
         fetchMpAcceptedMethods()
-    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods])
+        fetchSfStatus()
+    }, [checkPlan, fetchWaStatus, fetchMpAcceptedMethods, fetchSfStatus])
 
     const handleConnectClick = () => {
         if (!hasMinimumPlan(planSlug, "crescer")) {
@@ -676,10 +774,343 @@ export const IntegrationsSubPage = ({
                                 </div>
                             </div>
                         </div>
+
+                        <h3 className="text-lg font-bold text-brand-dark dark:text-dark-heading mb-4 mt-10">Logística</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="border border-brand-border dark:border-dark-border rounded-2xl p-5 bg-white dark:bg-dark-surface flex flex-col justify-between transition-all">
+                                <div>
+                                    <div className="flex gap-4 items-start">
+                                        <img
+                                            src="https://img.dudit.com.br/static/icons/payments/SuperFrete.png"
+                                            alt="SuperFrete"
+                                            className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-brand-dark dark:text-dark-heading text-[17px] leading-tight block">
+                                                    SuperFrete
+                                                </span>
+                                                {(sfStatus?.connected || superfreteConnected) ? (
+                                                    <Badge variant="green"></Badge>
+                                                ) : !hasMinimumPlan(planSlug, "escalar") ? (
+                                                    <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 cursor-pointer" onClick={() => openPlanUpgrade("escalar")}>
+                                                        <img src={planStarIconForTarget("escalar")!} alt="" className="w-3.5 h-3.5 object-contain" />
+                                                        <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Escalar</span>
+                                                    </div>
+                                                ) : (
+                                                    <Badge variant="gray"></Badge>
+                                                )}
+                                            </div>
+                                            {(sfStatus?.email || sfStatus?.balance !== undefined) && (
+                                                <div className="mt-1">
+                                                    {sfStatus?.email && (
+                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block font-medium">
+                                                            {sfStatus.email}
+                                                        </span>
+                                                    )}
+                                                    {sfStatus?.balance !== undefined && (
+                                                        <span className="text-xs text-brand-inactive-text dark:text-dark-body block font-medium">
+                                                            Saldo: R$ {Number(sfStatus.balance).toFixed(2)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-brand-inactive-text dark:text-dark-body mt-4 leading-relaxed font-normal">
+                                        Conecte sua conta para gerar etiquetas de frete nacional com Correios, JadLog e mais.
+                                    </p>
+                                </div>
+
+                                <div className="mt-4">
+                                    <hr className="my-4 border-brand-border dark:border-dark-border" />
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex justify-start gap-2">
+                                            <Button
+                                                variant="link"
+                                                onClick={() => {
+                                                    setSfActiveTab("connect")
+                                                    setActiveModal("superfreteConfig")
+                                                }}
+                                            >
+                                                Saber mais
+                                            </Button>
+                                            {(sfStatus?.connected || superfreteConnected) && (
+                                                <Button
+                                                    variant="link"
+                                                    onClick={() => {
+                                                        setSfActiveTab("settings")
+                                                        setActiveModal("superfreteConfig")
+                                                    }}
+                                                >
+                                                    Configurar
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Switch
+                                            checked={sfStatus?.connected || superfreteConnected}
+                                            onCheckedChange={(checked) => {
+                                                if (sfIsLoading || isCheckingPlan) return
+                                                if (checked) {
+                                                    setSfActiveTab("connect")
+                                                    setActiveModal("superfreteConfig")
+                                                } else {
+                                                    handleSfDisconnect()
+                                                }
+                                            }}
+                                            className={sfIsLoading || isCheckingPlan ? "opacity-50 cursor-not-allowed" : ""}
+                                        />
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* 1. WhatsApp Connection Info Modal */}
+                {/* SuperFrete Configuration Modal */}
+                <DefaultModal
+                    isOpen={activeModal === "superfreteConfig"}
+                    onClose={() => setActiveModal(null)}
+                    title="SuperFrete"
+                    maxWidth="lg"
+                >
+                    <div className="flex gap-4 mb-6 border-b border-brand-border dark:border-dark-border">
+                        <button
+                            onClick={() => setSfActiveTab("connect")}
+                            className={`pb-2 px-1 text-sm font-medium transition-colors ${
+                                sfActiveTab === "connect"
+                                    ? "text-brand-blue dark:text-blue-400 border-b-2 border-brand-blue dark:border-blue-400"
+                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:text-dark-heading"
+                            }`}
+                        >
+                            Conectar
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (sfStatus?.connected || superfreteConnected) {
+                                    setSfActiveTab("settings")
+                                }
+                            }}
+                            className={`pb-2 px-1 text-sm font-medium transition-colors ${
+                                sfActiveTab === "settings"
+                                    ? "text-brand-blue dark:text-blue-400 border-b-2 border-brand-blue dark:border-blue-400"
+                                    : "text-brand-inactive-text dark:text-dark-body hover:text-brand-dark dark:text-dark-heading"
+                            }`}
+                            disabled={!(sfStatus?.connected || superfreteConnected)}
+                        >
+                            Configurações
+                        </button>
+                    </div>
+
+                    {sfActiveTab === "connect" && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Conecte sua conta SuperFrete informando o token de API gerado em https://sandbox.superfrete.com/#/integrations
+                            </p>
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl p-4">
+                                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-2">
+                                    Como obter o token:
+                                </p>
+                                <ol className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-decimal list-inside">
+                                    <li>Acesse sandbox.superfrete.com/#/integrations</li>
+                                    <li>Clique em "Desenvolvedores" → "Integrar"</li>
+                                    <li>Copie o token gerado e cole abaixo</li>
+                                </ol>
+                            </div>
+                            <Input
+                                label="Token de API SuperFrete"
+                                placeholder="Cole seu token aqui..."
+                                value={sfTokenInput}
+                                onChange={(e) => setSfTokenInput(e.target.value)}
+                                variant="full-rounded"
+                            />
+                            {sfStatus?.balance !== undefined && (
+                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/40 rounded-xl p-3">
+                                    <p className="text-xs text-green-700 dark:text-green-400">
+                                        Saldo atual na carteira: R$ {Number(sfStatus.balance).toFixed(2)}
+                                    </p>
+                                </div>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    disabled={sfIsConnecting || !sfTokenInput.trim()}
+                                    isLoading={sfIsConnecting}
+                                    onClick={handleSfConnect}
+                                >
+                                    {sfIsConnecting ? "Conectando..." : "Conectar"}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {sfActiveTab === "settings" && (
+                        <div className="space-y-4">
+                            <p className="text-sm text-brand-inactive-text dark:text-dark-body">
+                                Configure as preferências padrão para geração de etiquetas.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="CEP de origem"
+                                    placeholder="00000-000"
+                                    value={sfOriginCep}
+                                    onChange={(e) => setSfOriginCep(e.target.value)}
+                                    variant="full-rounded"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Altura (cm)"
+                                    type="number"
+                                    placeholder="10"
+                                    value={sfDefaultHeight}
+                                    onChange={(e) => setSfDefaultHeight(e.target.value)}
+                                    variant="full-rounded"
+                                />
+                                <Input
+                                    label="Largura (cm)"
+                                    type="number"
+                                    placeholder="10"
+                                    value={sfDefaultWidth}
+                                    onChange={(e) => setSfDefaultWidth(e.target.value)}
+                                    variant="full-rounded"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input
+                                    label="Comprimento (cm)"
+                                    type="number"
+                                    placeholder="10"
+                                    value={sfDefaultLength}
+                                    onChange={(e) => setSfDefaultLength(e.target.value)}
+                                    variant="full-rounded"
+                                />
+                                <Input
+                                    label="Peso (kg)"
+                                    type="number"
+                                    placeholder="0.5"
+                                    value={sfDefaultWeight}
+                                    onChange={(e) => setSfDefaultWeight(e.target.value)}
+                                    variant="full-rounded"
+                                />
+                            </div>
+
+                            <Input
+                                label="Valor do seguro (R$)"
+                                type="number"
+                                placeholder="0"
+                                value={sfInsuranceValue}
+                                onChange={(e) => setSfInsuranceValue(e.target.value)}
+                                variant="full-rounded"
+                            />
+                            <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                Valor declarado da encomenda para seguro. Deixe 0 para desativar.
+                            </p>
+
+                            <div className="flex items-center justify-between py-2">
+                                <div>
+                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                        Mão própria
+                                    </span>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Garantir que a encomenda seja entregue apenas ao destinatário autorizado.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={sfOwnHand}
+                                    onCheckedChange={setSfOwnHand}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between py-2">
+                                <div>
+                                    <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                        Aviso de recebimento
+                                    </span>
+                                    <p className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                        Solicitar confirmação de recebimento do destinatário.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={sfReceipt}
+                                    onCheckedChange={setSfReceipt}
+                                />
+                            </div>
+
+                            <div className="border-t border-brand-border dark:border-dark-border pt-4">
+                                <p className="text-sm font-medium text-brand-dark dark:text-dark-heading mb-3">
+                                    Serviços de frete
+                                </p>
+                                <div className="space-y-2">
+                                    {[
+                                        { id: 1 as SuperFreteServiceId, label: "PAC" },
+                                        { id: 2 as SuperFreteServiceId, label: "SEDEX" },
+                                        { id: 17 as SuperFreteServiceId, label: "Mini Envios" },
+                                        { id: 3 as SuperFreteServiceId, label: "JadLog" },
+                                        { id: 31 as SuperFreteServiceId, label: "Loggi" },
+                                        { id: 33 as SuperFreteServiceId, label: "J&T" },
+                                    ].map((svc) => (
+                                        <div key={svc.id} className="flex items-center justify-between py-2">
+                                            <span className="text-sm text-brand-dark dark:text-dark-heading">
+                                                {svc.label}
+                                            </span>
+                                            <Switch
+                                                checked={sfServices.includes(svc.id)}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setSfServices([...sfServices, svc.id])
+                                                    } else {
+                                                        setSfServices(sfServices.filter((s) => s !== svc.id))
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-4 border-t border-brand-border dark:border-dark-border">
+                                <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    onClick={async () => {
+                                        const res = await saveSuperFreteConfigAction({
+                                            originCep: sfOriginCep,
+                                            height: Number(sfDefaultHeight),
+                                            width: Number(sfDefaultWidth),
+                                            length: Number(sfDefaultLength),
+                                            weight: Number(sfDefaultWeight),
+                                            insuranceValue: Number(sfInsuranceValue || "0"),
+                                            ownHand: sfOwnHand,
+                                            receipt: sfReceipt,
+                                            services: sfServices,
+                                        })
+                                        if (res.success) {
+                                            toast.success("Configurações salvas!")
+                                            if (sfStatus?.webhookConfigured !== true) {
+                                                await setupSuperFreteWebhookAction()
+                                            }
+                                            await fetchSfStatus()
+                                            setActiveModal(null)
+                                        } else {
+                                            toast.error(res.error || "Erro ao salvar configurações")
+                                        }
+                                    }}
+                                >
+                                    Salvar
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DefaultModal>
                 <DefaultModal
                     isOpen={waActiveModal === "info"}
                     onClose={() => setWaActiveModal(null)}

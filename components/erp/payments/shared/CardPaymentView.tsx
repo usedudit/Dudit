@@ -46,13 +46,13 @@ export function CardPaymentView({
   const installmentDropdownOptions =
     installmentOptions.length > 0
       ? installmentOptions.map((opt) => ({
-          value: String(opt.installments),
-          label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`,
-        }))
+        value: String(opt.installments),
+        label: `${opt.installments}x de ${formatCurrency(opt.installmentValue)}${opt.hasInterest ? "" : " sem juros"}`,
+      }))
       : Array.from({ length: Math.max(1, maxInstallments) }, (_, i) => {
-          const num = i + 1
-          return { value: String(num), label: `${num}x de ${formatCurrency(amount / num)}` }
-        })
+        const num = i + 1
+        return { value: String(num), label: `${num}x de ${formatCurrency(amount / num)}` }
+      })
 
   return (
     <div className="flex flex-col items-center justify-start pt-2 w-full max-w-sm mx-auto">
@@ -65,8 +65,8 @@ export function CardPaymentView({
         <MoneyInput value={amount} onChange={onAmountChange} className="font-bold text-lg" />
         {!hideInstallments && (
           readOnlyInstallments ? (
-            <div className="rounded-xl bg-gray-50 dark:bg-dark-border/20 p-4">
-              <div className="text-xs text-brand-inactive-text uppercase tracking-wide font-bold mb-1">Parcelas</div>
+            <div>
+              <div className="text-brand-inactive-text dark:text-dark-body font-medium mb-1">Parcelas</div>
               <div className="font-bold text-brand-dark dark:text-dark-heading">
                 {installmentDropdownOptions.find((o) => o.value === installments)?.label ||
                   `1x de ${formatCurrency(amount)}`}

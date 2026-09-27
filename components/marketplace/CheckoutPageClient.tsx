@@ -2051,6 +2051,30 @@ export function CheckoutPageClient() {
         return msg
     }
 
+    // Fallback padrão: quando o limite mensal do vendedor esgotou (pedidos/agendamentos),
+    // o cliente continua o atendimento pelo WhatsApp do vendedor em vez de ser bloqueado.
+    const redirectToSellerWhatsApp = async (reason: string): Promise<boolean> => {
+        const phone = checkoutContext?.partner?.phone || partnerInfo.phone
+        let cleanPhone = phone ? phone.replace(/\D/g, "") : ""
+        if (cleanPhone && !cleanPhone.startsWith("55") && cleanPhone.length <= 11) {
+            cleanPhone = "55" + cleanPhone
+        }
+        if (!cleanPhone) return false
+
+        if (sessionData?.source === "cart" && activeCartItemIds.length > 0) {
+            await deleteCartItemsAction(activeCartItemIds)
+        }
+        sessionStorage.removeItem("checkout_session")
+        invalidateCartCache()
+
+        const message = `${buildWhatsAppMessage()}\n*⚠️ Motivo:* ${reason}`
+        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank")
+        notifyError("Continuar pelo WhatsApp", `${reason} Fomos direcionados ao WhatsApp do vendedor para concluir o atendimento.`)
+        setIsLoading(false)
+        router.push("/")
+        return true
+    }
+
     const handleSubmit = async (e?: React.FormEvent) => {
         if (submitInFlightRef.current) return
         submitInFlightRef.current = true
@@ -2238,7 +2262,10 @@ export function CheckoutPageClient() {
                         storeId,
                         true,
                     )
-                    if (result.error) throw new Error(result.error)
+                    if (result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp("A loja atingiu o limite mensal de pedidos.")) return
+                        throw new Error(result.error)
+                    }
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Pedido realizado!", "Seu pedido foi pago integralmente com seu crédito na loja.")
@@ -2282,7 +2309,10 @@ export function CheckoutPageClient() {
                         false,
                         storeId,
                     )
-                    if (result.error) throw new Error(result.error)
+                    if (result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp("A loja atingiu o limite mensal de pedidos/agendamentos.")) return
+                        throw new Error(result.error)
+                    }
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Agendamento confirmado!", "Seus créditos de assinatura foram utilizados.")
@@ -2306,7 +2336,10 @@ export function CheckoutPageClient() {
                         payWithAmount: undefined,
                         checkoutPricingSnapshot,
                     })
-                    if ('error' in result && result.error) throw new Error(result.error)
+                    if ('error' in result && result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp("A loja atingiu o limite mensal de pedidos/agendamentos.")) return
+                        throw new Error(result.error)
+                    }
                     sessionStorage.removeItem("checkout_session")
                     notifySuccess("Agendamento confirmado!", "Seus créditos de assinatura foram utilizados.")
                     setIsLoading(false)
@@ -2473,7 +2506,10 @@ export function CheckoutPageClient() {
                         storeId,
                         useStoreCredit && availableStoreCredit > 0,
                     )
-                    if (result.error) throw new Error(result.error)
+                    if (result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp("A loja atingiu o limite mensal de pedidos/agendamentos.")) return
+                        throw new Error(result.error)
+                    }
                     invalidateCartCache()
                     sessionStorage.removeItem("checkout_session")
 
@@ -2522,7 +2558,10 @@ export function CheckoutPageClient() {
                         payWithAmount: payWithAmount || undefined,
                         checkoutPricingSnapshot,
                     })
-                    if ('error' in result && result.error) throw new Error(result.error)
+                    if ('error' in result && result.error) {
+                        if ((result as any).whatsappFallback && await redirectToSellerWhatsApp("A loja atingiu o limite mensal de pedidos.")) return
+                        throw new Error(result.error)
+                    }
                     const successResult = result as any
                     sessionStorage.removeItem("checkout_session")
 

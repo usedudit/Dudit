@@ -4,16 +4,14 @@ import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
+import { Navbar, Footer, GridLines, CTA, ToolPageHero, FaqSection } from "@/components/InstitucionalShared"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/reusable/Button"
+import { Input } from "@/components/reusable/Input"
+import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
+import { PercentageInput } from "@/components/reusable/Inputs/PercentageInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
-import {
-    Percent,
-    TrendingDown,
-    CheckCircle2,
-    ArrowRight,
-    HelpCircle,
-    ChevronDown
-} from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraTaxasMarketplacePage() {
     const router = useRouter()
@@ -21,7 +19,6 @@ export default function CalculadoraTaxasMarketplacePage() {
     const [taxaPercentual, setTaxaPercentual] = useState<number>(18)
     const [taxaFixaPorPedido, setTaxaFixaPorPedido] = useState<number>(2.5)
     const [quantidadePedidos, setQuantidadePedidos] = useState<number>(160)
-    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
@@ -47,16 +44,16 @@ export default function CalculadoraTaxasMarketplacePage() {
 
     const faqs = [
         {
-            q: "Quanto os marketplaces e apps de delivery costumam cobrar de comissão?",
-            a: "A maioria dos marketplaces tradicionais e aplicativos de delivery cobra entre 12% e 27% sobre o valor total do pedido, além de uma taxa fixa por transação (que varia de R$ 1,50 a R$ 4,50). Em pedidos de valor menor, essa combinação pode consumir mais de 30% da sua margem de lucro."
+            question: "Quanto os marketplaces e apps de delivery costumam cobrar de comissão?",
+            answer: "A maioria dos marketplaces tradicionais e aplicativos de delivery cobra entre 12% e 27% sobre o valor total do pedido, além de uma taxa fixa por transação (que varia de R$ 1,50 a R$ 4,50). Em pedidos de valor menor, essa combinação pode consumir mais de 30% da sua margem de lucro."
         },
         {
-            q: "Como a Dudit consegue cobrar 0% de comissão por venda?",
-            a: "A Dudit opera no modelo SaaS (Software como Serviço) com planos fixos muito acessíveis (a partir de R$ 0 no plano gratuito ou R$ 19,90/mês). Nós não cobramos porcentagem sobre as suas vendas. Todo o valor transacionado cai direto na sua conta."
+            question: "Como a Dudit consegue cobrar 0% de comissão por venda?",
+            answer: "A Dudit opera no modelo SaaS (Software como Serviço) com planos fixos muito acessíveis (a partir de R$ 0 no plano gratuito ou R$ 19,90/mês). Nós não cobramos porcentagem sobre as suas vendas. Todo o valor transacionado cai direto na sua conta."
         },
         {
-            q: "Posso continuar vendendo nos marketplaces e também usar a Dudit?",
-            a: "Com certeza! Muitos lojistas utilizam a Dudit como sua vitrine principal para clientes recorrentes do bairro e redes sociais (WhatsApp/Instagram), economizando nas taxas desses clientes fiéis, enquanto usam marketplaces apenas para atração esporádica."
+            question: "Posso continuar vendendo nos marketplaces e também usar a Dudit?",
+            answer: "Com certeza! Muitos lojistas utilizam a Dudit como sua vitrine principal para clientes recorrentes do bairro e redes sociais (WhatsApp/Instagram), economizando nas taxas desses clientes fiéis, enquanto usam marketplaces apenas para atração esporádica."
         }
     ]
 
@@ -65,10 +62,10 @@ export default function CalculadoraTaxasMarketplacePage() {
         "@type": "FAQPage",
         mainEntity: faqs.map(f => ({
             "@type": "Question",
-            name: f.q,
+            name: f.question,
             acceptedAnswer: {
                 "@type": "Answer",
-                text: f.a,
+                text: f.answer,
             }
         }))
     }
@@ -97,208 +94,150 @@ export default function CalculadoraTaxasMarketplacePage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-                    <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
-                                <Link href="/" prefetch={false} className="hover:text-brand-green">Início</Link>
-                                <span>/</span>
-                                <Link href="/ferramentas" className="hover:text-brand-green">Ferramentas</Link>
-                                <span>/</span>
-                                <span className="text-brand-dark font-semibold">Calculadora de Taxas</span>
-                            </nav>
+                <ToolPageHero
+                    current="Calculadora de Taxas"
+                    title="Calculadora de Taxas de Marketplace e Delivery"
+                    description="Veja quanto dinheiro você está deixando na mesa com comissões de 12% a 27% e descubra quanto economizaria vendendo direto."
+                />
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
-                                Calculadora de Taxas de Marketplace & Delivery
-                            </h1>
-                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
-                                Veja quanto dinheiro você está deixando na mesa com comissões de 12% a 27% e descubra quanto economizaria vendendo direto.
-                            </p>
-                        </motion.div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
+                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
-                                initial={{ opacity: 0, x: -30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-white rounded-xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-6"
+                                className="lg:col-span-7"
                             >
-                                <h2 className="text-xl font-bold text-brand-dark flex items-center gap-2">
-                                    <Percent className="w-5 h-5 text-brand-green" />
-                                    Dados da sua operação
-                                </h2>
+                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                    <CardContent className="px-6 py-6 space-y-5">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-brand-dark">Dados da sua operação</h2>
+                                            <p className="text-sm text-brand-inactive-text mt-1">
+                                                Preencha os valores e o resultado é atualizado na hora.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Faturamento Mensal (R$)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="100"
-                                            value={faturamento}
-                                            onChange={(e) => setFaturamento(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-lg"
-                                        />
-                                    </div>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Faturamento mensal"
+                                                name="faturamento"
+                                                value={faturamento}
+                                                onChange={setFaturamento}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Total vendido no mês, somando todos os canais.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="text-xs font-bold text-brand-dark uppercase tracking-wider">
-                                            Comissão do Marketplace (%)
-                                        </label>
-                                        <span className="text-sm font-bold text-brand-green">{taxaPercentual}%</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        min="5"
-                                        max="35"
-                                        step="1"
-                                        value={taxaPercentual}
-                                        onChange={(e) => setTaxaPercentual(Number(e.target.value))}
-                                        className="w-full accent-brand-green cursor-pointer h-2 bg-gray-100 rounded-lg"
-                                    />
-                                    <div className="flex justify-between text-[11px] text-gray-400 mt-1 font-medium">
-                                        <span>5% (Mínimo)</span>
-                                        <span>18% (Média iFood/ML)</span>
-                                        <span>35% (Apps Premium)</span>
-                                    </div>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <PercentageInput
+                                                label="Comissão do marketplace"
+                                                name="comissao"
+                                                value={taxaPercentual}
+                                                onChange={setTaxaPercentual}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                A maioria das plataformas cobra entre 12% e 27%.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Pedidos por Mês
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={quantidadePedidos}
-                                        onChange={(e) => setQuantidadePedidos(Number(e.target.value) || 0)}
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                    />
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <Input
+                                                label="Pedidos por mês"
+                                                name="pedidos"
+                                                type="number"
+                                                min={1}
+                                                value={quantidadePedidos}
+                                                onChange={(e) => setQuantidadePedidos(Number(e.target.value) || 0)}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Quantidade média de pedidos fechados no mês.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Taxa fixa por pedido (se houver)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.5"
-                                            value={taxaFixaPorPedido}
-                                            onChange={(e) => setTaxaFixaPorPedido(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                        />
-                                    </div>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Taxa fixa por pedido"
+                                                name="taxa-fixa"
+                                                value={taxaFixaPorPedido}
+                                                onChange={setTaxaFixaPorPedido}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Se a plataforma cobrar um valor fixo por transação, some aqui. Caso contrário, deixe em zero.
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </motion.div>
 
                             <motion.div
-                                initial={{ opacity: 0, x: 30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
+                                className="lg:col-span-5"
                             >
-                                <div>
-                                    <span className="text-brand-green text-xs font-bold uppercase tracking-widest block mb-4">
-                                        RESULTADO DA SIMULAÇÃO
-                                    </span>
-
-                                    <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10">
-                                        <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase mb-1">
-                                            <TrendingDown className="w-4 h-4" />
-                                            Você perde em taxas todo mês:
-                                        </div>
-                                        <div className="text-3xl sm:text-4xl font-bold text-red-400">
-                                            {formatBRL(custoTotalMarketplaceMensal)}
-                                        </div>
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            Isso equivale a <strong>{formatBRL(custoTotalMarketplaceAnual)}</strong> por ano em comissões.
-                                        </div>
-                                    </div>
-
-                                    <div className="mb-8 p-6 rounded-2xl bg-brand-green/15 border border-brand-green/30">
-                                        <div className="text-xs font-bold text-brand-green uppercase tracking-wider mb-1">
-                                            Economia estimada com a Dudit (0% taxa):
-                                        </div>
-                                        <div className="text-4xl sm:text-5xl font-bold text-brand-green mb-2">
-                                            {formatBRL(economiaAnual)}
-                                        </div>
-                                        <p className="text-xs text-gray-300 leading-relaxed">
-                                            Dinheiro que volta 100% para o seu bolso para reinvestir em estoque, marketing ou lucro real da sua empresa.
+                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                    <CardContent className="px-6 py-6">
+                                        <p className="text-sm font-medium text-gray-300">
+                                            Você paga em taxas todo mês
                                         </p>
-                                    </div>
-                                </div>
+                                        <p className="text-4xl font-bold text-white mt-1">
+                                            {formatBRL(custoTotalMarketplaceMensal)}
+                                        </p>
+                                        <p className="text-sm text-gray-400 mt-2">
+                                            Isso equivale a <span className="font-semibold text-white">{formatBRL(custoTotalMarketplaceAnual)}</span> por ano em comissões.
+                                        </p>
 
-                                <div>
-                                    <Link
-                                        href="/auth/login?mode=partner"
-                                        className="w-full py-4 rounded-xl bg-brand-green text-white font-bold flex items-center justify-center gap-2 hover:bg-brand-green/90 transition-all shadow-lg hover:scale-[1.02]"
-                                    >
-                                        <span>Começar a vender com 0% de comissão</span>
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Link>
-                                    <p className="text-center text-[11px] text-gray-400 mt-3">
-                                        Plano gratuito disponível • Sem fidelidade ou contrato preso
-                                    </p>
-                                </div>
+                                        <div className="mt-6 border-t border-white/10 pt-4 space-y-3 text-sm">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Comissão ({taxaPercentual}%)</span>
+                                                <span className="font-semibold text-white">{formatBRL(comissaoPercentualMensal)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Taxas fixas ({quantidadePedidos} pedidos)</span>
+                                                <span className="font-semibold text-white">{formatBRL(taxaFixaMensal)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Plano Dudit Crescer (0% de comissão)</span>
+                                                <span className="font-semibold text-white">{formatBRL(custoDuditMensal)}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6 rounded-xl bg-brand-green/10 border border-brand-green/20 p-5">
+                                            <p className="text-sm font-medium text-brand-green">
+                                                Economia anual estimada com a Dudit
+                                            </p>
+                                            <p className="text-3xl font-bold text-brand-green mt-1">
+                                                {formatBRL(economiaAnual)}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                                                Sem porcentagem sobre as vendas: o valor de cada pedido cai inteiro na sua conta.
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-6">
+                                            <Button asChild size="lg" className="w-full">
+                                                <Link href="/auth/login?mode=partner">
+                                                    <span>Começar a vender com 0% de comissão</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </Button>
+                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                                Plano gratuito disponível, sem fidelidade ou contrato preso
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </motion.div>
                         </div>
                     </div>
                 </section>
 
-                <section className="py-24 bg-white relative border-t border-gray-100">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <h3 className="text-2xl font-bold text-brand-dark mb-6 flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5 text-brand-green" />
-                            Dúvidas Frequentes sobre Taxas e Comissões
-                        </h3>
-
-                        <div className="space-y-4">
-                            {faqs.map((faq, i) => {
-                                const isOpen = openFaq === i
-                                return (
-                                    <div
-                                        key={i}
-                                        className="border border-gray-100 rounded-xl overflow-hidden bg-white"
-                                    >
-                                        <button
-                                            onClick={() => setOpenFaq(isOpen ? null : i)}
-                                            className="w-full flex items-center justify-between p-5 text-left font-bold text-brand-dark text-base hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span>{faq.q}</span>
-                                            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                                        </button>
-                                        {isOpen && (
-                                            <div className="px-5 pb-5 text-sm text-brand-inactive-text leading-relaxed">
-                                                {faq.a}
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                </section>
+                <FaqSection title="Dúvidas frequentes sobre taxas e comissões" items={faqs} />
             </main>
 
             <CTA onNavigate={onNavigate} />

@@ -17,6 +17,7 @@ import FilterSheet, { FilterSectionConfig } from "@/components/reusable/FilterSh
 import Pagination from "@/components/reusable/Pagination"
 import OrderListItem from "./OrderListRow"
 import OrderGridCard from "./OrderGridCard"
+import { OrderShippingSection } from "./OrderShippingSection"
 import OrderPageControls from "./OrderPageControls"
 import CreateOrder from "./CreateOrder"
 import OrderDetailView from "./OrderDetailView"
@@ -104,6 +105,8 @@ interface Order {
     payment_provider?: string;
     has_items_to_restore?: boolean;
     checkout_fulfillment?: Record<string, unknown> | null;
+    tracking_number?: string | null;
+    tracking_url?: string | null;
 }
 
 interface FilterState {
@@ -112,7 +115,7 @@ interface FilterState {
     datePeriod: DatePeriodFilterValue
 }
 
-type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel";
+type SortKey = "order_id" | "total" | "status" | "customer" | "date" | "channel" | "tracking";
 type SortDirection = "asc" | "desc";
 
 const INITIAL_FILTERS: FilterState = {
@@ -128,6 +131,7 @@ const COLUMNS: { id: string; label: string; align: "left" | "center" | "right"; 
     { id: "date", label: "Data", align: "left", width: "150px" },
     { id: "total", label: "Total", align: "left", width: "150px" },
     { id: "status", label: "Status", align: "left", width: "80px" },
+    { id: "tracking", label: "Rastreio", align: "left", width: "170px" },
     { id: "actions", label: "Ações", align: "center", width: "80px" },
 ]
 
@@ -281,6 +285,7 @@ export default function OrdersPage({
     const [notesSheet, setNotesSheet] = useState<{ open: boolean; orderId: string | null; notes: string }>({ open: false, orderId: null, notes: "" })
     const [notesSheetSaving, setNotesSheetSaving] = useState(false)
     const [printOrderId, setPrintOrderId] = useState<string | null>(null)
+    const [shippingLabelModal, setShippingLabelModal] = useState<Order | null>(null)
     const [paidAmountValue, setPaidAmountValue] = useState<number>(0)
     const [deliveryWarningModal, setDeliveryWarningModal] = useState<{
         isOpen: boolean
@@ -423,6 +428,12 @@ export default function OrdersPage({
                     ? o.customer_name
                     : (cust?.name || cust?.email || o.buyer_email || o.customer_name || "Consumidor final")
 
+                const shipments = Array.isArray(o.order_shipments) ? [...o.order_shipments] : []
+                shipments.sort((a: any, b: any) =>
+                    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+                )
+                const trackedShipment = shipments.find((s: any) => s.tracking_number) || null
+
                 return {
                     originalId: o.id,
                     displayId: o.order_number || o.mp_payment_id || `#${o.id.substring(0, 8)}`,
@@ -458,13 +469,16 @@ export default function OrdersPage({
                     payment_provider: o.payment_provider || "",
                     has_items_to_restore: Boolean(o.has_items_to_restore),
                     checkout_fulfillment: o.checkout_fulfillment || null,
+                    tracking_number: trackedShipment?.tracking_number || null,
+                    tracking_url: trackedShipment?.tracking_url || null,
                 }
             })
             .filter((o: Order) => {
                 const searchMatch =
                     o.displayId.toLowerCase().includes(term) ||
                     o.customer_name.toLowerCase().includes(term) ||
-                    (o.customer_id || "").toLowerCase().includes(term)
+                    (o.customer_id || "").toLowerCase().includes(term) ||
+                    (o.tracking_number || "").toLowerCase().includes(term)
 
                 return searchMatch
             })
@@ -496,6 +510,7 @@ export default function OrdersPage({
                     case "customer": aVal = a.customer_name; bVal = b.customer_name; break
                     case "date": aVal = a.created_at_time; bVal = b.created_at_time; break
                     case "channel": aVal = a.order_source; bVal = b.order_source; break
+                    case "tracking": aVal = a.tracking_number || ""; bVal = b.tracking_number || ""; break
                     default: return 0
                 }
 
@@ -1301,6 +1316,7 @@ export default function OrdersPage({
                                                                             onDetails={handleDetailsOrder}
                                                                             onPaymentStatus={o.situation !== "cancelled" ? () => handlePaymentStatusClick(o) : undefined}
                                                                             onDeliveryStatus={o.situation !== "cancelled" && !o.hasOnlyServices ? () => openDeliveryStatusModal(o) : undefined}
+                                                                            onGenerateLabel={(row) => setShippingLabelModal(row)}
                                                                             onPrefetchMouseEnter={getPrefetchProps(o.originalId).onMouseEnter}
                                                                             onPrefetchMouseLeave={getPrefetchProps(o.originalId).onMouseLeave}
                                                                             onPrefetchTouchStart={getPrefetchProps(o.originalId).onTouchStart}
@@ -1592,6 +1608,23 @@ export default function OrdersPage({
                     (deliveryWarningModal.reasonDropdownValue === "other" && !deliveryWarningModal.customReasonText.trim())
                 }
             />
+
+            <DefaultModal
+                isOpen={!!shippingLabelModal}
+                onClose={() => setShippingLabelModal(null)}
+                title="Etiqueta de envio"
+            >
+                {shippingLabelModal && (
+                    <div className="p-2">
+                        <OrderShippingSection
+                            orderId={shippingLabelModal.originalId}
+                            partnerId={partnerId}
+                            order={shippingLabelModal}
+                            onRefresh={() => afterMutation(shippingLabelModal.originalId)}
+                        />
+                    </div>
+                )}
+            </DefaultModal>
 
             {printOrderId && (
                 <SaleReceiptPrintModal

@@ -2,7 +2,7 @@
 
 import React from "react"
 import { motion } from "framer-motion"
-import { Checkbox, Badge, ActionsDropdown, Tooltip } from "@/components/reusable"
+import { Checkbox, Badge, ActionsDropdown, Tooltip, Button } from "@/components/reusable"
 import { formatCurrency } from "@/lib/utils";
 import { ShoppingCartIcon, ArrowDownIcon, ArrowUpIcon, ReturnIcon, MoneyIcon, TruckIcon, StoreIcon } from "@/lib/icons"
 import { PaymentMethodIndicator } from "../transactions/PaymentMethodIndicator"
@@ -25,6 +25,7 @@ interface OrderListItemProps {
     onPrint?: (order: any) => void
     onPaymentStatus?: (order: any) => void
     onDeliveryStatus?: (order: any) => void
+    onGenerateLabel?: (order: any) => void
     canEdit?: boolean
     cancelLabel?: string
     showCheckbox?: boolean
@@ -49,6 +50,7 @@ const OrderListItem = React.memo(
         onPrint,
         onPaymentStatus,
         onDeliveryStatus,
+        onGenerateLabel,
         canEdit = true,
         cancelLabel = "Cancelar",
         showCheckbox = true,
@@ -191,6 +193,54 @@ const OrderListItem = React.memo(
                     return (
                         <span className="text-[13px] font-medium truncate max-w-[120px]">
                             {order.order_source || "Manual"}
+                        </span>
+                    )
+
+                case "tracking":
+                    if (!order.tracking_number) {
+                        if (onGenerateLabel && order.situation !== "cancelled") {
+                            return (
+                                <div
+                                    className="flex items-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => onGenerateLabel(order)}
+                                    >
+                                        Gerar etiqueta
+                                    </Button>
+                                </div>
+                            )
+                        }
+                        return (
+                            <span className="text-[13px] font-medium text-brand-inactive-text dark:text-dark-body">
+                                —
+                            </span>
+                        )
+                    }
+                    if (order.tracking_url) {
+                        return (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    window.open(order.tracking_url, "_blank")
+                                }}
+                                title={order.tracking_number}
+                                className="text-[13px] font-bold text-brand-blue hover:underline truncate max-w-[150px] block text-left"
+                            >
+                                {order.tracking_number}
+                            </button>
+                        )
+                    }
+                    return (
+                        <span
+                            title={order.tracking_number}
+                            className="text-[13px] font-bold text-brand-dark dark:text-dark-heading truncate max-w-[150px] block"
+                        >
+                            {order.tracking_number}
                         </span>
                     )
 

@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
   const isSystemPath =
     pathname === "/" ||
     PUBLIC_PATHS.filter(p => p !== "/").some(p => pathname.startsWith(p)) ||
-    ["/institucional", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/print", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp", "/manutencao"].some(p => pathname.startsWith(p));
+    ["/institucional", "/erp", "/account", "/auth", "/sacola", "/perfil", "/pedidos", "/api", "/print", "/dashboard", "/payment", "/checkout", "/ddt-admin", "/entregadores", "/invite", "/vitrine", "/produto", "/assinaturas", "/colecoes", "/favoritos", "/select-erp", "/manutencao", "/ferramentas"].some(p => pathname.startsWith(p));
 
   // Apenas intercepta paths de 1 ou 2 segmentos que não são de sistema
   if (!isSystemPath && (segments.length === 1 || segments.length === 2)) {

@@ -4,18 +4,13 @@ import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Navbar, Footer, GridLines, CTA } from "@/components/InstitucionalShared"
+import { Navbar, Footer, GridLines, CTA, ToolPageHero, FaqSection } from "@/components/InstitucionalShared"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/reusable/Button"
+import { MoneyInput } from "@/components/reusable/Inputs/MoneyInput"
+import { PercentageInput } from "@/components/reusable/Inputs/PercentageInput"
 import { safeJsonLdStringify } from "@/lib/utils/safe-json-ld"
-import {
-    Calculator,
-    TrendingUp,
-    CheckCircle2,
-    ArrowRight,
-    HelpCircle,
-    ChevronDown,
-    DollarSign,
-    Percent
-} from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 export default function CalculadoraMargemLucroPage() {
     const router = useRouter()
@@ -23,7 +18,6 @@ export default function CalculadoraMargemLucroPage() {
     const [despesasVariaveis, setDespesasVariaveis] = useState<number>(10)
     const [despesasFixas, setDespesasFixas] = useState<number>(15)
     const [margemLucroDesejada, setMargemLucroDesejada] = useState<number>(25)
-    const [openFaq, setOpenFaq] = useState<number | null>(0)
 
     const onNavigate = (page: string) => {
         if (page === 'home') router.push('/institucional/inicio')
@@ -50,16 +44,16 @@ export default function CalculadoraMargemLucroPage() {
 
     const faqs = [
         {
-            q: "Qual a diferença entre Margem de Lucro e Markup?",
-            a: "A margem de lucro é a porcentagem do preço final de venda que sobra como lucro líquido. Já o Markup é o multiplicador aplicado sobre o custo do produto para chegar ao preço de venda. Por exemplo: se você compra por R$ 50 e vende por R$ 100, seu Markup é de 2.0x (100%), mas sua margem bruta é de 50%."
+            question: "Qual a diferença entre margem de lucro e markup?",
+            answer: "A margem de lucro é a porcentagem do preço final de venda que sobra como lucro líquido. Já o markup é o multiplicador aplicado sobre o custo do produto para chegar ao preço de venda. Por exemplo: se você compra por R$ 50 e vende por R$ 100, seu markup é de 2.0x (100%), mas sua margem bruta é de 50%."
         },
         {
-            q: "Por que não devo apenas somar a porcentagem de lucro ao custo?",
-            a: "Somar uma porcentagem diretamente ao custo (ex: R$ 100 + 20% = R$ 120) é o erro mais comum no comércio. Ao vender por R$ 120, se você pagar 10% de imposto e 5% de taxa de cartão sobre o total, o desconto incidirá sobre R$ 120, consumindo quase todo o seu lucro esperado. A fórmula correta é o Markup Divisor."
+            question: "Por que não devo apenas somar a porcentagem de lucro ao custo?",
+            answer: "Somar uma porcentagem diretamente ao custo (ex: R$ 100 + 20% = R$ 120) é o erro mais comum no comércio. Ao vender por R$ 120, se você pagar 10% de imposto e 5% de taxa de cartão sobre o total, o desconto incidirá sobre R$ 120, consumindo quase todo o seu lucro esperado. A fórmula correta é o markup divisor."
         },
         {
-            q: "Como a Dudit ajuda no controle de preços e estoque?",
-            a: "No ERP da Dudit, ao cadastrar seus produtos, você define o preço de custo e preço de venda. O sistema calcula automaticamente o lucro por item, avisa quando o estoque estiver acabando e gera relatórios completos de vendas no PDV e WhatsApp."
+            question: "Como a Dudit ajuda no controle de preços e estoque?",
+            answer: "No ERP da Dudit, ao cadastrar seus produtos, você define o preço de custo e preço de venda. O sistema calcula automaticamente o lucro por item, avisa quando o estoque estiver acabando e gera relatórios completos de vendas no PDV e no WhatsApp."
         }
     ]
 
@@ -68,10 +62,10 @@ export default function CalculadoraMargemLucroPage() {
         "@type": "FAQPage",
         mainEntity: faqs.map(f => ({
             "@type": "Question",
-            name: f.q,
+            name: f.question,
             acceptedAnswer: {
                 "@type": "Answer",
-                text: f.a,
+                text: f.answer,
             }
         }))
     }
@@ -100,216 +94,142 @@ export default function CalculadoraMargemLucroPage() {
             <Navbar onNavigate={onNavigate} />
 
             <main>
-                <section className="relative bg-white pt-32 pb-20 overflow-hidden flex flex-col justify-center">
-                    <GridLines />
-                    <div className="flex-1 flex flex-col container mx-auto px-4 lg:px-0 max-w-[1400px] w-full relative z-10 text-center">
-                        <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.6 }}
-                        >
-                            <nav className="flex items-center justify-center gap-2 text-xs text-brand-inactive-text mb-6">
-                                <Link href="/" prefetch={false} className="hover:text-brand-green">Início</Link>
-                                <span>/</span>
-                                <Link href="/ferramentas" className="hover:text-brand-green">Ferramentas</Link>
-                                <span>/</span>
-                                <span className="text-brand-dark font-semibold">Calculadora de Preço de Venda</span>
-                            </nav>
+                <ToolPageHero
+                    current="Preço de Venda e Markup"
+                    title="Calculadora de Margem de Lucro e Preço de Venda"
+                    description="Calcule o preço de venda ideal pelo markup divisor para nunca mais ter prejuízo nas suas vendas."
+                />
 
-                            <h1 className="text-5xl font-bold text-brand-dark tracking-tight mb-4 leading-tight">
-                                Calculadora de Margem de Lucro & Preço de Venda
-                            </h1>
-                            <p className="text-lg md:text-xl text-brand-inactive-text max-w-2xl mx-auto leading-relaxed">
-                                Calcule o preço de venda ideal (Markup Divisor) para nunca mais ter prejuízo nas suas vendas.
-                            </p>
-                        </motion.div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
+                <section className="py-16 sm:py-24 bg-white relative border-t border-gray-100">
                     <GridLines />
                     <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                             <motion.div
-                                initial={{ opacity: 0, x: -30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-white rounded-xl p-6 sm:p-8 border border-gray-100 shadow-sm space-y-6"
+                                className="lg:col-span-7"
                             >
-                                <h2 className="text-xl font-bold text-brand-dark flex items-center gap-2">
-                                    <Calculator className="w-5 h-5 text-blue-600" />
-                                    Custos e Despesas
-                                </h2>
+                                <Card className="bg-white border-brand-border rounded-2xl shadow-none py-0">
+                                    <CardContent className="px-6 py-6 space-y-5">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-brand-dark">Custos e despesas</h2>
+                                            <p className="text-sm text-brand-inactive-text mt-1">
+                                                Informe o custo do item e quanto a venda consome em impostos e despesas.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Custo do Produto / Serviço (R$)
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">R$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="1"
-                                            value={custoProduto}
-                                            onChange={(e) => setCustoProduto(Number(e.target.value) || 0)}
-                                            className="w-full pl-12 pr-4 py-3.5 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-lg"
-                                        />
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Quanto você pagou pelo produto ou insumo.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <MoneyInput
+                                                label="Custo do produto ou serviço"
+                                                name="custo-produto"
+                                                value={custoProduto}
+                                                onChange={setCustoProduto}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Quanto você pagou pelo produto ou insumo.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Despesas Variáveis (% sobre a venda)
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="50"
-                                            value={despesasVariaveis}
-                                            onChange={(e) => setDespesasVariaveis(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                        />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Impostos (Simples/MEI), taxas de cartão, comissões de vendedores.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <PercentageInput
+                                                label="Despesas variáveis sobre a venda"
+                                                name="despesas-variaveis"
+                                                value={despesasVariaveis}
+                                                onChange={setDespesasVariaveis}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Impostos (Simples ou MEI), taxas de cartão e comissão de vendedores.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Despesas Fixas Rateadas (% estimada)
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max="50"
-                                            value={despesasFixas}
-                                            onChange={(e) => setDespesasFixas(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold"
-                                        />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">Aluguel, luz, água, internet e pró-labore divididos pelo volume.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <PercentageInput
+                                                label="Despesas fixas rateadas"
+                                                name="despesas-fixas"
+                                                value={despesasFixas}
+                                                onChange={setDespesasFixas}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                Aluguel, luz, água, internet e pró-labore divididos pelo volume de vendas.
+                                            </p>
+                                        </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-brand-dark uppercase tracking-wider mb-2">
-                                        Margem de Lucro Líquida Desejada (%)
-                                    </label>
-                                    <div className="relative">
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="80"
-                                            value={margemLucroDesejada}
-                                            onChange={(e) => setMargemLucroDesejada(Number(e.target.value) || 0)}
-                                            className="w-full pr-12 pl-4 py-3 rounded-xl border border-gray-200 focus:border-brand-green focus:ring-2 focus:ring-brand-green/20 outline-none text-brand-dark font-bold text-brand-green"
-                                        />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">%</span>
-                                    </div>
-                                    <span className="text-[11px] text-gray-400 mt-1 block">O lucro limpo que deve sobrar na conta após pagar tudo.</span>
-                                </div>
+                                        <div className="space-y-1.5">
+                                            <PercentageInput
+                                                label="Margem de lucro líquida desejada"
+                                                name="margem-lucro"
+                                                value={margemLucroDesejada}
+                                                onChange={setMargemLucroDesejada}
+                                            />
+                                            <p className="text-xs text-brand-inactive-text">
+                                                O lucro limpo que deve sobrar na conta após pagar tudo.
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </motion.div>
 
                             <motion.div
-                                initial={{ opacity: 0, x: 30 }}
-                                whileInView={{ opacity: 1, x: 0 }}
-                                transition={{ duration: 0.6 }}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5, delay: 0.1 }}
                                 viewport={{ once: true }}
-                                className="lg:col-span-6 bg-brand-dark rounded-xl p-6 sm:p-8 text-white flex flex-col justify-between shadow-xl"
+                                className="lg:col-span-5"
                             >
-                                <div>
-                                    <span className="text-brand-green text-xs font-bold uppercase tracking-widest block mb-4">
-                                        PREÇO DE VENDA RECOMENDADO
-                                    </span>
+                                <Card className="bg-brand-dark border-brand-dark rounded-2xl shadow-none py-0 text-white">
+                                    <CardContent className="px-6 py-6">
+                                        <div className="rounded-xl bg-brand-green/10 border border-brand-green/20 p-5 text-center">
+                                            <p className="text-sm font-medium text-brand-green">
+                                                Preço de venda recomendado
+                                            </p>
+                                            <p className="text-4xl font-bold text-brand-green mt-1">
+                                                {formatBRL(precoVendaCalculado)}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-2">
+                                                Markup de <span className="font-semibold text-white">{markupMultiplicador.toFixed(2)}x</span> sobre o custo
+                                            </p>
+                                        </div>
 
-                                    <div className="mb-6 p-6 rounded-2xl bg-brand-green/15 border border-brand-green/30 text-center">
-                                        <div className="text-xs font-bold text-brand-green uppercase tracking-wider mb-1">
-                                            Você deve vender por:
-                                        </div>
-                                        <div className="text-4xl sm:text-5xl font-bold text-brand-green mb-2">
-                                            {formatBRL(precoVendaCalculado)}
-                                        </div>
-                                        <div className="text-xs text-gray-300">
-                                            Markup Multiplicador: <strong>{markupMultiplicador.toFixed(2)}x</strong>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3 mb-8 text-xs">
-                                        <div className="flex justify-between py-2 border-b border-white/10">
-                                            <span className="text-gray-300">Custo do Produto:</span>
-                                            <span className="font-bold text-white">{formatBRL(custoProduto)}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b border-white/10">
-                                            <span className="text-gray-300">Despesas Variáveis ({despesasVariaveis}%):</span>
-                                            <span className="font-bold text-gray-300">{formatBRL(valorDespesasVariaveis)}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b border-white/10">
-                                            <span className="text-gray-300">Despesas Fixas ({despesasFixas}%):</span>
-                                            <span className="font-bold text-gray-300">{formatBRL(valorDespesasFixas)}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2.5 bg-white/5 px-3 rounded-lg">
-                                            <span className="font-bold text-brand-green">Lucro Líquido Real ({margemLucroDesejada}%):</span>
-                                            <span className="font-bold text-brand-green">{formatBRL(lucroLiquidoReal)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <Link
-                                        href="/auth/login?mode=partner"
-                                        className="w-full py-4 rounded-xl bg-brand-green text-white font-bold flex items-center justify-center gap-2 hover:bg-brand-green/90 transition-all shadow-lg hover:scale-[1.02]"
-                                    >
-                                        <span>Cadastrar produtos no ERP Dudit</span>
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Link>
-                                    <p className="text-center text-[11px] text-gray-400 mt-3">
-                                        Controle de estoque, vendas no PDV e catálogo online gratuito
-                                    </p>
-                                </div>
-                            </motion.div>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="py-24 bg-white relative border-t border-gray-100">
-                    <GridLines />
-                    <div className="max-w-[1400px] w-full mx-auto px-4 lg:px-0 relative z-10">
-                        <h3 className="text-2xl font-bold text-brand-dark mb-6 flex items-center gap-2">
-                            <HelpCircle className="w-5 h-5 text-brand-green" />
-                            Como Precificar Produtos Corretamente
-                        </h3>
-
-                        <div className="space-y-4">
-                            {faqs.map((faq, i) => {
-                                const isOpen = openFaq === i
-                                return (
-                                    <div
-                                        key={i}
-                                        className="border border-gray-100 rounded-xl overflow-hidden bg-white"
-                                    >
-                                        <button
-                                            onClick={() => setOpenFaq(isOpen ? null : i)}
-                                            className="w-full flex items-center justify-between p-5 text-left font-bold text-brand-dark text-base hover:bg-gray-50 transition-colors"
-                                        >
-                                            <span>{faq.q}</span>
-                                            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                                        </button>
-                                        {isOpen && (
-                                            <div className="px-5 pb-5 text-sm text-brand-inactive-text leading-relaxed">
-                                                {faq.a}
+                                        <div className="mt-6 border-t border-white/10 pt-4 space-y-3 text-sm">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Custo do produto</span>
+                                                <span className="font-semibold text-white">{formatBRL(custoProduto)}</span>
                                             </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Despesas variáveis ({despesasVariaveis}%)</span>
+                                                <span className="font-semibold text-white">{formatBRL(valorDespesasVariaveis)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-gray-300">Despesas fixas ({despesasFixas}%)</span>
+                                                <span className="font-semibold text-white">{formatBRL(valorDespesasFixas)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4 rounded-lg bg-brand-green/10 px-3 py-2.5">
+                                                <span className="font-semibold text-brand-green">Lucro líquido ({margemLucroDesejada}%)</span>
+                                                <span className="font-semibold text-brand-green">{formatBRL(lucroLiquidoReal)}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6">
+                                            <Button asChild size="lg" className="w-full">
+                                                <Link href="/auth/login?mode=partner">
+                                                    <span>Cadastrar produtos no ERP Dudit</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                            </Button>
+                                            <p className="text-center text-xs text-gray-400 mt-3">
+                                                Controle de estoque, vendas no PDV e catálogo online gratuito
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
                         </div>
                     </div>
                 </section>
+
+                <FaqSection title="Como precificar produtos corretamente" items={faqs} />
             </main>
 
             <CTA onNavigate={onNavigate} />

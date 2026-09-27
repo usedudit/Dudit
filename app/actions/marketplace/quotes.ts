@@ -75,7 +75,7 @@ export async function requestMarketplaceQuoteAction(input: RequestMarketplaceQuo
             // 3. Check monthly quotes limit
             const limitCheck = await checkLimit(partnerId, "monthly_quotes")
             if (!limitCheck.allowed) {
-                return errorResponse("O prestador atingiu o limite de orçamentos para este mês. Entre em contato via WhatsApp.")
+                return errorResponse("O prestador atingiu o limite de orçamentos para este mês. Entre em contato via WhatsApp.", { whatsappFallback: true })
             }
 
             // 4. Fetch buyer profile for customer sync

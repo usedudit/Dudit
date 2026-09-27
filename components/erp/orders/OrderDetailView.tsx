@@ -37,6 +37,7 @@ import { getOrderDetailsAction, getOrderHistoryAction } from "@/app/actions/erp/
 import { getOrderDeliverySummaryAction } from "@/app/actions/erp/deliveries"
 import { OrderHistoryTab } from "./OrderHistoryTab"
 import { OrderAttachmentsTab } from "./OrderAttachmentsTab"
+import { OrderShippingSection } from "./OrderShippingSection"
 import { useNotification } from "@/hooks/use-notification"
 import { getR2ImageUrl } from "@/lib/utils/get-r2-image-url"
 import { formatCurrency, formatDateTime, formatTime, formatDayMonth, formatQuantityWithUnit, formatUnitPriceWithUnit } from "@/lib/utils"
@@ -239,6 +240,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
     }
 
     const handleBack = useCallback(() => onBack(), [onBack])
+
+    const refreshOrder = useCallback(async () => {
+        const refreshed = await getOrderDetailsAction(orderId, partnerId)
+        if (refreshed && "success" in refreshed && refreshed.success) {
+            setOrder(refreshed.data)
+        }
+    }, [orderId, partnerId])
 
     const { setHeaderOverride } = useSidebar()
 
@@ -1303,6 +1311,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                     {showFinancialBreakdown && financialData && (
                                                         <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
                                                     )}
+
+                                                    <OrderShippingSection
+                                                        orderId={orderId}
+                                                        partnerId={partnerId}
+                                                        order={order}
+                                                        onRefresh={refreshOrder}
+                                                    />
                                                 </div>
 
                                                 <div className="col-span-12 lg:col-span-4 pl-0 lg:pl-12 space-y-6 border-0 lg:border-l border-brand-border dark:border-dark-border">
@@ -1772,6 +1787,13 @@ export default function OrderDetailView({ orderId, partnerId, onBack, onEditOrde
                                                 {showFinancialBreakdown && financialData && (
                                                     <FinancialBreakdownDisplay data={financialData} formatCurrency={formatCurrency} />
                                                 )}
+
+                                                <OrderShippingSection
+                                                    orderId={orderId}
+                                                    partnerId={partnerId}
+                                                    order={order}
+                                                    onRefresh={refreshOrder}
+                                                />
                                             </div>
                                         </FadeIn>
                                     </TabsContent>

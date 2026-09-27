@@ -39,8 +39,19 @@ export default async function SettingsPage() {
     .limit(1)
     .maybeSingle()
 
+  const { data: partnerIntegrations } = await supabase
+    .from("partner_integrations")
+    .select("provider_slug, status")
+    .eq("partner_id", context.partnerId)
+
+  const superfreteConnected = (partnerIntegrations || []).some(
+    (integration: { provider_slug: string; status: string }) =>
+      integration.provider_slug === "superfrete" && integration.status === "connected",
+  )
+
   const partner: any = {
     ...rawPartner,
+    superfreteConnected,
     store,
     store_name: store?.name,
     store_description: store?.description,
