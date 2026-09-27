@@ -112,7 +112,7 @@ const OrderListRow = React.memo(({ order, isPending, onDetail }: OrderListRowPro
                         } else {
                             pmLabel = order.payment_method || null;
                         }
-                        return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify />
+                        return <PaymentMethodIndicator label={pmLabel || order.payment_provider || "-"} provider={order.payment_provider} simplify compact />
                     })()}
                 </div>
             </td>

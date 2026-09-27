@@ -15,7 +15,7 @@ import {
     ShoppingCart01Icon,
     Shield01Icon,
     Tag01Icon,
-    User03Icon,
+    User02Icon,
     UserMultiple02Icon,
     ColumnInsertIcon,
     Settings01Icon,
@@ -297,7 +297,7 @@ export const Settings2Icon = CreateIcon(FilterHorizontalIcon)
 // USERS / AUTH
 // ============================
 
-export const UserIcon = CreateIcon(User03Icon)
+export const UserIcon = CreateIcon(User02Icon)
 export const Users = CreateIcon(UserMultiple02Icon)
 export const IdentityCardIcon = CreateIcon(IdentityCard)
 

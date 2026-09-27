@@ -145,11 +145,14 @@ export async function createMpSubscription(
   planId: string,
   payerEmail: string,
   actorUserId: string,
+  options?: { skipExistingCheck?: boolean },
 ): Promise<CreateSubscriptionResult> {
   const admin = getAdminClient()
 
   // ── Race condition guard ──
-  const existing = await getPartnerSubscription(partnerId)
+  // Skip the existing-subscription check when called from the upgrade flow
+  // (updateMpSubscription), since the old subscription was just canceled.
+  const existing = options?.skipExistingCheck ? null : await getPartnerSubscription(partnerId)
   if (existing) {
     if (["active", "trialing", "past_due"].includes(existing.status)) {
       return { success: false, error: "Já existe uma assinatura ativa para este parceiro" }
@@ -348,6 +351,7 @@ export async function cancelMpSubscription(
   subscriptionId: string,
   actorUserId?: string,
   reason?: string,
+  options?: { immediate?: boolean },
 ): Promise<CancelSubscriptionResult> {
   const admin = getAdminClient()
 
@@ -408,7 +412,7 @@ export async function cancelMpSubscription(
     sub.current_period_end && new Date(sub.current_period_end).getTime() > Date.now()
   const isPaidActive = ["active", "trialing"].includes(sub.status)
 
-  if (isPaidActive && hasFuturePeriodEnd) {
+  if (isPaidActive && hasFuturePeriodEnd && !options?.immediate) {
     // ── KEEP ACCESS UNTIL END OF PAID PERIOD ──
     const { error: updateError } = await admin
       .from("subscriptions")
@@ -560,13 +564,13 @@ export async function updateMpSubscription(
 
   if (isUpgrade) {
     // ── UPGRADE: Cancel current + create new immediately ──
-    const cancelResult = await cancelMpSubscription(currentSub.id, actorUserId)
+    const cancelResult = await cancelMpSubscription(currentSub.id, actorUserId, undefined, { immediate: true })
     if (!cancelResult.success) {
       return { success: false, type: "upgrade", error: cancelResult.error }
     }
 
     const billingEmail = currentSub.billing_email || ""
-    const createResult = await createMpSubscription(partnerId, newPlanId, billingEmail, actorUserId)
+    const createResult = await createMpSubscription(partnerId, newPlanId, billingEmail, actorUserId, { skipExistingCheck: true })
 
     if (!createResult.success) {
       return { success: false, type: "upgrade", error: createResult.error }

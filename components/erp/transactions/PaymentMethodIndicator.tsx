@@ -8,14 +8,16 @@ export function PaymentMethodIndicator({
     label,
     provider,
     simplifyMultiple = true,
-    simplify = false
+    simplify = false,
+    compact = false
 }: {
     label?: string | null
     provider?: string | null
     simplifyMultiple?: boolean
     simplify?: boolean
+    compact?: boolean
 }) {
-    if (!label) return <span className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body truncate">Não informado</span>
+    if (!label) return <span className={`font-semibold text-brand-inactive-text dark:text-dark-body truncate ${compact ? "text-xs" : "text-sm"}`}>Não informado</span>
 
     const parts = splitPaymentMethodLabels(label)
         .map(p => p.trim())
@@ -25,18 +27,18 @@ export function PaymentMethodIndicator({
 
     if (parts.length > 1) {
         if (simplifyMultiple) {
-            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" provider={provider} simplify={simplify} />
+            return <PaymentMethodIndicatorKeyed part="Múltiplos meios" provider={provider} simplify={simplify} compact={compact} />
         }
         return (
             <div className="flex flex-wrap gap-2 items-center">
                 {parts.map((part, index) => (
-                    <PaymentMethodIndicatorKeyed key={index} part={part} provider={provider} simplify={simplify} />
+                    <PaymentMethodIndicatorKeyed key={index} part={part} provider={provider} simplify={simplify} compact={compact} />
                 ))}
             </div>
         )
     }
 
-    return <PaymentMethodIndicatorKeyed part={parts[0] || label} provider={provider} simplify={simplify} />
+    return <PaymentMethodIndicatorKeyed part={parts[0] || label} provider={provider} simplify={simplify} compact={compact} />
 }
 
 function splitPaymentMethodLabels(label: string): string[] {
@@ -134,7 +136,7 @@ function resolveIcons(normalized: string, providerIsMP: boolean): { icons: React
     return { icons, colorClass }
 }
 
-function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = false }: { part: string; provider?: string | null; simplify?: boolean }) {
+function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = false, compact = false }: { part: string; provider?: string | null; simplify?: boolean; compact?: boolean }) {
     const displayPart = doSimplify ? simplifyLabel(part) : part
 
     const providerIsMP = !!provider?.toLowerCase().includes("mercado pago")
@@ -149,7 +151,7 @@ function PaymentMethodIndicatorKeyed({ part, provider, simplify: doSimplify = fa
     }
 
     return (
-        <span className={`inline-flex items-center gap-2 text-sm font-semibold ${colorClass}`}>
+        <span className={`inline-flex items-center gap-2 font-semibold ${compact ? "text-xs" : "text-sm"} ${colorClass}`}>
             <span className="flex items-center gap-1">
                 {icons}
             </span>

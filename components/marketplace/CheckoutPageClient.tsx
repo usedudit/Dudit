@@ -561,12 +561,14 @@ export function CheckoutPageClient() {
                     setCarrierOptions([])
                     setSelectedCarrierServiceId(null)
                     setCarrierError(!res.success ? res.error : "Nenhuma transportadora disponível para este endereço.")
-                    setShowOutsideRadiusModal(true)
+                    // Modal de "Entrega Indisponível" só quando realmente não há
+                    // opção de transporte. Motivos de configuração (plano, CEP de
+                    // origem, erro de cotação) ficam visíveis no card inline.
+                    setShowOutsideRadiusModal(!res.success && res.reason === "no_options")
                 }
             } catch {
                 if (!active) return
                 setCarrierError("Não foi possível calcular o frete agora.")
-                setShowOutsideRadiusModal(true)
             } finally {
                 if (active) setCarrierQuoteLoading(false)
             }

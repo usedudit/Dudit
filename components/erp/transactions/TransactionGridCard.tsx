@@ -97,7 +97,7 @@ const TransactionGridCard = React.memo(
 
                         <div className="flex items-center gap-1.5">
                             <div className="mt-1 flex items-center">
-                                <PaymentMethodIndicator label={transaction.paymentType} simplify />
+                                <PaymentMethodIndicator label={transaction.paymentType} simplify compact />
                             </div>
                         </div>
                     </div>

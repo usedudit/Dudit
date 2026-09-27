@@ -763,7 +763,7 @@ export const IntegrationsSubPage = ({
                                         <img
                                             src="https://img.dudit.com.br/static/icons/WhatsApp.png"
                                             alt="WhatsApp"
-                                            className="w-12 h-12 rounded-xl object-contain shrink-0"
+                                            className="w-12 h-12 rounded-md object-contain shrink-0"
                                         />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -851,7 +851,7 @@ export const IntegrationsSubPage = ({
                                         <img
                                             src="https://img.dudit.com.br/static/icons/brands/Superfrete.png"
                                             alt="SuperFrete"
-                                            className="w-12 h-12 object-contain shrink-0"
+                                            className="w-12 h-12 rounded-md object-contain shrink-0"
                                         />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -870,13 +870,13 @@ export const IntegrationsSubPage = ({
                                                 )}
                                             </div>
                                             <a
-                                                href="https://www.superfrete.com.br"
+                                                href="https://www.superfrete.com"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-xs text-brand-green hover:underline w-max mt-1 font-medium block"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                superfrete.com.br
+                                                superfrete.com
                                             </a>
                                         </div>
                                     </div>
@@ -1185,7 +1185,7 @@ export const IntegrationsSubPage = ({
                     maxWidth="lg"
                 >
                     <div className="flex flex-col min-h-[500px]">
-                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
                             <img src="https://img.dudit.com.br/static/icons/brands/SuperfreteLogo.png" alt="" className="w-full h-full object-contain" />
                         </div>
 
@@ -1337,7 +1337,7 @@ export const IntegrationsSubPage = ({
                     maxWidth="lg"
                 >
                     <div className="flex flex-col min-h-[500px]">
-                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
                             <img src="https://img.dudit.com.br/static/banners/WhatsappLogo.png" alt="" className="w-full h-full object-contain" />
                         </div>
 
@@ -1606,7 +1606,7 @@ export const IntegrationsSubPage = ({
                 >
                     <div className="flex flex-col min-h-[500px]">
                         {/* Banner */}
-                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group">
+                        <div className="bg-brand-gray dark:bg-dark-border/30 rounded-2xl flex items-center justify-center relative group h-[200px]">
                             <img src="https://img.dudit.com.br/static/banners/MercadoPago.png" alt="" className="w-full h-full object-contain" />
                         </div>
 

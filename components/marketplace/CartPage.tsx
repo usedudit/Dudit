@@ -23,6 +23,7 @@ import { computeItemDisplayPrice } from "@/lib/services/pricing-engine"
 import { validateServiceBookingAvailabilityAction } from "@/app/actions/marketplace/services"
 import { getAddressesAction, createAddressAction } from "@/app/actions/shared/addresses"
 import { quoteDeliveryFeeAction } from "@/app/actions/shared/delivery"
+import { quoteCarrierFreightAction, type CarrierFreightOption } from "@/app/actions/marketplace/carrier-shipping"
 import { hasDeliveryRatesConfigured } from "@/lib/delivery/fee"
 import { MapPinIcon, PlusIcon, CheckCircleIcon, TruckIcon } from "@/lib/icons"
 import { notifyAddressUpdated, useAddressSync, DUDIT_ACTIVE_ADDRESS_STORAGE_KEY } from "@/lib/utils/address-sync"
@@ -65,6 +66,8 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
     })
     const selectedAddress = userAddresses.find(a => a.id === selectedAddressId)
     const [deliveryQuotes, setDeliveryQuotes] = useState<Record<string, { fee: number; distanceKm: number | null; breakdown: any; loading: boolean; error: string | null }>>({})
+    // Carrier freight (SuperFrete) — fallback when own delivery radius has no coverage
+    const [carrierQuotes, setCarrierQuotes] = useState<Record<string, { options: CarrierFreightOption[]; loading: boolean; error: string | null; selectedServiceId: number | null; key: string | null }>>({})
     const [showAddressModal, setShowAddressModal] = useState(false)
     const [showNewAddressForm, setShowNewAddressForm] = useState(false)
     const [newAddressData, setNewAddressData] = useState({
@@ -729,8 +732,112 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         })
     }, [selectedAddress, optimisticItems, itemsByPartner])
 
+    // Quote carrier options per partner once own delivery reports no coverage ("raio")
+    useEffect(() => {
+        if (!selectedAddress) return
+        const destinationCep = String(selectedAddress.zip_code || "").replace(/\D/g, "")
+        if (destinationCep.length !== 8) return
+
+        Object.entries(itemsByPartner).forEach(([storeKey, data]: [string, any]) => {
+            const quote = deliveryQuotes[storeKey]
+            if (!quote || quote.loading || !quote.error || !quote.error.toLowerCase().includes("raio")) return
+
+            const partnerId = data.partnerId || data.partner?.id || storeKey
+            const dedupeKey = `${partnerId}:${destinationCep}`
+            if (carrierQuotes[storeKey]?.key === dedupeKey) return
+
+            setCarrierQuotes(prev => ({
+                ...prev,
+                [storeKey]: { options: [], loading: true, error: null, selectedServiceId: null, key: dedupeKey },
+            }))
+
+            quoteCarrierFreightAction({ partnerId, toPostalCode: destinationCep }).then(res => {
+                setCarrierQuotes(prev => {
+                    const cur = prev[storeKey]
+                    if (!cur || cur.key !== dedupeKey) return prev
+                    if (res.success && res.options.length > 0) {
+                        return {
+                            ...prev,
+                            [storeKey]: { options: res.options, loading: false, error: null, selectedServiceId: res.options[0].serviceId, key: dedupeKey },
+                        }
+                    }
+                    return {
+                        ...prev,
+                        [storeKey]: { options: [], loading: false, error: !res.success ? res.error : "Nenhuma transportadora disponível para este endereço.", selectedServiceId: null, key: dedupeKey },
+                    }
+                })
+            }).catch(() => {
+                setCarrierQuotes(prev => {
+                    const cur = prev[storeKey]
+                    if (!cur || cur.key !== dedupeKey) return prev
+                    return { ...prev, [storeKey]: { ...cur, loading: false, options: [], selectedServiceId: null, error: "Não foi possível calcular o frete agora." } }
+                })
+            })
+        })
+    }, [selectedAddress, deliveryQuotes, itemsByPartner, carrierQuotes])
+
+    const handleCarrierQuoteSelect = (storeKey: string, opt: CarrierFreightOption) => {
+        setCarrierQuotes(prev => ({
+            ...prev,
+            [storeKey]: { ...(prev[storeKey] || { loading: false, error: null, key: null }), selectedServiceId: opt.serviceId },
+        }))
+    }
+
+    const getCarrierSelectedOption = (storeKey?: string) => {
+        if (!storeKey) return null
+        const cq = carrierQuotes[storeKey]
+        if (!cq || cq.selectedServiceId == null || cq.options.length === 0) return null
+        return cq.options.find(o => o.serviceId === cq.selectedServiceId) || null
+    }
+
+    const renderCarrierQuote = (storeKey: string) => {
+        const cq = carrierQuotes[storeKey]
+        if (!cq || (!cq.loading && cq.options.length === 0 && !cq.error)) return null
+        return (
+            <div className="space-y-2">
+                <p className="text-xs font-semibold text-brand-inactive-text dark:text-dark-body flex items-center gap-1.5">
+                    <TruckIcon size={14} />
+                    Entrega por transportadora (SuperFrete)
+                </p>
+                {cq.options.map(opt => (
+                    <button
+                        key={opt.serviceId}
+                        type="button"
+                        onClick={() => handleCarrierQuoteSelect(storeKey, opt)}
+                        className={`w-full flex items-center justify-between gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer ${cq.selectedServiceId === opt.serviceId
+                            ? "border-brand-green bg-green-50/30 dark:bg-green-900/10"
+                            : "border border-brand-border dark:border-dark-border hover:border-brand-dark dark:hover:border-dark-heading bg-transparent hover:bg-brand-slate/50 dark:hover:bg-dark-border/10"
+                        }`}
+                    >
+                        <span className="flex flex-col">
+                            <span className="text-sm font-medium text-brand-dark dark:text-dark-heading">
+                                {opt.companyName ? `${opt.companyName} - ${opt.serviceName}` : opt.serviceName}
+                            </span>
+                            <span className="text-xs text-brand-inactive-text dark:text-dark-body">
+                                {opt.deliveryMinDays != null && opt.deliveryMaxDays != null
+                                    ? `Entrega em ${opt.deliveryMinDays} a ${opt.deliveryMaxDays} dias`
+                                    : "Prazo a confirmar"}
+                            </span>
+                        </span>
+                        <span className="text-sm font-semibold text-brand-dark dark:text-dark-heading">
+                            {formatCurrency(Number(opt.price))}
+                        </span>
+                    </button>
+                ))}
+                {cq.loading && (
+                    <p className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando opções de entrega...</p>
+                )}
+                {cq.error && !cq.loading && (
+                    <p className="text-xs text-red-500">{cq.error}</p>
+                )}
+            </div>
+        )
+    }
+
     const getPartnerDeliveryFee = (partnerData: any, selectedItemsTotal: number = 0, storeKey?: string) => {
         if (hasOnlyServices(partnerData?.items || [])) return 0
+        const carrierOption = getCarrierSelectedOption(storeKey)
+        if (carrierOption) return Number(carrierOption.price)
         if (storeKey && deliveryQuotes[storeKey] && !deliveryQuotes[storeKey].loading && !deliveryQuotes[storeKey].error) {
             return Number(deliveryQuotes[storeKey].fee || 0)
         }
@@ -779,6 +886,14 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
         const quote = storeKey ? deliveryQuotes[storeKey] : null
         if (quote?.loading) {
             return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando...</span>
+        }
+        const carrierOption = getCarrierSelectedOption(storeKey)
+        if (carrierOption) {
+            return formatCurrency(Number(carrierOption.price))
+        }
+        const carrierQuoteState = storeKey ? carrierQuotes[storeKey] : null
+        if (carrierQuoteState?.loading) {
+            return <span className="text-xs text-brand-inactive-text dark:text-dark-body animate-pulse">Calculando frete nacional...</span>
         }
         if (quote?.error && quote.error !== "Entrega não disponível no plano atual.") {
             const isTechnical = quote.error.includes("incompleto") || quote.error.includes("coordenadas") || quote.error.includes("plano")
@@ -1368,6 +1483,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
+                                                                    {renderCarrierQuote(storeKey)}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center text-base font-bold text-brand-dark dark:text-dark-heading">
                                                                         <span>Total</span>
@@ -1418,6 +1534,7 @@ export function CartPageClient({ itemsByPartner, userId, initialCartCount, initi
                                                                             <span className="text-brand-green font-semibold">{getDeliveryLabel(data, partnerItemsTotal, storeKey)}</span>
                                                                         </div>
                                                                     )}
+                                                                    {renderCarrierQuote(storeKey)}
                                                                     <div className="h-[1px] bg-brand-border dark:bg-dark-border w-full" />
                                                                     <div className="flex justify-between items-center font-bold text-xl text-brand-dark dark:text-dark-heading">
                                                                         <span>Total Geral</span>

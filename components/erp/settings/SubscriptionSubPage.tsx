@@ -1097,13 +1097,16 @@ export const SubscriptionSubPage = ({ partnerId, onBack }: { partnerId?: string;
                     }
                 >
                     <div className="space-y-4 py-2">
-                        <IconPlaceholder
-                            placeholderType="image"
-                            imageSrc="https://img.dudit.com.br/static/icons/payments/MercadoPago.png"
-                            imageAlt="Mercado Pago"
-                            title="Pagamento Seguro via Mercado Pago"
-                            subtitle="Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit."
-                        />
+                        <div className="w-16 h-16 bg-brand-gray dark:bg-dark-border/30 border border-brand-border dark:border-dark-border rounded-full flex justify-center items-center mb-6">
+                            <img src="https://img.dudit.com.br/static/icons/payments/MercadoPago.png" alt="Mercado Pago" className="w-8 h-8 object-contain" />
+                        </div>
+
+                        <h1 className="text-2xl font-bold text-brand-dark dark:text-dark-heading text-center mb-2">
+                            Pagamento Seguro via Mercado Pago
+                        </h1>
+                        <p className="text-md text-brand-inactive-text text-center max-w-md">
+                            Seus dados de pagamento são protegidos por criptografia de ponta a ponta e processados diretamente no Mercado Pago. Seus dados financeiros nunca passam pela Dudit.
+                        </p>
 
                         <Input
                             label="Email de faturamento"
